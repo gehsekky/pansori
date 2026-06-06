@@ -75,6 +75,10 @@ function AdminScreen({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [createErr, setCreateErr] = useState<string | null>(null);
+
+  // Rename form (owners): edits campaigns.name — the picker-card identity.
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
   const newId = newName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -138,7 +142,24 @@ function AdminScreen({
 
   useEffect(() => {
     if (selectedId) loadMembers(selectedId);
+    setRenaming(false);
   }, [selectedId, loadMembers]);
+
+  async function handleRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedId || busy || !renameValue.trim()) return;
+    setBusy(true);
+    setMutationErr(null);
+    try {
+      const { name } = await api.renameCampaign(selectedId, renameValue.trim());
+      setCampaigns((prev) => prev.map((c) => (c.id === selectedId ? { ...c, name } : c)));
+      setRenaming(false);
+    } catch (err) {
+      setMutationErr(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -405,19 +426,69 @@ function AdminScreen({
               <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
                 MEMBERS — {selected.name.toUpperCase()}
               </p>
-              {user.is_admin && (
-                <button
-                  className={styles.ghostBtn}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
-                  disabled={busy}
-                  onClick={() =>
-                    handleVisibility(selected.visibility === 'global' ? 'private' : 'global')
-                  }
-                >
-                  {selected.visibility === 'global' ? 'MAKE PRIVATE' : 'MAKE GLOBAL'}
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {canManage && (
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    disabled={busy}
+                    data-testid="rename-campaign-btn"
+                    onClick={() => {
+                      setRenaming((v) => !v);
+                      setRenameValue(selected.name);
+                      setMutationErr(null);
+                    }}
+                  >
+                    RENAME
+                  </button>
+                )}
+                {user.is_admin && (
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    disabled={busy}
+                    onClick={() =>
+                      handleVisibility(selected.visibility === 'global' ? 'private' : 'global')
+                    }
+                  >
+                    {selected.visibility === 'global' ? 'MAKE PRIVATE' : 'MAKE GLOBAL'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {renaming && (
+              <form
+                onSubmit={handleRename}
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'flex-end',
+                  marginBottom: '0.85rem',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <label className={styles.formLbl} htmlFor="rename-campaign-name">
+                    CAMPAIGN NAME
+                  </label>
+                  <input
+                    id="rename-campaign-name"
+                    className={styles.formInp}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className={styles.sendBtn}
+                  disabled={busy || !renameValue.trim()}
+                  data-testid="save-rename-btn"
+                >
+                  SAVE
+                </button>
+              </form>
+            )}
 
             {membersErr && (
               <p role="alert" style={{ color: 'var(--t-hp-low)', fontSize: '0.8rem' }}>

@@ -184,6 +184,8 @@ export const SetCampaignVisibilitySchema = z
 
 // Campaign creation: slug id + display name. 'catalog' is reserved (it
 // prefixes the catalog read routes under /api/campaigns).
+export const RenameCampaignSchema = z.object({ name: z.string().trim().min(1).max(80) }).strict();
+
 export const CreateCampaignSchema = z
   .object({
     id: z
@@ -762,7 +764,6 @@ const TownsSchema = z
   });
 
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
-  displayNoun: z.string().min(1).max(40),
   // Narration hook: the first narrative entry of a new game (overlays the
   // code/template campaign.intro).
   gameStart: z.string().min(1).max(4000),

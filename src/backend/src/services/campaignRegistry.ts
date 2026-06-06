@@ -26,12 +26,15 @@ export async function syncCampaignRegistry(
     const name = campaignDisplayName(contexts[id]);
     // Code-authored campaigns are the built-ins — globally visible on first
     // registration. Visibility is deliberately NOT in the conflict update:
-    // an admin demoting a campaign to private must survive restarts.
+    // an admin demoting a campaign to private must survive restarts. Same
+    // for an API rename (name_overridden) — the code name only propagates
+    // until someone renames through the creator.
     await pool.query(
       `INSERT INTO campaigns (id, name, visibility)
        VALUES ($1, $2, 'global')
        ON CONFLICT (id) DO UPDATE
-         SET name = EXCLUDED.name, updated_at = NOW()`,
+         SET name = EXCLUDED.name, updated_at = NOW()
+       WHERE campaigns.name_overridden = FALSE`,
       [id, name]
     );
   }

@@ -12,6 +12,7 @@ vi.mock('../lib/api.ts', () => ({
     setCampaignMemberRole: vi.fn(),
     removeCampaignMember: vi.fn(),
     setCampaignVisibility: vi.fn(),
+    renameCampaign: vi.fn(),
     createCampaign: vi.fn(),
     // Used by the nested CampaignContentEditor.
     listCampaignSections: vi.fn(),
@@ -267,6 +268,32 @@ describe('AdminScreen', () => {
     );
     // Local state flips without a refetch — button now offers the demote.
     expect(await screen.findByText('MAKE PRIVATE')).toBeTruthy();
+  });
+
+  it('owners can rename a campaign; the card and header update in place', async () => {
+    mockCampaigns('owner');
+    mocked.renameCampaign.mockResolvedValue({ ok: true, name: 'Vale of Mists' });
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
+    await screen.findByText('MEMBERS — MALGOVIA');
+    fireEvent.click(screen.getByTestId('rename-campaign-btn'));
+    // Pre-filled with the current name.
+    const input = screen.getByLabelText('CAMPAIGN NAME') as HTMLInputElement;
+    expect(input.value).toBe('Malgovia');
+    fireEvent.change(input, { target: { value: 'Vale of Mists' } });
+    fireEvent.click(screen.getByTestId('save-rename-btn'));
+    await waitFor(() =>
+      expect(mocked.renameCampaign).toHaveBeenCalledWith('malgovia', 'Vale of Mists')
+    );
+    // Local state updates without a refetch — header + campaign card.
+    expect(await screen.findByText('MEMBERS — VALE OF MISTS')).toBeTruthy();
+    expect(screen.getByText('Vale of Mists')).toBeTruthy();
+  });
+
+  it('editors do not get the rename button', async () => {
+    mockCampaigns('editor');
+    render(<AdminScreen user={{ ...OWNER_USER, id: 'u-bob' }} onBack={vi.fn()} />);
+    await screen.findByText('MEMBERS — MALGOVIA');
+    expect(screen.queryByTestId('rename-campaign-btn')).toBeNull();
   });
 
   it('the REGIONS panel routes card clicks through onEditMap with the campaign id', async () => {

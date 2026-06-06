@@ -371,8 +371,6 @@ describe('editable sections registry', () => {
     expect(CAMPAIGN_SECTION_SCHEMAS.narratives.safeParse({ genericArrival: 'nope' }).success).toBe(
       false
     );
-    expect(CAMPAIGN_SECTION_SCHEMAS.displayNoun.safeParse('').success).toBe(false);
-    expect(CAMPAIGN_SECTION_SCHEMAS.displayNoun.safeParse('marsh').success).toBe(true);
   });
 
   // A minimal valid region — tests tweak single fields off this base.
@@ -658,17 +656,24 @@ describe('towns table store', () => {
 describe('section CRUD + live refresh', () => {
   it('put → refresh serves the DB version; delete → refresh restores code', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
-    const code = codeCtx({ id: 'malgovia', displayNoun: 'vale' });
+    const code = codeCtx({
+      id: 'malgovia',
+      narratives: { genericArrival: ['from code'] } as never,
+    });
     const contexts: Record<string, Context> = { malgovia: code };
     const codeContexts: Record<string, Context> = { malgovia: code };
 
-    expect(await putCampaignSection(db.pool, 'malgovia', 'displayNoun', 'marsh')).toBe(true);
+    expect(
+      await putCampaignSection(db.pool, 'malgovia', 'narratives', {
+        genericArrival: ['from db'],
+      })
+    ).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, codeContexts, 'malgovia');
-    expect(contexts.malgovia.displayNoun).toBe('marsh');
+    expect(contexts.malgovia.narratives.genericArrival).toEqual(['from db']);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'displayNoun')).toBe(true);
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'narratives')).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, codeContexts, 'malgovia');
-    expect(contexts.malgovia.displayNoun).toBe('vale');
+    expect(contexts.malgovia.narratives.genericArrival).toEqual(['from code']);
   });
 
   it('refresh folds CONVERTED table regions into the campaign block, keeping its rooms', async () => {
@@ -808,11 +813,11 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('reports a missing campaign and reads back stored data', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: { displayNoun: 'marsh' } } });
-    expect(await getCampaignData(db.pool, 'malgovia')).toEqual({ displayNoun: 'marsh' });
+    const db = makeContentDb({ campaigns: { malgovia: { gameStart: 'A new dawn.' } } });
+    expect(await getCampaignData(db.pool, 'malgovia')).toEqual({ gameStart: 'A new dawn.' });
     expect(await getCampaignData(db.pool, 'nope')).toBeNull();
-    expect(await putCampaignSection(db.pool, 'nope', 'displayNoun', 'x')).toBe(false);
-    expect(await deleteCampaignSection(db.pool, 'nope', 'displayNoun')).toBe(false);
+    expect(await putCampaignSection(db.pool, 'nope', 'gameStart', 'x')).toBe(false);
+    expect(await deleteCampaignSection(db.pool, 'nope', 'gameStart')).toBe(false);
   });
 
   it('DB-born campaigns (no code context) resolve over the base template', async () => {

@@ -292,6 +292,14 @@ export const api = {
       body: JSON.stringify({ visibility }),
     }),
 
+  // Owner-level — rename the campaign (its picker-card identity; the slug
+  // id never changes).
+  renameCampaign: (campaignId: string, name: string) =>
+    req<{ ok: boolean; name: string }>(`/campaigns/${campaignId}/name`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    }),
+
   // Content sections (editor+). PUT writes the DB version (live immediately);
   // DELETE reverts the section to the code-defined version.
   listCampaignSections: (campaignId: string) =>

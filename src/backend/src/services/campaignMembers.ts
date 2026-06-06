@@ -119,6 +119,21 @@ export async function setCampaignVisibility(
   return (rowCount ?? 0) > 0;
 }
 
+// Rename a campaign. Sets name_overridden so the boot-time registry sync
+// (which propagates code world_name renames for the built-ins) leaves the
+// new name alone.
+export async function renameCampaign(
+  pool: Pool,
+  campaignId: string,
+  name: string
+): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    'UPDATE campaigns SET name = $2, name_overridden = TRUE, updated_at = NOW() WHERE id = $1',
+    [campaignId, name]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function listMembers(pool: Pool, campaignId: string): Promise<CampaignMemberRow[]> {
   const { rows } = await pool.query<CampaignMemberRow>(
     `SELECT m.user_id, m.role, m.added_at, u.display_name, u.email, u.avatar_url

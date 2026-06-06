@@ -79,7 +79,6 @@ export function baseContextFor(campaignId: string): Context {
 // and shadow same-id (items) / same-name (monsters) catalog entries. The
 // composed lootTable / enemyTemplates are LIVE engine fields.
 export const EDITABLE_SECTIONS = [
-  'displayNoun',
   'gameStart',
   'narratives',
   'regions',

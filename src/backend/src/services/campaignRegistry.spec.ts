@@ -55,6 +55,9 @@ describe('syncCampaignRegistry', () => {
     // NOT touch visibility (admin demotions survive restarts).
     expect(mock.queries[0]).toContain('visibility');
     expect(mock.queries[0]).not.toContain('SET visibility');
+    // An API rename sets name_overridden — the sync's conflict-update must
+    // skip those rows so the rename survives restarts.
+    expect(mock.queries[0]).toContain('WHERE campaigns.name_overridden = FALSE');
   });
 
   it('handles an empty context map without touching the table', async () => {

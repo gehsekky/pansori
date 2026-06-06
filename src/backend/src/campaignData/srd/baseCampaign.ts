@@ -23,9 +23,9 @@ import type { Context } from '../../types.js';
 // (services/campaignContent.ts) merges their DB sections over THIS context
 // instead: all the engine machinery that isn't DB-editable yet (class
 // config, spell/feat tables, backgrounds, narrative pools) comes from
-// here; everything the creator edits (displayNoun, narratives, regions,
-// customs) overlays it, and the ambient SRD catalogs compose the full
-// loot table + bestiary in on top of the empty lists below.
+// here; everything the creator edits (gameStart, narratives, regions,
+// towns, customs) overlays it, and the ambient SRD catalogs compose the
+// full loot table + bestiary in on top of the empty lists below.
 //
 // The stub world (a camp and a cave) keeps a freshly created campaign
 // PLAYABLE from minute one — the engine's map model still runs on

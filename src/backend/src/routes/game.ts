@@ -166,8 +166,15 @@ export const gameRouter = Router();
 // per `spellList` tag (arcane / divine / primal) for the same picker.
 gameRouter.get('/contexts', async (req, res) => {
   let visible: Set<string>;
+  // The registry name is the campaign's display name (creator-renamable);
+  // displayNoun is only the legacy fallback when the registry is down.
+  const names = new Map<string, string>();
   try {
     visible = await listVisibleCampaignIds(pool, (req as AuthedRequest).user);
+    const { rows } = await pool.query<{ id: string; name: string }>(
+      'SELECT id, name FROM campaigns'
+    );
+    for (const row of rows) names.set(row.id, row.name);
   } catch (err) {
     // Registry unavailable (e.g. mid-migration) — fail open to the code-
     // defined contexts rather than blanking the new-game page; the code
@@ -187,7 +194,7 @@ gameRouter.get('/contexts', async (req, res) => {
       }));
       return {
         id: c.id,
-        displayName: c.displayNoun,
+        displayName: names.get(c.id) ?? c.displayNoun,
         classes: Object.keys(c.classPrimaryStats),
         // Per-class "choose N from options" skill proficiencies + the curated
         // default selection — drives the creation-screen skill picker.

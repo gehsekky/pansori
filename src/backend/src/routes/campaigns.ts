@@ -11,6 +11,7 @@ import {
   CAMPAIGN_SECTION_SCHEMAS,
   CreateCampaignSchema,
   PutCampaignSectionSchema,
+  RenameCampaignSchema,
   SetCampaignMemberRoleSchema,
   SetCampaignVisibilitySchema,
   parseBody,
@@ -34,6 +35,7 @@ import {
   listCampaignsForUser,
   listMembers,
   removeMember,
+  renameCampaign,
   setCampaignVisibility,
   setMemberRole,
 } from '../services/campaignMembers.js';
@@ -177,6 +179,29 @@ campaignsRouter.put(
     } catch (err) {
       console.error('[campaigns] role change failed:', err);
       res.status(500).json({ error: 'Failed to change role' });
+    }
+  }
+);
+
+// Rename a campaign. Owner-level — the name is the campaign's identity on
+// the new-game picker. Survives the boot-time registry sync
+// (name_overridden); the slug id never changes.
+campaignsRouter.put(
+  '/:campaignId/name',
+  requireCampaignRole('owner'),
+  async (req: Request, res: Response) => {
+    const parsed = parseBody(req, res, RenameCampaignSchema);
+    if (!parsed) return;
+    try {
+      const updated = await renameCampaign(pool, param(req, 'campaignId'), parsed.name);
+      if (!updated) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      res.json({ ok: true, name: parsed.name });
+    } catch (err) {
+      console.error('[campaigns] rename failed:', err);
+      res.status(500).json({ error: 'Failed to rename campaign' });
     }
   }
 );
