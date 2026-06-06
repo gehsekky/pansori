@@ -114,5 +114,14 @@ Never cite PHB pages — pansori doesn't carry PHB content.
 - **Don't block on CI.** After pushing, do NOT poll or `gh run
   watch` the GitHub Actions CI/Deploy job. Push, tell me it's
   pushed, and let me watch it — I'll flag any failure. (The local
-  gate — lint + tsc + the full test suite — is what you're
-  responsible for; CI is mine to monitor.)
+  gate is what you're responsible for; CI is mine to monitor.)
+- **The local pre-push gate** is lint + tsc + the full unit suites
+  + **the e2e smoke**: run `npx playwright test` against the
+  running dev stack (`npm run dev`; the backend needs
+  `E2E_TEST_LOGIN_ENABLED=true`, already set in dev) before
+  pushing. It's ~10s and it's the only local check that exercises
+  login → creation → BEGIN ADVENTURE → combat for real — unit
+  suites alone have let CI-only breakage through (the auto-fill /
+  Divine Order incident, 2026-06-06). Check exit codes explicitly;
+  don't pipe test output through grep/tail in a way that can mask
+  a failure.
