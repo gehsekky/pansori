@@ -181,6 +181,53 @@ export const SetCampaignVisibilitySchema = z
   })
   .strict();
 
+// ─── Campaign content sections ───────────────────────────────────────────────
+// Per-section value schemas for the content-editing API. A section becomes
+// editable by adding it here AND to EDITABLE_SECTIONS (campaignContent.ts) —
+// a spec asserts the two stay in lockstep. Shapes mirror the Context
+// interface (types.ts); validation is structural, not game-rules.
+
+const StringArray = z.array(z.string().min(1));
+const StringArrayMap = z.record(z.string(), StringArray);
+// TieredNarrative: a flat pool or a tier-keyed map of pools.
+const TieredNarrativeSchema = z.union([StringArray, StringArrayMap]);
+
+const NarrativesSchema = z
+  .object({
+    roomArrival: StringArrayMap,
+    genericArrival: StringArray,
+    weaponVerbs: StringArrayMap,
+    classStyle: StringArrayMap,
+    enemyReactions: StringArrayMap,
+    // Record<number, string[]> in TS — JSON object keys are strings.
+    deathSaveStatus: StringArrayMap,
+    combatHit: TieredNarrativeSchema,
+    combatMiss: TieredNarrativeSchema,
+    enemyAttacks: StringArray,
+    killShot: StringArray,
+    lootPickedUp: StringArray,
+    noLoot: StringArray,
+    alreadyLooted: StringArray,
+    noEnemy: StringArray,
+    alreadyDead: StringArray,
+    sneakSuccess: StringArray,
+    deathLines: StringArray,
+    enemyDeflected: StringArray,
+    levelUp: StringArray,
+    combatStart: StringArray.optional(),
+    shortRest: StringArray.optional(),
+    longRest: StringArray.optional(),
+  })
+  .strict();
+
+export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  displayNoun: z.string().min(1).max(40),
+  narratives: NarrativesSchema,
+};
+
+// PUT body for a section write: { value: <section payload> }.
+export const PutCampaignSectionSchema = z.object({ value: z.unknown() }).strict();
+
 export const AddCampaignMemberSchema = z
   .object({
     email: z.string().email(),

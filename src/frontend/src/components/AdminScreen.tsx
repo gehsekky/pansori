@@ -7,6 +7,7 @@ import {
   api,
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
+import CampaignContentEditor from './CampaignContentEditor.tsx';
 import styles from '../styles.module.css';
 
 // Map the backend's mutation-failure reasons (routes/campaigns.ts) to
@@ -382,18 +383,8 @@ function AdminScreen({ user, onBack }: { user: AuthUser; onBack: () => void }) {
           </div>
         )}
 
-        {/* ── Content editing placeholder ───────────────────────────────── */}
-        {selected && (
-          <div
-            className={styles.card}
-            style={{ marginTop: '1rem', color: 'var(--t-dim)', textAlign: 'center' }}
-          >
-            <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em' }}>CONTENT</p>
-            <p style={{ fontSize: '0.75rem', marginTop: 6 }}>
-              Campaign content editing lands here as it moves from code into the database.
-            </p>
-          </div>
-        )}
+        {/* ── Content editing (DB-first sections, code supplement) ──────── */}
+        {selected && <CampaignContentEditor campaignId={selected.id} />}
       </div>
     </div>
   );

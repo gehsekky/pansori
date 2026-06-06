@@ -8,10 +8,21 @@
 
 import {
   AddCampaignMemberSchema,
+  CAMPAIGN_SECTION_SCHEMAS,
+  PutCampaignSectionSchema,
   SetCampaignMemberRoleSchema,
   SetCampaignVisibilitySchema,
   parseBody,
 } from './schemas.js';
+import { CODE_CONTEXTS, CONTEXTS } from '../services/contextStore.js';
+import {
+  EDITABLE_SECTIONS,
+  deleteCampaignSection,
+  getCampaignData,
+  isEditableSection,
+  putCampaignSection,
+  refreshCampaignOverlay,
+} from '../services/campaignContent.js';
 import { Request, Response, Router } from 'express';
 import {
   addMemberByEmail,
@@ -159,6 +170,145 @@ campaignsRouter.delete(
     } catch (err) {
       console.error('[campaigns] remove member failed:', err);
       res.status(500).json({ error: 'Failed to remove member' });
+    }
+  }
+);
+
+// ─── Campaign content (DB-authored sections) ─────────────────────────────────
+//
+// The content-editing API over campaigns.data. Editor+ gated. A section's
+// effective value is DB-first (code supplements): GET returns the value the
+// engine currently serves plus where it came from; PUT writes the DB
+// version and re-resolves the live context immediately (no restart);
+// DELETE reverts the section to code.
+
+// Where does a section's effective value come from for this campaign?
+function sectionSource(
+  data: Record<string, unknown>,
+  campaignId: string,
+  section: string
+): 'db' | 'code' | 'none' {
+  if (section in data) return 'db';
+  const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
+  if (code && code[section] !== undefined) return 'code';
+  return 'none';
+}
+
+// The editable sections + each one's current source — drives the admin
+// UI's content menu.
+campaignsRouter.get(
+  '/:campaignId/data',
+  requireCampaignRole('editor'),
+  async (req: Request, res: Response) => {
+    try {
+      const data = await getCampaignData(pool, param(req, 'campaignId'));
+      if (data === null) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      res.json(
+        EDITABLE_SECTIONS.map((section) => ({
+          section,
+          source: sectionSource(data, param(req, 'campaignId'), section),
+        }))
+      );
+    } catch (err) {
+      console.error('[campaigns] data listing failed:', err);
+      res.status(500).json({ error: 'Failed to list campaign data' });
+    }
+  }
+);
+
+campaignsRouter.get(
+  '/:campaignId/data/:section',
+  requireCampaignRole('editor'),
+  async (req: Request, res: Response) => {
+    const section = param(req, 'section');
+    if (!isEditableSection(section)) {
+      res.status(404).json({ error: 'unknown_section' });
+      return;
+    }
+    try {
+      const campaignId = param(req, 'campaignId');
+      const data = await getCampaignData(pool, campaignId);
+      if (data === null) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      const source = sectionSource(data, campaignId, section);
+      const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
+      const value = source === 'db' ? data[section] : (code?.[section] ?? null);
+      res.json({ section, source, value });
+    } catch (err) {
+      console.error('[campaigns] section read failed:', err);
+      res.status(500).json({ error: 'Failed to read section' });
+    }
+  }
+);
+
+campaignsRouter.put(
+  '/:campaignId/data/:section',
+  requireCampaignRole('editor'),
+  async (req: Request, res: Response) => {
+    const section = param(req, 'section');
+    if (!isEditableSection(section)) {
+      res.status(404).json({ error: 'unknown_section' });
+      return;
+    }
+    const parsed = parseBody(req, res, PutCampaignSectionSchema);
+    if (!parsed) return;
+    // Per-section structural validation — a malformed section would crash
+    // the engine mid-game, so reject anything off-shape with the issues.
+    const valueCheck = CAMPAIGN_SECTION_SCHEMAS[section].safeParse(parsed.value);
+    if (!valueCheck.success) {
+      res.status(400).json({
+        error: 'invalid_section_value',
+        issues: valueCheck.error.issues.map((i) => ({
+          path: i.path.join('.'),
+          message: i.message,
+        })),
+      });
+      return;
+    }
+    try {
+      const campaignId = param(req, 'campaignId');
+      const updated = await putCampaignSection(pool, campaignId, section, valueCheck.data);
+      if (!updated) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      // Re-resolve the live context so the edit serves immediately.
+      await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, campaignId);
+      res.json({ ok: true, section, source: 'db' });
+    } catch (err) {
+      console.error('[campaigns] section write failed:', err);
+      res.status(500).json({ error: 'Failed to write section' });
+    }
+  }
+);
+
+// Revert a section to its code-defined version.
+campaignsRouter.delete(
+  '/:campaignId/data/:section',
+  requireCampaignRole('editor'),
+  async (req: Request, res: Response) => {
+    const section = param(req, 'section');
+    if (!isEditableSection(section)) {
+      res.status(404).json({ error: 'unknown_section' });
+      return;
+    }
+    try {
+      const campaignId = param(req, 'campaignId');
+      const updated = await deleteCampaignSection(pool, campaignId, section);
+      if (!updated) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, campaignId);
+      res.json({ ok: true, section, source: sectionSource({}, campaignId, section) });
+    } catch (err) {
+      console.error('[campaigns] section revert failed:', err);
+      res.status(500).json({ error: 'Failed to revert section' });
     }
   }
 );

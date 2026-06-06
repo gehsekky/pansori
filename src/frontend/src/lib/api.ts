@@ -60,6 +60,20 @@ export interface CampaignMember {
   avatar_url: string | null;
 }
 
+// Content sections live DB-first with code supplement: 'db' = the DB
+// version is what the engine serves; 'code' = falls through to the
+// campaignData files; 'none' = the section exists nowhere yet.
+export type CampaignSectionSource = 'db' | 'code' | 'none';
+
+export interface CampaignSectionInfo {
+  section: string;
+  source: CampaignSectionSource;
+}
+
+export interface CampaignSectionValue extends CampaignSectionInfo {
+  value: unknown;
+}
+
 export interface ActionResult {
   narrative: string;
   choices: GameChoice[];
@@ -270,6 +284,26 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ visibility }),
     }),
+
+  // Content sections (editor+). PUT writes the DB version (live immediately);
+  // DELETE reverts the section to the code-defined version.
+  listCampaignSections: (campaignId: string) =>
+    req<CampaignSectionInfo[]>(`/campaigns/${campaignId}/data`),
+
+  getCampaignSection: (campaignId: string, section: string) =>
+    req<CampaignSectionValue>(`/campaigns/${campaignId}/data/${section}`),
+
+  putCampaignSection: (campaignId: string, section: string, value: unknown) =>
+    req<{ ok: boolean; section: string; source: CampaignSectionSource }>(
+      `/campaigns/${campaignId}/data/${section}`,
+      { method: 'PUT', body: JSON.stringify({ value }) }
+    ),
+
+  deleteCampaignSection: (campaignId: string, section: string) =>
+    req<{ ok: boolean; section: string; source: CampaignSectionSource }>(
+      `/campaigns/${campaignId}/data/${section}`,
+      { method: 'DELETE' }
+    ),
 
   listContexts: () => req<BackendContextSummary[]>('/game/contexts'),
 

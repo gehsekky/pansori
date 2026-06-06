@@ -12,6 +12,11 @@ vi.mock('../lib/api.ts', () => ({
     setCampaignMemberRole: vi.fn(),
     removeCampaignMember: vi.fn(),
     setCampaignVisibility: vi.fn(),
+    // Used by the nested CampaignContentEditor.
+    listCampaignSections: vi.fn(),
+    getCampaignSection: vi.fn(),
+    putCampaignSection: vi.fn(),
+    deleteCampaignSection: vi.fn(),
   },
 }));
 
@@ -59,6 +64,9 @@ function mockCampaigns(
 
 beforeEach(() => {
   for (const fn of Object.values(mocked)) fn.mockReset();
+  // The content editor renders whenever a campaign is selected — give it a
+  // quiet default so member-management tests don't trip over it.
+  mocked.listCampaignSections.mockResolvedValue([]);
 });
 
 describe('AdminScreen', () => {

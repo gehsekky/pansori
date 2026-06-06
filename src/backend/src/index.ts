@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import './auth/passport.js';
-import { CONTEXTS, gameRouter } from './routes/game.js';
+import { CONTEXTS } from './services/contextStore.js';
 import { Server } from 'socket.io';
 import { applyCampaignOverlays } from './services/campaignContent.js';
 import { authRouter } from './routes/auth.js';
@@ -9,6 +9,7 @@ import connectPgSimple from 'connect-pg-simple';
 import cors from 'cors';
 import { createServer } from 'http';
 import express from 'express';
+import { gameRouter } from './routes/game.js';
 import helmet from 'helmet';
 import passport from 'passport';
 import { pool } from './db/pool.js';

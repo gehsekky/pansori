@@ -84,19 +84,15 @@ import {
   toggleWornItem,
 } from '../services/equipment.js';
 import type { AuthedRequest } from '../auth/middleware.js';
+import { CONTEXTS } from '../services/contextStore.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
 import { generateSeed } from '../services/procgen.js';
 import { initMapState } from '../services/mapEngine.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
-import { loadContexts } from '../services/contextLoader.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
 
-// Contexts are loaded once at startup by scanning the contexts/ directory.
-// Adding a new campaign only requires dropping a .ts file there. Exported
-// so index.ts can sync the campaigns DB registry from the same load.
-export const CONTEXTS: Record<string, Context> = await loadContexts();
 // Resolved lazily (not a const) because startup applies DB content overlays
 // onto CONTEXTS after migrations (services/campaignContent.ts) — a captured
 // first-entry reference would keep serving the pre-overlay object.
