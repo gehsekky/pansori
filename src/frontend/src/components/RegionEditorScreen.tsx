@@ -12,9 +12,11 @@ import styles from '../styles.module.css';
 // flag; town floor). Pick a terrain from the palette and click/drag to
 // paint; the TIER tool (regions only — towns carry no tiers) paints
 // per-cell tier overrides (rendered as a corner number); the START tool
-// relocates the party marker. Sites/venues render as ◆ markers (edited
-// via the section JSON for now). SAVE writes the whole section back
-// through the normal content PUT — same validation, same live refresh.
+// relocates the party marker; the SITES/VENUES tool places and edits the
+// map's transition markers (◆) — click a cell to place, click a marker to
+// select, with a form for name/kind/target and MOVE/DELETE. SAVE writes
+// the whole section back through the normal content PUT — same
+// validation, same live refresh.
 //
 // The grid model is the painter's data model on purpose (design call
 // 2026-06-06): cells are { t, tier?, enc? }; terrain BEHAVIOR derives
@@ -24,6 +26,23 @@ interface Cell {
   t: string;
   tier?: number;
   enc?: number;
+}
+
+// A site (region) or venue (town) — the map's transition cells, edited
+// visually with the SITES/VENUES tool. One shape covers both: sites are
+// kind 'town'|'local' (+ townId/entryRoomId/icon/onEnter), venues are
+// kind 'interior'|'gate' (+ entryRoomId).
+interface EditorSite {
+  id: string;
+  name: string;
+  pos: { x: number; y: number };
+  kind: string;
+  townId?: string;
+  entryRoomId?: string;
+  desc?: string;
+  onEnter?: string;
+  icon?: string;
+  [key: string]: unknown;
 }
 
 interface EditorRegion {
@@ -38,8 +57,8 @@ interface EditorRegion {
   encounterChance?: number; // regions only
   baseTier?: number; // regions only
   floor?: string; // towns only
-  sites?: Array<{ id: string; name: string; pos: { x: number; y: number }; kind: string }>;
-  venues?: Array<{ id: string; name: string; pos: { x: number; y: number }; kind: string }>;
+  sites?: EditorSite[];
+  venues?: EditorSite[];
   [key: string]: unknown;
 }
 
@@ -83,7 +102,7 @@ const TERRAIN_COLORS: Record<TerrainType, string> = {
 
 const TERRAIN_TYPES = Object.keys(TERRAIN) as TerrainType[];
 
-type Tool = 'terrain' | 'tier' | 'start';
+type Tool = 'terrain' | 'tier' | 'start' | 'site';
 
 const CELL_PX = 30;
 
@@ -121,6 +140,14 @@ function RegionEditorScreen({
   // Regions only: flip THIS region to the starting region on save (the
   // others go false in the same write — exactly-one is a schema rule).
   const [makeStarter, setMakeStarter] = useState(false);
+  // The map's sites (region) / venues (town), edited with the SITES tool.
+  const [sites, setSites] = useState<EditorSite[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  // Armed by the MOVE button: the next cell click relocates the selected
+  // site instead of creating a new one.
+  const [moveArmed, setMoveArmed] = useState(false);
+  // Region painter only: the campaign's town ids, for the site townId picker.
+  const [townIds, setTownIds] = useState<string[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -154,8 +181,22 @@ function RegionEditorScreen({
         setStartPos({ ...r.startPos });
         setDetails(detailsFrom(r));
         setMakeStarter(false);
+        setSites(((kind === 'region' ? r.sites : r.venues) ?? []).map((s) => ({ ...s })));
+        setSelectedSiteId(null);
+        setMoveArmed(false);
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
+    // Region sites can point at the campaign's towns — load their ids for
+    // the picker. Best-effort: an empty list just means no town options.
+    if (kind === 'region') {
+      api
+        .getCampaignSection(campaignId, 'towns')
+        .then((s) => {
+          const list = Array.isArray(s.value) ? (s.value as Array<{ id?: unknown }>) : [];
+          setTownIds(list.map((t) => t.id).filter((id): id is string => typeof id === 'string'));
+        })
+        .catch(() => setTownIds([]));
+    }
   }, [campaignId, regionId, section, kind]);
 
   // Drag-paint ends wherever the mouse is released.
@@ -170,6 +211,35 @@ function RegionEditorScreen({
       setSaved(false);
       if (tool === 'start') {
         setStartPos({ x, y });
+        setDirty(true);
+        return;
+      }
+      if (tool === 'site') {
+        // Click a marker → select it. Click an empty cell → move the
+        // selected site there (when MOVE is armed) or place a new one.
+        const hit = sites.find((s) => s.pos.x === x && s.pos.y === y);
+        if (hit) {
+          setSelectedSiteId(hit.id);
+          setMoveArmed(false);
+          return;
+        }
+        if (moveArmed && selectedSiteId) {
+          setSites((prev) =>
+            prev.map((s) => (s.id === selectedSiteId ? { ...s, pos: { x, y } } : s))
+          );
+          setMoveArmed(false);
+          setDirty(true);
+          return;
+        }
+        const n = sites.length + 1;
+        let id = `${kind === 'region' ? 'site' : 'venue'}-${n}`;
+        while (sites.some((s) => s.id === id)) id += 'x';
+        const draft: EditorSite =
+          kind === 'region'
+            ? { id, name: 'New Site', pos: { x, y }, kind: 'local' }
+            : { id, name: 'New Venue', pos: { x, y }, kind: 'interior' };
+        setSites((prev) => [...prev, draft]);
+        setSelectedSiteId(id);
         setDirty(true);
         return;
       }
@@ -190,8 +260,34 @@ function RegionEditorScreen({
       });
       setDirty(true);
     },
-    [tool, terrainBrush, tierBrush]
+    [tool, terrainBrush, tierBrush, sites, selectedSiteId, moveArmed, kind]
   );
+
+  // Patch the selected site; clearing a kind's target also clears the
+  // other kind's leftover (flipping town↔local shouldn't strand a stale id).
+  function updateSite(id: string, patch: Partial<EditorSite>) {
+    setSites((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        const next = { ...s, ...patch };
+        if (patch.kind === 'town') delete next.entryRoomId;
+        if (patch.kind === 'local' || patch.kind === 'interior' || patch.kind === 'gate') {
+          delete next.townId;
+        }
+        return next;
+      })
+    );
+    setDirty(true);
+    setSaved(false);
+  }
+
+  function deleteSite(id: string) {
+    setSites((prev) => prev.filter((s) => s.id !== id));
+    if (selectedSiteId === id) setSelectedSiteId(null);
+    setMoveArmed(false);
+    setDirty(true);
+    setSaved(false);
+  }
 
   function resize(newW: number, newH: number) {
     const w = Math.max(1, Math.min(200, newW));
@@ -208,14 +304,38 @@ function RegionEditorScreen({
       return next;
     });
     setStartPos((p) => ({ x: Math.min(p.x, w - 1), y: Math.min(p.y, h - 1) }));
+    // Clamp markers too — a shrink must not strand a site off-grid (the
+    // schema bounds-checks positions on save).
+    setSites((prev) =>
+      prev.map((s) => ({
+        ...s,
+        pos: { x: Math.min(s.pos.x, w - 1), y: Math.min(s.pos.y, h - 1) },
+      }))
+    );
     setDirty(true);
     setSaved(false);
+  }
+
+  // Fold the edited sites/venues back in: optional fields prune when empty
+  // ('' would fail the SLUG/min-length schemas); an empty list drops the key.
+  function mergeSites(next: EditorRegion) {
+    const cleaned = sites.map((s) => {
+      const c: EditorSite = { ...s };
+      for (const k of ['townId', 'entryRoomId', 'desc', 'onEnter', 'icon'] as const) {
+        if (!c[k]) delete c[k];
+      }
+      return c;
+    });
+    const key = kind === 'region' ? 'sites' : 'venues';
+    if (cleaned.length > 0) next[key] = cleaned;
+    else delete next[key];
   }
 
   // Fold the details form back into the region: '' clears an optional
   // field, numbers parse client-side (the server re-validates shapes).
   function mergeDetails(r: EditorRegion): EditorRegion | { error: string } {
     const next: EditorRegion = { ...r, grid, startPos };
+    mergeSites(next);
     next.name = details.name.trim() || r.name;
     if (details.desc.trim()) next.desc = details.desc.trim();
     else delete next.desc;
@@ -279,8 +399,11 @@ function RegionEditorScreen({
 
   const height = grid.length;
   const width = grid[0]?.length ?? 0;
-  const markers = (kind === 'region' ? region?.sites : region?.venues) ?? [];
-  const siteAt = (x: number, y: number) => markers.find((s) => s.pos.x === x && s.pos.y === y);
+  // Markers render from the EDITED sites state (not the saved region), so
+  // placements show immediately.
+  const siteAt = (x: number, y: number) => sites.find((s) => s.pos.x === x && s.pos.y === y);
+  const selectedSite = sites.find((s) => s.id === selectedSiteId) ?? null;
+  const markerNoun = kind === 'region' ? 'SITE' : 'VENUE';
 
   return (
     <div className={styles.pageFlex}>
@@ -336,6 +459,7 @@ function RegionEditorScreen({
                         ['terrain', 'TERRAIN'],
                         ...(kind === 'region' ? [['tier', 'TIER'] as [Tool, string]] : []),
                         ['start', 'START POS'],
+                        ['site', kind === 'region' ? 'SITES' : 'VENUES'],
                       ] as Array<[Tool, string]>
                     ).map(([t, label]) => (
                       <button
@@ -419,6 +543,163 @@ function RegionEditorScreen({
                   </div>
                 )}
 
+                {tool === 'site' && (
+                  <div style={{ flexBasis: '100%' }}>
+                    <p className={styles.formLbl}>
+                      {markerNoun}S — CLICK AN EMPTY CELL TO PLACE · CLICK A ◆ TO SELECT
+                      {moveArmed && (
+                        <span style={{ color: 'var(--t-hp-mid)' }}>
+                          {' '}
+                          · CLICK THE DESTINATION CELL
+                        </span>
+                      )}
+                    </p>
+                    {selectedSite ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '0.75rem',
+                          flexWrap: 'wrap',
+                          alignItems: 'flex-end',
+                        }}
+                      >
+                        <div style={{ flex: '2 1 160px' }}>
+                          <label className={styles.formLbl} htmlFor="site-name">
+                            NAME
+                          </label>
+                          <input
+                            id="site-name"
+                            className={styles.formInp}
+                            value={selectedSite.name}
+                            onChange={(e) => updateSite(selectedSite.id, { name: e.target.value })}
+                          />
+                        </div>
+                        <div style={{ flex: '1 1 110px' }}>
+                          <label className={styles.formLbl} htmlFor="site-kind">
+                            KIND
+                          </label>
+                          <select
+                            id="site-kind"
+                            className={styles.formInp}
+                            style={{ cursor: 'pointer' }}
+                            value={selectedSite.kind}
+                            onChange={(e) => updateSite(selectedSite.id, { kind: e.target.value })}
+                          >
+                            {(kind === 'region'
+                              ? [
+                                  ['local', 'LOCAL (DUNGEON)'],
+                                  ['town', 'TOWN'],
+                                ]
+                              : [
+                                  ['interior', 'INTERIOR'],
+                                  ['gate', 'GATE (EXIT)'],
+                                ]
+                            ).map(([v, label]) => (
+                              <option key={v} value={v}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {selectedSite.kind === 'town' && (
+                          <div style={{ flex: '1 1 130px' }}>
+                            <label className={styles.formLbl} htmlFor="site-town">
+                              TOWN
+                            </label>
+                            <select
+                              id="site-town"
+                              className={styles.formInp}
+                              style={{ cursor: 'pointer' }}
+                              value={selectedSite.townId ?? ''}
+                              onChange={(e) =>
+                                updateSite(selectedSite.id, { townId: e.target.value })
+                              }
+                            >
+                              <option value="">— PICK A TOWN —</option>
+                              {townIds.map((id) => (
+                                <option key={id} value={id}>
+                                  {id}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {(selectedSite.kind === 'local' || selectedSite.kind === 'interior') && (
+                          <div style={{ flex: '1 1 130px' }}>
+                            <label className={styles.formLbl} htmlFor="site-room">
+                              ENTRY ROOM ID
+                            </label>
+                            <input
+                              id="site-room"
+                              className={styles.formInp}
+                              placeholder="e.g. old_cave"
+                              value={selectedSite.entryRoomId ?? ''}
+                              onChange={(e) =>
+                                updateSite(selectedSite.id, { entryRoomId: e.target.value })
+                              }
+                            />
+                          </div>
+                        )}
+                        {kind === 'region' && (
+                          <div style={{ flex: '1 1 110px' }}>
+                            <label className={styles.formLbl} htmlFor="site-icon">
+                              ICON
+                            </label>
+                            <input
+                              id="site-icon"
+                              className={styles.formInp}
+                              placeholder="default"
+                              value={selectedSite.icon ?? ''}
+                              onChange={(e) =>
+                                updateSite(selectedSite.id, { icon: e.target.value })
+                              }
+                            />
+                          </div>
+                        )}
+                        <div style={{ flex: '2 1 200px' }}>
+                          <label className={styles.formLbl} htmlFor="site-on-enter">
+                            ON ENTER NARRATION
+                          </label>
+                          <input
+                            id="site-on-enter"
+                            className={styles.formInp}
+                            placeholder="none"
+                            value={selectedSite.onEnter ?? ''}
+                            onChange={(e) =>
+                              updateSite(selectedSite.id, { onEnter: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                            aria-pressed={moveArmed}
+                            data-testid="site-move-btn"
+                            onClick={() => setMoveArmed((v) => !v)}
+                          >
+                            MOVE
+                          </button>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                            data-testid="site-delete-btn"
+                            onClick={() => deleteSite(selectedSite.id)}
+                          >
+                            DELETE
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ color: 'var(--t-dim)', fontSize: '0.75rem' }}>
+                        {sites.length === 0
+                          ? `No ${markerNoun.toLowerCase()}s yet — click a cell to place the first one.`
+                          : `Select a ◆ to edit it, or click an empty cell to place a new ${markerNoun.toLowerCase()}.`}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <p className={styles.formLbl}>SIZE</p>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -487,7 +768,9 @@ function RegionEditorScreen({
                         }}
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          setPainting(true);
+                          // Site placement is click-only — drag-painting
+                          // markers would scatter one per cell crossed.
+                          if (tool !== 'site') setPainting(true);
                           applyTool(x, y);
                         }}
                         onMouseEnter={() => {
@@ -528,7 +811,10 @@ function RegionEditorScreen({
                                 site.kind === 'town' || site.kind === 'gate'
                                   ? '#ffd76a'
                                   : '#ff8a8a',
-                              textShadow: '0 0 3px #000',
+                              textShadow:
+                                site.id === selectedSiteId
+                                  ? '0 0 6px #fff, 0 0 3px #000'
+                                  : '0 0 3px #000',
                             }}
                           >
                             ◆
@@ -541,8 +827,8 @@ function RegionEditorScreen({
               </div>
               <p style={{ color: 'var(--t-dim)', fontSize: '0.7rem', marginTop: 8 }}>
                 {kind === 'region'
-                  ? 'CLICK / DRAG TO PAINT · ★ START · ◆ SITE (edit sites in the REGIONS JSON) · CORNER NUMBER = TIER OVERRIDE'
-                  : 'CLICK / DRAG TO PAINT · ★ START · ◆ VENUE (edit venues in the TOWNS JSON)'}
+                  ? 'CLICK / DRAG TO PAINT · ★ START · ◆ SITE (edit with the SITES tool) · CORNER NUMBER = TIER OVERRIDE'
+                  : 'CLICK / DRAG TO PAINT · ★ START · ◆ VENUE (edit with the VENUES tool)'}
               </p>
             </div>
 

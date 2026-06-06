@@ -69,24 +69,12 @@ const TERRAIN_THEMES: Record<string, TerrainArtMap> = {
   },
 };
 
-function CampaignContentEditor({
-  campaignId,
-  onEditMap,
-}: {
-  campaignId: string;
-  // Open the visual painter for one of this campaign's regions/towns —
-  // offered under the REGIONS / TOWNS sections when provided.
-  onEditMap?: (kind: 'region' | 'town', mapId: string) => void;
-}) {
+function CampaignContentEditor({ campaignId }: { campaignId: string }) {
   const [sections, setSections] = useState<CampaignSectionInfo[]>([]);
   const [sectionsErr, setSectionsErr] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [activeSource, setActiveSource] = useState<CampaignSectionSource>('none');
   const [text, setText] = useState('');
-  // The section's last SAVED value — what the server (and so the region
-  // painter) actually has. The PAINT MAP buttons derive from this, not from
-  // the live textarea: painting an unsaved region would dead-end.
-  const [savedValue, setSavedValue] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -107,7 +95,6 @@ function CampaignContentEditor({
       setError(null);
       setSaved(false);
       setText('');
-      setSavedValue(null);
       api
         .getCampaignSection(campaignId, section)
         .then((s) => {
@@ -117,7 +104,6 @@ function CampaignContentEditor({
           } else {
             setText(s.value === null ? '' : JSON.stringify(s.value, null, 2));
           }
-          setSavedValue(s.value);
         })
         .catch(() => setError('Could not load this section.'));
     },
@@ -146,32 +132,12 @@ function CampaignContentEditor({
       await api.putCampaignSection(campaignId, active, value);
       setActiveSource('db');
       setSections((prev) => prev.map((s) => (s.section === active ? { ...s, source: 'db' } : s)));
-      setSavedValue(value);
       setSaved(true);
     } catch (err) {
       setError(describeError(err));
     } finally {
       setBusy(false);
     }
-  }
-
-  // A minimal valid town to get a campaign onto the map painter in one
-  // click: insert → SAVE → its PAINT button appears. (Regions get their
-  // own card-based panel below the content box, so no starter here.)
-  function starterTownJson(): string {
-    const grid = Array.from({ length: 8 }, () =>
-      Array.from({ length: 10 }, () => ({ t: 'plains' }))
-    );
-    const starter = {
-      id: 'town-1',
-      name: 'New Town',
-      feetPerSquare: 25,
-      grid,
-      startPos: { x: 1, y: 1 },
-      floor: 'dirt',
-      venues: [{ id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' }],
-    };
-    return JSON.stringify([starter], null, 2);
   }
 
   async function handleRevert() {
@@ -243,67 +209,6 @@ function CampaignContentEditor({
 
       {active && (
         <>
-          {/* Map painter shortcuts — one per SAVED town (the painter loads
-              from the server, so unsaved maps can't be painted yet). With
-              nothing saved, offer a one-click starter. Regions navigate
-              through the REGIONS card panel below the content box instead. */}
-          {active === 'towns' &&
-            onEditMap &&
-            (() => {
-              const savedMaps = (Array.isArray(savedValue) ? savedValue : []).filter(
-                (r): r is { id: string; name?: string } =>
-                  typeof (r as { id?: unknown }).id === 'string'
-              );
-              return (
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 6,
-                    flexWrap: 'wrap',
-                    marginBottom: 8,
-                    alignItems: 'center',
-                  }}
-                >
-                  {savedMaps.length > 0 ? (
-                    <>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>PAINT MAP:</span>
-                      {savedMaps.map((r) => (
-                        <button
-                          key={r.id}
-                          className={styles.ghostBtn}
-                          style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
-                          onClick={() => onEditMap('town', r.id)}
-                        >
-                          🗺 {r.name ?? r.id}
-                        </button>
-                      ))}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        (NEW TOWNS NEED A SAVE FIRST)
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        NO SAVED TOWNS YET —
-                      </span>
-                      <button
-                        className={styles.ghostBtn}
-                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
-                        onClick={() => {
-                          setText(starterTownJson());
-                          setSaved(false);
-                        }}
-                      >
-                        INSERT STARTER TOWN
-                      </button>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        THEN SAVE TO UNLOCK THE MAP PAINTER
-                      </span>
-                    </>
-                  )}
-                </div>
-              );
-            })()}
           {/* Terrain-art theme presets — pre-fill the per-type override map;
               hand-tweak entries in the JSON after. The tile list below the
               buttons is the catalog of valid ids. */}

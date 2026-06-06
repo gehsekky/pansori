@@ -2,42 +2,61 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
 
-// REGIONS panel on the campaign creator screen — the card-based way into
-// the region painter. One card per defined region (click → painter);
-// + NEW REGION appends a starter region to the section (first one becomes
-// the starting region) and jumps straight to the painter. Bulk edits
-// (sites, per-cell enc overrides) still live in the REGIONS JSON section
-// of the CONTENT box above.
+// REGIONS / TOWNS panels on the campaign creator screen — the card-based
+// way into the map painter. One card per defined map (click → painter);
+// + NEW REGION/TOWN appends a starter to the section (the first region of
+// a campaign becomes the starting region; a starter town ships with a
+// gate venue) and jumps straight to the painter. Bulk edits still live in
+// the section JSON of the CONTENT box above.
 
-interface PanelRegion {
+interface PanelMap {
   id: string;
   name: string;
-  isStartingRegion?: boolean;
+  isStartingRegion?: boolean; // regions only
   desc?: string;
   grid?: Array<Array<unknown>>;
+  sites?: Array<unknown>; // regions only
+  venues?: Array<unknown>; // towns only
   [key: string]: unknown;
 }
 
-function starterRegion(id: string, name: string, isFirst: boolean): PanelRegion {
+const SECTION = { region: 'regions', town: 'towns' } as const;
+
+function starterMap(kind: 'region' | 'town', id: string, name: string, isFirst: boolean): PanelMap {
+  const grid = Array.from({ length: 8 }, () => Array.from({ length: 10 }, () => ({ t: 'plains' })));
+  if (kind === 'region') {
+    return {
+      id,
+      name,
+      isStartingRegion: isFirst,
+      feetPerSquare: 5280,
+      grid,
+      startPos: { x: 1, y: 1 },
+    };
+  }
   return {
     id,
     name,
-    isStartingRegion: isFirst,
-    feetPerSquare: 5280,
-    grid: Array.from({ length: 8 }, () => Array.from({ length: 10 }, () => ({ t: 'plains' }))),
+    feetPerSquare: 25,
+    grid,
     startPos: { x: 1, y: 1 },
+    floor: 'dirt',
+    venues: [{ id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' }],
   };
 }
 
-function RegionsPanel({
+function MapsPanel({
   campaignId,
-  onOpenRegion,
+  kind,
+  onOpenMap,
 }: {
   campaignId: string;
-  // Navigate to the painter (/creator/<campaign id>/region/<region id>).
-  onOpenRegion?: (regionId: string) => void;
+  kind: 'region' | 'town';
+  // Navigate to the painter (/creator/<campaign id>/<kind>/<map id>).
+  onOpenMap?: (mapId: string) => void;
 }) {
-  const [regions, setRegions] = useState<PanelRegion[] | null>(null);
+  const section = SECTION[kind];
+  const [maps, setMaps] = useState<PanelMap[] | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
@@ -52,40 +71,41 @@ function RegionsPanel({
     .slice(0, 40);
 
   useEffect(() => {
-    setRegions(null);
+    setMaps(null);
     setLoadErr(null);
     setCreating(false);
     setNewName('');
     setCreateErr(null);
     api
-      .getCampaignSection(campaignId, 'regions')
-      .then((s) => setRegions(Array.isArray(s.value) ? (s.value as PanelRegion[]) : []))
-      .catch(() => setLoadErr('Could not load this campaign’s regions.'));
-  }, [campaignId]);
+      .getCampaignSection(campaignId, section)
+      .then((s) => setMaps(Array.isArray(s.value) ? (s.value as PanelMap[]) : []))
+      .catch(() => setLoadErr(`Could not load this campaign’s ${section}.`));
+  }, [campaignId, section]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || !regions || newId.length === 0) return;
-    if (regions.some((r) => r.id === newId)) {
+    if (busy || !maps || newId.length === 0) return;
+    if (maps.some((m) => m.id === newId)) {
       setCreateErr(`The id "${newId}" is taken — pick a different name.`);
       return;
     }
     setBusy(true);
     setCreateErr(null);
-    const next = [...regions, starterRegion(newId, newName.trim(), regions.length === 0)];
+    const next = [...maps, starterMap(kind, newId, newName.trim(), maps.length === 0)];
     try {
-      await api.putCampaignSection(campaignId, 'regions', next);
-      setRegions(next);
+      await api.putCampaignSection(campaignId, section, next);
+      setMaps(next);
       setCreating(false);
       setNewName('');
-      onOpenRegion?.(newId);
+      onOpenMap?.(newId);
     } catch {
-      setCreateErr('Could not create the region — try again.');
+      setCreateErr(`Could not create the ${kind} — try again.`);
     } finally {
       setBusy(false);
     }
   }
 
+  const KIND_LABEL = kind.toUpperCase();
   return (
     <div className={styles.card} style={{ marginTop: '1rem' }}>
       <div
@@ -97,10 +117,10 @@ function RegionsPanel({
         }}
       >
         <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
-          REGIONS
+          {section.toUpperCase()}
         </p>
         <button
-          data-testid="new-region-btn"
+          data-testid={`new-${kind}-btn`}
           className={styles.ghostBtn}
           style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
           onClick={() => {
@@ -108,7 +128,7 @@ function RegionsPanel({
             setCreateErr(null);
           }}
         >
-          + NEW REGION
+          + NEW {KIND_LABEL}
         </button>
       </div>
 
@@ -129,15 +149,15 @@ function RegionsPanel({
           }}
         >
           <div style={{ flex: 1 }}>
-            <label className={styles.formLbl} htmlFor="new-region-name">
-              REGION NAME
+            <label className={styles.formLbl} htmlFor={`new-${kind}-name`}>
+              {KIND_LABEL} NAME
             </label>
             <input
-              id="new-region-name"
+              id={`new-${kind}-name`}
               className={styles.formInp}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. The Frost Reach"
+              placeholder={kind === 'region' ? 'e.g. The Frost Reach' : 'e.g. Oakvale'}
               autoFocus
             />
           </div>
@@ -145,7 +165,7 @@ function RegionsPanel({
             type="submit"
             className={styles.sendBtn}
             disabled={busy || newId.length === 0}
-            data-testid="create-region-btn"
+            data-testid={`create-${kind}-btn`}
           >
             CREATE
           </button>
@@ -154,7 +174,10 @@ function RegionsPanel({
       {creating && (
         <p style={{ fontSize: '0.7rem', color: 'var(--t-dim)', marginTop: -6, marginBottom: 10 }}>
           ID: {newId || '—'} · 10×8 PLAINS STARTER — OPENS IN THE PAINTER
-          {regions?.length === 0 ? ' · FIRST REGION BECOMES THE STARTING REGION' : ''}
+          {kind === 'region' && maps?.length === 0
+            ? ' · FIRST REGION BECOMES THE STARTING REGION'
+            : ''}
+          {kind === 'town' ? ' · SHIPS WITH A GATE VENUE' : ''}
         </p>
       )}
       {createErr && (
@@ -163,22 +186,23 @@ function RegionsPanel({
         </p>
       )}
 
-      {regions && regions.length === 0 && !creating && (
+      {maps && maps.length === 0 && !creating && (
         <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
-          No regions yet — hit + NEW REGION to lay down the first map.
+          No {section} yet — hit + NEW {KIND_LABEL} to lay down the first map.
         </p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {regions?.map((r) => {
-          const h = r.grid?.length ?? 0;
-          const w = r.grid?.[0]?.length ?? 0;
+        {maps?.map((m) => {
+          const h = m.grid?.length ?? 0;
+          const w = m.grid?.[0]?.length ?? 0;
+          const markers = kind === 'region' ? m.sites : m.venues;
           return (
             <button
-              key={r.id}
-              data-testid={`region-card-${r.id}`}
+              key={m.id}
+              data-testid={`${kind}-card-${m.id}`}
               className={styles.card}
-              onClick={() => onOpenRegion?.(r.id)}
+              onClick={() => onOpenMap?.(m.id)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -198,8 +222,8 @@ function RegionsPanel({
                     color: 'var(--t-primary)',
                   }}
                 >
-                  {r.name}
-                  {r.isStartingRegion && (
+                  {m.name}
+                  {m.isStartingRegion && (
                     <span style={{ color: 'var(--t-hp-high)', fontSize: '0.7rem' }}>
                       {' '}
                       · STARTING REGION
@@ -217,8 +241,8 @@ function RegionsPanel({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {r.id}
-                  {r.desc ? ` — ${r.desc}` : ''}
+                  {m.id}
+                  {m.desc ? ` — ${m.desc}` : ''}
                 </p>
               </div>
               <p
@@ -230,6 +254,9 @@ function RegionsPanel({
                 }}
               >
                 {w}×{h}
+                {markers && markers.length > 0
+                  ? ` · ${markers.length} ${kind === 'region' ? 'SITE' : 'VENUE'}${markers.length > 1 ? 'S' : ''}`
+                  : ''}
               </p>
             </button>
           );
@@ -239,4 +266,4 @@ function RegionsPanel({
   );
 }
 
-export default RegionsPanel;
+export default MapsPanel;

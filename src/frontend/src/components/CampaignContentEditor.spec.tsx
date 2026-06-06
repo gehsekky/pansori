@@ -157,14 +157,17 @@ describe('CampaignContentEditor', () => {
     expect(await screen.findByText(/Invalid shape — genericArrival: Required/)).toBeTruthy();
   });
 
-  it('regions section is plain JSON — no paint row (the REGIONS panel owns that)', async () => {
-    mocked.listCampaignSections.mockResolvedValue([{ section: 'regions', source: 'db' }]);
+  it('map sections are plain JSON — no paint rows (the REGIONS/TOWNS panels own that)', async () => {
+    mocked.listCampaignSections.mockResolvedValue([
+      { section: 'regions', source: 'db' },
+      { section: 'towns', source: 'none' },
+    ]);
     mocked.getCampaignSection.mockResolvedValue({
       section: 'regions',
       source: 'db',
       value: [{ id: 'vale', name: 'The Vale', isStartingRegion: true }],
     });
-    render(<CampaignContentEditor campaignId="malgovia" onEditMap={vi.fn()} />);
+    render(<CampaignContentEditor campaignId="malgovia" />);
     fireEvent.click(await screen.findByText('REGIONS'));
     const textarea = (await screen.findByLabelText(
       /REGIONS — SERVING FROM DATABASE/
@@ -172,23 +175,11 @@ describe('CampaignContentEditor', () => {
     await waitFor(() => expect(textarea.value).toContain('The Vale'));
     expect(screen.queryByText(/PAINT MAP/)).toBeNull();
     expect(screen.queryByText(/INSERT STARTER/)).toBeNull();
-  });
-
-  it('towns section offers PAINT buttons and a gate-equipped starter', async () => {
-    mocked.listCampaignSections.mockResolvedValue([{ section: 'towns', source: 'none' }]);
     mocked.getCampaignSection.mockResolvedValue({ section: 'towns', source: 'none', value: null });
-    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'towns', source: 'db' });
-    const onEditMap = vi.fn();
-    render(<CampaignContentEditor campaignId="malgovia" onEditMap={onEditMap} />);
-    fireEvent.click(await screen.findByText('TOWNS'));
-    expect(await screen.findByText(/NO SAVED TOWNS YET/)).toBeTruthy();
-    fireEvent.click(screen.getByText('INSERT STARTER TOWN'));
-    const textarea = screen.getByLabelText(/TOWNS/) as HTMLTextAreaElement;
-    expect(textarea.value).toContain('"town-1"');
-    expect(textarea.value).toContain('"gate"');
-    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
-    fireEvent.click(await screen.findByRole('button', { name: /New Town/ }));
-    expect(onEditMap).toHaveBeenCalledWith('town', 'town-1');
+    fireEvent.click(screen.getByText('TOWNS'));
+    await screen.findByLabelText(/TOWNS — SERVING FROM EMPTY/);
+    expect(screen.queryByText(/PAINT MAP/)).toBeNull();
+    expect(screen.queryByText(/INSERT STARTER/)).toBeNull();
   });
 
   it('reverts a DB section to code after confirm and reloads it', async () => {

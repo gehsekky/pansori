@@ -8,7 +8,7 @@ import {
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
 import CampaignContentEditor from './CampaignContentEditor.tsx';
-import RegionsPanel from './RegionsPanel.tsx';
+import MapsPanel from './MapsPanel.tsx';
 import styles from '../styles.module.css';
 
 // Map the backend's mutation-failure reasons (routes/campaigns.ts) to
@@ -610,21 +610,22 @@ function AdminScreen({
         )}
 
         {/* ── Content editing (DB-first sections, code supplement) ──────── */}
-        {selected && (
-          <CampaignContentEditor
-            campaignId={selected.id}
-            onEditMap={onEditMap ? (kind, mapId) => onEditMap(selected.id, kind, mapId) : undefined}
-          />
-        )}
+        {selected && <CampaignContentEditor campaignId={selected.id} />}
 
-        {/* ── Regions (card-based way into the map painter) ─────────────── */}
+        {/* ── Regions + towns (card-based way into the map painter) ─────── */}
         {selected && (
-          <RegionsPanel
-            campaignId={selected.id}
-            onOpenRegion={
-              onEditMap ? (regionId) => onEditMap(selected.id, 'region', regionId) : undefined
-            }
-          />
+          <>
+            <MapsPanel
+              campaignId={selected.id}
+              kind="region"
+              onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, 'region', mapId) : undefined}
+            />
+            <MapsPanel
+              campaignId={selected.id}
+              kind="town"
+              onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, 'town', mapId) : undefined}
+            />
+          </>
         )}
       </div>
     </div>

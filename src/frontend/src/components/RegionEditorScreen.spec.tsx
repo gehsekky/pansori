@@ -38,11 +38,13 @@ const OTHER = {
 
 beforeEach(() => {
   for (const fn of Object.values(mocked)) fn.mockReset();
-  mocked.getCampaignSection.mockResolvedValue({
-    section: 'regions',
-    source: 'db',
-    value: [REGION, OTHER],
-  });
+  // The region painter loads its section AND the towns list (for the site
+  // tool's town picker) — dispatch by section.
+  mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+    section === 'regions'
+      ? { section, source: 'db', value: [REGION, OTHER] }
+      : { section, source: 'db', value: [{ id: 'oakvale', name: 'Oakvale' }] }
+  );
   mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'regions', source: 'db' });
 });
 
@@ -234,6 +236,123 @@ describe('RegionEditorScreen', () => {
     await screen.findByTestId('cell-0-0');
     expect(screen.getByText('★ STARTING REGION')).toBeTruthy();
     expect(screen.queryByTestId('make-starter-btn')).toBeNull();
+  });
+
+  it('SITES tool places a new site, edits it via the form, and saves it with the map', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    // Place on an empty cell → a draft site appears, selected.
+    fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+    expect(screen.getByTestId('cell-1-0').getAttribute('aria-label')).toContain('site: New Site');
+    fireEvent.change(screen.getByLabelText('NAME', { selector: '#site-name' }), {
+      target: { value: 'Oakvale' },
+    });
+    fireEvent.change(screen.getByLabelText('KIND'), { target: { value: 'town' } });
+    fireEvent.change(screen.getByLabelText('TOWN'), { target: { value: 'oakvale' } });
+    fireEvent.change(screen.getByLabelText('ON ENTER NARRATION', { selector: '#site-on-enter' }), {
+      target: { value: 'Smoke curls from the chimneys.' },
+    });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const list = mocked.putCampaignSection.mock.calls[0][2] as (typeof REGION)[];
+    const sites = list[0].sites!;
+    expect(sites).toHaveLength(2); // The Pit + the new town site
+    const added = sites.find((s) => s.name === 'Oakvale')! as Record<string, unknown>;
+    expect(added.kind).toBe('town');
+    expect(added.townId).toBe('oakvale');
+    expect(added.onEnter).toBe('Smoke curls from the chimneys.');
+    expect(added.pos).toEqual({ x: 1, y: 0 });
+    // Flipping to town pruned the local target; empty optionals pruned too.
+    expect('entryRoomId' in added).toBe(false);
+    expect('icon' in added).toBe(false);
+  });
+
+  it('selecting a marker edits it; DELETE removes it from the save', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    // Click the existing site marker (The Pit at 2,1) → selected in the form.
+    fireEvent.mouseDown(screen.getByTestId('cell-2-1'));
+    expect(
+      (screen.getByLabelText('NAME', { selector: '#site-name' }) as HTMLInputElement).value
+    ).toBe('The Pit');
+    fireEvent.click(screen.getByTestId('site-delete-btn'));
+    expect(screen.getByTestId('cell-2-1').getAttribute('aria-label')).not.toContain('The Pit');
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const list = mocked.putCampaignSection.mock.calls[0][2] as (typeof REGION)[];
+    // The only site was deleted — the key drops entirely.
+    expect('sites' in list[0]).toBe(false);
+  });
+
+  it('MOVE arms a relocation: the next cell click moves the selected site', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-2-1')); // select The Pit
+    fireEvent.click(screen.getByTestId('site-move-btn'));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-1'));
+    expect(screen.getByTestId('cell-0-1').getAttribute('aria-label')).toContain('site: The Pit');
+    expect(screen.getByTestId('cell-2-1').getAttribute('aria-label')).not.toContain('The Pit');
+    // Disarmed after the move — the next empty click places a NEW site.
+    fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+    expect(screen.getByTestId('cell-1-0').getAttribute('aria-label')).toContain('site: New Site');
+  });
+
+  it('site placement is click-only — dragging never scatters markers', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+    fireEvent.mouseEnter(screen.getByTestId('cell-2-0'));
+    expect(screen.getByTestId('cell-2-0').getAttribute('aria-label')).not.toContain('site');
+  });
+
+  it('VENUES tool in town mode: interior venues take an entry room id', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'towns',
+      source: 'db',
+      value: [
+        {
+          id: 'oakvale',
+          name: 'Oakvale',
+          feetPerSquare: 25,
+          grid: [
+            [{ t: 'plains' }, { t: 'plains' }],
+            [{ t: 'plains' }, { t: 'plains' }],
+          ],
+          startPos: { x: 0, y: 0 },
+        },
+      ],
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'towns', source: 'db' });
+    render(
+      <RegionEditorScreen campaignId="sandbox" regionId="oakvale" kind="town" onBack={vi.fn()} />
+    );
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'VENUES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-1-1'));
+    fireEvent.change(screen.getByLabelText('NAME', { selector: '#site-name' }), {
+      target: { value: 'The Split Acorn' },
+    });
+    fireEvent.change(screen.getByLabelText('ENTRY ROOM ID'), {
+      target: { value: 'acorn-taproom' },
+    });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const [, section, value] = mocked.putCampaignSection.mock.calls[0];
+    expect(section).toBe('towns');
+    const town = (value as Array<{ venues?: Array<Record<string, unknown>> }>)[0];
+    expect(town.venues).toEqual([
+      {
+        id: 'venue-1',
+        name: 'The Split Acorn',
+        pos: { x: 1, y: 1 },
+        kind: 'interior',
+        entryRoomId: 'acorn-taproom',
+      },
+    ]);
   });
 
   it('town mode swaps the region-only details for the floor picker', async () => {
