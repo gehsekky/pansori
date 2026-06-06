@@ -38,7 +38,7 @@ describe('CampaignContentEditor', () => {
     expect(screen.getByText('EMPTY')).toBeTruthy();
   });
 
-  it('opens a section and loads its effective value as JSON', async () => {
+  it('opens a plain-text section raw — no JSON quoting', async () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'displayNoun',
       source: 'code',
@@ -47,9 +47,9 @@ describe('CampaignContentEditor', () => {
     render(<CampaignContentEditor campaignId="malgovia" />);
     fireEvent.click(await screen.findByText('DISPLAYNOUN'));
     const textarea = (await screen.findByLabelText(
-      /DISPLAYNOUN — SERVING FROM CODE/
+      /DISPLAYNOUN — SERVING FROM CODE · PLAIN TEXT/
     )) as HTMLTextAreaElement;
-    await waitFor(() => expect(textarea.value).toBe('"vale"'));
+    await waitFor(() => expect(textarea.value).toBe('vale'));
     // Code-sourced section has no DB version to revert.
     expect(screen.queryByText('REVERT TO CODE')).toBeNull();
   });
@@ -69,7 +69,7 @@ describe('CampaignContentEditor', () => {
     await waitFor(() => expect(textarea.value).toContain('Moonstone Amulet'));
   });
 
-  it('saves parsed JSON to the database and flips the badge', async () => {
+  it('saves plain text verbatim — quotes and newlines need no escaping', async () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'displayNoun',
       source: 'code',
@@ -79,27 +79,52 @@ describe('CampaignContentEditor', () => {
     render(<CampaignContentEditor campaignId="malgovia" />);
     fireEvent.click(await screen.findByText('DISPLAYNOUN'));
     const textarea = await screen.findByLabelText(/DISPLAYNOUN/);
-    fireEvent.change(textarea, { target: { value: '"marsh"' } });
+    const raw = 'The "Misty" Marsh\nof Old';
+    fireEvent.change(textarea, { target: { value: raw } });
     fireEvent.click(screen.getByText('SAVE TO DATABASE'));
+    // The textarea content IS the value — stored verbatim, never JSON-parsed.
     await waitFor(() =>
-      expect(mocked.putCampaignSection).toHaveBeenCalledWith('malgovia', 'displayNoun', 'marsh')
+      expect(mocked.putCampaignSection).toHaveBeenCalledWith('malgovia', 'displayNoun', raw)
     );
     expect(await screen.findByText('SAVED — LIVE NOW')).toBeTruthy();
   });
 
-  it('rejects invalid JSON client-side without calling the api', async () => {
+  it('rejects invalid JSON client-side without calling the api (structured sections)', async () => {
     mocked.getCampaignSection.mockResolvedValue({
-      section: 'displayNoun',
-      source: 'code',
-      value: 'vale',
+      section: 'narratives',
+      source: 'db',
+      value: {},
     });
     render(<CampaignContentEditor campaignId="malgovia" />);
-    fireEvent.click(await screen.findByText('DISPLAYNOUN'));
-    const textarea = await screen.findByLabelText(/DISPLAYNOUN/);
+    fireEvent.click(await screen.findByText('NARRATIVES'));
+    const textarea = await screen.findByLabelText(/NARRATIVES/);
     fireEvent.change(textarea, { target: { value: '{not json' } });
     fireEvent.click(screen.getByText('SAVE TO DATABASE'));
     expect(await screen.findByText(/Not valid JSON/)).toBeTruthy();
     expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+  });
+
+  it('gameStart round-trips raw narration text', async () => {
+    mocked.listCampaignSections.mockResolvedValue([{ section: 'gameStart', source: 'code' }]);
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'gameStart',
+      source: 'code',
+      value: 'A fresh world, waiting to be written.',
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'gameStart', source: 'db' });
+    render(<CampaignContentEditor campaignId="towns-check" />);
+    fireEvent.click(await screen.findByText('GAMESTART'));
+    const textarea = (await screen.findByLabelText(
+      /GAMESTART — SERVING FROM CODE · PLAIN TEXT/
+    )) as HTMLTextAreaElement;
+    // Loads unquoted, edits save verbatim.
+    await waitFor(() => expect(textarea.value).toBe('A fresh world, waiting to be written.'));
+    const opening = 'The caravan drops you at the crossroads — "good luck," the driver mutters.';
+    fireEvent.change(textarea, { target: { value: opening } });
+    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
+    await waitFor(() =>
+      expect(mocked.putCampaignSection).toHaveBeenCalledWith('towns-check', 'gameStart', opening)
+    );
   });
 
   it('surfaces server-side shape validation issues', async () => {

@@ -2,11 +2,13 @@ import { type CampaignSectionInfo, type CampaignSectionSource, api } from '../li
 import { useCallback, useEffect, useState } from 'react';
 import styles from '../styles.module.css';
 
-// Campaign content editor: one editable Context section at a time as raw
-// JSON. Sections resolve DB-first with code supplement — the source badge
-// says which version the engine is serving; SAVE writes the DB version
-// (live immediately, no restart); REVERT TO CODE deletes the DB version so
-// the campaignData files take over again.
+// Campaign content editor: one editable Context section at a time — raw
+// JSON for structured sections, raw text for the plain-string ones
+// (PLAIN_TEXT_SECTIONS — no quoting needed). Sections resolve DB-first
+// with code supplement — the source badge says which version the engine
+// is serving; SAVE writes the DB version (live immediately, no restart);
+// REVERT TO CODE deletes the DB version so the campaignData files take
+// over again.
 //
 // CUSTOMITEMS / CUSTOMMONSTERS hold only the campaign's OWN content — the
 // full SRD item + monster catalogs are ambient (every campaign gets them
@@ -32,6 +34,12 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
   code: 'CODE',
   none: 'EMPTY',
 };
+
+// Sections whose value is a plain string (displayNoun, gameStart): edited
+// as raw text — no JSON quoting in the textarea. The API request body is
+// JSON, so escaping happens on the wire automatically; on load the string
+// value displays verbatim.
+const PLAIN_TEXT_SECTIONS = new Set(['displayNoun', 'gameStart']);
 
 function CampaignContentEditor({
   campaignId,
@@ -76,7 +84,11 @@ function CampaignContentEditor({
         .getCampaignSection(campaignId, section)
         .then((s) => {
           setActiveSource(s.source);
-          setText(s.value === null ? '' : JSON.stringify(s.value, null, 2));
+          if (PLAIN_TEXT_SECTIONS.has(section)) {
+            setText(typeof s.value === 'string' ? s.value : '');
+          } else {
+            setText(s.value === null ? '' : JSON.stringify(s.value, null, 2));
+          }
           setSavedValue(s.value);
         })
         .catch(() => setError('Could not load this section.'));
@@ -87,11 +99,17 @@ function CampaignContentEditor({
   async function handleSave() {
     if (!active || busy) return;
     let value: unknown;
-    try {
-      value = JSON.parse(text);
-    } catch {
-      setError('Not valid JSON — fix the syntax and try again.');
-      return;
+    if (PLAIN_TEXT_SECTIONS.has(active)) {
+      // Plain-text sections store the textarea verbatim — quotes, newlines
+      // and all. JSON escaping happens in the request body, not by hand.
+      value = text;
+    } else {
+      try {
+        value = JSON.parse(text);
+      } catch {
+        setError('Not valid JSON — fix the syntax and try again.');
+        return;
+      }
     }
     setBusy(true);
     setError(null);
@@ -260,17 +278,18 @@ function CampaignContentEditor({
             })()}
           <label className={styles.formLbl} htmlFor="content-section-editor">
             {active.toUpperCase()} — SERVING FROM {SOURCE_LABEL[activeSource]}
+            {PLAIN_TEXT_SECTIONS.has(active) && ' · PLAIN TEXT'}
           </label>
           <textarea
             id="content-section-editor"
             className={styles.formInp}
-            spellCheck={false}
+            spellCheck={PLAIN_TEXT_SECTIONS.has(active)}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
               setSaved(false);
             }}
-            rows={16}
+            rows={PLAIN_TEXT_SECTIONS.has(active) ? 5 : 16}
             style={{ fontFamily: 'inherit', fontSize: '0.75rem', resize: 'vertical' }}
           />
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: 8 }}>
