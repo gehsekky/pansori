@@ -669,10 +669,99 @@ const EnemyTemplatesSchema = z
     }
   });
 
+// Towns — the second map level, mirroring regions. Venues are the town
+// grid's transition cells: 'interior' opens a local room (entryRoomId
+// required); 'gate' ascends back to the region (no target). The kind↔
+// target pairing and grid bounds are enforced in the superRefine.
+const TownVenueSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(80),
+    pos: GridPosSchema,
+    kind: z.enum(['interior', 'gate']),
+    entryRoomId: SLUG.optional(),
+    desc: z.string().min(1).max(2000).optional(),
+  })
+  .strict();
+
+const TownsSchema = z
+  .array(
+    z
+      .object({
+        id: SLUG,
+        name: z.string().min(1).max(80),
+        desc: z.string().min(1).max(2000).optional(),
+        // Settlement scale: 25 ft per square.
+        feetPerSquare: z.number().positive(),
+        grid: RegionGridSchema,
+        startPos: GridPosSchema,
+        venues: z.array(TownVenueSchema).max(100).optional(),
+        // Cosmetic ground texture for bare cells.
+        floor: z.enum(['grass', 'dirt', 'cobblestone', 'sand']).optional(),
+      })
+      .strict()
+      .superRefine((t, ctx) => {
+        const gridHeight = t.grid.length;
+        const gridWidth = t.grid[0]?.length ?? 0;
+        t.grid.forEach((row, y) => {
+          if (row.length !== gridWidth) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `grid row ${y} has ${row.length} cells; expected ${gridWidth} (grid must be rectangular)`,
+              path: ['grid', y],
+            });
+          }
+        });
+        if (t.startPos.x >= gridWidth || t.startPos.y >= gridHeight) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `startPos (${t.startPos.x},${t.startPos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+            path: ['startPos'],
+          });
+        }
+        const venueIds = new Set<string>();
+        (t.venues ?? []).forEach((v, i) => {
+          if (venueIds.has(v.id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `duplicate venue id "${v.id}"`,
+              path: ['venues', i, 'id'],
+            });
+          }
+          venueIds.add(v.id);
+          if (v.pos.x >= gridWidth || v.pos.y >= gridHeight) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `venue "${v.id}" pos (${v.pos.x},${v.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+              path: ['venues', i, 'pos'],
+            });
+          }
+          if (v.kind === 'interior' && !v.entryRoomId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `venue "${v.id}" is an interior and needs entryRoomId`,
+              path: ['venues', i, 'entryRoomId'],
+            });
+          }
+        });
+      })
+  )
+  .min(1)
+  .superRefine((towns, ctx) => {
+    const ids = new Set<string>();
+    for (const t of towns) {
+      if (ids.has(t.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate town id "${t.id}"` });
+      }
+      ids.add(t.id);
+    }
+  });
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   displayNoun: z.string().min(1).max(40),
   narratives: NarrativesSchema,
   regions: RegionsSchema,
+  towns: TownsSchema,
   // Customs ON TOP of the ambient SRD catalogs — same per-entry shapes as
   // the catalogs themselves (these compose into live engine fields).
   customItems: LootTableSchema,

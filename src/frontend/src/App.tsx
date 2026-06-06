@@ -149,8 +149,9 @@ export default function App() {
   // Deep-linked creator selection (/creator/<campaign id>) — consumed by
   // AdminScreen as its initial selection when the creator view opens.
   const [creatorCampaignId, setCreatorCampaignId] = useState<string | null>(null);
-  // Deep-linked region painter (/creator/<campaign id>/region/<region id>).
+  // Deep-linked map painter (/creator/<campaign id>/(region|town)/<map id>).
   const [creatorRegionId, setCreatorRegionId] = useState<string | null>(null);
+  const [creatorMapKind, setCreatorMapKind] = useState<'region' | 'town'>('region');
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -256,13 +257,14 @@ export default function App() {
             return loadSessions();
           }
         }
-        // Region painter deep link: /creator/<campaign id>/region/<region id>.
+        // Map painter deep link: /creator/<campaign id>/(region|town)/<map id>.
         const regionMatch = window.location.pathname.match(
-          /^\/creator\/([a-z0-9_-]+)\/region\/([a-z0-9_-]+)\/?$/i
+          /^\/creator\/([a-z0-9_-]+)\/(region|town)\/([a-z0-9_-]+)\/?$/i
         );
         if (regionMatch) {
           setCreatorCampaignId(regionMatch[1]);
-          setCreatorRegionId(regionMatch[2]);
+          setCreatorMapKind(regionMatch[2].toLowerCase() as 'region' | 'town');
+          setCreatorRegionId(regionMatch[3]);
           setView('region-editor');
           return;
         }
@@ -452,10 +454,11 @@ export default function App() {
             // history entries — the creator view itself is the destination.
             window.history.replaceState(null, '', id ? `/creator/${id}` : '/creator')
           }
-          onEditRegion={(campaignId, regionId) => {
+          onEditMap={(campaignId, kind, mapId) => {
             setCreatorCampaignId(campaignId);
-            setCreatorRegionId(regionId);
-            window.history.pushState(null, '', `/creator/${campaignId}/region/${regionId}`);
+            setCreatorMapKind(kind);
+            setCreatorRegionId(mapId);
+            window.history.pushState(null, '', `/creator/${campaignId}/${kind}/${mapId}`);
             setView('region-editor');
           }}
           onBack={() => {
@@ -469,6 +472,7 @@ export default function App() {
         <RegionEditorScreen
           campaignId={creatorCampaignId}
           regionId={creatorRegionId}
+          kind={creatorMapKind}
           onBack={() => {
             window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
             setView('creator');

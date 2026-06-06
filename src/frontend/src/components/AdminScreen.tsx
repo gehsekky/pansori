@@ -40,7 +40,7 @@ function AdminScreen({
   mode = 'admin',
   initialCampaignId,
   onSelectCampaign,
-  onEditRegion,
+  onEditMap,
 }: {
   user: AuthUser;
   onBack: () => void;
@@ -52,8 +52,8 @@ function AdminScreen({
   // Selection→URL sync: fired with the selected campaign id (null when
   // nothing is selected) so the parent can keep the address bar current.
   onSelectCampaign?: (id: string | null) => void;
-  // Open the visual region painter for a region of the given campaign.
-  onEditRegion?: (campaignId: string, regionId: string) => void;
+  // Open the visual map painter for a region/town of the given campaign.
+  onEditMap?: (campaignId: string, kind: 'region' | 'town', mapId: string) => void;
 }) {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [campaignsErr, setCampaignsErr] = useState<string | null>(null);
@@ -541,9 +541,7 @@ function AdminScreen({
         {selected && (
           <CampaignContentEditor
             campaignId={selected.id}
-            onEditRegion={
-              onEditRegion ? (regionId) => onEditRegion(selected.id, regionId) : undefined
-            }
+            onEditMap={onEditMap ? (kind, mapId) => onEditMap(selected.id, kind, mapId) : undefined}
           />
         )}
       </div>

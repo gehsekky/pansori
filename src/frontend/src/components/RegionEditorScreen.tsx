@@ -3,14 +3,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
 
-// Visual region grid painter (/creator/<campaign id>/region/<region id>).
+// Visual map grid painter:
+//   /creator/<campaign id>/region/<region id>   (kind 'region')
+//   /creator/<campaign id>/town/<town id>       (kind 'town')
 //
-// Edits ONE region's dense terrain grid: pick a terrain from the palette
-// and click/drag to paint; the TIER tool paints per-cell tier overrides
-// (rendered as a corner number); the START tool relocates the party
-// marker. Sites render as ◆ markers (edited via the regions JSON for
-// now). SAVE writes the whole regions section back through the normal
-// content PUT — same validation, same live refresh.
+// Edits ONE map's dense terrain grid: pick a terrain from the palette
+// and click/drag to paint; the TIER tool (regions only — towns carry no
+// tiers) paints per-cell tier overrides (rendered as a corner number);
+// the START tool relocates the party marker. Sites/venues render as ◆
+// markers (edited via the section JSON for now). SAVE writes the whole
+// section back through the normal content PUT — same validation, same
+// live refresh.
 //
 // The grid model is the painter's data model on purpose (design call
 // 2026-06-06): cells are { t, tier?, enc? }; terrain BEHAVIOR derives
@@ -28,6 +31,7 @@ interface EditorRegion {
   grid: Cell[][];
   startPos: { x: number; y: number };
   sites?: Array<{ id: string; name: string; pos: { x: number; y: number }; kind: string }>;
+  venues?: Array<{ id: string; name: string; pos: { x: number; y: number }; kind: string }>;
   [key: string]: unknown;
 }
 
@@ -66,12 +70,17 @@ function describeError(err: unknown): string {
 function RegionEditorScreen({
   campaignId,
   regionId,
+  kind = 'region',
   onBack,
 }: {
   campaignId: string;
   regionId: string;
+  // Which map level is being painted — picks the section ('regions' /
+  // 'towns'), the marker source (sites / venues), and tool availability.
+  kind?: 'region' | 'town';
   onBack: () => void;
 }) {
+  const section = kind === 'region' ? 'regions' : 'towns';
   // The full regions list (the save unit) + the edited region's pieces.
   const [regions, setRegions] = useState<EditorRegion[] | null>(null);
   const [grid, setGrid] = useState<Cell[][]>([]);
@@ -92,7 +101,7 @@ function RegionEditorScreen({
 
   useEffect(() => {
     api
-      .getCampaignSection(campaignId, 'regions')
+      .getCampaignSection(campaignId, section)
       .then((s) => {
         const list = Array.isArray(s.value) ? (s.value as EditorRegion[]) : [];
         setRegions(list);
@@ -100,8 +109,8 @@ function RegionEditorScreen({
         if (!r) {
           setLoadErr(
             list.length === 0
-              ? 'This campaign has no regions yet — define one in the REGIONS section first.'
-              : `No region "${regionId}" in this campaign.`
+              ? `This campaign has no ${section} yet — define one in the ${section.toUpperCase()} section first.`
+              : `No ${kind} "${regionId}" in this campaign.`
           );
           return;
         }
@@ -109,7 +118,7 @@ function RegionEditorScreen({
         setStartPos({ ...r.startPos });
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
-  }, [campaignId, regionId]);
+  }, [campaignId, regionId, section, kind]);
 
   // Drag-paint ends wherever the mouse is released.
   useEffect(() => {
@@ -172,7 +181,7 @@ function RegionEditorScreen({
     setSaved(false);
     const updated = regions.map((r) => (r.id === regionId ? { ...r, grid, startPos } : r));
     try {
-      await api.putCampaignSection(campaignId, 'regions', updated);
+      await api.putCampaignSection(campaignId, section, updated);
       setRegions(updated);
       setDirty(false);
       setSaved(true);
@@ -185,8 +194,8 @@ function RegionEditorScreen({
 
   const height = grid.length;
   const width = grid[0]?.length ?? 0;
-  const siteAt = (x: number, y: number) =>
-    region?.sites?.find((s) => s.pos.x === x && s.pos.y === y);
+  const markers = (kind === 'region' ? region?.sites : region?.venues) ?? [];
+  const siteAt = (x: number, y: number) => markers.find((s) => s.pos.x === x && s.pos.y === y);
 
   return (
     <div className={styles.pageFlex}>
@@ -194,7 +203,8 @@ function RegionEditorScreen({
         <div className={styles.sessionsHeader}>
           <div>
             <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
-              REGION MAP — {(region?.name ?? regionId).toUpperCase()}
+              {kind === 'region' ? 'REGION' : 'TOWN'} MAP —{' '}
+              {(region?.name ?? regionId).toUpperCase()}
             </h1>
             <p className={styles.sub}>
               {width}×{height} · 1 SQUARE = {String(region?.feetPerSquare ?? 5280)} FT
@@ -239,7 +249,7 @@ function RegionEditorScreen({
                     {(
                       [
                         ['terrain', 'TERRAIN'],
-                        ['tier', 'TIER'],
+                        ...(kind === 'region' ? [['tier', 'TIER'] as [Tool, string]] : []),
                         ['start', 'START POS'],
                       ] as Array<[Tool, string]>
                     ).map(([t, label]) => (
@@ -429,7 +439,10 @@ function RegionEditorScreen({
                           <span
                             aria-hidden="true"
                             style={{
-                              color: site.kind === 'town' ? '#ffd76a' : '#ff8a8a',
+                              color:
+                                site.kind === 'town' || site.kind === 'gate'
+                                  ? '#ffd76a'
+                                  : '#ff8a8a',
                               textShadow: '0 0 3px #000',
                             }}
                           >
@@ -442,8 +455,9 @@ function RegionEditorScreen({
                 )}
               </div>
               <p style={{ color: 'var(--t-dim)', fontSize: '0.7rem', marginTop: 8 }}>
-                CLICK / DRAG TO PAINT · ★ START · ◆ SITE (edit sites in the REGIONS JSON) · CORNER
-                NUMBER = TIER OVERRIDE
+                {kind === 'region'
+                  ? 'CLICK / DRAG TO PAINT · ★ START · ◆ SITE (edit sites in the REGIONS JSON) · CORNER NUMBER = TIER OVERRIDE'
+                  : 'CLICK / DRAG TO PAINT · ★ START · ◆ VENUE (edit venues in the TOWNS JSON)'}
               </p>
             </div>
 

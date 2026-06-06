@@ -127,11 +127,11 @@ describe('CampaignContentEditor', () => {
       source: 'db',
       value: [{ id: 'vale', name: 'The Vale', isStartingRegion: true }],
     });
-    const onEditRegion = vi.fn();
-    render(<CampaignContentEditor campaignId="malgovia" onEditRegion={onEditRegion} />);
+    const onEditMap = vi.fn();
+    render(<CampaignContentEditor campaignId="malgovia" onEditMap={onEditMap} />);
     fireEvent.click(await screen.findByText('REGIONS'));
     fireEvent.click(await screen.findByRole('button', { name: /The Vale/ }));
-    expect(onEditRegion).toHaveBeenCalledWith('vale');
+    expect(onEditMap).toHaveBeenCalledWith('region', 'vale');
   });
 
   it('regions section with nothing saved offers the starter region flow', async () => {
@@ -142,7 +142,7 @@ describe('CampaignContentEditor', () => {
       value: null,
     });
     mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'regions', source: 'db' });
-    render(<CampaignContentEditor campaignId="malgovia" onEditRegion={vi.fn()} />);
+    render(<CampaignContentEditor campaignId="malgovia" onEditMap={vi.fn()} />);
     fireEvent.click(await screen.findByText('REGIONS'));
     expect(await screen.findByText(/NO SAVED REGIONS YET/)).toBeTruthy();
     fireEvent.click(screen.getByText('INSERT STARTER REGION'));
@@ -152,6 +152,23 @@ describe('CampaignContentEditor', () => {
     // Saving flips the section to db and surfaces the PAINT button.
     fireEvent.click(screen.getByText('SAVE TO DATABASE'));
     expect(await screen.findByRole('button', { name: /New Region/ })).toBeTruthy();
+  });
+
+  it('towns section offers PAINT buttons and a gate-equipped starter', async () => {
+    mocked.listCampaignSections.mockResolvedValue([{ section: 'towns', source: 'none' }]);
+    mocked.getCampaignSection.mockResolvedValue({ section: 'towns', source: 'none', value: null });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'towns', source: 'db' });
+    const onEditMap = vi.fn();
+    render(<CampaignContentEditor campaignId="malgovia" onEditMap={onEditMap} />);
+    fireEvent.click(await screen.findByText('TOWNS'));
+    expect(await screen.findByText(/NO SAVED TOWNS YET/)).toBeTruthy();
+    fireEvent.click(screen.getByText('INSERT STARTER TOWN'));
+    const textarea = screen.getByLabelText(/TOWNS/) as HTMLTextAreaElement;
+    expect(textarea.value).toContain('"town-1"');
+    expect(textarea.value).toContain('"gate"');
+    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
+    fireEvent.click(await screen.findByRole('button', { name: /New Town/ }));
+    expect(onEditMap).toHaveBeenCalledWith('town', 'town-1');
   });
 
   it('reverts a DB section to code after confirm and reloads it', async () => {

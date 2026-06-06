@@ -27,11 +27,13 @@
 import type {
   Context,
   EnemyTemplate,
+  FloorType,
   LootItem,
   Region,
   TerrainCell,
   TerrainType,
   TierZone,
+  Town,
 } from '../types.js';
 import {
   composeEnemyTemplates,
@@ -62,10 +64,10 @@ export function baseContextFor(campaignId: string): Context {
 // stay in lockstep — there's a spec asserting that). Order is the display
 // order in the admin UI.
 //
-// 'regions' is the first DB-era section with no code-context counterpart —
-// stored relationally in campaign_regions. The engine doesn't read it
-// yet — it still runs on campaign.regions (the 3-level grid model); the
-// resolver will map this list in as the map content migrates to the DB.
+// 'regions' / 'towns' are DB-era sections with no code-context counterpart
+// — stored relationally in campaign_regions / campaign_towns. They're LIVE:
+// loadOverlay converts them (dbRegionsToEngine / dbTownsToEngine) and folds
+// them into campaign.regions / campaign.towns, replacing the code maps.
 //
 // 'customItems' / 'customMonsters' are a campaign's OWN content on top of
 // the ambient SRD catalogs (services/itemCatalog.ts / monsterCatalog.ts):
@@ -76,6 +78,7 @@ export const EDITABLE_SECTIONS = [
   'displayNoun',
   'narratives',
   'regions',
+  'towns',
   'customItems',
   'customMonsters',
 ] as const;
@@ -312,6 +315,199 @@ export async function deleteCampaignRegions(pool: Pool, campaignId: string): Pro
   return true;
 }
 
+// ─── Towns (relational storage — campaign_towns + campaign_town_venues) ──────
+
+export interface CampaignTownVenue {
+  id: string;
+  name: string;
+  pos: { x: number; y: number };
+  kind: 'interior' | 'gate';
+  entryRoomId?: string;
+  desc?: string;
+}
+
+export interface CampaignTown {
+  id: string;
+  name: string;
+  desc?: string;
+  feetPerSquare: number;
+  grid: CampaignRegionCell[][];
+  startPos: { x: number; y: number };
+  venues?: CampaignTownVenue[];
+  floor?: FloorType;
+}
+
+interface TownRow {
+  id: string;
+  name: string;
+  description: string | null;
+  feet_per_square: number;
+  grid: CampaignRegionCell[][];
+  start_x: number;
+  start_y: number;
+  floor: FloorType | null;
+}
+
+interface VenueRow {
+  town_id: string;
+  id: string;
+  name: string;
+  pos_x: number;
+  pos_y: number;
+  kind: 'interior' | 'gate';
+  entry_room_id: string | null;
+  description: string | null;
+}
+
+function rowToVenue(r: VenueRow): CampaignTownVenue {
+  return {
+    id: r.id,
+    name: r.name,
+    pos: { x: r.pos_x, y: r.pos_y },
+    kind: r.kind,
+    ...(r.entry_room_id !== null ? { entryRoomId: r.entry_room_id } : {}),
+    ...(r.description !== null ? { desc: r.description } : {}),
+  };
+}
+
+export async function getCampaignTowns(pool: Pool, campaignId: string): Promise<CampaignTown[]> {
+  const { rows } = await pool.query<TownRow>(
+    `SELECT id, name, description, feet_per_square, grid, start_x, start_y, floor
+       FROM campaign_towns
+      WHERE campaign_id = $1
+      ORDER BY sort_order, id`,
+    [campaignId]
+  );
+  if (rows.length === 0) return [];
+  const { rows: venueRows } = await pool.query<VenueRow>(
+    `SELECT town_id, id, name, pos_x, pos_y, kind, entry_room_id, description
+       FROM campaign_town_venues
+      WHERE campaign_id = $1
+      ORDER BY town_id, sort_order, id`,
+    [campaignId]
+  );
+  const venuesByTown = new Map<string, CampaignTownVenue[]>();
+  for (const row of venueRows) {
+    const list = venuesByTown.get(row.town_id) ?? [];
+    list.push(rowToVenue(row));
+    venuesByTown.set(row.town_id, list);
+  }
+  return rows.map((r) => {
+    const town: CampaignTown = {
+      id: r.id,
+      name: r.name,
+      ...(r.description !== null ? { desc: r.description } : {}),
+      feetPerSquare: r.feet_per_square,
+      grid: r.grid,
+      startPos: { x: r.start_x, y: r.start_y },
+      ...(r.floor !== null ? { floor: r.floor } : {}),
+    };
+    const venues = venuesByTown.get(r.id);
+    return venues && venues.length > 0 ? { ...town, venues } : town;
+  });
+}
+
+// Replace-all write — deleting the towns cascades their venues away too.
+export async function putCampaignTowns(
+  pool: Pool,
+  campaignId: string,
+  towns: CampaignTown[]
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query('DELETE FROM campaign_towns WHERE campaign_id = $1', [campaignId]);
+    for (let i = 0; i < towns.length; i++) {
+      const t = towns[i];
+      await client.query(
+        `INSERT INTO campaign_towns
+           (campaign_id, id, sort_order, name, description, feet_per_square,
+            grid, start_x, start_y, floor)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)`,
+        [
+          campaignId,
+          t.id,
+          i,
+          t.name,
+          t.desc ?? null,
+          t.feetPerSquare,
+          JSON.stringify(t.grid),
+          t.startPos.x,
+          t.startPos.y,
+          t.floor ?? null,
+        ]
+      );
+      const venues = t.venues ?? [];
+      for (let j = 0; j < venues.length; j++) {
+        const v = venues[j];
+        await client.query(
+          `INSERT INTO campaign_town_venues
+             (campaign_id, town_id, id, sort_order, name, pos_x, pos_y, kind,
+              entry_room_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            campaignId,
+            t.id,
+            v.id,
+            j,
+            v.name,
+            v.pos.x,
+            v.pos.y,
+            v.kind,
+            v.entryRoomId ?? null,
+            v.desc ?? null,
+          ]
+        );
+      }
+    }
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCampaignTowns(pool: Pool, campaignId: string): Promise<boolean> {
+  const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+  if (!rowCount) return false;
+  await pool.query('DELETE FROM campaign_towns WHERE campaign_id = $1', [campaignId]);
+  return true;
+}
+
+// Convert DB towns into the engine model — same dense→sparse terrain rule
+// as regions; venues pass through (the engine's MapVenue shape matches).
+// Per-cell tier/enc have no meaning at town scale and are dropped.
+export function dbTownsToEngine(towns: CampaignTown[]): Town[] {
+  return towns.map((t) => {
+    const terrain: TerrainCell[] = [];
+    t.grid.forEach((row, y) =>
+      row.forEach((cell, x) => {
+        if (cell.t !== 'plains') terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
+      })
+    );
+    return {
+      id: t.id,
+      name: t.name,
+      ...(t.desc !== undefined ? { desc: t.desc } : {}),
+      feetPerSquare: t.feetPerSquare,
+      gridWidth: t.grid[0]?.length ?? 0,
+      gridHeight: t.grid.length,
+      ...(terrain.length > 0 ? { terrain } : {}),
+      startPos: t.startPos,
+      venues: (t.venues ?? []).map((v) => ({ ...v })),
+      ...(t.floor !== undefined ? { floor: t.floor } : {}),
+    };
+  });
+}
+
 // Convert DB regions (dense {t, tier?, enc?} grid + child sites) into the
 // engine's map model (sparse terrain + tierZones rectangles):
 //
@@ -384,6 +580,10 @@ export async function getDbSection(
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
   }
+  if (section === 'towns') {
+    const towns = await getCampaignTowns(pool, campaignId);
+    return { present: towns.length > 0, value: towns.length > 0 ? towns : undefined };
+  }
   if (section === 'customItems') {
     const items = await getCampaignCustomItems(pool, campaignId);
     return { present: items.length > 0, value: items.length > 0 ? items : undefined };
@@ -410,6 +610,9 @@ export async function putCampaignSection(
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
   }
+  if (section === 'towns') {
+    return putCampaignTowns(pool, campaignId, value as CampaignTown[]);
+  }
   if (section === 'customItems') {
     return putCampaignCustomItems(pool, campaignId, value as LootItem[]);
   }
@@ -434,6 +637,9 @@ export async function deleteCampaignSection(
 ): Promise<boolean> {
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
+  }
+  if (section === 'towns') {
+    return deleteCampaignTowns(pool, campaignId);
   }
   if (section === 'customItems') {
     return deleteCampaignCustomItems(pool, campaignId);
@@ -486,15 +692,17 @@ async function loadOverlay(
   const overlay: Record<string, unknown> =
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
 
-  // DB regions DRIVE the map: converted to the engine model and folded
-  // into the campaign block (replacing the code/template regions while
-  // the rest of the block — rooms, towns, placed enemies/loot, quests —
-  // stays code-supplied until those sections migrate).
+  // DB regions + towns DRIVE the map: converted to the engine model and
+  // folded into the campaign block (each replacing its code/template
+  // counterpart while the rest of the block — rooms, placed enemies/loot,
+  // quests — stays code-supplied until those sections migrate).
   const dbRegions = await getCampaignRegions(pool, campaignId);
-  if (dbRegions.length > 0) {
+  const dbTowns = await getCampaignTowns(pool, campaignId);
+  if (dbRegions.length > 0 || dbTowns.length > 0) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
-      regions: dbRegionsToEngine(dbRegions),
+      ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
+      ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
     };
   }
 

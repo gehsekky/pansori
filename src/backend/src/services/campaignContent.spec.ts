@@ -1,18 +1,22 @@
 // DB-first context resolution — the merge rules that bridge DB-authored
 // campaign content and the campaignData/ code folders: DB top-level fields
 // win, code fills the rest, the merge is shallow (whole-section replace),
-// protected fields and malformed overlays are ignored. Regions live in
-// their own table (campaign_regions); everything else in campaigns.data.
+// protected fields and malformed overlays are ignored. Regions and towns
+// live in their own tables (campaign_regions, campaign_towns); everything
+// else in campaigns.data.
 
 import {
   type CampaignRegion,
   type CampaignRegionCell,
+  type CampaignTown,
   EDITABLE_SECTIONS,
   applyCampaignOverlays,
   dbRegionsToEngine,
+  dbTownsToEngine,
   deleteCampaignSection,
   getCampaignData,
   getCampaignRegions,
+  getCampaignTowns,
   getDbSection,
   isEditableSection,
   mergeContextWithOverlay,
@@ -47,6 +51,12 @@ function makeContentDb(initial: {
   // sort_order, name, pos_x, pos_y, kind, town_id, entry_room_id,
   // description, icon]
   const sites = new Map<string, unknown[][]>();
+  // campaignId → town insert params after campaign_id: [id, sort_order,
+  // name, description, feet_per_square, gridJson, start_x, start_y, floor]
+  const towns = new Map<string, unknown[][]>();
+  // campaignId → venue insert params after campaign_id: [town_id, id,
+  // sort_order, name, pos_x, pos_y, kind, entry_room_id, description]
+  const venues = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -97,6 +107,59 @@ function makeContentDb(initial: {
       list.push(rest);
       sites.set(campaignId as string, list);
       return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_town_venues') && sql.includes('SELECT')) {
+      const list = [...(venues.get(params[0] as string) ?? [])].sort((a, b) =>
+        a[0] === b[0] ? (a[2] as number) - (b[2] as number) : String(a[0]) < String(b[0]) ? -1 : 1
+      );
+      const rows = list.map((p) => ({
+        town_id: p[0],
+        id: p[1],
+        sort_order: p[2],
+        name: p[3],
+        pos_x: p[4],
+        pos_y: p[5],
+        kind: p[6],
+        entry_room_id: p[7],
+        description: p[8],
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('INSERT INTO campaign_town_venues')) {
+      const [campaignId, ...rest] = params;
+      const list = venues.get(campaignId as string) ?? [];
+      list.push(rest);
+      venues.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('DELETE FROM campaign_towns')) {
+      towns.delete(params[0] as string);
+      venues.delete(params[0] as string); // FK cascade
+      return { rows: [], rowCount: 0 };
+    }
+    if (sql.includes('INSERT INTO campaign_towns')) {
+      const [campaignId, ...rest] = params;
+      const list = towns.get(campaignId as string) ?? [];
+      list.push(rest);
+      towns.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_towns') && sql.includes('SELECT')) {
+      const list = [...(towns.get(params[0] as string) ?? [])].sort(
+        (a, b) => (a[1] as number) - (b[1] as number)
+      );
+      const rows = list.map((p) => ({
+        id: p[0],
+        sort_order: p[1],
+        name: p[2],
+        description: p[3],
+        feet_per_square: p[4],
+        grid: JSON.parse(p[5] as string),
+        start_x: p[6],
+        start_y: p[7],
+        floor: p[8],
+      }));
+      return { rows, rowCount: rows.length };
     }
     if (sql.includes('FROM campaign_regions') && sql.includes('SELECT')) {
       const list = [...(regions.get(params[0] as string) ?? [])].sort(
@@ -171,6 +234,35 @@ const REGION_B: CampaignRegion = {
   isStartingRegion: false,
   feetPerSquare: 5280,
   grid: G(8, 8, 'snow'),
+  startPos: { x: 0, y: 0 },
+};
+
+const TOWN_A: CampaignTown = {
+  id: 'oakvale',
+  name: 'Oakvale',
+  desc: 'A timber town under the old oak.',
+  feetPerSquare: 25,
+  grid: G(10, 8),
+  startPos: { x: 1, y: 1 },
+  venues: [
+    { id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' },
+    {
+      id: 'tavern',
+      name: 'The Split Acorn',
+      pos: { x: 4, y: 3 },
+      kind: 'interior',
+      entryRoomId: 'acorn-taproom',
+      desc: 'Lamplight and the smell of cider.',
+    },
+  ],
+  floor: 'dirt',
+};
+
+const TOWN_B: CampaignTown = {
+  id: 'milldale',
+  name: 'Milldale',
+  feetPerSquare: 25,
+  grid: G(6, 6),
   startPos: { x: 0, y: 0 },
 };
 
@@ -400,6 +492,65 @@ describe('editable sections registry', () => {
     expect(regions.safeParse([region({ encounterChance: 1.5 })]).success).toBe(false);
     expect(regions.safeParse([region({ baseTier: 9 })]).success).toBe(false);
   });
+
+  // A minimal valid town — tests tweak single fields off this base.
+  const town = (over: Record<string, unknown> = {}) => ({
+    id: 'oakvale',
+    name: 'Oakvale',
+    feetPerSquare: 25,
+    grid: G(10, 8),
+    startPos: { x: 1, y: 1 },
+    ...over,
+  });
+
+  it('towns schema accepts the full fixture and a lean town', () => {
+    const result = CAMPAIGN_SECTION_SCHEMAS.towns.safeParse([TOWN_A, TOWN_B]);
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it('towns schema validates venues: interior needs entryRoomId, bounds, unique ids', () => {
+    const towns = CAMPAIGN_SECTION_SCHEMAS.towns;
+    const gate = { id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' };
+    const tavern = {
+      id: 'tavern',
+      name: 'The Split Acorn',
+      pos: { x: 4, y: 3 },
+      kind: 'interior',
+      entryRoomId: 'acorn-taproom',
+    };
+    expect(towns.safeParse([town({ venues: [gate, tavern] })]).success).toBe(true);
+    // Interior without entryRoomId; gates carry no target and are fine bare.
+    expect(
+      towns.safeParse([town({ venues: [{ ...tavern, entryRoomId: undefined }] })]).success
+    ).toBe(false);
+    // Out-of-grid pos (grid is 10x8) and duplicate ids.
+    expect(towns.safeParse([town({ venues: [{ ...gate, pos: { x: 10, y: 0 } }] })]).success).toBe(
+      false
+    );
+    expect(towns.safeParse([town({ venues: [gate, gate] })]).success).toBe(false);
+    // Unknown extra field and off-enum kind.
+    expect(towns.safeParse([town({ venues: [{ ...gate, locked: true }] })]).success).toBe(false);
+    expect(towns.safeParse([town({ venues: [{ ...gate, kind: 'portal' }] })]).success).toBe(false);
+  });
+
+  it('towns schema enforces grid shape, floor enum, and unique town ids', () => {
+    const towns = CAMPAIGN_SECTION_SCHEMAS.towns;
+    for (const missing of ['feetPerSquare', 'grid', 'startPos']) {
+      const t = town();
+      delete (t as Record<string, unknown>)[missing];
+      expect(towns.safeParse([t]).success, `missing ${missing} should fail`).toBe(false);
+    }
+    const ragged = G(4, 3);
+    ragged[1] = ragged[1].slice(0, 2);
+    expect(towns.safeParse([town({ grid: ragged, startPos: { x: 0, y: 0 } })]).success).toBe(false);
+    expect(towns.safeParse([town({ startPos: { x: 10, y: 0 } })]).success).toBe(false); // x == width
+    expect(towns.safeParse([town({ floor: 'lava' })]).success).toBe(false);
+    expect(towns.safeParse([town({ floor: 'cobblestone' })]).success).toBe(true);
+    expect(towns.safeParse([town(), town({ name: 'B' })]).success).toBe(false); // dup ids
+    expect(towns.safeParse([town({ id: 'Oakvale!' })]).success).toBe(false);
+    expect(towns.safeParse([]).success).toBe(false);
+    expect(towns.safeParse([town({ mayor: 'Bob' })]).success).toBe(false);
+  });
 });
 
 describe('regions table store', () => {
@@ -444,6 +595,50 @@ describe('regions table store', () => {
   });
 });
 
+describe('towns table store', () => {
+  it('round-trips towns with their venues in order, preserving optionals', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect(await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A, TOWN_B])).toBe(true);
+    const back = await getCampaignTowns(db.pool, 'malgovia');
+    expect(back).toEqual([TOWN_A, TOWN_B]);
+    // Optional fields absent (not null): the gate venue has no
+    // entryRoomId/desc, and the lean town carries no venues/floor keys.
+    expect('entryRoomId' in back[0].venues![0]).toBe(false);
+    expect('desc' in back[0].venues![0]).toBe(false);
+    expect('venues' in back[1]).toBe(false);
+    expect('floor' in back[1]).toBe(false);
+  });
+
+  it('put is replace-all and cascades venue rows', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A, TOWN_B]);
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_B]);
+    const back = await getCampaignTowns(db.pool, 'malgovia');
+    expect(back).toEqual([TOWN_B]);
+    // TOWN_A's venues went with it — a re-add of the bare town stays bare.
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [{ ...TOWN_A, venues: undefined }]);
+    expect('venues' in (await getCampaignTowns(db.pool, 'malgovia'))[0]).toBe(false);
+  });
+
+  it('rejects writes to a missing campaign; delete reverts to empty', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect(await putCampaignSection(db.pool, 'nope', 'towns', [TOWN_A])).toBe(false);
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'towns')).toBe(true);
+    expect(await getCampaignTowns(db.pool, 'malgovia')).toEqual([]);
+    expect(await deleteCampaignSection(db.pool, 'nope', 'towns')).toBe(false);
+  });
+
+  it('getDbSection reports presence from the towns table', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    expect((await getDbSection(db.pool, 'malgovia', 'towns')).present).toBe(false);
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
+    const after = await getDbSection(db.pool, 'malgovia', 'towns');
+    expect(after.present).toBe(true);
+    expect(after.value).toEqual([TOWN_A]);
+  });
+});
+
 describe('section CRUD + live refresh', () => {
   it('put → refresh serves the DB version; delete → refresh restores code', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
@@ -482,6 +677,49 @@ describe('section CRUD + live refresh', () => {
     expect(campaign.regions?.[0].gridWidth).toBe(12);
     expect(campaign.regions?.[0].gridHeight).toBe(10);
     expect(campaign.regions?.[0].startPos).toEqual({ x: 3, y: 4 });
+  });
+
+  it('refresh folds DB towns into the campaign block beside the regions', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
+        towns: [{ id: 'old-code-town' } as never],
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const campaign = contexts.malgovia.campaign!;
+    expect(campaign.rooms.map((r) => r.id)).toEqual(['square']);
+    expect(campaign.regions?.map((r) => r.id)).toEqual(['malgovia']);
+    // DB towns replace the code towns, converted to engine form.
+    expect(campaign.towns?.map((t) => t.id)).toEqual(['oakvale']);
+    expect(campaign.towns?.[0].gridWidth).toBe(10);
+    expect(campaign.towns?.[0].venues.map((v) => v.id)).toEqual(['gate', 'tavern']);
+  });
+
+  it('DB towns without DB regions still fold in, keeping the code regions', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [],
+        regions: [{ id: 'code-region' } as never],
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const campaign = contexts.malgovia.campaign!;
+    expect(campaign.towns?.map((t) => t.id)).toEqual(['oakvale']);
+    expect(campaign.regions?.map((r) => r.id)).toEqual(['code-region']);
   });
 
   it('regions round-trip their sites (child rows) in order; replace-all cascades them', async () => {
@@ -589,6 +827,43 @@ describe('dbRegionsToEngine', () => {
     expect(region.encounterChance).toBe(0.15);
     expect(region.baseTier).toBe(1);
     expect(region.desc).toBe('A mist-shrouded vale.');
+  });
+});
+
+describe('dbTownsToEngine', () => {
+  it('converts the dense grid to sparse terrain with derived dims', () => {
+    const grid = G(10, 8);
+    grid[0][2] = { t: 'water' };
+    grid[3][4] = { t: 'forest' };
+    const [town] = dbTownsToEngine([{ ...TOWN_A, grid }]);
+    expect(town.gridWidth).toBe(10);
+    expect(town.gridHeight).toBe(8);
+    expect(town.terrain).toEqual([
+      { pos: { x: 2, y: 0 }, type: 'water' },
+      { pos: { x: 4, y: 3 }, type: 'forest' },
+    ]);
+    // An all-plains grid carries no terrain key at all.
+    expect(dbTownsToEngine([TOWN_A])[0].terrain).toBeUndefined();
+  });
+
+  it('drops per-cell tier/enc — meaningless at town scale', () => {
+    const grid = G(10, 8);
+    grid[1][1] = { t: 'road', tier: 3, enc: 0.5 };
+    const [town] = dbTownsToEngine([{ ...TOWN_A, grid }]);
+    expect(town.terrain).toEqual([{ pos: { x: 1, y: 1 }, type: 'road' }]);
+    expect('tierZones' in town).toBe(false);
+  });
+
+  it('passes venues, floor, and scalars through; venueless towns get []', () => {
+    const [town, lean] = dbTownsToEngine([TOWN_A, TOWN_B]);
+    expect(town.venues).toEqual(TOWN_A.venues);
+    expect(town.floor).toBe('dirt');
+    expect(town.feetPerSquare).toBe(25);
+    expect(town.startPos).toEqual({ x: 1, y: 1 });
+    expect(town.desc).toBe('A timber town under the old oak.');
+    // The engine Town shape requires venues; lean towns get an empty list.
+    expect(lean.venues).toEqual([]);
+    expect('floor' in lean).toBe(false);
   });
 });
 

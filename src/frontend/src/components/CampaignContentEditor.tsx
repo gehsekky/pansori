@@ -35,12 +35,12 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
 
 function CampaignContentEditor({
   campaignId,
-  onEditRegion,
+  onEditMap,
 }: {
   campaignId: string;
-  // Open the visual painter for one of this campaign's regions — offered
-  // under the REGIONS section when provided.
-  onEditRegion?: (regionId: string) => void;
+  // Open the visual painter for one of this campaign's regions/towns —
+  // offered under the REGIONS / TOWNS sections when provided.
+  onEditMap?: (kind: 'region' | 'town', mapId: string) => void;
 }) {
   const [sections, setSections] = useState<CampaignSectionInfo[]>([]);
   const [sectionsErr, setSectionsErr] = useState<string | null>(null);
@@ -109,26 +109,32 @@ function CampaignContentEditor({
     }
   }
 
-  // A minimal valid region to get a new campaign onto the map painter in
+  // A minimal valid region/town to get a campaign onto the map painter in
   // one click: insert → SAVE → its PAINT button appears.
-  function starterRegionJson(): string {
+  function starterMapJson(section: 'regions' | 'towns'): string {
     const grid = Array.from({ length: 8 }, () =>
       Array.from({ length: 10 }, () => ({ t: 'plains' }))
     );
-    return JSON.stringify(
-      [
-        {
-          id: 'region-1',
-          name: 'New Region',
-          isStartingRegion: true,
-          feetPerSquare: 5280,
-          grid,
-          startPos: { x: 1, y: 1 },
-        },
-      ],
-      null,
-      2
-    );
+    const starter =
+      section === 'regions'
+        ? {
+            id: 'region-1',
+            name: 'New Region',
+            isStartingRegion: true,
+            feetPerSquare: 5280,
+            grid,
+            startPos: { x: 1, y: 1 },
+          }
+        : {
+            id: 'town-1',
+            name: 'New Town',
+            feetPerSquare: 25,
+            grid,
+            startPos: { x: 1, y: 1 },
+            floor: 'dirt',
+            venues: [{ id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' }],
+          };
+    return JSON.stringify([starter], null, 2);
   }
 
   async function handleRevert() {
@@ -200,13 +206,14 @@ function CampaignContentEditor({
 
       {active && (
         <>
-          {/* Region painter shortcuts — one per SAVED region (the painter
-              loads from the server, so unsaved regions can't be painted
-              yet). With nothing saved, offer a one-click starter region. */}
-          {active === 'regions' &&
-            onEditRegion &&
+          {/* Map painter shortcuts — one per SAVED region/town (the painter
+              loads from the server, so unsaved maps can't be painted yet).
+              With nothing saved, offer a one-click starter. */}
+          {(active === 'regions' || active === 'towns') &&
+            onEditMap &&
             (() => {
-              const savedRegions = (Array.isArray(savedValue) ? savedValue : []).filter(
+              const mapKind = active === 'regions' ? 'region' : 'town';
+              const savedMaps = (Array.isArray(savedValue) ? savedValue : []).filter(
                 (r): r is { id: string; name?: string } =>
                   typeof (r as { id?: unknown }).id === 'string'
               );
@@ -220,37 +227,37 @@ function CampaignContentEditor({
                     alignItems: 'center',
                   }}
                 >
-                  {savedRegions.length > 0 ? (
+                  {savedMaps.length > 0 ? (
                     <>
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>PAINT MAP:</span>
-                      {savedRegions.map((r) => (
+                      {savedMaps.map((r) => (
                         <button
                           key={r.id}
                           className={styles.ghostBtn}
                           style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
-                          onClick={() => onEditRegion(r.id)}
+                          onClick={() => onEditMap(mapKind, r.id)}
                         >
                           🗺 {r.name ?? r.id}
                         </button>
                       ))}
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        (NEW REGIONS NEED A SAVE FIRST)
+                        (NEW {active.toUpperCase()} NEED A SAVE FIRST)
                       </span>
                     </>
                   ) : (
                     <>
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        NO SAVED REGIONS YET —
+                        NO SAVED {active.toUpperCase()} YET —
                       </span>
                       <button
                         className={styles.ghostBtn}
                         style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
                         onClick={() => {
-                          setText(starterRegionJson());
+                          setText(starterMapJson(active));
                           setSaved(false);
                         }}
                       >
-                        INSERT STARTER REGION
+                        INSERT STARTER {mapKind.toUpperCase()}
                       </button>
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
                         THEN SAVE TO UNLOCK THE MAP PAINTER
