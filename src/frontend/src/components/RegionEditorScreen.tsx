@@ -7,13 +7,14 @@ import styles from '../styles.module.css';
 //   /creator/<campaign id>/region/<region id>   (kind 'region')
 //   /creator/<campaign id>/town/<town id>       (kind 'town')
 //
-// Edits ONE map's dense terrain grid: pick a terrain from the palette
-// and click/drag to paint; the TIER tool (regions only — towns carry no
-// tiers) paints per-cell tier overrides (rendered as a corner number);
-// the START tool relocates the party marker. Sites/venues render as ◆
-// markers (edited via the section JSON for now). SAVE writes the whole
-// section back through the normal content PUT — same validation, same
-// live refresh.
+// Edits ONE map: its dense terrain grid plus the non-map details (name,
+// description, scale; region encounter chance / base tier / starting
+// flag; town floor). Pick a terrain from the palette and click/drag to
+// paint; the TIER tool (regions only — towns carry no tiers) paints
+// per-cell tier overrides (rendered as a corner number); the START tool
+// relocates the party marker. Sites/venues render as ◆ markers (edited
+// via the section JSON for now). SAVE writes the whole section back
+// through the normal content PUT — same validation, same live refresh.
 //
 // The grid model is the painter's data model on purpose (design call
 // 2026-06-06): cells are { t, tier?, enc? }; terrain BEHAVIOR derives
@@ -30,9 +31,37 @@ interface EditorRegion {
   name: string;
   grid: Cell[][];
   startPos: { x: number; y: number };
+  desc?: string;
+  feetPerSquare?: number;
+  isStartingRegion?: boolean; // regions only
+  encounterChance?: number; // regions only
+  baseTier?: number; // regions only
+  floor?: string; // towns only
   sites?: Array<{ id: string; name: string; pos: { x: number; y: number }; kind: string }>;
   venues?: Array<{ id: string; name: string; pos: { x: number; y: number }; kind: string }>;
   [key: string]: unknown;
+}
+
+// The non-map fields editable on this page, held as strings ('' = unset)
+// and parsed/pruned at save time.
+interface Details {
+  name: string;
+  desc: string;
+  feetPerSquare: string;
+  encounterChance: string; // regions only
+  baseTier: string; // regions only
+  floor: string; // towns only
+}
+
+function detailsFrom(r: EditorRegion): Details {
+  return {
+    name: r.name ?? '',
+    desc: r.desc ?? '',
+    feetPerSquare: r.feetPerSquare !== undefined ? String(r.feetPerSquare) : '',
+    encounterChance: r.encounterChance !== undefined ? String(r.encounterChance) : '',
+    baseTier: r.baseTier !== undefined ? String(r.baseTier) : '',
+    floor: r.floor ?? '',
+  };
 }
 
 const TERRAIN_COLORS: Record<TerrainType, string> = {
@@ -85,6 +114,10 @@ function RegionEditorScreen({
   const [regions, setRegions] = useState<EditorRegion[] | null>(null);
   const [grid, setGrid] = useState<Cell[][]>([]);
   const [startPos, setStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [details, setDetails] = useState<Details>(detailsFrom({} as EditorRegion));
+  // Regions only: flip THIS region to the starting region on save (the
+  // others go false in the same write — exactly-one is a schema rule).
+  const [makeStarter, setMakeStarter] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -116,6 +149,8 @@ function RegionEditorScreen({
         }
         setGrid(r.grid.map((row) => row.map((c) => ({ ...c }))));
         setStartPos({ ...r.startPos });
+        setDetails(detailsFrom(r));
+        setMakeStarter(false);
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
   }, [campaignId, regionId, section, kind]);
@@ -174,15 +209,54 @@ function RegionEditorScreen({
     setSaved(false);
   }
 
+  // Fold the details form back into the region: '' clears an optional
+  // field, numbers parse client-side (the server re-validates shapes).
+  function mergeDetails(r: EditorRegion): EditorRegion | { error: string } {
+    const next: EditorRegion = { ...r, grid, startPos };
+    next.name = details.name.trim() || r.name;
+    if (details.desc.trim()) next.desc = details.desc.trim();
+    else delete next.desc;
+    const fps = Number(details.feetPerSquare);
+    if (!Number.isFinite(fps) || fps <= 0) {
+      return { error: 'FEET PER SQUARE must be a positive number.' };
+    }
+    next.feetPerSquare = fps;
+    if (kind === 'region') {
+      if (details.encounterChance.trim() === '') delete next.encounterChance;
+      else {
+        const enc = Number(details.encounterChance);
+        if (!Number.isFinite(enc) || enc < 0 || enc > 1) {
+          return { error: 'ENCOUNTER CHANCE must be between 0 and 1.' };
+        }
+        next.encounterChance = enc;
+      }
+      if (details.baseTier === '') delete next.baseTier;
+      else next.baseTier = Number(details.baseTier);
+      if (makeStarter) next.isStartingRegion = true;
+    } else if (details.floor === '') delete next.floor;
+    else next.floor = details.floor;
+    return next;
+  }
+
   async function handleSave() {
     if (!regions || !region || busy) return;
+    const merged = mergeDetails(region);
+    if ('error' in merged && typeof merged.error === 'string') {
+      setError(merged.error);
+      return;
+    }
     setBusy(true);
     setError(null);
     setSaved(false);
-    const updated = regions.map((r) => (r.id === regionId ? { ...r, grid, startPos } : r));
+    const updated = regions.map((r) => {
+      if (r.id === regionId) return merged as EditorRegion;
+      // Exactly one starting region: claiming the flag releases it elsewhere.
+      return makeStarter && kind === 'region' ? { ...r, isStartingRegion: false } : r;
+    });
     try {
       await api.putCampaignSection(campaignId, section, updated);
       setRegions(updated);
+      setMakeStarter(false);
       setDirty(false);
       setSaved(true);
     } catch (err) {
@@ -190,6 +264,12 @@ function RegionEditorScreen({
     } finally {
       setBusy(false);
     }
+  }
+
+  function updateDetail(key: keyof Details, value: string) {
+    setDetails((d) => ({ ...d, [key]: value }));
+    setDirty(true);
+    setSaved(false);
   }
 
   const height = grid.length;
@@ -459,6 +539,155 @@ function RegionEditorScreen({
                   ? 'CLICK / DRAG TO PAINT · ★ START · ◆ SITE (edit sites in the REGIONS JSON) · CORNER NUMBER = TIER OVERRIDE'
                   : 'CLICK / DRAG TO PAINT · ★ START · ◆ VENUE (edit venues in the TOWNS JSON)'}
               </p>
+            </div>
+
+            {/* ── Details (the non-map fields; saved with the map) ────────── */}
+            <div className={styles.card} style={{ marginTop: '1rem' }}>
+              <p
+                style={{
+                  fontSize: '0.8rem',
+                  letterSpacing: '0.12em',
+                  color: 'var(--t-mid)',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                DETAILS
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '2 1 220px' }}>
+                  <label className={styles.formLbl} htmlFor="map-detail-name">
+                    NAME
+                  </label>
+                  <input
+                    id="map-detail-name"
+                    className={styles.formInp}
+                    value={details.name}
+                    onChange={(e) => updateDetail('name', e.target.value)}
+                  />
+                </div>
+                <div style={{ flex: '1 1 120px' }}>
+                  <label className={styles.formLbl} htmlFor="map-detail-fps">
+                    FEET PER SQUARE
+                  </label>
+                  <input
+                    id="map-detail-fps"
+                    className={styles.formInp}
+                    type="number"
+                    min={1}
+                    value={details.feetPerSquare}
+                    onChange={(e) => updateDetail('feetPerSquare', e.target.value)}
+                  />
+                </div>
+                {kind === 'region' && (
+                  <>
+                    <div style={{ flex: '1 1 120px' }}>
+                      <label className={styles.formLbl} htmlFor="map-detail-enc">
+                        ENCOUNTER CHANCE (0–1)
+                      </label>
+                      <input
+                        id="map-detail-enc"
+                        className={styles.formInp}
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        placeholder="none"
+                        value={details.encounterChance}
+                        onChange={(e) => updateDetail('encounterChance', e.target.value)}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 100px' }}>
+                      <label className={styles.formLbl} htmlFor="map-detail-tier">
+                        BASE TIER
+                      </label>
+                      <select
+                        id="map-detail-tier"
+                        className={styles.formInp}
+                        style={{ cursor: 'pointer' }}
+                        value={details.baseTier}
+                        onChange={(e) => updateDetail('baseTier', e.target.value)}
+                      >
+                        <option value="">—</option>
+                        {[1, 2, 3, 4].map((t) => (
+                          <option key={t} value={String(t)}>
+                            TIER {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+                {kind === 'town' && (
+                  <div style={{ flex: '1 1 120px' }}>
+                    <label className={styles.formLbl} htmlFor="map-detail-floor">
+                      FLOOR
+                    </label>
+                    <select
+                      id="map-detail-floor"
+                      className={styles.formInp}
+                      style={{ cursor: 'pointer' }}
+                      value={details.floor}
+                      onChange={(e) => updateDetail('floor', e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {['grass', 'dirt', 'cobblestone', 'sand'].map((f) => (
+                        <option key={f} value={f}>
+                          {f.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: '0.75rem' }}>
+                <label className={styles.formLbl} htmlFor="map-detail-desc">
+                  DESCRIPTION
+                </label>
+                <textarea
+                  id="map-detail-desc"
+                  className={styles.formInp}
+                  rows={2}
+                  style={{ resize: 'vertical' }}
+                  value={details.desc}
+                  onChange={(e) => updateDetail('desc', e.target.value)}
+                />
+              </div>
+              {kind === 'region' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'center',
+                    marginTop: '0.75rem',
+                  }}
+                >
+                  {region.isStartingRegion && !makeStarter ? (
+                    <span style={{ color: 'var(--t-hp-high)', fontSize: '0.75rem' }}>
+                      ★ STARTING REGION
+                    </span>
+                  ) : makeStarter ? (
+                    <span style={{ color: 'var(--t-hp-mid)', fontSize: '0.75rem' }}>
+                      ★ BECOMES THE STARTING REGION ON SAVE
+                    </span>
+                  ) : (
+                    <button
+                      className={styles.ghostBtn}
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+                      data-testid="make-starter-btn"
+                      onClick={() => {
+                        setMakeStarter(true);
+                        setDirty(true);
+                        setSaved(false);
+                      }}
+                    >
+                      MAKE STARTING REGION
+                    </button>
+                  )}
+                  <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
+                    THE PARTY OPENS THE CAMPAIGN IN THE STARTING REGION
+                  </span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: 8 }}>

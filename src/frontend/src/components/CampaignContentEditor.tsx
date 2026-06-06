@@ -109,31 +109,22 @@ function CampaignContentEditor({
     }
   }
 
-  // A minimal valid region/town to get a campaign onto the map painter in
-  // one click: insert → SAVE → its PAINT button appears.
-  function starterMapJson(section: 'regions' | 'towns'): string {
+  // A minimal valid town to get a campaign onto the map painter in one
+  // click: insert → SAVE → its PAINT button appears. (Regions get their
+  // own card-based panel below the content box, so no starter here.)
+  function starterTownJson(): string {
     const grid = Array.from({ length: 8 }, () =>
       Array.from({ length: 10 }, () => ({ t: 'plains' }))
     );
-    const starter =
-      section === 'regions'
-        ? {
-            id: 'region-1',
-            name: 'New Region',
-            isStartingRegion: true,
-            feetPerSquare: 5280,
-            grid,
-            startPos: { x: 1, y: 1 },
-          }
-        : {
-            id: 'town-1',
-            name: 'New Town',
-            feetPerSquare: 25,
-            grid,
-            startPos: { x: 1, y: 1 },
-            floor: 'dirt',
-            venues: [{ id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' }],
-          };
+    const starter = {
+      id: 'town-1',
+      name: 'New Town',
+      feetPerSquare: 25,
+      grid,
+      startPos: { x: 1, y: 1 },
+      floor: 'dirt',
+      venues: [{ id: 'gate', name: 'Town Gate', pos: { x: 0, y: 1 }, kind: 'gate' }],
+    };
     return JSON.stringify([starter], null, 2);
   }
 
@@ -206,13 +197,13 @@ function CampaignContentEditor({
 
       {active && (
         <>
-          {/* Map painter shortcuts — one per SAVED region/town (the painter
-              loads from the server, so unsaved maps can't be painted yet).
-              With nothing saved, offer a one-click starter. */}
-          {(active === 'regions' || active === 'towns') &&
+          {/* Map painter shortcuts — one per SAVED town (the painter loads
+              from the server, so unsaved maps can't be painted yet). With
+              nothing saved, offer a one-click starter. Regions navigate
+              through the REGIONS card panel below the content box instead. */}
+          {active === 'towns' &&
             onEditMap &&
             (() => {
-              const mapKind = active === 'regions' ? 'region' : 'town';
               const savedMaps = (Array.isArray(savedValue) ? savedValue : []).filter(
                 (r): r is { id: string; name?: string } =>
                   typeof (r as { id?: unknown }).id === 'string'
@@ -235,29 +226,29 @@ function CampaignContentEditor({
                           key={r.id}
                           className={styles.ghostBtn}
                           style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
-                          onClick={() => onEditMap(mapKind, r.id)}
+                          onClick={() => onEditMap('town', r.id)}
                         >
                           🗺 {r.name ?? r.id}
                         </button>
                       ))}
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        (NEW {active.toUpperCase()} NEED A SAVE FIRST)
+                        (NEW TOWNS NEED A SAVE FIRST)
                       </span>
                     </>
                   ) : (
                     <>
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
-                        NO SAVED {active.toUpperCase()} YET —
+                        NO SAVED TOWNS YET —
                       </span>
                       <button
                         className={styles.ghostBtn}
                         style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
                         onClick={() => {
-                          setText(starterMapJson(active));
+                          setText(starterTownJson());
                           setSaved(false);
                         }}
                       >
-                        INSERT STARTER {mapKind.toUpperCase()}
+                        INSERT STARTER TOWN
                       </button>
                       <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>
                         THEN SAVE TO UNLOCK THE MAP PAINTER

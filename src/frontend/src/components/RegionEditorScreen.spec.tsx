@@ -141,4 +141,112 @@ describe('RegionEditorScreen', () => {
     renderEditor();
     expect(await screen.findByText(/No region "proving-grounds"/)).toBeTruthy();
   });
+
+  it('details form edits name/desc/scale/tiering and saves them with the map', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    // Pre-filled from the loaded region.
+    expect((screen.getByLabelText('NAME') as HTMLInputElement).value).toBe('The Proving Grounds');
+    expect((screen.getByLabelText('FEET PER SQUARE') as HTMLInputElement).value).toBe('5280');
+
+    fireEvent.change(screen.getByLabelText('NAME'), { target: { value: 'The Crucible' } });
+    fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: 'Iron and ash.' } });
+    fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), {
+      target: { value: '0.25' },
+    });
+    fireEvent.change(screen.getByLabelText('BASE TIER'), { target: { value: '2' } });
+    expect(screen.getByText(/UNSAVED/)).toBeTruthy();
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const list = mocked.putCampaignSection.mock.calls[0][2] as (typeof REGION)[];
+    expect(list[0].name).toBe('The Crucible');
+    expect((list[0] as { desc?: string }).desc).toBe('Iron and ash.');
+    expect((list[0] as { encounterChance?: number }).encounterChance).toBe(0.25);
+    expect((list[0] as { baseTier?: number }).baseTier).toBe(2);
+    // Untouched fields survive the merge.
+    expect(list[0].isStartingRegion).toBe(true);
+    expect(list[0].sites).toEqual(REGION.sites);
+  });
+
+  it('clearing an optional detail removes the key instead of writing empty', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'regions',
+      source: 'db',
+      value: [{ ...REGION, desc: 'old', encounterChance: 0.5, baseTier: 3 }, OTHER],
+    });
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('BASE TIER'), { target: { value: '' } });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    expect('desc' in saved[0]).toBe(false);
+    expect('encounterChance' in saved[0]).toBe(false);
+    expect('baseTier' in saved[0]).toBe(false);
+  });
+
+  it('rejects an out-of-range encounter chance client-side', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), { target: { value: '2' } });
+    fireEvent.click(screen.getByText('SAVE'));
+    expect(await screen.findByText(/ENCOUNTER CHANCE must be between 0 and 1/)).toBeTruthy();
+    expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+  });
+
+  it('MAKE STARTING REGION claims the flag and releases it from the others', async () => {
+    render(<RegionEditorScreen campaignId="sandbox" regionId="frost-reach" onBack={vi.fn()} />);
+    await screen.findByTestId('cell-0-0');
+    // frost-reach is not the starter — the claim button shows.
+    fireEvent.click(screen.getByTestId('make-starter-btn'));
+    expect(screen.getByText(/BECOMES THE STARTING REGION ON SAVE/)).toBeTruthy();
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const list = mocked.putCampaignSection.mock.calls[0][2] as (typeof REGION)[];
+    expect(list.find((r) => r.id === 'frost-reach')!.isStartingRegion).toBe(true);
+    expect(list.find((r) => r.id === 'proving-grounds')!.isStartingRegion).toBe(false);
+    // After the save the badge replaces the pending note.
+    expect(await screen.findByText('★ STARTING REGION')).toBeTruthy();
+  });
+
+  it('the starting region shows the badge, not the claim button', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    expect(screen.getByText('★ STARTING REGION')).toBeTruthy();
+    expect(screen.queryByTestId('make-starter-btn')).toBeNull();
+  });
+
+  it('town mode swaps the region-only details for the floor picker', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'towns',
+      source: 'db',
+      value: [
+        {
+          id: 'oakvale',
+          name: 'Oakvale',
+          feetPerSquare: 25,
+          grid: [[{ t: 'plains' }, { t: 'road' }]],
+          startPos: { x: 0, y: 0 },
+          floor: 'dirt',
+        },
+      ],
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'towns', source: 'db' });
+    render(
+      <RegionEditorScreen campaignId="sandbox" regionId="oakvale" kind="town" onBack={vi.fn()} />
+    );
+    await screen.findByTestId('cell-0-0');
+    expect((screen.getByLabelText('FLOOR') as HTMLSelectElement).value).toBe('dirt');
+    expect(screen.queryByLabelText('ENCOUNTER CHANCE (0–1)')).toBeNull();
+    expect(screen.queryByLabelText('BASE TIER')).toBeNull();
+    expect(screen.queryByTestId('make-starter-btn')).toBeNull();
+    fireEvent.change(screen.getByLabelText('FLOOR'), { target: { value: 'cobblestone' } });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{ floor?: string }>;
+    expect(saved[0].floor).toBe('cobblestone');
+  });
 });

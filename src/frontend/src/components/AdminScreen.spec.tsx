@@ -65,9 +65,11 @@ function mockCampaigns(
 
 beforeEach(() => {
   for (const fn of Object.values(mocked)) fn.mockReset();
-  // The content editor renders whenever a campaign is selected — give it a
-  // quiet default so member-management tests don't trip over it.
+  // The content editor + regions panel render whenever a campaign is
+  // selected — give them quiet defaults so member-management tests don't
+  // trip over them.
   mocked.listCampaignSections.mockResolvedValue([]);
+  mocked.getCampaignSection.mockResolvedValue({ section: 'regions', source: 'none', value: null });
 });
 
 describe('AdminScreen', () => {
@@ -265,5 +267,27 @@ describe('AdminScreen', () => {
     );
     // Local state flips without a refetch — button now offers the demote.
     expect(await screen.findByText('MAKE PRIVATE')).toBeTruthy();
+  });
+
+  it('the REGIONS panel routes card clicks through onEditMap with the campaign id', async () => {
+    mockCampaigns('owner');
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'regions',
+      source: 'db',
+      value: [
+        {
+          id: 'vale',
+          name: 'The Vale',
+          isStartingRegion: true,
+          feetPerSquare: 5280,
+          grid: [[{ t: 'plains' }]],
+          startPos: { x: 0, y: 0 },
+        },
+      ],
+    });
+    const onEditMap = vi.fn();
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} onEditMap={onEditMap} />);
+    fireEvent.click(await screen.findByTestId('region-card-vale'));
+    expect(onEditMap).toHaveBeenCalledWith('malgovia', 'region', 'vale');
   });
 });

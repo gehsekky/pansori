@@ -8,6 +8,7 @@ import {
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
 import CampaignContentEditor from './CampaignContentEditor.tsx';
+import RegionsPanel from './RegionsPanel.tsx';
 import styles from '../styles.module.css';
 
 // Map the backend's mutation-failure reasons (routes/campaigns.ts) to
@@ -542,6 +543,16 @@ function AdminScreen({
           <CampaignContentEditor
             campaignId={selected.id}
             onEditMap={onEditMap ? (kind, mapId) => onEditMap(selected.id, kind, mapId) : undefined}
+          />
+        )}
+
+        {/* ── Regions (card-based way into the map painter) ─────────────── */}
+        {selected && (
+          <RegionsPanel
+            campaignId={selected.id}
+            onOpenRegion={
+              onEditMap ? (regionId) => onEditMap(selected.id, 'region', regionId) : undefined
+            }
           />
         )}
       </div>
