@@ -1,9 +1,4 @@
-import {
-  type CampaignSectionInfo,
-  type CampaignSectionSource,
-  type CatalogItem,
-  api,
-} from '../lib/api.ts';
+import { type CampaignSectionInfo, type CampaignSectionSource, api } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import styles from '../styles.module.css';
@@ -14,13 +9,13 @@ import styles from '../styles.module.css';
 // immediately, no restart); REVERT TO CODE deletes the DB version so the
 // campaignData files take over again.
 //
-// Most sections edit as raw JSON. The loot table gets a structured picker
-// (same idiom as the character screen's weapon-mastery badges): every
-// catalog item is a toggleable badge, selected = offered by this campaign.
-// Campaign-custom items (and catalog tweaks saved earlier) survive the
-// picker — customs render as their own toggleable badges, and a selected
-// catalog id whose stored definition differs keeps its stored version.
-// EDIT AS JSON drops to the raw editor for authoring tweaks/customs.
+// Most sections edit as raw JSON. Catalog-backed list sections (loot
+// table, enemy templates) get a structured picker — the same idiom as the
+// character screen's weapon-mastery badges: every catalog entry is a
+// toggleable badge, selected = offered by this campaign. Campaign-custom
+// entries survive the picker under a CAMPAIGN CUSTOM group (for monsters
+// that includes rethemed SRD entries — anything not byte-identical to the
+// catalog). EDIT AS JSON drops to the raw editor for authoring those.
 
 function describeError(err: unknown): string {
   const e = err as { error?: string; issues?: Array<{ path: string; message: string }> };
@@ -41,12 +36,91 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
   none: 'EMPTY',
 };
 
-const ITEM_TYPE_ORDER: Array<CatalogItem['type']> = ['weapon', 'armor', 'consumable', 'misc'];
-const ITEM_TYPE_LABEL: Record<CatalogItem['type'], string> = {
-  weapon: 'WEAPONS',
-  armor: 'ARMOR',
-  consumable: 'CONSUMABLES',
-  misc: 'MISC',
+// Key-order-insensitive structural equality — mirrors the server's
+// matching rule for catalog entries.
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+// ─── Catalog picker plumbing ─────────────────────────────────────────────────
+
+interface PickerEntry {
+  key: string;
+  label: string;
+  group: string;
+  title: string;
+  definition: Record<string, unknown>;
+}
+
+function crLabel(cr: number): string {
+  if (cr === 0.125) return '1/8';
+  if (cr === 0.25) return '1/4';
+  if (cr === 0.5) return '1/2';
+  return String(cr);
+}
+
+function crBand(cr: number): string {
+  if (cr < 1) return 'CR 0 – 1/2';
+  if (cr <= 2) return 'CR 1 – 2';
+  if (cr <= 5) return 'CR 3 – 5';
+  return 'CR 6+';
+}
+
+interface PickerConfig {
+  load: () => Promise<PickerEntry[]>;
+  groups: string[];
+  // Selection key of a stored (section-value) item: a catalog key when the
+  // item corresponds to a catalog entry, else a custom: key.
+  storedKey: (item: Record<string, unknown>, entries: PickerEntry[]) => string;
+  customLabel: (item: Record<string, unknown>) => string;
+}
+
+const PICKER_SECTIONS: Record<string, PickerConfig> = {
+  lootTable: {
+    load: async () =>
+      (await api.listItemCatalog()).map((i) => ({
+        key: i.id,
+        label: i.name,
+        group: { weapon: 'WEAPONS', armor: 'ARMOR', consumable: 'CONSUMABLES', misc: 'MISC' }[
+          i.type
+        ],
+        title: i.desc,
+        definition: i as unknown as Record<string, unknown>,
+      })),
+    groups: ['WEAPONS', 'ARMOR', 'CONSUMABLES', 'MISC'],
+    // Items carry ids — a stored item matches the catalog entry of the
+    // same id even when its definition was tweaked.
+    storedKey: (item, entries) =>
+      entries.some((e) => e.key === item.id) ? (item.id as string) : `custom:${item.id}`,
+    customLabel: (item) => String(item.name ?? item.id),
+  },
+  enemyTemplates: {
+    load: async () =>
+      (await api.listMonsterCatalog()).map((m) => ({
+        key: m.id,
+        label: `${m.definition.name} (CR ${crLabel(m.definition.cr)})`,
+        group: crBand(m.definition.cr),
+        title: `HP ${m.definition.hp} · AC ${m.definition.ac} · +${m.definition.toHit} to hit · ${m.definition.damage}`,
+        definition: m.definition as unknown as Record<string, unknown>,
+      })),
+    groups: ['CR 0 – 1/2', 'CR 1 – 2', 'CR 3 – 5', 'CR 6+'],
+    // Templates carry no ids — a stored template matches a catalog entry
+    // only by deep equality; everything else (rethemes, bosses) is custom.
+    storedKey: (item, entries) => {
+      const eq = stableStringify(item);
+      const match = entries.find((e) => stableStringify(e.definition) === eq);
+      return match ? match.key : `custom:${item.name}`;
+    },
+    customLabel: (item) => String(item.name),
+  },
 };
 
 function badgeStyle(on: boolean): CSSProperties {
@@ -72,13 +146,16 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Loot-table picker state. `lootValue` is the section's effective item
-  // list as loaded (the source of stored tweak/custom definitions);
-  // `selectedIds` drives the badges; `jsonMode` flips to the raw editor.
-  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
-  const [lootValue, setLootValue] = useState<CatalogItem[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Picker state (catalog-backed sections). `storedItems` is the section's
+  // effective list as loaded — the source of stored custom/tweak
+  // definitions; `selectedKeys` drives the badges; `jsonMode` flips raw.
+  const [catalog, setCatalog] = useState<PickerEntry[] | null>(null);
+  const [storedItems, setStoredItems] = useState<Record<string, unknown>[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [jsonMode, setJsonMode] = useState(false);
+
+  const picker = active ? PICKER_SECTIONS[active] : undefined;
+  const usingBadges = !!picker && !jsonMode;
 
   useEffect(() => {
     setActive(null);
@@ -97,42 +174,50 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
       setSaved(false);
       setText('');
       setJsonMode(false);
-      const loads: Promise<unknown>[] = [
-        api.getCampaignSection(campaignId, section).then((s) => {
+      setCatalog(null);
+      const config = PICKER_SECTIONS[section];
+      const loads: Promise<unknown>[] = [api.getCampaignSection(campaignId, section)];
+      if (config) loads.push(config.load());
+      Promise.all(loads)
+        .then((results) => {
+          const s = results[0] as { source: CampaignSectionSource; value: unknown };
           setActiveSource(s.source);
           setText(s.value === null ? '' : JSON.stringify(s.value, null, 2));
-          if (section === 'lootTable') {
-            const items = Array.isArray(s.value) ? (s.value as CatalogItem[]) : [];
-            setLootValue(items);
-            setSelectedIds(new Set(items.map((i) => i.id)));
+          if (config) {
+            const entries = results[1] as PickerEntry[];
+            const items = Array.isArray(s.value) ? (s.value as Record<string, unknown>[]) : [];
+            setCatalog(entries);
+            setStoredItems(items);
+            setSelectedKeys(new Set(items.map((i) => config.storedKey(i, entries))));
           }
-        }),
-      ];
-      if (section === 'lootTable') {
-        loads.push(api.listItemCatalog().then(setCatalog));
-      }
-      Promise.all(loads).catch(() => setError('Could not load this section.'));
+        })
+        .catch(() => setError('Could not load this section.'));
     },
     [campaignId]
   );
 
-  // The item list a badge selection represents: catalog items in display
-  // order (using the stored definition when the campaign saved a tweak),
-  // then selected customs in their stored order.
-  function badgesPayload(): CatalogItem[] {
-    const storedById = new Map(lootValue.map((i) => [i.id, i]));
-    const catalogIds = new Set((catalog ?? []).map((c) => c.id));
-    const out: CatalogItem[] = [];
-    for (const c of catalog ?? []) {
-      if (selectedIds.has(c.id)) out.push(storedById.get(c.id) ?? c);
+  // Stored items keyed by their selection key (for preferring the stored
+  // definition — item tweaks — and for custom definitions).
+  function storedByKey(): Map<string, Record<string, unknown>> {
+    if (!picker || !catalog) return new Map();
+    return new Map(storedItems.map((i) => [picker.storedKey(i, catalog), i]));
+  }
+
+  // The list a badge selection represents: catalog entries in display
+  // order (stored definition preferred), then selected customs in stored order.
+  function badgesPayload(): unknown[] {
+    if (!picker || !catalog) return [];
+    const stored = storedByKey();
+    const out: unknown[] = [];
+    for (const entry of catalog) {
+      if (selectedKeys.has(entry.key)) out.push(stored.get(entry.key) ?? entry.definition);
     }
-    for (const item of lootValue) {
-      if (!catalogIds.has(item.id) && selectedIds.has(item.id)) out.push(item);
+    for (const item of storedItems) {
+      const key = picker.storedKey(item, catalog);
+      if (key.startsWith('custom:') && selectedKeys.has(key)) out.push(item);
     }
     return out;
   }
-
-  const usingBadges = active === 'lootTable' && !jsonMode;
 
   async function handleSave() {
     if (!active || busy) return;
@@ -154,11 +239,11 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
       await api.putCampaignSection(campaignId, active, value);
       setActiveSource('db');
       setSections((prev) => prev.map((s) => (s.section === active ? { ...s, source: 'db' } : s)));
-      if (active === 'lootTable') {
+      if (picker && catalog) {
         // The saved list is the new stored value — keep picker state in sync.
-        const items = value as CatalogItem[];
-        setLootValue(items);
-        setSelectedIds(new Set(items.map((i) => i.id)));
+        const items = value as Record<string, unknown>[];
+        setStoredItems(items);
+        setSelectedKeys(new Set(items.map((i) => picker.storedKey(i, catalog))));
         setText(JSON.stringify(items, null, 2));
       }
       setSaved(true);
@@ -190,12 +275,12 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
     setBusy(false);
   }
 
-  function toggleItem(id: string) {
+  function toggleKey(key: string) {
     setSaved(false);
-    setSelectedIds((prev) => {
+    setSelectedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -211,26 +296,30 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
       return;
     }
     try {
-      const items = JSON.parse(text) as CatalogItem[];
+      const items = JSON.parse(text) as Record<string, unknown>[];
       if (!Array.isArray(items)) throw new Error('not a list');
-      setLootValue(items);
-      setSelectedIds(new Set(items.map((i) => i.id)));
+      if (picker && catalog) {
+        setStoredItems(items);
+        setSelectedKeys(new Set(items.map((i) => picker.storedKey(i, catalog))));
+      }
       setJsonMode(false);
     } catch {
       setError('Not valid JSON — fix the syntax (or save) before switching back.');
     }
   }
 
-  const catalogIdSet = new Set((catalog ?? []).map((c) => c.id));
-  const customItems = lootValue.filter((i) => !catalogIdSet.has(i.id));
-  const tweakedIds = new Set(
-    lootValue
-      .filter((i) => catalogIdSet.has(i.id))
-      .filter((i) => {
-        const c = (catalog ?? []).find((x) => x.id === i.id);
-        return c && JSON.stringify(c) !== JSON.stringify(i);
-      })
-      .map((i) => i.id)
+  // Customs (and, for items, tweak flags) for the picker render.
+  const stored = storedByKey();
+  const customEntries = [...stored.entries()].filter(([key]) => key.startsWith('custom:'));
+  const tweakedKeys = new Set(
+    !picker || !catalog
+      ? []
+      : catalog
+          .filter((e) => {
+            const s = stored.get(e.key);
+            return s && stableStringify(s) !== stableStringify(e.definition);
+          })
+          .map((e) => e.key)
   );
 
   return (
@@ -292,16 +381,16 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
             <label className={styles.formLbl} htmlFor="content-section-editor">
               {active.toUpperCase()} — SERVING FROM {SOURCE_LABEL[activeSource]}
               {usingBadges && (
-                <span style={{ color: 'var(--t-mid)' }}> ({selectedIds.size} SELECTED)</span>
+                <span style={{ color: 'var(--t-mid)' }}> ({selectedKeys.size} SELECTED)</span>
               )}
             </label>
-            {active === 'lootTable' && (
+            {picker && (
               <button
                 className={styles.ghostBtn}
                 style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
                 onClick={toggleJsonMode}
               >
-                {jsonMode ? 'ITEM PICKER' : 'EDIT AS JSON'}
+                {jsonMode ? 'BADGE PICKER' : 'EDIT AS JSON'}
               </button>
             )}
           </div>
@@ -311,11 +400,11 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
               <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>Loading catalog…</p>
             ) : (
               <div>
-                {ITEM_TYPE_ORDER.map((type) => {
-                  const group = catalog.filter((c) => c.type === type);
-                  if (group.length === 0) return null;
+                {picker.groups.map((group) => {
+                  const entries = catalog.filter((e) => e.group === group);
+                  if (entries.length === 0) return null;
                   return (
-                    <div key={type} style={{ marginBottom: '0.75rem' }}>
+                    <div key={group} style={{ marginBottom: '0.75rem' }}>
                       <p
                         style={{
                           fontSize: '0.7rem',
@@ -324,23 +413,23 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
                           marginBottom: 4,
                         }}
                       >
-                        {ITEM_TYPE_LABEL[type]}
+                        {group}
                       </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {group.map((item) => {
-                          const on = selectedIds.has(item.id);
+                        {entries.map((entry) => {
+                          const on = selectedKeys.has(entry.key);
                           return (
                             <button
-                              key={item.id}
+                              key={entry.key}
                               type="button"
                               aria-pressed={on}
-                              title={item.desc}
+                              title={entry.title}
                               style={badgeStyle(on)}
-                              onClick={() => toggleItem(item.id)}
+                              onClick={() => toggleKey(entry.key)}
                             >
                               {on ? '✓ ' : ''}
-                              {item.name}
-                              {tweakedIds.has(item.id) && (
+                              {entry.label}
+                              {tweakedKeys.has(entry.key) && (
                                 <span style={{ opacity: 0.7 }}> (tweaked)</span>
                               )}
                             </button>
@@ -350,7 +439,7 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
                     </div>
                   );
                 })}
-                {customItems.length > 0 && (
+                {customEntries.length > 0 && (
                   <div style={{ marginBottom: '0.75rem' }}>
                     <p
                       style={{
@@ -363,19 +452,19 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
                       CAMPAIGN CUSTOM
                     </p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {customItems.map((item) => {
-                        const on = selectedIds.has(item.id);
+                      {customEntries.map(([key, item]) => {
+                        const on = selectedKeys.has(key);
                         return (
                           <button
-                            key={item.id}
+                            key={key}
                             type="button"
                             aria-pressed={on}
-                            title={item.desc}
+                            title={String(item.desc ?? '')}
                             style={badgeStyle(on)}
-                            onClick={() => toggleItem(item.id)}
+                            onClick={() => toggleKey(key)}
                           >
                             {on ? '✓ ' : ''}
-                            {item.name}
+                            {picker.customLabel(item)}
                           </button>
                         );
                       })}
@@ -402,7 +491,7 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: 8 }}>
             <button
               className={styles.sendBtn}
-              disabled={busy || (usingBadges ? selectedIds.size === 0 : !text.trim())}
+              disabled={busy || (usingBadges ? selectedKeys.size === 0 : !text.trim())}
               onClick={handleSave}
             >
               SAVE TO DATABASE

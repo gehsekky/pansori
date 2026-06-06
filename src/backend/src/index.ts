@@ -20,6 +20,7 @@ import session from 'express-session';
 import { setIO } from './services/broadcast.js';
 import { syncCampaignRegistry } from './services/campaignRegistry.js';
 import { syncItemCatalog } from './services/itemCatalog.js';
+import { syncMonsterCatalog } from './services/monsterCatalog.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -172,6 +173,7 @@ const PORT = process.env.PORT || 3001;
 runMigrations(pool)
   .then(() => syncCampaignRegistry(pool, CONTEXTS))
   .then(() => syncItemCatalog(pool))
+  .then(() => syncMonsterCatalog(pool))
   .then(() => applyCampaignOverlays(pool, CONTEXTS))
   .then(() => {
     httpServer.listen(PORT, () => console.log(`Backend running on :${PORT}`));

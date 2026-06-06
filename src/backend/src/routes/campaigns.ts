@@ -36,6 +36,7 @@ import {
 import { requireAdmin, requireCampaignRole } from '../auth/middleware.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { getItemCatalog } from '../services/itemCatalog.js';
+import { getMonsterCatalog } from '../services/monsterCatalog.js';
 import { pool } from '../db/pool.js';
 
 export const campaignsRouter = Router();
@@ -49,6 +50,17 @@ campaignsRouter.get('/catalog/items', async (_req: Request, res: Response) => {
   } catch (err) {
     console.error('[campaigns] item catalog read failed:', err);
     res.status(500).json({ error: 'Failed to read item catalog' });
+  }
+});
+
+// The global monster catalog (SRD bestiary) — feeds the enemy-templates
+// badge picker. EnemyTemplate carries no id, so entries pair {id, definition}.
+campaignsRouter.get('/catalog/monsters', async (_req: Request, res: Response) => {
+  try {
+    res.json(await getMonsterCatalog(pool));
+  } catch (err) {
+    console.error('[campaigns] monster catalog read failed:', err);
+    res.status(500).json({ error: 'Failed to read monster catalog' });
   }
 });
 

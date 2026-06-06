@@ -10,6 +10,7 @@ vi.mock('../lib/api.ts', () => ({
     putCampaignSection: vi.fn(),
     deleteCampaignSection: vi.fn(),
     listItemCatalog: vi.fn(),
+    listMonsterCatalog: vi.fn(),
   },
 }));
 
@@ -23,14 +24,27 @@ const CATALOG = [
   { id: 'leather_armor', name: 'Leather Armor', type: 'armor', desc: 'AC 11', damage: null },
 ];
 
+const MONSTERS = [
+  {
+    id: 'bandit',
+    definition: { name: 'Bandit', cr: 0.125, hp: 11, ac: 12, toHit: 3, damage: '1d6+1' },
+  },
+  {
+    id: 'ogre',
+    definition: { name: 'Ogre', cr: 2, hp: 59, ac: 11, toHit: 6, damage: '2d8+4' },
+  },
+];
+
 beforeEach(() => {
   for (const fn of Object.values(mocked)) fn.mockReset();
   mocked.listCampaignSections.mockResolvedValue([
     { section: 'displayNoun', source: 'code' },
     { section: 'narratives', source: 'db' },
     { section: 'lootTable', source: 'code' },
+    { section: 'enemyTemplates', source: 'code' },
   ]);
   mocked.listItemCatalog.mockResolvedValue(CATALOG);
+  mocked.listMonsterCatalog.mockResolvedValue(MONSTERS);
 });
 
 describe('CampaignContentEditor', () => {
@@ -173,6 +187,40 @@ describe('CampaignContentEditor', () => {
     );
   });
 
+  it('enemyTemplates picker matches by deep equality — rethemes are customs', async () => {
+    const retheme = { ...MONSTERS[0].definition, name: 'Frost Bandit' };
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'enemyTemplates',
+      source: 'code',
+      value: [MONSTERS[1].definition, retheme], // exact ogre + rethemed bandit
+    });
+    mocked.putCampaignSection.mockResolvedValue({
+      ok: true,
+      section: 'enemyTemplates',
+      source: 'db',
+    });
+    render(<CampaignContentEditor campaignId="malgovia" />);
+    fireEvent.click(await screen.findByText('ENEMYTEMPLATES'));
+    // CR group headers; the exact ogre matches its catalog badge.
+    expect(await screen.findByText('CR 0 – 1/2')).toBeTruthy();
+    const ogre = screen.getByRole('button', { name: /Ogre \(CR 2\)/ });
+    expect(ogre.getAttribute('aria-pressed')).toBe('true');
+    // The rethemed bandit is NOT the catalog bandit — it's a custom.
+    const bandit = screen.getByRole('button', { name: /Bandit \(CR 1\/8\)/ });
+    expect(bandit.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByText('CAMPAIGN CUSTOM')).toBeTruthy();
+    const frostBandit = screen.getByRole('button', { name: /Frost Bandit/ });
+    expect(frostBandit.getAttribute('aria-pressed')).toBe('true');
+    // Save: catalog ogre + the preserved retheme.
+    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
+    await waitFor(() =>
+      expect(mocked.putCampaignSection).toHaveBeenCalledWith('malgovia', 'enemyTemplates', [
+        MONSTERS[1].definition,
+        retheme,
+      ])
+    );
+  });
+
   it('EDIT AS JSON round-trips the selection through the textarea', async () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'lootTable',
@@ -189,7 +237,7 @@ describe('CampaignContentEditor', () => {
     fireEvent.change(textarea, {
       target: { value: JSON.stringify([CATALOG[0], CATALOG[1]]) },
     });
-    fireEvent.click(screen.getByText('ITEM PICKER'));
+    fireEvent.click(screen.getByText('BADGE PICKER'));
     const longsword = await screen.findByRole('button', { name: /Longsword/ });
     expect(longsword.getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText(/2 SELECTED/)).toBeTruthy();

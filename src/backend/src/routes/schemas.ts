@@ -392,11 +392,192 @@ const LootTableSchema = z
     }
   });
 
+// Enemy templates — full EnemyTemplate definitions (types.ts). Another
+// LIVE engine field: a campaign with campaign_monsters mappings serves
+// these stat blocks to actual combat, so the nested boss machinery
+// (phases / legendary / lair) is mirrored strictly too.
+const ConditionNameSchema = z.enum([
+  'paralyzed',
+  'stunned',
+  'poisoned',
+  'prone',
+  'frightened',
+  'blinded',
+  'restrained',
+  'incapacitated',
+  'grappled',
+  'invisible',
+  'exhaustion',
+  'charmed',
+  'unconscious',
+  'deafened',
+  'petrified',
+  'faerie_fired',
+  'banished',
+  'polymorphed',
+]);
+
+const AbilityKeySchema = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
+
+const OnHitEffectSchema = z
+  .object({
+    condition: ConditionNameSchema,
+    ability: AbilityKeySchema.optional(),
+    dc: z.number().int().min(1).max(30).optional(),
+    escapeDc: z.number().int().min(1).max(30).optional(),
+  })
+  .strict();
+
+const BossPhaseEffectSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('set_multiattack'), value: z.number().int().min(1).max(8) }).strict(),
+  z.object({ kind: z.literal('set_damage'), dice: DICE }).strict(),
+  z.object({ kind: z.literal('set_to_hit'), value: z.number().int().min(0).max(20) }).strict(),
+  z.object({ kind: z.literal('set_ac'), value: z.number().int().min(5).max(30) }).strict(),
+  z.object({ kind: z.literal('set_on_hit_effect'), effect: OnHitEffectSchema }).strict(),
+  z.object({ kind: z.literal('add_resistance'), damageType: z.string().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal('heal'), amount: z.number().int().positive() }).strict(),
+]);
+
+const BossPhaseSchema = z
+  .object({
+    // Percentage of max HP (e.g. 50 = the phase triggers at half HP).
+    hpPct: z.number().min(0).max(100),
+    name: z.string().min(1).max(80),
+    narrative: z.string().min(1).max(2000),
+    effects: z.array(BossPhaseEffectSchema),
+  })
+  .strict();
+
+const LegendaryActionSchema = z
+  .object({
+    id: z.string().min(1).max(60),
+    name: z.string().min(1).max(80),
+    cost: z.number().int().min(1).max(5),
+    kind: z.literal('extra_attack'),
+    narrative: z.string().max(2000).optional(),
+  })
+  .strict();
+
+const LairActionSchema = z
+  .object({
+    id: z.string().min(1).max(60),
+    name: z.string().min(1).max(80),
+    kind: z.literal('aoe_save_damage'),
+    dice: DICE,
+    damageType: z.string().min(1).max(20),
+    savingThrow: AbilityKeySchema,
+    saveDC: z.number().int().min(1).max(30),
+    condition: ConditionNameSchema.optional(),
+    conditionDuration: z.number().int().min(1).max(100).optional(),
+    narrative: z.string().min(1).max(2000),
+  })
+  .strict();
+
+const MonsterAuraSchema = z
+  .object({
+    radiusFt: z.number().positive(),
+    save: z
+      .object({ ability: AbilityKeySchema, dc: z.number().int().min(1).max(30) })
+      .strict()
+      .optional(),
+    condition: ConditionNameSchema.optional(),
+    conditionDuration: z.number().int().min(1).max(100).optional(),
+    damage: DICE.optional(),
+    damageType: z.string().min(1).max(20).optional(),
+    name: z.string().min(1).max(80).optional(),
+  })
+  .strict();
+
+const BreathWeaponSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    dice: DICE,
+    damageType: z.string().min(1).max(20),
+    savingThrow: AbilityKeySchema,
+    saveDC: z.number().int().min(1).max(30),
+    rechargeMin: z.number().int().min(2).max(6).optional(),
+    condition: ConditionNameSchema.optional(),
+    conditionDuration: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+const AbilityScore = z.number().int().min(1).max(30);
+
+const EnemyTemplateSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    cr: z.number().min(0).max(30),
+    hp: z.number().int().positive(),
+    ac: z.number().int().min(5).max(30),
+    damage: DICE,
+    toHit: z.number().int().min(0).max(20),
+    xp: z.number().int().nonnegative(),
+    creatureType: z
+      .enum(['undead', 'fiend', 'beast', 'humanoid', 'construct', 'dragon'])
+      .optional(),
+    str: AbilityScore.optional(),
+    dex: AbilityScore.optional(),
+    con: AbilityScore.optional(),
+    int: AbilityScore.optional(),
+    wis: AbilityScore.optional(),
+    cha: AbilityScore.optional(),
+    onHitEffect: OnHitEffectSchema.optional(),
+    multiattack: z.number().int().min(1).max(8).optional(),
+    resistances: z.array(z.string().min(1).max(20)).optional(),
+    vulnerabilities: z.array(z.string().min(1).max(20)).optional(),
+    immunities: z.array(z.string().min(1).max(20)).optional(),
+    condition_immunities: z.array(z.string().min(1).max(30)).optional(),
+    damageType: z.string().min(1).max(20).optional(),
+    packTactics: z.boolean().optional(),
+    bloodiedFrenzy: z.boolean().optional(),
+    bonusDamage: DICE.optional(),
+    bonusDamageType: z.string().min(1).max(20).optional(),
+    undeadFortitude: z.boolean().optional(),
+    lifeDrain: z.boolean().optional(),
+    parry: z.boolean().optional(),
+    parryBonus: z.number().int().min(1).max(5).optional(),
+    rampage: z.boolean().optional(),
+    aura: MonsterAuraSchema.optional(),
+    breathWeapon: BreathWeaponSchema.optional(),
+    spells: z.array(z.string().min(1).max(60)).optional(),
+    castChance: z.number().min(0).max(1).optional(),
+    spellSaveDC: z.number().int().min(1).max(30).optional(),
+    spellAttackBonus: z.number().int().min(0).max(20).optional(),
+    attackReachFt: z.number().positive().optional(),
+    speedFt: z.number().nonnegative().optional(),
+    darkvision_ft: z.number().nonnegative().optional(),
+    sunlightSensitivity: z.boolean().optional(),
+    phases: z.array(BossPhaseSchema).optional(),
+    legendary_actions: z.array(LegendaryActionSchema).optional(),
+    legendary_pool: z.number().int().min(1).max(10).optional(),
+    lair_actions: z.array(LairActionSchema).optional(),
+    drops: z.array(z.string().min(1).max(60)).optional(),
+    goldDrop: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+const EnemyTemplatesSchema = z
+  .array(EnemyTemplateSchema)
+  .min(1)
+  .superRefine((templates, ctx) => {
+    const names = new Set<string>();
+    for (const t of templates) {
+      if (names.has(t.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate template name "${t.name}"`,
+        });
+      }
+      names.add(t.name);
+    }
+  });
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   displayNoun: z.string().min(1).max(40),
   narratives: NarrativesSchema,
   regions: RegionsSchema,
   lootTable: LootTableSchema,
+  enemyTemplates: EnemyTemplatesSchema,
 };
 
 // PUT body for a section write: { value: <section payload> }.
