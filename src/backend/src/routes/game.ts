@@ -93,8 +93,9 @@ import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
 
 // Contexts are loaded once at startup by scanning the contexts/ directory.
-// Adding a new campaign only requires dropping a .ts file there.
-const CONTEXTS: Record<string, Context> = await loadContexts();
+// Adding a new campaign only requires dropping a .ts file there. Exported
+// so index.ts can sync the campaigns DB registry from the same load.
+export const CONTEXTS: Record<string, Context> = await loadContexts();
 const DEFAULT_CONTEXT = Object.values(CONTEXTS)[0] ?? ({ id: 'none' } as Context);
 
 // SRD — initial weapon masteries by class. Each listed class starts

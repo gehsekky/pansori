@@ -24,6 +24,9 @@ export interface AuthUser {
   email: string;
   display_name: string;
   avatar_url: string | null;
+  // Site admin — will gate the campaign admin section. Mirrors AppUser
+  // on the backend; flipped manually in the DB, never via the UI.
+  is_admin: boolean;
 }
 
 export interface AuthProvider {

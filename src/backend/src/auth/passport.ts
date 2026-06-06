@@ -12,6 +12,10 @@ export interface AppUser {
   email: string;
   display_name: string;
   avatar_url: string | null;
+  // Site admin — gates the admin section and bypasses per-campaign role
+  // checks (see auth/middleware.ts). Never set by any OAuth flow; flipped
+  // manually in the DB (UPDATE users SET is_admin = TRUE WHERE email = …).
+  is_admin: boolean;
 }
 
 declare global {
@@ -39,7 +43,7 @@ export async function findOrCreateUser(input: {
 
   // Try to resolve an existing identity → user.
   const existing = await pool.query<AppUser>(
-    `SELECT u.id, u.email, u.display_name, u.avatar_url
+    `SELECT u.id, u.email, u.display_name, u.avatar_url, u.is_admin
        FROM user_identities i
        JOIN users u ON u.id = i.user_id
       WHERE i.provider = $1 AND i.provider_id = $2`,
@@ -52,7 +56,7 @@ export async function findOrCreateUser(input: {
       `UPDATE users
           SET email = $2, display_name = $3, avatar_url = $4
         WHERE id = $1
-        RETURNING id, email, display_name, avatar_url`,
+        RETURNING id, email, display_name, avatar_url, is_admin`,
       [existing.rows[0].id, email, displayName, avatarUrl]
     );
     return refreshed.rows[0];
@@ -66,7 +70,7 @@ export async function findOrCreateUser(input: {
   const userRes = await pool.query<AppUser>(
     `INSERT INTO users (email, display_name, avatar_url)
      VALUES ($1, $2, $3)
-     RETURNING id, email, display_name, avatar_url`,
+     RETURNING id, email, display_name, avatar_url, is_admin`,
     [email, displayName, avatarUrl]
   );
   const user = userRes.rows[0];
@@ -154,7 +158,7 @@ passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id: string, done) => {
   try {
     const { rows } = await pool.query<AppUser>(
-      'SELECT id, email, display_name, avatar_url FROM users WHERE id = $1',
+      'SELECT id, email, display_name, avatar_url, is_admin FROM users WHERE id = $1',
       [id]
     );
     done(null, rows[0] ?? null);

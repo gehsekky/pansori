@@ -33,7 +33,13 @@ const escapedSession: SessionSummary = {
 
 const defaultProps = {
   sessions: [],
-  user: { id: 'u1', email: 'test@test.com', display_name: 'Test User', avatar_url: null },
+  user: {
+    id: 'u1',
+    email: 'test@test.com',
+    display_name: 'Test User',
+    avatar_url: null,
+    is_admin: false,
+  },
   loading: false,
   onResume: vi.fn(),
   onNewGame: vi.fn(),

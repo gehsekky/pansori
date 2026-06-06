@@ -7,7 +7,19 @@
 
 import type { Pool, PoolClient } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { readdirSync } from 'fs';
 import { runMigrations } from './migrationRunner.js';
+
+// The real files on disk, sorted the way the runner sorts them — so adding a
+// migration never requires touching this spec's fixtures.
+function migrationFilesOnDisk(): string[] {
+  const dir = join(dirname(fileURLToPath(import.meta.url)), '../../migrations');
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+}
 
 function makeMockPool(opts: { appliedMigrations?: string[]; gameSessionsExists?: boolean }) {
   const applied = new Set(opts.appliedMigrations ?? []);
@@ -69,47 +81,29 @@ describe('migrationRunner', () => {
   });
 
   it('only runs migrations not already in schema_migrations', async () => {
-    // Pretend 001-010 are applied; only 011 should run.
-    const allButLast = [
-      '001_init.sql',
-      '002_remove_user_auth.sql',
-      '003_merge_session_state.sql',
-      '004_google_auth.sql',
-      '005_portrait_url.sql',
-      '006_campaign_state.sql',
-      '007_drop_leader_columns.sql',
-      '008_drop_leader_columns_recheck.sql',
-      '009_user_identities.sql',
-      '010_session_participants.sql',
-    ];
-    const mock = makeMockPool({ appliedMigrations: allButLast, gameSessionsExists: true });
+    // Pretend everything but the newest file is applied; only it should run.
+    const files = migrationFilesOnDisk();
+    const newest = files[files.length - 1];
+    const mock = makeMockPool({
+      appliedMigrations: files.slice(0, -1),
+      gameSessionsExists: true,
+    });
     await runMigrations(mock.pool);
     const transactions = (
       mock.client.query as unknown as ReturnType<typeof vi.fn>
     ).mock.calls.filter(
       ([sql]: unknown[]) => typeof sql === 'string' && sql.startsWith('BEGIN')
     ).length;
-    expect(transactions).toBe(1); // just 011
-    expect([...mock.applied]).toContain('011_session_turn_seq.sql');
+    expect(transactions).toBe(1); // just the newest file
+    expect([...mock.applied]).toContain(newest);
   });
 
   it('is a no-op when DB is up to date', async () => {
     // Pretend everything currently on disk is applied — runner should do nothing.
-    // We list a superset (anything currently in src/backend/migrations).
-    const allApplied = [
-      '001_init.sql',
-      '002_remove_user_auth.sql',
-      '003_merge_session_state.sql',
-      '004_google_auth.sql',
-      '005_portrait_url.sql',
-      '006_campaign_state.sql',
-      '007_drop_leader_columns.sql',
-      '008_drop_leader_columns_recheck.sql',
-      '009_user_identities.sql',
-      '010_session_participants.sql',
-      '011_session_turn_seq.sql',
-    ];
-    const mock = makeMockPool({ appliedMigrations: allApplied, gameSessionsExists: true });
+    const mock = makeMockPool({
+      appliedMigrations: migrationFilesOnDisk(),
+      gameSessionsExists: true,
+    });
     await runMigrations(mock.pool);
     const ranInTransaction = (
       mock.client.query as unknown as ReturnType<typeof vi.fn>

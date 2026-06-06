@@ -171,6 +171,23 @@ export const ActionSchema = z
   })
   .strict();
 
+// ─── Campaigns (admin / membership) ─────────────────────────────────────────
+
+const CampaignRoleSchema = z.enum(['owner', 'editor']);
+
+export const AddCampaignMemberSchema = z
+  .object({
+    email: z.string().email(),
+    role: CampaignRoleSchema,
+  })
+  .strict();
+
+export const SetCampaignMemberRoleSchema = z
+  .object({
+    role: CampaignRoleSchema,
+  })
+  .strict();
+
 // ─── Helper: validate or 400 ─────────────────────────────────────────────────
 
 // Used inline in handlers: `const parsed = parseBody(req, res, Schema); if

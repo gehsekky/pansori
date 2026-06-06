@@ -1,12 +1,13 @@
 import 'dotenv/config';
 import './auth/passport.js';
+import { CONTEXTS, gameRouter } from './routes/game.js';
 import { Server } from 'socket.io';
 import { authRouter } from './routes/auth.js';
+import { campaignsRouter } from './routes/campaigns.js';
 import connectPgSimple from 'connect-pg-simple';
 import cors from 'cors';
 import { createServer } from 'http';
 import express from 'express';
-import { gameRouter } from './routes/game.js';
 import helmet from 'helmet';
 import passport from 'passport';
 import { pool } from './db/pool.js';
@@ -15,6 +16,7 @@ import { requireAuth } from './auth/middleware.js';
 import { runMigrations } from './services/migrationRunner.js';
 import session from 'express-session';
 import { setIO } from './services/broadcast.js';
+import { syncCampaignRegistry } from './services/campaignRegistry.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,6 +108,9 @@ const gameLimiter = rateLimit({
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/game', requireAuth, gameLimiter, gameRouter);
+// Campaign membership / future admin section. Shares the game limiter —
+// low-traffic admin surface, same abuse profile.
+app.use('/api/campaigns', requireAuth, gameLimiter, campaignsRouter);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -157,13 +162,15 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3001;
 
-// Run pending DB migrations before serving traffic. A failure here aborts
-// startup so we don't accept requests against a half-migrated schema.
+// Run pending DB migrations, then sync the campaigns registry, before
+// serving traffic. A failure in either aborts startup so we don't accept
+// requests against a half-migrated schema or an unregistered campaign set.
 runMigrations(pool)
+  .then(() => syncCampaignRegistry(pool, CONTEXTS))
   .then(() => {
     httpServer.listen(PORT, () => console.log(`Backend running on :${PORT}`));
   })
   .catch((err) => {
-    console.error('[startup] Migration runner failed — aborting:', err);
+    console.error('[startup] Migration / registry sync failed — aborting:', err);
     process.exit(1);
   });
