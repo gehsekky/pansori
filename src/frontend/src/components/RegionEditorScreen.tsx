@@ -199,6 +199,10 @@ function RegionEditorScreen({
   // picker — kept fresh by the hosted TOWNS panel below (onMaps fires on
   // load and after every create).
   const [townIds, setTownIds] = useState<string[]>([]);
+  // The campaign's room ids, for the venue / local-site ENTRY ROOM picker.
+  // Town pages get them live from the hosted ROOMS panel; region pages
+  // fetch them once (their hosted panel is TOWNS).
+  const [roomOptions, setRoomOptions] = useState<string[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -257,6 +261,19 @@ function RegionEditorScreen({
         setMoveArmed(false);
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
+    // Region pages need the room pool for the local-site ENTRY ROOM picker
+    // (town pages get it live from their hosted ROOMS panel instead).
+    if (kind === 'region') {
+      api
+        .getCampaignSection(campaignId, 'rooms')
+        .then((s) => {
+          const list = Array.isArray(s.value) ? (s.value as Array<{ id?: unknown }>) : [];
+          setRoomOptions(
+            list.map((r) => r.id).filter((id): id is string => typeof id === 'string')
+          );
+        })
+        .catch(() => setRoomOptions([]));
+    }
   }, [campaignId, regionId, section, kind]);
 
   // Drag-paint ends wherever the mouse is released.
@@ -422,6 +439,15 @@ function RegionEditorScreen({
       kind === 'room' ? { ...r, grid, entryPos: startPos } : { ...r, grid, startPos };
     if (kind === 'room' && sites.some((s) => s.kind === 'room' && !s.toRoomId)) {
       return { error: 'Every room exit needs a TO ROOM target (or flip it to LEAVE).' };
+    }
+    if (kind === 'town' && sites.some((s) => s.kind === 'interior' && !s.entryRoomId)) {
+      return { error: 'Every interior venue needs an ENTRY ROOM (or flip it to GATE).' };
+    }
+    if (kind === 'region' && sites.some((s) => s.kind === 'local' && !s.entryRoomId)) {
+      return { error: 'Every local site needs an ENTRY ROOM (or flip it to TOWN).' };
+    }
+    if (kind === 'region' && sites.some((s) => s.kind === 'town' && !s.townId)) {
+      return { error: 'Every town site needs a TOWN target (or flip it to LOCAL).' };
     }
     mergeSites(next);
     next.name = details.name.trim() || r.name;
@@ -844,17 +870,33 @@ function RegionEditorScreen({
                         {(selectedSite.kind === 'local' || selectedSite.kind === 'interior') && (
                           <div style={{ flex: '1 1 130px' }}>
                             <label className={styles.formLbl} htmlFor="site-room">
-                              ENTRY ROOM ID
+                              ENTRY ROOM
                             </label>
-                            <input
+                            <select
                               id="site-room"
                               className={styles.formInp}
-                              placeholder="e.g. old_cave"
+                              style={{ cursor: 'pointer' }}
                               value={selectedSite.entryRoomId ?? ''}
                               onChange={(e) =>
                                 updateSite(selectedSite.id, { entryRoomId: e.target.value })
                               }
-                            />
+                            >
+                              <option value="">— PICK A ROOM —</option>
+                              {/* A reference outside the DB room pool (a code
+                                  room like old_cave) stays editable — it's
+                                  listed as unlisted, not silently dropped. */}
+                              {selectedSite.entryRoomId &&
+                                !roomOptions.includes(selectedSite.entryRoomId) && (
+                                  <option value={selectedSite.entryRoomId}>
+                                    {selectedSite.entryRoomId} (unlisted)
+                                  </option>
+                                )}
+                              {roomOptions.map((id) => (
+                                <option key={id} value={id}>
+                                  {id}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         )}
                         {kind === 'region' && (
@@ -1301,10 +1343,11 @@ function RegionEditorScreen({
               )}
             </div>
 
-            {/* ── Towns (region page only) — towns are reached through this
-                region's town sites, so they're authored right here. The
-                panel also feeds the site tool's TOWN picker (onMaps), so a
-                town created here is pickable immediately. */}
+            {/* ── Child maps. Towns are authored on the region page (they're
+                reached through its town sites); rooms on the town page
+                (reached through its interior venues). Each hosted panel
+                also feeds the marker tool's target picker (onMaps), so a
+                map created here is pickable immediately. */}
             {kind === 'region' && (
               <MapsPanel
                 campaignId={campaignId}
@@ -1315,6 +1358,21 @@ function RegionEditorScreen({
                     ? (mapId) => {
                         if (dirty && !confirm('Discard unsaved map changes?')) return;
                         onOpenMap('town', mapId);
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {kind === 'town' && (
+              <MapsPanel
+                campaignId={campaignId}
+                kind="room"
+                onMaps={(maps) => setRoomOptions(maps.map((m) => m.id))}
+                onOpenMap={
+                  onOpenMap
+                    ? (mapId) => {
+                        if (dirty && !confirm('Discard unsaved map changes?')) return;
+                        onOpenMap('room', mapId);
                       }
                     : undefined
                 }

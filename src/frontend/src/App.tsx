@@ -153,9 +153,13 @@ export default function App() {
   // towns nest: /creator/<cid>/region/<region id>/town/<town id>).
   const [creatorRegionId, setCreatorRegionId] = useState<string | null>(null);
   const [creatorMapKind, setCreatorMapKind] = useState<'region' | 'town' | 'room'>('region');
-  // The region a town painter was reached through — its URL parent and
-  // where BACK returns to.
-  const [creatorParentRegionId, setCreatorParentRegionId] = useState<string | null>(null);
+  // Painter breadcrumb stack — the maps the current painter was reached
+  // THROUGH (region → its town → that town's room). BACK pops one level;
+  // empty = BACK returns to the creator screen. Town URLs nest under the
+  // nearest region in the stack.
+  const [painterStack, setPainterStack] = useState<
+    Array<{ kind: 'region' | 'town' | 'room'; mapId: string }>
+  >([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -268,7 +272,7 @@ export default function App() {
         );
         if (townMatch) {
           setCreatorCampaignId(townMatch[1]);
-          setCreatorParentRegionId(townMatch[2]);
+          setPainterStack([{ kind: 'region', mapId: townMatch[2] }]);
           setCreatorMapKind('town');
           setCreatorRegionId(townMatch[3]);
           setView('region-editor');
@@ -280,6 +284,7 @@ export default function App() {
         );
         if (regionMatch) {
           setCreatorCampaignId(regionMatch[1]);
+          setPainterStack([]);
           setCreatorMapKind(regionMatch[2].toLowerCase() as 'region' | 'room');
           setCreatorRegionId(regionMatch[3]);
           setView('region-editor');
@@ -477,7 +482,7 @@ export default function App() {
             setCreatorCampaignId(campaignId);
             setCreatorMapKind(kind);
             setCreatorRegionId(mapId);
-            setCreatorParentRegionId(null);
+            setPainterStack([]);
             window.history.pushState(null, '', `/creator/${campaignId}/${kind}/${mapId}`);
             setView('region-editor');
           }}
@@ -488,43 +493,62 @@ export default function App() {
         />
       )}
 
-      {view === 'region-editor' && user && creatorCampaignId && creatorRegionId && (
-        <RegionEditorScreen
-          campaignId={creatorCampaignId}
-          regionId={creatorRegionId}
-          kind={creatorMapKind}
-          onBack={() => {
-            // A town painter backs out to the region it was reached
-            // through; everything else returns to the creator screen.
-            if (creatorMapKind === 'town' && creatorParentRegionId) {
-              setCreatorMapKind('region');
-              setCreatorRegionId(creatorParentRegionId);
-              setCreatorParentRegionId(null);
-              window.history.pushState(
-                null,
-                '',
-                `/creator/${creatorCampaignId}/region/${creatorParentRegionId}`
-              );
-              return;
+      {view === 'region-editor' &&
+        user &&
+        creatorCampaignId &&
+        creatorRegionId &&
+        (() => {
+          // Painter URL: towns nest under the nearest region in the
+          // breadcrumb stack; regions/rooms stay flat.
+          const painterUrl = (
+            kind: 'region' | 'town' | 'room',
+            mapId: string,
+            stack: Array<{ kind: string; mapId: string }>
+          ) => {
+            if (kind === 'town') {
+              const parent = [...stack].reverse().find((e) => e.kind === 'region');
+              if (parent) {
+                return `/creator/${creatorCampaignId}/region/${parent.mapId}/town/${mapId}`;
+              }
             }
-            window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
-            setView('creator');
-          }}
-          // Painter→painter navigation (the region page hosts the TOWNS
-          // panel): swap the edited map in place, same view. Towns nest
-          // under the region they're opened from.
-          onOpenMap={(kind, mapId) => {
-            const url =
-              kind === 'town'
-                ? `/creator/${creatorCampaignId}/region/${creatorRegionId}/town/${mapId}`
-                : `/creator/${creatorCampaignId}/${kind}/${mapId}`;
-            if (kind === 'town') setCreatorParentRegionId(creatorRegionId);
-            setCreatorMapKind(kind);
-            setCreatorRegionId(mapId);
-            window.history.pushState(null, '', url);
-          }}
-        />
-      )}
+            return `/creator/${creatorCampaignId}/${kind}/${mapId}`;
+          };
+          return (
+            <RegionEditorScreen
+              campaignId={creatorCampaignId}
+              regionId={creatorRegionId}
+              kind={creatorMapKind}
+              onBack={() => {
+                // Pop one breadcrumb level (room → its town → its region);
+                // an empty stack backs out to the creator screen.
+                const up = painterStack[painterStack.length - 1];
+                if (up) {
+                  const rest = painterStack.slice(0, -1);
+                  setPainterStack(rest);
+                  setCreatorMapKind(up.kind);
+                  setCreatorRegionId(up.mapId);
+                  window.history.pushState(null, '', painterUrl(up.kind, up.mapId, rest));
+                  return;
+                }
+                window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
+                setView('creator');
+              }}
+              // Painter→painter navigation (the region page hosts TOWNS,
+              // the town page hosts ROOMS): swap the edited map in place
+              // and remember where we came from.
+              onOpenMap={(kind, mapId) => {
+                const nextStack = [
+                  ...painterStack,
+                  { kind: creatorMapKind, mapId: creatorRegionId },
+                ];
+                setPainterStack(nextStack);
+                setCreatorMapKind(kind);
+                setCreatorRegionId(mapId);
+                window.history.pushState(null, '', painterUrl(kind, mapId, nextStack));
+              }}
+            />
+          );
+        })()}
 
       {view === 'char' && (
         <CharScreen

@@ -24,7 +24,7 @@ const REGION = {
     [{ t: 'plains' }, { t: 'forest', tier: 2 }, { t: 'road' }],
   ],
   startPos: { x: 0, y: 0 },
-  sites: [{ id: 'pit', name: 'The Pit', pos: { x: 2, y: 1 }, kind: 'local' }],
+  sites: [{ id: 'pit', name: 'The Pit', pos: { x: 2, y: 1 }, kind: 'local', entryRoomId: 'pit' }],
 };
 
 const OTHER = {
@@ -38,12 +38,15 @@ const OTHER = {
 
 beforeEach(() => {
   for (const fn of Object.values(mocked)) fn.mockReset();
-  // The region painter loads its section AND the towns list (for the site
-  // tool's town picker) — dispatch by section.
+  // The region painter loads its section, the towns list (site TOWN
+  // picker, via the hosted panel) and the rooms list (local-site ENTRY
+  // ROOM picker) — dispatch by section.
   mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
     section === 'regions'
       ? { section, source: 'db', value: [REGION, OTHER] }
-      : { section, source: 'db', value: [{ id: 'oakvale', name: 'Oakvale' }] }
+      : section === 'towns'
+        ? { section, source: 'db', value: [{ id: 'oakvale', name: 'Oakvale' }] }
+        : { section, source: 'db', value: [] }
   );
   mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'regions', source: 'db' });
 });
@@ -290,6 +293,11 @@ describe('RegionEditorScreen', () => {
     expect(
       (screen.getByLabelText('NAME', { selector: '#site-name' }) as HTMLInputElement).value
     ).toBe('The Pit');
+    // Its entry room ('pit') isn't in the DB room pool — preserved as an
+    // unlisted option instead of being silently dropped.
+    const entryRoom = screen.getByLabelText('ENTRY ROOM') as HTMLSelectElement;
+    expect(entryRoom.value).toBe('pit');
+    expect([...entryRoom.options].map((o) => o.textContent)).toContain('pit (unlisted)');
     fireEvent.click(screen.getByTestId('site-delete-btn'));
     expect(screen.getByTestId('cell-2-1').getAttribute('aria-label')).not.toContain('The Pit');
     fireEvent.click(screen.getByText('SAVE'));
@@ -322,36 +330,58 @@ describe('RegionEditorScreen', () => {
     expect(screen.getByTestId('cell-2-0').getAttribute('aria-label')).not.toContain('site');
   });
 
-  it('VENUES tool in town mode: interior venues take an entry room id', async () => {
-    mocked.getCampaignSection.mockResolvedValue({
-      section: 'towns',
-      source: 'db',
-      value: [
-        {
-          id: 'oakvale',
-          name: 'Oakvale',
-          feetPerSquare: 25,
-          grid: [
-            [{ t: 'plains' }, { t: 'plains' }],
-            [{ t: 'plains' }, { t: 'plains' }],
-          ],
-          startPos: { x: 0, y: 0 },
-        },
-      ],
-    });
+  it('VENUES tool in town mode: interiors pick an entry room from the hosted ROOMS panel', async () => {
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'towns'
+        ? {
+            section,
+            source: 'db',
+            value: [
+              {
+                id: 'oakvale',
+                name: 'Oakvale',
+                feetPerSquare: 25,
+                grid: [
+                  [{ t: 'plains' }, { t: 'plains' }],
+                  [{ t: 'plains' }, { t: 'plains' }],
+                ],
+                startPos: { x: 0, y: 0 },
+              },
+            ],
+          }
+        : {
+            section,
+            source: 'db',
+            value: [
+              {
+                id: 'acorn-taproom',
+                name: 'The Taproom',
+                desc: 'd',
+                grid: [[{}]],
+                entryPos: { x: 0, y: 0 },
+              },
+            ],
+          }
+    );
     mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'towns', source: 'db' });
     render(
       <RegionEditorScreen campaignId="sandbox" regionId="oakvale" kind="town" onBack={vi.fn()} />
     );
     await screen.findByTestId('cell-0-0');
+    // The town page hosts the ROOMS panel — its rooms feed the venue picker.
+    expect(await screen.findByText('ROOMS')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'VENUES' }));
     fireEvent.mouseDown(screen.getByTestId('cell-1-1'));
     fireEvent.change(screen.getByLabelText('NAME', { selector: '#site-name' }), {
       target: { value: 'The Split Acorn' },
     });
-    fireEvent.change(screen.getByLabelText('ENTRY ROOM ID'), {
-      target: { value: 'acorn-taproom' },
-    });
+    // An interior with no room picked is blocked client-side.
+    fireEvent.click(screen.getByText('SAVE'));
+    expect(await screen.findByText(/interior venue needs an ENTRY ROOM/)).toBeTruthy();
+    expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+    const picker = screen.getByLabelText('ENTRY ROOM') as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.value)).toEqual(['', 'acorn-taproom']);
+    fireEvent.change(picker, { target: { value: 'acorn-taproom' } });
     fireEvent.click(screen.getByText('SAVE'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const [, section, value] = mocked.putCampaignSection.mock.calls[0];
