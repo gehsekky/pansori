@@ -73,6 +73,9 @@ describe('conversation mode', () => {
       path: [],
       prompt: 'Ask me anything.',
     });
+    // The greeting narrates as the NPC speaking (speaker-prefixed), matching
+    // the talk_response exchange format.
+    expect(r.narrative).toContain('The Sage: "Ask me anything."');
     const choices = generateChoices(r.newState, seed, ctx);
     // Every surfaced choice is a conversation choice — nothing else leaks in.
     expect(choices.every((c) => c.kind === 'conversation')).toBe(true);

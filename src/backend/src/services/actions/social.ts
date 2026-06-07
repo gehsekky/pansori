@@ -71,6 +71,9 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
     return;
   }
 
+  // The greeting is the NPC speaking — prefix the speaker so the narrative
+  // pane reads as dialogue (matching the talk_response exchange format).
+  const spokenGreeting = `${npc.name}: "${npc.greeting}"`;
   let narrative: string;
   if (attitude === 'indifferent') {
     const dc = npc.persuasionDC ?? 12;
@@ -82,13 +85,13 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
         ...ctx.st,
         npc_attitudes: { ...ctx.st.npc_attitudes, [npc.id]: 'friendly' },
       };
-      narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${npc.greeting}`;
+      narrative = `You approach ${npc.name} with care (CHA check ${roll} vs DC ${dc} — success). ${spokenGreeting}`;
     } else {
       ctx.narrative = `${npc.name} eyes you warily (CHA check ${roll} vs DC ${dc} — fail). They're not ready to talk yet.`;
       return;
     }
   } else {
-    narrative = npc.greeting;
+    narrative = spokenGreeting;
   }
 
   if (!ctx.st.npc_talked.includes(npc.id)) {
