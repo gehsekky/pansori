@@ -630,6 +630,9 @@ describe('editable sections registry', () => {
       name: 'Old Hob',
       attitude: 'friendly',
       greeting: 'Evening.',
+      firstGreeting: 'New faces! Welcome.',
+      goodbye: 'Mind the step.',
+      firstGoodbye: 'Come back for the stew.',
       responses: [{ label: 'Ask', reply: 'No.', responses: [{ label: 'Press', reply: 'NO.' }] }],
       shop: [{ itemId: 'rope', price: 1 }],
       pos: { x: 3, y: 3 },
@@ -1488,6 +1491,8 @@ describe('section CRUD + live refresh', () => {
             name: 'Old Hob',
             attitude: 'friendly',
             greeting: 'Evening.',
+            firstGreeting: 'New faces! Welcome.',
+            goodbye: 'Mind the step.',
             pos: { x: 1, y: 1 },
             shop: [
               { itemId: 'rope', price: 1 },
@@ -1504,6 +1509,10 @@ describe('section CRUD + live refresh', () => {
     // stat-block defaults, dialogue defaults to an empty tree.
     expect(hob.roomId).toBe('cellar');
     expect(hob.greeting).toBe('Evening.');
+    // NPC narrative hooks pass through; the unauthored one stays absent.
+    expect(hob.firstGreeting).toBe('New faces! Welcome.');
+    expect(hob.goodbye).toBe('Mind the step.');
+    expect('firstGoodbye' in hob).toBe(false);
     expect(hob.attitude).toBe('friendly');
     expect(hob.pos).toEqual({ x: 1, y: 1 });
     expect(hob.hp).toBe(4);

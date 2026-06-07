@@ -73,7 +73,13 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
 
   // The greeting is the NPC speaking — prefix the speaker so the narrative
   // pane reads as dialogue (matching the talk_response exchange format).
-  const spokenGreeting = `${npc.name}: "${npc.greeting}"`;
+  // FIRST-time talks (npc_talked) play firstGreeting when authored; every
+  // later talk plays the plain greeting — the NPC-hook twin of the level
+  // hooks' FIRST-overrides-plain rule.
+  const greetingText = ctx.st.npc_talked.includes(npc.id)
+    ? npc.greeting
+    : (npc.firstGreeting ?? npc.greeting);
+  const spokenGreeting = `${npc.name}: "${greetingText}"`;
   let narrative: string;
   if (attitude === 'indifferent') {
     const dc = npc.persuasionDC ?? 12;
@@ -113,7 +119,7 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
     }
     ctx.st = {
       ...ctx.st,
-      active_conversation: { npcId: npc.id, roomId: ctx.roomId, path: [], prompt: npc.greeting },
+      active_conversation: { npcId: npc.id, roomId: ctx.roomId, path: [], prompt: greetingText },
     };
   } else {
     updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
@@ -285,9 +291,24 @@ export const handleEndConversation: ActionHandler<{ type: 'end_conversation' }> 
   const npc = ctx.st.active_conversation
     ? npcById(ctx.seed, ctx.st.active_conversation.npcId)
     : undefined;
+  // Goodbye narrative hooks — the farewell twin of the greeting pair: the
+  // FIRST explicit end of a conversation with this NPC plays firstGoodbye
+  // when authored; every later end plays the plain goodbye. No goodbye
+  // authored ⇒ just the generic ending line.
+  let goodbye = '';
+  if (npc) {
+    const farewelled = ctx.st.npc_farewelled ?? [];
+    const text = farewelled.includes(npc.id) ? npc.goodbye : (npc.firstGoodbye ?? npc.goodbye);
+    if (text) goodbye = `${npc.name}: "${text}" `;
+    if (!farewelled.includes(npc.id)) {
+      ctx.st = { ...ctx.st, npc_farewelled: [...farewelled, npc.id] };
+    }
+  }
   // Ending the talk also closes any open vendor pane (it nests under the talk).
   ctx.st = { ...ctx.st, active_conversation: undefined, active_shop: undefined };
-  ctx.narrative = npc ? `You end the conversation with ${npc.name}.` : 'You end the conversation.';
+  ctx.narrative = npc
+    ? `${goodbye}You end the conversation with ${npc.name}.`
+    : 'You end the conversation.';
 };
 
 /**

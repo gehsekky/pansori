@@ -673,6 +673,16 @@ describe('RegionEditorScreen', () => {
       fireEvent.change(screen.getByLabelText('GREETING'), {
         target: { value: 'Mind the step.' },
       });
+      // NPC narrative hooks: set two; the third stays empty and is pruned.
+      fireEvent.change(
+        screen.getByLabelText('FIRST GREETING', { selector: '#npc-firstGreeting-0' }),
+        {
+          target: { value: 'New faces! Welcome.' },
+        }
+      );
+      fireEvent.change(screen.getByLabelText('GOODBYE', { selector: '#npc-goodbye-0' }), {
+        target: { value: 'Walk safe.' },
+      });
       fireEvent.click(screen.getByTestId('place-npc-0'));
       fireEvent.mouseDown(screen.getByTestId('cell-1-1'));
       expect(screen.getByText('AT (1,1)')).toBeTruthy();
@@ -699,6 +709,8 @@ describe('RegionEditorScreen', () => {
         name: 'Old Hob',
         attitude: 'friendly',
         greeting: 'Mind the step.',
+        firstGreeting: 'New faces! Welcome.',
+        goodbye: 'Walk safe.',
         pos: { x: 1, y: 1 },
         // JSON-authored extras preserved untouched.
         responses: [{ label: 'Ask', reply: 'No.' }],

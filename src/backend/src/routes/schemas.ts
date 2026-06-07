@@ -1027,6 +1027,12 @@ const RoomNpcSchema = z
     name: z.string().min(1).max(80),
     attitude: z.enum(['friendly', 'indifferent', 'hostile']),
     greeting: z.string().min(1).max(2000),
+    // NPC narrative hooks — the FIRST variant overrides the plain one once:
+    // firstGreeting on the first talk, firstGoodbye on the first explicit
+    // END CONVERSATION; goodbye plays on every later end (optional).
+    firstGreeting: z.string().min(1).max(2000).optional(),
+    goodbye: z.string().min(1).max(2000).optional(),
+    firstGoodbye: z.string().min(1).max(2000).optional(),
     responses: z.array(RoomNpcResponseSchema).max(8).optional(),
     persuasionDC: z.number().int().min(1).max(30).optional(),
     pos: GridPosSchema.optional(),

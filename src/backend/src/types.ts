@@ -1636,6 +1636,11 @@ export interface GameState {
   // Persists for the whole playthrough, like objects_searched.
   dialogue_chosen?: string[];
 
+  // NPC ids whose conversation has been explicitly ended at least once —
+  // drives the firstGoodbye narrative hook (the greeting-side twin is
+  // npc_talked, which drives firstGreeting).
+  npc_farewelled?: string[];
+
   // Script engine flags
   flags: Record<string, boolean | string | number>;
 

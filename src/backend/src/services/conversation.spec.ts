@@ -142,6 +142,58 @@ describe('conversation mode', () => {
   });
 });
 
+describe('NPC narrative hooks (firstGreeting / goodbye / firstGoodbye)', () => {
+  const elder: PlacedNpc = {
+    ...npc,
+    id: 'elder',
+    name: 'The Elder',
+    greeting: 'Back again, are we?',
+    firstGreeting: 'Strangers! We rarely see new faces here.',
+    goodbye: 'Walk safe.',
+    firstGoodbye: 'Come back when you have seen the old oak.',
+    responses: [{ label: 'Just passing through', reply: 'Mm.' }],
+  };
+  const eSeed = { ...seed, npcs: { elder } } as unknown as Seed;
+  const eAct = (
+    state: ReturnType<typeof makeState>,
+    action: Parameters<typeof takeAction>[0]['action']
+  ) => takeAction({ action, history: [], state, seed: eSeed, context: ctx });
+
+  it('first talk plays firstGreeting; later talks play the plain greeting', async () => {
+    let r = await eAct(makeState({ id: 'pc-1' }, { current_room: ROOM }), {
+      type: 'talk',
+      npcId: 'elder',
+    });
+    expect(r.narrative).toContain('The Elder: "Strangers! We rarely see new faces here."');
+    expect(r.newState.active_conversation?.prompt).toBe('Strangers! We rarely see new faces here.');
+    r = await eAct(r.newState, { type: 'end_conversation' });
+    r = await eAct(r.newState, { type: 'talk', npcId: 'elder' });
+    expect(r.narrative).toContain('The Elder: "Back again, are we?"');
+    expect(r.newState.active_conversation?.prompt).toBe('Back again, are we?');
+  });
+
+  it('first end plays firstGoodbye; later ends play the plain goodbye', async () => {
+    let r = await eAct(makeState({ id: 'pc-1' }, { current_room: ROOM }), {
+      type: 'talk',
+      npcId: 'elder',
+    });
+    r = await eAct(r.newState, { type: 'end_conversation' });
+    expect(r.narrative).toContain('The Elder: "Come back when you have seen the old oak."');
+    expect(r.narrative).toContain('You end the conversation with The Elder.');
+    expect(r.newState.npc_farewelled).toEqual(['elder']);
+    r = await eAct(r.newState, { type: 'talk', npcId: 'elder' });
+    r = await eAct(r.newState, { type: 'end_conversation' });
+    expect(r.narrative).toContain('The Elder: "Walk safe."');
+    expect(r.newState.npc_farewelled).toEqual(['elder']); // no duplicate
+  });
+
+  it('hooks are optional: no goodbye keeps the generic ending line only', async () => {
+    let r = await act(start(), { type: 'talk', npcId: NPC }); // the Sage has none
+    r = await act(r.newState, { type: 'end_conversation' });
+    expect(r.narrative).toBe('You end the conversation with The Sage.');
+  });
+});
+
 describe('gated dialogue (condition + once)', () => {
   // A smuggler whose root node mixes an open option, a flag-gated option and
   // a one-shot — the flag-gated one is UNLOCKED BY the one-shot's consequence,

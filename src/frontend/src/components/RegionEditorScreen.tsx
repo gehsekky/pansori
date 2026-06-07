@@ -133,6 +133,11 @@ interface EditorNpc {
   name: string;
   attitude: string;
   greeting: string;
+  // NPC narrative hooks — FIRST overrides the plain one once (first talk /
+  // first explicit end of conversation).
+  firstGreeting?: string;
+  goodbye?: string;
+  firstGoodbye?: string;
   pos?: { x: number; y: number };
   icon?: string;
   responses?: DialogueNode[];
@@ -745,6 +750,9 @@ function RegionEditorScreen({
             const c: EditorNpc = { ...n, name: n.name.trim(), greeting: n.greeting.trim() };
             if (!c.icon) delete c.icon;
             if (!c.pos) delete c.pos;
+            if (!c.firstGreeting) delete c.firstGreeting;
+            if (!c.goodbye) delete c.goodbye;
+            if (!c.firstGoodbye) delete c.firstGoodbye;
             if (!c.responses || c.responses.length === 0) delete c.responses;
             return c;
           });
@@ -2131,6 +2139,45 @@ function RegionEditorScreen({
                             <span aria-hidden="true">✕</span>
                           </button>
                         </div>
+                      </div>
+                      {/* NPC narrative hooks — FIRST overrides the plain one
+                          once (first talk / first end of conversation). */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          alignItems: 'flex-end',
+                          flexWrap: 'wrap',
+                          marginTop: 4,
+                        }}
+                      >
+                        {(
+                          [
+                            ['firstGreeting', 'FIRST GREETING', 'defaults to greeting'],
+                            ['goodbye', 'GOODBYE', 'none'],
+                            ['firstGoodbye', 'FIRST GOODBYE', 'defaults to goodbye'],
+                          ] as const
+                        ).map(([key, label, ph]) => (
+                          <div key={key} style={{ flex: '1 1 180px' }}>
+                            <label className={styles.formLbl} htmlFor={`npc-${key}-${i}`}>
+                              {label}
+                            </label>
+                            <input
+                              id={`npc-${key}-${i}`}
+                              className={styles.formInp}
+                              placeholder={ph}
+                              value={(n[key] as string) ?? ''}
+                              onChange={(ev) => {
+                                const v = ev.target.value;
+                                setPlacedNpcs((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, [key]: v } : p))
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            />
+                          </div>
+                        ))}
                       </div>
                       {dialogueOpen === i && (
                         <div style={{ marginTop: 6 }}>

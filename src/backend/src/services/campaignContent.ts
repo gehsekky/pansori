@@ -684,6 +684,9 @@ export interface CampaignRoomNpc {
   name: string;
   attitude: 'friendly' | 'indifferent' | 'hostile';
   greeting: string;
+  firstGreeting?: string;
+  goodbye?: string;
+  firstGoodbye?: string;
   responses?: CampaignRoomNpcResponse[];
   persuasionDC?: number;
   pos?: GridPos;
@@ -1226,6 +1229,9 @@ function materializeRoomNpcs(
         name: n.name,
         attitude: n.attitude,
         greeting: n.greeting,
+        ...(n.firstGreeting ? { firstGreeting: n.firstGreeting } : {}),
+        ...(n.goodbye ? { goodbye: n.goodbye } : {}),
+        ...(n.firstGoodbye ? { firstGoodbye: n.firstGoodbye } : {}),
         responses: (n.responses ?? []) as PlacedNpc['responses'],
         ...(n.persuasionDC !== undefined ? { persuasionDC: n.persuasionDC } : {}),
         ...(n.pos ? { pos: n.pos } : {}),

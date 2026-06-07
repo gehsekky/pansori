@@ -1046,6 +1046,15 @@ export interface NpcTemplate {
   icon?: string;
   // Social
   greeting: string;
+  // NPC narrative hooks, mirroring the level-hook pattern: the FIRST variant
+  // overrides the plain one once. firstGreeting plays the first time the
+  // party ever talks to this NPC (GameState.npc_talked); goodbye plays on
+  // END CONVERSATION, with firstGoodbye overriding the first time
+  // (GameState.npc_farewelled). All optional — greeting is the fallback,
+  // and no goodbye means the generic "You end the conversation" line.
+  firstGreeting?: string;
+  goodbye?: string;
+  firstGoodbye?: string;
   responses: NpcDialogueResponse[];
   persuasionDC?: number; // CHA check DC when indifferent (default 12)
   // Trade
