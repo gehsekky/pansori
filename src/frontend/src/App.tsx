@@ -477,6 +477,13 @@ export default function App() {
             window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
             setView('creator');
           }}
+          // Painter→painter navigation (the region page hosts the TOWNS
+          // panel): swap the edited map in place, same view.
+          onOpenMap={(kind, mapId) => {
+            setCreatorMapKind(kind);
+            setCreatorRegionId(mapId);
+            window.history.pushState(null, '', `/creator/${creatorCampaignId}/${kind}/${mapId}`);
+          }}
         />
       )}
 

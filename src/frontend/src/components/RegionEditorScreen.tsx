@@ -1,5 +1,6 @@
 import { TERRAIN, type TerrainType } from '../shared-types.ts';
 import { useCallback, useEffect, useState } from 'react';
+import MapsPanel from './MapsPanel.tsx';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
 
@@ -165,6 +166,7 @@ function RegionEditorScreen({
   regionId,
   kind = 'region',
   onBack,
+  onOpenMap,
 }: {
   campaignId: string;
   regionId: string;
@@ -173,6 +175,10 @@ function RegionEditorScreen({
   // tool availability.
   kind?: 'region' | 'town' | 'room';
   onBack: () => void;
+  // Navigate to another map's painter — the region page hosts the TOWNS
+  // panel (towns are reached through region sites), and its cards/creates
+  // open the town painter through this.
+  onOpenMap?: (kind: 'region' | 'town' | 'room', mapId: string) => void;
 }) {
   const section = kind === 'region' ? 'regions' : kind === 'town' ? 'towns' : 'rooms';
   // The full regions list (the save unit) + the edited region's pieces.
@@ -189,7 +195,9 @@ function RegionEditorScreen({
   // Armed by the MOVE button: the next cell click relocates the selected
   // site instead of creating a new one.
   const [moveArmed, setMoveArmed] = useState(false);
-  // Region painter only: the campaign's town ids, for the site townId picker.
+  // Region painter only: the campaign's town ids, for the site townId
+  // picker — kept fresh by the hosted TOWNS panel below (onMaps fires on
+  // load and after every create).
   const [townIds, setTownIds] = useState<string[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
@@ -211,6 +219,15 @@ function RegionEditorScreen({
   const region = regions?.find((r) => r.id === regionId) ?? null;
 
   useEffect(() => {
+    // The painter can navigate map→map without unmounting (region page →
+    // its TOWNS panel → town painter) — clear the previous map's
+    // transient state before loading the next.
+    setLoadErr(null);
+    setError(null);
+    setDirty(false);
+    setSaved(false);
+    setTool('terrain');
+    setTerrainBrush('plains');
     api
       .getCampaignSection(campaignId, section)
       .then((s) => {
@@ -240,17 +257,6 @@ function RegionEditorScreen({
         setMoveArmed(false);
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
-    // Region sites can point at the campaign's towns — load their ids for
-    // the picker. Best-effort: an empty list just means no town options.
-    if (kind === 'region') {
-      api
-        .getCampaignSection(campaignId, 'towns')
-        .then((s) => {
-          const list = Array.isArray(s.value) ? (s.value as Array<{ id?: unknown }>) : [];
-          setTownIds(list.map((t) => t.id).filter((id): id is string => typeof id === 'string'));
-        })
-        .catch(() => setTownIds([]));
-    }
   }, [campaignId, regionId, section, kind]);
 
   // Drag-paint ends wherever the mouse is released.
@@ -1267,6 +1273,26 @@ function RegionEditorScreen({
                 </p>
               )}
             </div>
+
+            {/* ── Towns (region page only) — towns are reached through this
+                region's town sites, so they're authored right here. The
+                panel also feeds the site tool's TOWN picker (onMaps), so a
+                town created here is pickable immediately. */}
+            {kind === 'region' && (
+              <MapsPanel
+                campaignId={campaignId}
+                kind="town"
+                onMaps={(maps) => setTownIds(maps.map((m) => m.id))}
+                onOpenMap={
+                  onOpenMap
+                    ? (mapId) => {
+                        if (dirty && !confirm('Discard unsaved map changes?')) return;
+                        onOpenMap('town', mapId);
+                      }
+                    : undefined
+                }
+              />
+            )}
           </>
         )}
       </div>

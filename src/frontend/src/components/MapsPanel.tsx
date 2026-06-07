@@ -70,11 +70,15 @@ function MapsPanel({
   campaignId,
   kind,
   onOpenMap,
+  onMaps,
 }: {
   campaignId: string;
   kind: 'region' | 'town' | 'room';
   // Navigate to the painter (/creator/<campaign id>/<kind>/<map id>).
   onOpenMap?: (mapId: string) => void;
+  // Fired with the current map list on load and after a create — lets a
+  // host page (the region painter's TOWNS panel) keep its pickers fresh.
+  onMaps?: (maps: Array<{ id: string; name: string }>) => void;
 }) {
   const section = SECTION[kind];
   const [maps, setMaps] = useState<PanelMap[] | null>(null);
@@ -99,8 +103,15 @@ function MapsPanel({
     setCreateErr(null);
     api
       .getCampaignSection(campaignId, section)
-      .then((s) => setMaps(Array.isArray(s.value) ? (s.value as PanelMap[]) : []))
+      .then((s) => {
+        const list = Array.isArray(s.value) ? (s.value as PanelMap[]) : [];
+        setMaps(list);
+        onMaps?.(list);
+      })
       .catch(() => setLoadErr(`Could not load this campaign’s ${section}.`));
+    // onMaps identity is unstable in hosts (inline arrow) — load on
+    // campaign/section change only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, section]);
 
   async function handleCreate(e: React.FormEvent) {
@@ -116,6 +127,7 @@ function MapsPanel({
     try {
       await api.putCampaignSection(campaignId, section, next);
       setMaps(next);
+      onMaps?.(next);
       setCreating(false);
       setNewName('');
       onOpenMap?.(newId);

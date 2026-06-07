@@ -355,6 +355,55 @@ describe('RegionEditorScreen', () => {
     ]);
   });
 
+  it('the region page hosts the TOWNS panel; a created town is a pickable site target immediately', async () => {
+    const onOpenMap = vi.fn();
+    render(
+      <RegionEditorScreen
+        campaignId="sandbox"
+        regionId="proving-grounds"
+        onBack={vi.fn()}
+        onOpenMap={onOpenMap}
+      />
+    );
+    await screen.findByTestId('cell-0-0');
+    // The hosted panel lists the campaign's towns; cards open the town painter.
+    expect(await screen.findByText('TOWNS')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('town-card-oakvale'));
+    expect(onOpenMap).toHaveBeenCalledWith('town', 'oakvale');
+    // Create a town through the panel...
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'towns', source: 'db' });
+    fireEvent.click(screen.getByTestId('new-town-btn'));
+    fireEvent.change(screen.getByLabelText('TOWN NAME'), { target: { value: 'Milldale' } });
+    fireEvent.click(screen.getByTestId('create-town-btn'));
+    await waitFor(() => expect(onOpenMap).toHaveBeenCalledWith('town', 'milldale'));
+    // ...and the site tool's TOWN picker knows it without a page reload.
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+    fireEvent.change(screen.getByLabelText('KIND'), { target: { value: 'town' } });
+    const picker = screen.getByLabelText('TOWN') as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.value)).toEqual(['', 'oakvale', 'milldale']);
+  });
+
+  it('navigating to a town from a dirty region painter asks before discarding', async () => {
+    const onOpenMap = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(
+      <RegionEditorScreen
+        campaignId="sandbox"
+        regionId="proving-grounds"
+        onBack={vi.fn()}
+        onOpenMap={onOpenMap}
+      />
+    );
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: /WATER/ }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-1')); // dirty now
+    fireEvent.click(await screen.findByTestId('town-card-oakvale'));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(onOpenMap).not.toHaveBeenCalled(); // declined — stay put
+    confirmSpy.mockRestore();
+  });
+
   describe('room mode', () => {
     const TAPROOM = {
       id: 'taproom',

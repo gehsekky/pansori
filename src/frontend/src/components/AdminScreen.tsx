@@ -612,10 +612,12 @@ function AdminScreen({
         {/* ── Content editing (DB-first sections, code supplement) ──────── */}
         {selected && <CampaignContentEditor campaignId={selected.id} />}
 
-        {/* ── Regions + towns + rooms (card-based way into the painter) ── */}
+        {/* ── Regions + rooms (card-based way into the painter). Towns are
+            authored INSIDE a region's painter page — they're reached
+            through region sites, so that's where their panel lives. ── */}
         {selected && (
           <>
-            {(['region', 'town', 'room'] as const).map((kind) => (
+            {(['region', 'room'] as const).map((kind) => (
               <MapsPanel
                 key={kind}
                 campaignId={selected.id}
