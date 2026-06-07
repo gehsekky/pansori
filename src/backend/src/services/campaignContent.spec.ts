@@ -62,7 +62,7 @@ function makeContentDb(initial: {
   const venues = new Map<string, unknown[][]>();
   // campaignId → room insert params after campaign_id: [id, sort_order,
   // name, description, feet_per_square, gridJson, entry_x, entry_y,
-  // exitsJson, lighting, floor, can_rest, enemiesJson]
+  // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson]
   const rooms = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
@@ -169,6 +169,7 @@ function makeContentDb(initial: {
         floor: p[10],
         can_rest: p[11],
         enemies: JSON.parse(p[12] as string),
+        loot: JSON.parse(p[13] as string),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -331,6 +332,7 @@ const ROOM_A: CampaignRoom = {
   floor: 'cobblestone',
   canRest: true,
   enemies: [{ name: 'Goblin', count: 2 }, { name: 'Wolf' }],
+  loot: [{ itemId: 'dagger', pos: { x: 1, y: 1 } }, { itemId: 'rope' }],
 };
 
 const ROOM_B: CampaignRoom = {
@@ -498,6 +500,27 @@ describe('editable sections registry', () => {
     // Duplicate ids and empty lists rejected.
     expect(rooms.safeParse([ROOM_B, { ...ROOM_B, name: 'Other' }]).success).toBe(false);
     expect(rooms.safeParse([]).success).toBe(false);
+  });
+
+  it('rooms schema validates loot placements: item id + bounded pos, strict shape', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const ok = rooms.safeParse([
+      { ...ROOM_B, loot: [{ itemId: 'dagger', pos: { x: 3, y: 3 } }, { itemId: 'rope' }] },
+    ]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // Out-of-grid pos (ROOM_B is 4x4), empty id, extra key, >10 entries.
+    expect(
+      rooms.safeParse([{ ...ROOM_B, loot: [{ itemId: 'dagger', pos: { x: 4, y: 0 } }] }]).success
+    ).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, loot: [{ itemId: '' }] }]).success).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, loot: [{ itemId: 'dagger', gold: 5 }] }]).success).toBe(
+      false
+    );
+    expect(
+      rooms.safeParse([
+        { ...ROOM_B, loot: Array.from({ length: 11 }, () => ({ itemId: 'dagger' })) },
+      ]).success
+    ).toBe(false);
   });
 
   it('rooms schema validates enemy placements: name + bounded count, strict shape', () => {
@@ -977,6 +1000,38 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.ghost.campaign?.intro).toBe('Boo. The tale begins.');
     // Template machinery still present under the overridden opening.
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
+  });
+
+  it('room loot placements materialize against the composed loot table on refresh', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const dagger = { id: 'dagger', name: 'Dagger', type: 'weapon', damage: '1d4' };
+    const code = codeCtx({
+      id: 'malgovia',
+      lootTable: [dagger] as never,
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [],
+        loot: { 'code-room': [{ id: 'old', name: 'Old Thing' }] },
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+      {
+        ...ROOM_B,
+        loot: [{ itemId: 'dagger', pos: { x: 2, y: 1 } }, { itemId: 'vanished-relic' }],
+      },
+    ]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const campaign = contexts.malgovia.campaign!;
+    // The placement is the FULL item + the placement pos; key stays
+    // engine-derived. The unknown item id was skipped with a warning.
+    expect(campaign.loot?.cellar).toEqual([{ ...dagger, pos: { x: 2, y: 1 } }]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('vanished-relic'));
+    // Rooms-wholesale: the code placed-loot map is replaced entirely.
+    expect(campaign.loot?.['code-room']).toBeUndefined();
+    warn.mockRestore();
   });
 
   it('room enemy placements materialize against the composed bestiary on refresh', async () => {

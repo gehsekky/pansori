@@ -814,6 +814,20 @@ const RoomsSchema = z
           )
           .max(10)
           .optional(),
+        // Loot placements: composed-loot-table item IDS (same DB-state
+        // existence rule as enemies). A pos makes the item a clickable
+        // grid token; bounds-checked in the superRefine below.
+        loot: z
+          .array(
+            z
+              .object({
+                itemId: z.string().min(1).max(80),
+                pos: GridPosSchema.optional(),
+              })
+              .strict()
+          )
+          .max(10)
+          .optional(),
       })
       .strict()
       .superRefine((r, ctx) => {
@@ -848,6 +862,15 @@ const RoomsSchema = z
               code: z.ZodIssueCode.custom,
               message: `exit ${i} needs exactly one of toRoomId or ascends`,
               path: ['exits', i],
+            });
+          }
+        });
+        (r.loot ?? []).forEach((l, i) => {
+          if (l.pos && (l.pos.x >= gridWidth || l.pos.y >= gridHeight)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `loot ${i} pos (${l.pos.x},${l.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+              path: ['loot', i, 'pos'],
             });
           }
         });

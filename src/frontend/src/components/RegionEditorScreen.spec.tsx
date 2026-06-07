@@ -8,6 +8,7 @@ vi.mock('../lib/api.ts', () => ({
     getCampaignSection: vi.fn(),
     putCampaignSection: vi.fn(),
     getMonsterCatalog: vi.fn(),
+    getItemCatalog: vi.fn(),
   },
 }));
 
@@ -53,6 +54,10 @@ beforeEach(() => {
   mocked.getMonsterCatalog.mockResolvedValue([
     { id: 'goblin', definition: { name: 'Goblin', cr: 0.25 } },
     { id: 'wolf', definition: { name: 'Wolf', cr: 0.25 } },
+  ]);
+  mocked.getItemCatalog.mockResolvedValue([
+    { id: 'dagger', name: 'Dagger' },
+    { id: 'rope', name: 'Rope (50 ft)' },
   ]);
 });
 
@@ -485,7 +490,9 @@ describe('RegionEditorScreen', () => {
       mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
         section === 'rooms'
           ? { section, source: 'db', value: [TAPROOM, CELLAR] }
-          : { section, source: 'db', value: [{ name: 'Pit Horror' }] }
+          : section === 'customMonsters'
+            ? { section, source: 'db', value: [{ name: 'Pit Horror' }] }
+            : { section, source: 'db', value: [{ id: 'hexed-coin', name: 'Hexed Coin' }] }
       );
       mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
       return render(
@@ -579,6 +586,37 @@ describe('RegionEditorScreen', () => {
       expect(saved.find((r) => r.id === 'cellar')!.enemies).toEqual([
         { name: 'Goblin', count: 3 },
         { name: 'Wolf' },
+      ]);
+    });
+
+    it('LOOT card: pick an item, PLACE arms a grid click, save folds {itemId, pos}', async () => {
+      renderRoom('cellar');
+      await screen.findByTestId('cell-0-0');
+      expect(await screen.findByText(/Nothing to find here/)).toBeTruthy();
+      fireEvent.click(screen.getByTestId('add-loot-btn'));
+      // Customs first, then the catalog; the new row defaults to the first.
+      const picker = screen.getByLabelText('Loot 1') as HTMLSelectElement;
+      expect([...picker.options].map((o) => o.value)).toEqual(['', 'hexed-coin', 'dagger', 'rope']);
+      expect(picker.value).toBe('hexed-coin');
+      fireEvent.change(picker, { target: { value: 'dagger' } });
+      expect(screen.getByText('UNPLACED')).toBeTruthy();
+      // Arm PLACE → the next grid click drops the token there.
+      fireEvent.click(screen.getByTestId('place-loot-0'));
+      expect(screen.getByText(/CLICK A GRID CELL TO PLACE/)).toBeTruthy();
+      fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+      expect(screen.getByText('AT (1,0)')).toBeTruthy();
+      expect(screen.getByTestId('cell-1-0').getAttribute('aria-label')).toContain('loot: Dagger');
+      // A second, unplaced item rides along without a pos.
+      fireEvent.click(screen.getByTestId('add-loot-btn'));
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        loot?: Array<Record<string, unknown>>;
+      }>;
+      expect(saved.find((r) => r.id === 'cellar')!.loot).toEqual([
+        { itemId: 'dagger', pos: { x: 1, y: 0 } },
+        { itemId: 'hexed-coin' },
       ]);
     });
 

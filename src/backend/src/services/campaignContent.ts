@@ -31,6 +31,7 @@ import type {
   FloorType,
   GridPos,
   LootItem,
+  PlacedLoot,
   Region,
   Room,
   RoomExit,
@@ -568,6 +569,14 @@ export interface CampaignRoomEnemy {
   count?: number; // default 1
 }
 
+// A loot placement: which item (by id — the composed loot-table identity)
+// and optionally where on the room grid (a pos makes it a clickable token;
+// without one it's a plain room pickup).
+export interface CampaignRoomLoot {
+  itemId: string;
+  pos?: GridPos;
+}
+
 export interface CampaignRoom {
   id: string;
   name: string;
@@ -580,6 +589,7 @@ export interface CampaignRoom {
   floor?: FloorType;
   canRest?: boolean;
   enemies?: CampaignRoomEnemy[];
+  loot?: CampaignRoomLoot[];
 }
 
 interface RoomRow {
@@ -595,12 +605,13 @@ interface RoomRow {
   floor: FloorType | null;
   can_rest: boolean;
   enemies: CampaignRoomEnemy[];
+  loot: CampaignRoomLoot[];
 }
 
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
-            lighting, floor, can_rest, enemies
+            lighting, floor, can_rest, enemies, loot
        FROM campaign_rooms
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
@@ -618,6 +629,7 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.floor !== null ? { floor: r.floor } : {}),
     ...(r.can_rest ? { canRest: true } : {}),
     ...(r.enemies.length > 0 ? { enemies: r.enemies } : {}),
+    ...(r.loot.length > 0 ? { loot: r.loot } : {}),
   }));
 }
 
@@ -641,8 +653,9 @@ export async function putCampaignRooms(
       await client.query(
         `INSERT INTO campaign_rooms
            (campaign_id, id, sort_order, name, description, feet_per_square,
-            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb)`,
+            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb,
+                 $15::jsonb)`,
         [
           campaignId,
           r.id,
@@ -658,6 +671,7 @@ export async function putCampaignRooms(
           r.floor ?? null,
           r.canRest ?? false,
           JSON.stringify(r.enemies ?? []),
+          JSON.stringify(r.loot ?? []),
         ]
       );
     }
@@ -959,12 +973,40 @@ async function loadOverlay(
         ? {
             rooms: dbRoomsToEngine(dbRooms),
             enemies: materializeRoomEnemies(campaignId, dbRooms, enemyTemplates),
+            loot: materializeRoomLoot(campaignId, dbRooms, lootTable),
           }
         : {}),
     };
   }
 
   return overlay;
+}
+
+// Expand each DB room's loot placements ({itemId, pos?}) into PlacedLoot
+// entries (the full item + the placement pos) against the composed loot
+// table. The per-placement key stays engine-derived (<roomId>#<index>).
+// An unknown item id (deleted custom) is skipped with a warning.
+function materializeRoomLoot(
+  campaignId: string,
+  rooms: CampaignRoom[],
+  lootTable: LootItem[]
+): Record<string, PlacedLoot[]> {
+  const placed: Record<string, PlacedLoot[]> = {};
+  for (const room of rooms) {
+    const list: PlacedLoot[] = [];
+    for (const p of room.loot ?? []) {
+      const item = lootTable.find((i) => i.id === p.itemId);
+      if (!item) {
+        console.warn(
+          `[campaignContent] ${campaignId}/${room.id}: no loot item with id "${p.itemId}" — placement skipped`
+        );
+        continue;
+      }
+      list.push({ ...item, ...(p.pos ? { pos: p.pos } : {}) });
+    }
+    if (list.length > 0) placed[room.id] = list;
+  }
+  return placed;
 }
 
 // Expand each DB room's placement specs ({name, count?}) into full Enemy

@@ -307,6 +307,10 @@ export const api = {
       `/campaigns/catalog/monsters`
     ),
 
+  // The ambient SRD item catalog (type-ordered LootItems) — feeds the room
+  // painter's loot-placement picker.
+  getItemCatalog: () => req<Array<{ id: string; name: string }>>(`/campaigns/catalog/items`),
+
   // Content sections (editor+). PUT writes the DB version (live immediately);
   // DELETE reverts the section to the code-defined version.
   listCampaignSections: (campaignId: string) =>

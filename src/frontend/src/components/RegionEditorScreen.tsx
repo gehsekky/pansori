@@ -89,6 +89,7 @@ interface EditorRegion {
   venues?: EditorSite[];
   exits?: EditorExit[]; // rooms only
   enemies?: Array<{ name: string; count?: number }>; // rooms only
+  loot?: Array<{ itemId: string; pos?: { x: number; y: number } }>; // rooms only
   [key: string]: unknown;
 }
 
@@ -208,6 +209,15 @@ function RegionEditorScreen({
   // names that feed the picker (ambient catalog + campaign customs).
   const [placedEnemies, setPlacedEnemies] = useState<Array<{ name: string; count: number }>>([]);
   const [monsterNames, setMonsterNames] = useState<string[]>([]);
+  // Rooms only: loot placements ({item id, optional grid pos}) + the item
+  // options that feed the picker (id + display name).
+  const [placedLoot, setPlacedLoot] = useState<
+    Array<{ itemId: string; pos?: { x: number; y: number } }>
+  >([]);
+  const [itemOptions, setItemOptions] = useState<Array<{ id: string; name: string }>>([]);
+  // Armed by a loot row's PLACE button: the next grid click drops that
+  // placement's token on the clicked cell.
+  const [lootPlaceIdx, setLootPlaceIdx] = useState<number | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -263,12 +273,14 @@ function RegionEditorScreen({
             : ((kind === 'region' ? r.sites : r.venues) ?? []).map((s) => ({ ...s }))
         );
         setPlacedEnemies((r.enemies ?? []).map((e) => ({ name: e.name, count: e.count ?? 1 })));
+        setPlacedLoot((r.loot ?? []).map((l) => ({ ...l })));
+        setLootPlaceIdx(null);
         setSelectedSiteId(null);
         setMoveArmed(false);
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
-    // Room pages need the bestiary names for the enemy-placement picker:
-    // the ambient SRD catalog (CR-ordered) plus the campaign's customs.
+    // Room pages need the bestiary names (enemy picker) and the item list
+    // (loot picker): the ambient SRD catalogs plus the campaign's customs.
     if (kind === 'room') {
       Promise.all([
         api.getMonsterCatalog().catch(() => []),
@@ -285,6 +297,22 @@ function RegionEditorScreen({
           .map((c) => c.definition?.name)
           .filter((n): n is string => typeof n === 'string');
         setMonsterNames([...new Set([...customNames, ...catalogNames])]);
+      });
+      Promise.all([
+        api.getItemCatalog().catch(() => []),
+        api
+          .getCampaignSection(campaignId, 'customItems')
+          .catch(() => ({ value: null }) as { value: unknown }),
+      ]).then(([catalog, customs]) => {
+        const customItems = Array.isArray(customs.value)
+          ? (customs.value as Array<{ id?: unknown; name?: unknown }>).filter(
+              (c): c is { id: string; name: string } =>
+                typeof c.id === 'string' && typeof c.name === 'string'
+            )
+          : [];
+        const seen = new Set(customItems.map((c) => c.id));
+        const catalogItems = catalog.filter((c) => !seen.has(c.id));
+        setItemOptions([...customItems, ...catalogItems]);
       });
     }
     // Region pages need the room pool for the local-site ENTRY ROOM picker
@@ -312,6 +340,15 @@ function RegionEditorScreen({
   const applyTool = useCallback(
     (x: number, y: number) => {
       setSaved(false);
+      // An armed loot PLACE wins the next click regardless of tool.
+      if (lootPlaceIdx !== null) {
+        setPlacedLoot((prev) =>
+          prev.map((l, i) => (i === lootPlaceIdx ? { ...l, pos: { x, y } } : l))
+        );
+        setLootPlaceIdx(null);
+        setDirty(true);
+        return;
+      }
       if (tool === 'start') {
         setStartPos({ x, y });
         setDirty(true);
@@ -373,7 +410,7 @@ function RegionEditorScreen({
       });
       setDirty(true);
     },
-    [tool, terrainBrush, tierBrush, mechBrush, sites, selectedSiteId, moveArmed, kind]
+    [tool, terrainBrush, tierBrush, mechBrush, sites, selectedSiteId, moveArmed, kind, lootPlaceIdx]
   );
 
   // Patch the selected site; clearing a kind's target also clears the
@@ -427,6 +464,11 @@ function RegionEditorScreen({
         pos: { x: Math.min(s.pos.x, w - 1), y: Math.min(s.pos.y, h - 1) },
       }))
     );
+    setPlacedLoot((prev) =>
+      prev.map((l) =>
+        l.pos ? { ...l, pos: { x: Math.min(l.pos.x, w - 1), y: Math.min(l.pos.y, h - 1) } } : l
+      )
+    );
     setDirty(true);
     setSaved(false);
   }
@@ -468,6 +510,9 @@ function RegionEditorScreen({
     }
     if (kind === 'room' && placedEnemies.some((e) => !e.name)) {
       return { error: 'Every enemy placement needs a creature picked.' };
+    }
+    if (kind === 'room' && placedLoot.some((l) => !l.itemId)) {
+      return { error: 'Every loot placement needs an item picked.' };
     }
     if (kind === 'town' && sites.some((s) => s.kind === 'interior' && !s.entryRoomId)) {
       return { error: 'Every interior venue needs an ENTRY ROOM (or flip it to GATE).' };
@@ -524,6 +569,14 @@ function RegionEditorScreen({
         } else {
           delete next.enemies;
         }
+        if (placedLoot.length > 0) {
+          next.loot = placedLoot.map((l) => ({
+            itemId: l.itemId,
+            ...(l.pos ? { pos: l.pos } : {}),
+          }));
+        } else {
+          delete next.loot;
+        }
       }
     }
     return next;
@@ -570,6 +623,10 @@ function RegionEditorScreen({
   const siteAt = (x: number, y: number) => sites.find((s) => s.pos.x === x && s.pos.y === y);
   const selectedSite = sites.find((s) => s.id === selectedSiteId) ?? null;
   const markerNoun = kind === 'region' ? 'SITE' : kind === 'town' ? 'VENUE' : 'EXIT';
+  // Positioned loot tokens (rooms) — rendered as $ on the grid.
+  const lootAt = (x: number, y: number) =>
+    placedLoot.find((l) => l.pos && l.pos.x === x && l.pos.y === y);
+  const itemName = (id: string) => itemOptions.find((o) => o.id === id)?.name ?? id;
   const defaultScale = kind === 'region' ? 5280 : kind === 'town' ? 25 : 5;
   // Exit targets for the room form: every room in the section.
   const roomIds = kind === 'room' ? (regions ?? []).map((r) => r.id) : [];
@@ -1045,13 +1102,14 @@ function RegionEditorScreen({
                 {grid.map((row, y) =>
                   row.map((cell, x) => {
                     const site = siteAt(x, y);
+                    const cellLoot = lootAt(x, y);
                     const isStart = startPos.x === x && startPos.y === y;
                     return (
                       <div
                         key={`${x},${y}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}`}
+                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}`}
                         data-testid={`cell-${x}-${y}`}
                         title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${site ? ` — ${site.name}` : ''}`}
                         style={{
@@ -1121,6 +1179,18 @@ function RegionEditorScreen({
                         {isStart && (
                           <span aria-hidden="true" style={{ textShadow: '0 0 3px #000' }}>
                             ★
+                          </span>
+                        )}
+                        {cellLoot && !site && !isStart && (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              color: '#9be08a',
+                              fontWeight: 'bold',
+                              textShadow: '0 0 3px #000',
+                            }}
+                          >
+                            $
                           </span>
                         )}
                         {site && (
@@ -1466,6 +1536,129 @@ function RegionEditorScreen({
                         aria-label={`Remove enemy ${i + 1}`}
                         onClick={() => {
                           setPlacedEnemies((prev) => prev.filter((_, j) => j !== i));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        <span aria-hidden="true">✕</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ── Loot (rooms only) — item placements against the campaign's
+                composed loot table. PLACE arms the next grid click to drop
+                the token ($); without a pos it's a plain room pickup. */}
+            {kind === 'room' && (
+              <div className={styles.card} style={{ marginTop: '1rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
+                    LOOT
+                    {lootPlaceIdx !== null && (
+                      <span style={{ color: 'var(--t-hp-mid)' }}>
+                        {' '}
+                        — CLICK A GRID CELL TO PLACE THE TOKEN
+                      </span>
+                    )}
+                  </p>
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    data-testid="add-loot-btn"
+                    onClick={() => {
+                      setPlacedLoot((prev) => [...prev, { itemId: itemOptions[0]?.id ?? '' }]);
+                      setDirty(true);
+                      setSaved(false);
+                    }}
+                  >
+                    + ADD LOOT
+                  </button>
+                </div>
+                {placedLoot.length === 0 ? (
+                  <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
+                    Nothing to find here. Placements come from the campaign&apos;s loot table (the
+                    full SRD catalog plus your custom items); placed tokens render as $ on the grid,
+                    unplaced items are plain room pickups.
+                  </p>
+                ) : (
+                  placedLoot.map((l, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                        padding: '0.3rem 0',
+                      }}
+                    >
+                      <select
+                        className={styles.formInp}
+                        style={{ flex: 1, cursor: 'pointer' }}
+                        aria-label={`Loot ${i + 1}`}
+                        value={l.itemId}
+                        onChange={(ev) => {
+                          const itemId = ev.target.value;
+                          setPlacedLoot((prev) =>
+                            prev.map((p, j) => (j === i ? { ...p, itemId } : p))
+                          );
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        <option value="">— PICK AN ITEM —</option>
+                        {l.itemId && !itemOptions.some((o) => o.id === l.itemId) && (
+                          <option value={l.itemId}>{l.itemId} (unlisted)</option>
+                        )}
+                        {itemOptions.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)', minWidth: 70 }}>
+                        {l.pos ? `AT (${l.pos.x},${l.pos.y})` : 'UNPLACED'}
+                      </span>
+                      <button
+                        className={styles.ghostBtn}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                        aria-pressed={lootPlaceIdx === i}
+                        data-testid={`place-loot-${i}`}
+                        onClick={() => setLootPlaceIdx((v) => (v === i ? null : i))}
+                      >
+                        PLACE
+                      </button>
+                      {l.pos && (
+                        <button
+                          className={styles.ghostBtn}
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                          aria-label={`Unplace loot ${i + 1}`}
+                          onClick={() => {
+                            setPlacedLoot((prev) =>
+                              prev.map((p, j) => (j === i ? { itemId: p.itemId } : p))
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        >
+                          UNPLACE
+                        </button>
+                      )}
+                      <button
+                        className={styles.ghostBtn}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                        aria-label={`Remove loot ${i + 1}`}
+                        onClick={() => {
+                          setPlacedLoot((prev) => prev.filter((_, j) => j !== i));
+                          setLootPlaceIdx(null);
                           setDirty(true);
                           setSaved(false);
                         }}
