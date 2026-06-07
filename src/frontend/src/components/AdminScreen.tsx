@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import CampaignContentEditor from './CampaignContentEditor.tsx';
 import FactionsPanel from './FactionsPanel.tsx';
+import MapArtPanel from './MapArtPanel.tsx';
 import MapsPanel from './MapsPanel.tsx';
 import QuestsPanel from './QuestsPanel.tsx';
 import styles from '../styles.module.css';
@@ -613,6 +614,10 @@ function AdminScreen({
 
         {/* ── Content editing (DB-first sections, code supplement) ──────── */}
         {selected && <CampaignContentEditor campaignId={selected.id} />}
+
+        {/* ── Map art: the structured terrainArt editor (tile picks, tints,
+            the town marker) — the visual skin the raw JSON tab also edits. ── */}
+        {selected && <MapArtPanel campaignId={selected.id} />}
 
         {/* ── Regions (card-based way into the painter). Towns and rooms are
             authored INSIDE their parent painter page (region hosts TOWNS,
