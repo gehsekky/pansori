@@ -7,6 +7,7 @@ vi.mock('../lib/api.ts', () => ({
   api: {
     getCampaignSection: vi.fn(),
     putCampaignSection: vi.fn(),
+    getMonsterCatalog: vi.fn(),
   },
 }));
 
@@ -49,6 +50,10 @@ beforeEach(() => {
         : { section, source: 'db', value: [] }
   );
   mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'regions', source: 'db' });
+  mocked.getMonsterCatalog.mockResolvedValue([
+    { id: 'goblin', definition: { name: 'Goblin', cr: 0.25 } },
+    { id: 'wolf', definition: { name: 'Wolf', cr: 0.25 } },
+  ]);
 });
 
 function renderEditor(onBack = vi.fn()) {
@@ -475,11 +480,13 @@ describe('RegionEditorScreen', () => {
     };
 
     function renderRoom(roomId = 'taproom') {
-      mocked.getCampaignSection.mockResolvedValue({
-        section: 'rooms',
-        source: 'db',
-        value: [TAPROOM, CELLAR],
-      });
+      // The room painter loads its section AND the campaign customs (for
+      // the enemy picker) — dispatch by section.
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? { section, source: 'db', value: [TAPROOM, CELLAR] }
+          : { section, source: 'db', value: [{ name: 'Pit Horror' }] }
+      );
       mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
       return render(
         <RegionEditorScreen campaignId="sandbox" regionId={roomId} kind="room" onBack={vi.fn()} />
@@ -546,6 +553,59 @@ describe('RegionEditorScreen', () => {
         { pos: { x: 2, y: 2 }, ascends: true, label: 'Door' },
         { pos: { x: 0, y: 2 }, toRoomId: 'cellar', label: 'Stairs down' },
       ]);
+    });
+
+    it('ENEMIES card: placements from customs + catalog, count folding, picker guard', async () => {
+      renderRoom('cellar'); // no placements yet
+      await screen.findByTestId('cell-0-0');
+      expect(await screen.findByText(/No enemies here/)).toBeTruthy();
+      fireEvent.click(screen.getByTestId('add-enemy-btn'));
+      // The picker offers the campaign custom first, then the catalog.
+      const picker = screen.getByLabelText('Enemy 1') as HTMLSelectElement;
+      expect([...picker.options].map((o) => o.value)).toEqual(['', 'Pit Horror', 'Goblin', 'Wolf']);
+      // The new row defaults to the first bestiary name.
+      expect(picker.value).toBe('Pit Horror');
+      fireEvent.change(picker, { target: { value: 'Goblin' } });
+      fireEvent.change(screen.getByLabelText('Enemy 1 count'), { target: { value: '3' } });
+      fireEvent.click(screen.getByTestId('add-enemy-btn'));
+      fireEvent.change(screen.getByLabelText('Enemy 2'), { target: { value: 'Wolf' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        enemies?: Array<Record<string, unknown>>;
+      }>;
+      // count 1 stays implicit; count > 1 is recorded.
+      expect(saved.find((r) => r.id === 'cellar')!.enemies).toEqual([
+        { name: 'Goblin', count: 3 },
+        { name: 'Wolf' },
+      ]);
+    });
+
+    it('removing every placement drops the enemies key from the save', async () => {
+      // The taproom fixture carries a placement — remove it and save.
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [{ ...TAPROOM, enemies: [{ name: 'Goblin', count: 2 }] }, CELLAR],
+            }
+          : { section, source: 'db', value: [] }
+      );
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      render(
+        <RegionEditorScreen campaignId="sandbox" regionId="taproom" kind="room" onBack={vi.fn()} />
+      );
+      await screen.findByTestId('cell-0-0');
+      // Pre-filled from the room: Goblin ×2.
+      expect((screen.getByLabelText('Enemy 1') as HTMLSelectElement).value).toBe('Goblin');
+      expect((screen.getByLabelText('Enemy 1 count') as HTMLInputElement).value).toBe('2');
+      fireEvent.click(screen.getByLabelText('Remove enemy 1'));
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+      expect('enemies' in saved[0]).toBe(false);
     });
 
     it('details: entry pos tool, lighting/floor/can-rest, desc required', async () => {

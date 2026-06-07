@@ -62,7 +62,7 @@ function makeContentDb(initial: {
   const venues = new Map<string, unknown[][]>();
   // campaignId → room insert params after campaign_id: [id, sort_order,
   // name, description, feet_per_square, gridJson, entry_x, entry_y,
-  // exitsJson, lighting, floor, can_rest]
+  // exitsJson, lighting, floor, can_rest, enemiesJson]
   const rooms = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
@@ -168,6 +168,7 @@ function makeContentDb(initial: {
         lighting: p[9],
         floor: p[10],
         can_rest: p[11],
+        enemies: JSON.parse(p[12] as string),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -329,6 +330,7 @@ const ROOM_A: CampaignRoom = {
   lighting: 'dim',
   floor: 'cobblestone',
   canRest: true,
+  enemies: [{ name: 'Goblin', count: 2 }, { name: 'Wolf' }],
 };
 
 const ROOM_B: CampaignRoom = {
@@ -496,6 +498,29 @@ describe('editable sections registry', () => {
     // Duplicate ids and empty lists rejected.
     expect(rooms.safeParse([ROOM_B, { ...ROOM_B, name: 'Other' }]).success).toBe(false);
     expect(rooms.safeParse([]).success).toBe(false);
+  });
+
+  it('rooms schema validates enemy placements: name + bounded count, strict shape', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const ok = rooms.safeParse([
+      { ...ROOM_B, enemies: [{ name: 'Goblin', count: 3 }, { name: 'Wolf' }] },
+    ]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    expect(rooms.safeParse([{ ...ROOM_B, enemies: [{ name: '' }] }]).success).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, enemies: [{ name: 'Goblin', count: 0 }] }]).success).toBe(
+      false
+    );
+    expect(rooms.safeParse([{ ...ROOM_B, enemies: [{ name: 'Goblin', count: 9 }] }]).success).toBe(
+      false
+    );
+    expect(rooms.safeParse([{ ...ROOM_B, enemies: [{ name: 'Goblin', hp: 99 }] }]).success).toBe(
+      false
+    );
+    expect(
+      rooms.safeParse([
+        { ...ROOM_B, enemies: Array.from({ length: 11 }, () => ({ name: 'Goblin' })) },
+      ]).success
+    ).toBe(false);
   });
 
   it('terrainArt schema: per-type tile ids from the shared catalog, {} allowed', () => {
@@ -952,6 +977,68 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.ghost.campaign?.intro).toBe('Boo. The tale begins.');
     // Template machinery still present under the overridden opening.
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
+  });
+
+  it('room enemy placements materialize against the composed bestiary on refresh', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const goblin = {
+      name: 'Goblin',
+      cr: 0.25,
+      hp: 7,
+      ac: 15,
+      damage: '1d6+2',
+      toHit: 4,
+      xp: 50,
+      creatureType: 'humanoid' as const,
+    };
+    const code = codeCtx({
+      id: 'malgovia',
+      enemyTemplates: [goblin] as never,
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [{ id: 'code-room', name: 'Code Room', desc: 'd' }],
+        enemies: { 'code-room': [{ id: 'code-room#0', name: 'Old Foe' }] },
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+      { ...ROOM_B, enemies: [{ name: 'Goblin', count: 2 }, { name: 'Vanished Horror' }] },
+    ]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const campaign = contexts.malgovia.campaign!;
+    // Two goblins, instance ids in the code convention, template stats +
+    // creatureType carried, base HP (party scaling stays seed-time).
+    const placed = campaign.enemies?.cellar ?? [];
+    expect(placed.map((e) => e.id)).toEqual(['cellar#0', 'cellar#1']);
+    expect(placed[0].name).toBe('Goblin');
+    expect(placed[0].hp).toBe(7);
+    expect(placed[0].ac).toBe(15);
+    expect(placed[0].creatureType).toBe('humanoid');
+    // The unknown template was skipped with a warning, not an error.
+    expect(placed).toHaveLength(2);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Vanished Horror'));
+    // Rooms-wholesale: the code placed-enemy map is replaced entirely.
+    expect(campaign.enemies?.['code-room']).toBeUndefined();
+    warn.mockRestore();
+  });
+
+  it('DB rooms with no placements still replace the code enemy map (empty)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [],
+        enemies: { 'code-room': [{ id: 'code-room#0', name: 'Old Foe' }] },
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_B]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.enemies).toEqual({});
   });
 
   it('DB rooms replace the campaign rooms wholesale on refresh', async () => {

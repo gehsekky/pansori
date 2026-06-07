@@ -800,6 +800,20 @@ const RoomsSchema = z
         lighting: z.enum(['bright', 'dim', 'dark', 'sunlight']).optional(),
         floor: z.enum(['grass', 'dirt', 'cobblestone', 'sand']).optional(),
         canRest: z.boolean().optional(),
+        // Enemy placements: composed-bestiary template NAMES (the catalog
+        // is DB state, so existence is resolved at overlay time — an
+        // unknown name is skipped with a warning, never a crash).
+        enemies: z
+          .array(
+            z
+              .object({
+                name: z.string().min(1).max(80),
+                count: z.number().int().min(1).max(8).optional(),
+              })
+              .strict()
+          )
+          .max(10)
+          .optional(),
       })
       .strict()
       .superRefine((r, ctx) => {

@@ -26,6 +26,7 @@
 
 import type {
   Context,
+  Enemy,
   EnemyTemplate,
   FloorType,
   GridPos,
@@ -54,6 +55,7 @@ import {
 } from './itemCatalog.js';
 import type { Pool } from 'pg';
 import { baseCampaignContext } from '../campaignData/srd/baseCampaign.js';
+import { materializeEnemy } from './enemyFactory.js';
 
 // The code supplement for a DB-born campaign (no campaignData/ folder):
 // the base template, re-keyed to the campaign's id. Everything the
@@ -558,6 +560,14 @@ export interface CampaignRoomExit {
   ascends?: boolean;
 }
 
+// An enemy placement: which bestiary template (by NAME — the composed
+// ambient-catalog + customs identity) and how many. The overlay
+// materializes these into full Enemy instances when the room folds in.
+export interface CampaignRoomEnemy {
+  name: string;
+  count?: number; // default 1
+}
+
 export interface CampaignRoom {
   id: string;
   name: string;
@@ -569,6 +579,7 @@ export interface CampaignRoom {
   lighting?: 'bright' | 'dim' | 'dark' | 'sunlight';
   floor?: FloorType;
   canRest?: boolean;
+  enemies?: CampaignRoomEnemy[];
 }
 
 interface RoomRow {
@@ -583,12 +594,13 @@ interface RoomRow {
   lighting: CampaignRoom['lighting'] | null;
   floor: FloorType | null;
   can_rest: boolean;
+  enemies: CampaignRoomEnemy[];
 }
 
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
-            lighting, floor, can_rest
+            lighting, floor, can_rest, enemies
        FROM campaign_rooms
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
@@ -605,6 +617,7 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.lighting !== null ? { lighting: r.lighting } : {}),
     ...(r.floor !== null ? { floor: r.floor } : {}),
     ...(r.can_rest ? { canRest: true } : {}),
+    ...(r.enemies.length > 0 ? { enemies: r.enemies } : {}),
   }));
 }
 
@@ -628,8 +641,8 @@ export async function putCampaignRooms(
       await client.query(
         `INSERT INTO campaign_rooms
            (campaign_id, id, sort_order, name, description, feet_per_square,
-            grid, entry_x, entry_y, exits, lighting, floor, can_rest)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13)`,
+            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb)`,
         [
           campaignId,
           r.id,
@@ -644,6 +657,7 @@ export async function putCampaignRooms(
           r.lighting ?? null,
           r.floor ?? null,
           r.canRest ?? false,
+          JSON.stringify(r.enemies ?? []),
         ]
       );
     }
@@ -909,23 +923,8 @@ async function loadOverlay(
   const gameStart = typeof overlay.gameStart === 'string' ? overlay.gameStart : undefined;
   delete overlay.gameStart;
 
-  // DB regions + towns + rooms DRIVE the map: converted to the engine model
-  // and folded into the campaign block (each replacing its code/template
-  // counterpart while the rest of the block — placed enemies/loot, quests —
-  // stays code-supplied until those sections migrate).
-  const dbRegions = await getCampaignRegions(pool, campaignId);
-  const dbTowns = await getCampaignTowns(pool, campaignId);
-  const dbRooms = await getCampaignRooms(pool, campaignId);
-  if (dbRegions.length > 0 || dbTowns.length > 0 || dbRooms.length > 0 || gameStart !== undefined) {
-    overlay.campaign = {
-      ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
-      ...(gameStart !== undefined ? { intro: gameStart } : {}),
-      ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
-      ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
-      ...(dbRooms.length > 0 ? { rooms: dbRoomsToEngine(dbRooms) } : {}),
-    };
-  }
-
+  // The composed catalogs come first — room enemy placements resolve
+  // against the composed bestiary below.
   const lootTable = composeLootTable(
     await getCampaignCustomItems(pool, campaignId),
     code.lootTable ?? [],
@@ -940,7 +939,63 @@ async function loadOverlay(
   );
   if (enemyTemplates.length > 0) overlay.enemyTemplates = enemyTemplates;
 
+  // DB regions + towns + rooms DRIVE the map: converted to the engine model
+  // and folded into the campaign block (each replacing its code/template
+  // counterpart while the rest of the block — placed loot, quests — stays
+  // code-supplied until those sections migrate).
+  const dbRegions = await getCampaignRegions(pool, campaignId);
+  const dbTowns = await getCampaignTowns(pool, campaignId);
+  const dbRooms = await getCampaignRooms(pool, campaignId);
+  if (dbRegions.length > 0 || dbTowns.length > 0 || dbRooms.length > 0 || gameStart !== undefined) {
+    overlay.campaign = {
+      ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
+      ...(gameStart !== undefined ? { intro: gameStart } : {}),
+      ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
+      ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
+      // Rooms-wholesale semantics extend to their enemies: DB rooms bring
+      // their own placed-enemy map (possibly empty), replacing the code one
+      // (whose room ids no longer resolve anyway).
+      ...(dbRooms.length > 0
+        ? {
+            rooms: dbRoomsToEngine(dbRooms),
+            enemies: materializeRoomEnemies(campaignId, dbRooms, enemyTemplates),
+          }
+        : {}),
+    };
+  }
+
   return overlay;
+}
+
+// Expand each DB room's placement specs ({name, count?}) into full Enemy
+// instances against the composed bestiary — ids are <roomId>#<n> (the same
+// convention code campaigns use), base HP from the template (party-size
+// scaling stays a seed-time concern in procgen). A placement naming a
+// template that no longer exists (a deleted custom) is skipped with a
+// warning rather than failing the whole overlay.
+function materializeRoomEnemies(
+  campaignId: string,
+  rooms: CampaignRoom[],
+  templates: EnemyTemplate[]
+): Record<string, Enemy[]> {
+  const placed: Record<string, Enemy[]> = {};
+  for (const room of rooms) {
+    const list: Enemy[] = [];
+    for (const p of room.enemies ?? []) {
+      const tpl = templates.find((t) => t.name === p.name);
+      if (!tpl) {
+        console.warn(
+          `[campaignContent] ${campaignId}/${room.id}: no enemy template named "${p.name}" — placement skipped`
+        );
+        continue;
+      }
+      for (let i = 0; i < (p.count ?? 1); i++) {
+        list.push(materializeEnemy(tpl, `${room.id}#${list.length}`, tpl.hp));
+      }
+    }
+    if (list.length > 0) placed[room.id] = list;
+  }
+  return placed;
 }
 
 // Overlay every registered campaign's DB content onto the loaded code

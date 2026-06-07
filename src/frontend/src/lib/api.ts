@@ -300,6 +300,13 @@ export const api = {
       body: JSON.stringify({ name }),
     }),
 
+  // The ambient SRD monster catalog (CR-ordered) — its names feed the room
+  // painter's enemy-placement picker.
+  getMonsterCatalog: () =>
+    req<Array<{ id: string; definition: { name: string; cr?: number } }>>(
+      `/campaigns/catalog/monsters`
+    ),
+
   // Content sections (editor+). PUT writes the DB version (live immediately);
   // DELETE reverts the section to the code-defined version.
   listCampaignSections: (campaignId: string) =>

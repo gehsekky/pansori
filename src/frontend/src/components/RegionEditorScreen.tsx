@@ -88,6 +88,7 @@ interface EditorRegion {
   sites?: EditorSite[];
   venues?: EditorSite[];
   exits?: EditorExit[]; // rooms only
+  enemies?: Array<{ name: string; count?: number }>; // rooms only
   [key: string]: unknown;
 }
 
@@ -203,6 +204,10 @@ function RegionEditorScreen({
   // Town pages get them live from the hosted ROOMS panel; region pages
   // fetch them once (their hosted panel is TOWNS).
   const [roomOptions, setRoomOptions] = useState<string[]>([]);
+  // Rooms only: enemy placements ({template name, count}) + the bestiary
+  // names that feed the picker (ambient catalog + campaign customs).
+  const [placedEnemies, setPlacedEnemies] = useState<Array<{ name: string; count: number }>>([]);
+  const [monsterNames, setMonsterNames] = useState<string[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -257,10 +262,31 @@ function RegionEditorScreen({
             ? exitsToSites(r.exits)
             : ((kind === 'region' ? r.sites : r.venues) ?? []).map((s) => ({ ...s }))
         );
+        setPlacedEnemies((r.enemies ?? []).map((e) => ({ name: e.name, count: e.count ?? 1 })));
         setSelectedSiteId(null);
         setMoveArmed(false);
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
+    // Room pages need the bestiary names for the enemy-placement picker:
+    // the ambient SRD catalog (CR-ordered) plus the campaign's customs.
+    if (kind === 'room') {
+      Promise.all([
+        api.getMonsterCatalog().catch(() => []),
+        api
+          .getCampaignSection(campaignId, 'customMonsters')
+          .catch(() => ({ value: null }) as { value: unknown }),
+      ]).then(([catalog, customs]) => {
+        const customNames = Array.isArray(customs.value)
+          ? (customs.value as Array<{ name?: unknown }>)
+              .map((c) => c.name)
+              .filter((n): n is string => typeof n === 'string')
+          : [];
+        const catalogNames = catalog
+          .map((c) => c.definition?.name)
+          .filter((n): n is string => typeof n === 'string');
+        setMonsterNames([...new Set([...customNames, ...catalogNames])]);
+      });
+    }
     // Region pages need the room pool for the local-site ENTRY ROOM picker
     // (town pages get it live from their hosted ROOMS panel instead).
     if (kind === 'region') {
@@ -440,6 +466,9 @@ function RegionEditorScreen({
     if (kind === 'room' && sites.some((s) => s.kind === 'room' && !s.toRoomId)) {
       return { error: 'Every room exit needs a TO ROOM target (or flip it to LEAVE).' };
     }
+    if (kind === 'room' && placedEnemies.some((e) => !e.name)) {
+      return { error: 'Every enemy placement needs a creature picked.' };
+    }
     if (kind === 'town' && sites.some((s) => s.kind === 'interior' && !s.entryRoomId)) {
       return { error: 'Every interior venue needs an ENTRY ROOM (or flip it to GATE).' };
     }
@@ -487,6 +516,14 @@ function RegionEditorScreen({
         else next.lighting = details.lighting;
         if (canRest) next.canRest = true;
         else delete next.canRest;
+        if (placedEnemies.length > 0) {
+          next.enemies = placedEnemies.map((e) => ({
+            name: e.name,
+            ...(e.count > 1 ? { count: e.count } : {}),
+          }));
+        } else {
+          delete next.enemies;
+        }
       }
     }
     return next;
@@ -1329,6 +1366,117 @@ function RegionEditorScreen({
                 </div>
               )}
             </div>
+
+            {/* ── Enemies (rooms only) — placement specs against the
+                campaign's composed bestiary; combat starts when the party
+                attacks them in play. Saved with the room. */}
+            {kind === 'room' && (
+              <div className={styles.card} style={{ marginTop: '1rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
+                    ENEMIES
+                  </p>
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    data-testid="add-enemy-btn"
+                    onClick={() => {
+                      setPlacedEnemies((prev) => [
+                        ...prev,
+                        { name: monsterNames[0] ?? '', count: 1 },
+                      ]);
+                      setDirty(true);
+                      setSaved(false);
+                    }}
+                  >
+                    + ADD ENEMY
+                  </button>
+                </div>
+                {placedEnemies.length === 0 ? (
+                  <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
+                    No enemies here — a safe room. Placements come from the campaign&apos;s bestiary
+                    (the full SRD catalog plus your custom monsters).
+                  </p>
+                ) : (
+                  placedEnemies.map((e, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                        padding: '0.3rem 0',
+                      }}
+                    >
+                      <select
+                        className={styles.formInp}
+                        style={{ flex: 1, cursor: 'pointer' }}
+                        aria-label={`Enemy ${i + 1}`}
+                        value={e.name}
+                        onChange={(ev) => {
+                          const name = ev.target.value;
+                          setPlacedEnemies((prev) =>
+                            prev.map((p, j) => (j === i ? { ...p, name } : p))
+                          );
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        <option value="">— PICK A CREATURE —</option>
+                        {e.name && !monsterNames.includes(e.name) && (
+                          <option value={e.name}>{e.name} (unlisted)</option>
+                        )}
+                        {monsterNames.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>×</span>
+                      <input
+                        className={styles.formInp}
+                        style={{ width: 64 }}
+                        type="number"
+                        min={1}
+                        max={8}
+                        aria-label={`Enemy ${i + 1} count`}
+                        value={e.count}
+                        onChange={(ev) => {
+                          const count = Math.max(
+                            1,
+                            Math.min(8, parseInt(ev.target.value, 10) || 1)
+                          );
+                          setPlacedEnemies((prev) =>
+                            prev.map((p, j) => (j === i ? { ...p, count } : p))
+                          );
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      />
+                      <button
+                        className={styles.ghostBtn}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                        aria-label={`Remove enemy ${i + 1}`}
+                        onClick={() => {
+                          setPlacedEnemies((prev) => prev.filter((_, j) => j !== i));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        <span aria-hidden="true">✕</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: 8 }}>
               {saved && (

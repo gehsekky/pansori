@@ -17,6 +17,11 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
   return {
     id,
     name: template.name,
+    // SRD creature type — drives Fiend/Undead interactions (Holy Water).
+    // The template contract says this carries onto live enemies; it was
+    // previously only carried by code campaigns' place() helper, so
+    // wilderness encounters (and now DB room placements) lost it.
+    creatureType: template.creatureType,
     hp,
     maxHp: hp,
     ac: template.ac,
