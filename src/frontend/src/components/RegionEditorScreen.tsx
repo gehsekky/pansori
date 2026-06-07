@@ -714,6 +714,33 @@ function RegionEditorScreen({
                         </span>
                       )}
                     </p>
+                    {/* Every existing marker, selectable — so the tool never
+                        reads as "empty" while the map shows ◆ markers. */}
+                    {sites.length > 0 && (
+                      <div
+                        style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}
+                        data-testid="marker-list"
+                      >
+                        {sites.map((s) => (
+                          <button
+                            key={s.id}
+                            className={styles.ghostBtn}
+                            aria-pressed={s.id === selectedSiteId}
+                            style={{
+                              padding: '0.25rem 0.6rem',
+                              fontSize: '0.7rem',
+                              borderColor: s.id === selectedSiteId ? 'var(--t-primary)' : undefined,
+                            }}
+                            onClick={() => {
+                              setSelectedSiteId(s.id);
+                              setMoveArmed(false);
+                            }}
+                          >
+                            ◆ {s.name || s.id} · {s.kind.toUpperCase()} ({s.pos.x},{s.pos.y})
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {selectedSite ? (
                       <div
                         style={{

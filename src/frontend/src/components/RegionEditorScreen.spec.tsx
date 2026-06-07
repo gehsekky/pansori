@@ -268,6 +268,19 @@ describe('RegionEditorScreen', () => {
     expect('icon' in added).toBe(false);
   });
 
+  it('the marker tool lists every existing marker; clicking one selects it', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    // The Pit exists on the map — it's listed, not hidden behind a cell click.
+    const chip = screen.getByRole('button', { name: /◆ The Pit · LOCAL \(2,1\)/ });
+    fireEvent.click(chip);
+    expect(
+      (screen.getByLabelText('NAME', { selector: '#site-name' }) as HTMLInputElement).value
+    ).toBe('The Pit');
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('selecting a marker edits it; DELETE removes it from the save', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
