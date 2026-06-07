@@ -614,20 +614,16 @@ function AdminScreen({
         {/* ── Content editing (DB-first sections, code supplement) ──────── */}
         {selected && <CampaignContentEditor campaignId={selected.id} />}
 
-        {/* ── Regions + rooms (card-based way into the painter). Towns are
-            authored INSIDE a region's painter page — they're reached
-            through region sites, so that's where their panel lives. ── */}
+        {/* ── Regions (card-based way into the painter). Towns and rooms are
+            authored INSIDE their parent painter page (region hosts TOWNS,
+            town hosts ROOMS) — the URL nests the full chain, so this page
+            only needs the top of it. ── */}
         {selected && (
-          <>
-            {(['region', 'room'] as const).map((kind) => (
-              <MapsPanel
-                key={kind}
-                campaignId={selected.id}
-                kind={kind}
-                onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, kind, mapId) : undefined}
-              />
-            ))}
-          </>
+          <MapsPanel
+            campaignId={selected.id}
+            kind="region"
+            onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, 'region', mapId) : undefined}
+          />
         )}
 
         {/* ── Story content: quests + factions (structured section panels;

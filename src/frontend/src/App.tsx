@@ -493,8 +493,10 @@ export default function App() {
             window.history.replaceState(null, '', id ? `/creator/${id}` : '/creator')
           }
           onEditMap={(campaignId, kind, mapId) => {
-            // Only regions/rooms launch from the creator screen — towns are
-            // reached (and URL-nested) through a region's painter page.
+            // Only regions launch from the creator screen — towns and rooms
+            // are reached (and URL-nested) through their parent painter page.
+            // The flat /creator/<cid>/room/<id> deep link stays parseable for
+            // old bookmarks.
             setCreatorCampaignId(campaignId);
             setCreatorMapKind(kind);
             setCreatorRegionId(mapId);
