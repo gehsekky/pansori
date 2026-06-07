@@ -1091,11 +1091,19 @@ const RoomNpcSchema = z
     shop: z
       .array(
         z
-          .object({ itemId: z.string().min(1).max(80), price: z.number().int().min(0).max(100000) })
+          .object({
+            itemId: z.string().min(1).max(80),
+            price: z.number().int().min(0).max(100000),
+            // Daily stock (absent = unlimited); vendors restock each in-game day.
+            qty: z.number().int().min(1).max(999).optional(),
+          })
           .strict()
       )
       .max(20)
       .optional(),
+    // The vendor's daily wallet (absent = unlimited) — caps what they can pay
+    // when the party sells; purchases replenish it.
+    shopGold: z.number().int().min(0).max(100000).optional(),
     // Ties the shop to a faction so the tier price multipliers apply
     // (factionShopPrice). An id with no matching faction fails soft to
     // flat prices — factions live in their own section.

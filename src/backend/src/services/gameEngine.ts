@@ -3960,6 +3960,46 @@ export function scaleUpcastDice(upcastBonus: string, levels: number): string {
 // A friendly shop NPC's wares as `buy` choices, with faction-aware pricing
 // folded in (factionShopPrice + the party's rep with the NPC's faction). Each is
 // tagged `kind:'vendor'` so the frontend renders them in the VendorPanel.
+// ─── Vendor economy helpers ───────────────────────────────────────────────────
+
+// The current in-game day (Day 1 starts the campaign).
+function shopDay(state: GameState): number {
+  return Math.floor((state.world_minute ?? 0) / 1440) + 1;
+}
+
+/**
+ * Daily restock — every vendor's stock and wallet reset at the start of each
+ * in-game day. Lazy: called by the shop handlers (enter_shop / buy / sell)
+ * before their logic, clearing the session maps when the day has rolled.
+ */
+export function maybeRestockShops(state: GameState): GameState {
+  const day = shopDay(state);
+  if (state.shop_restock_day === day) return state;
+  return { ...state, shop_stock: {}, shop_gold: {}, shop_restock_day: day };
+}
+
+/** Remaining stock for an entry: today's session count, else the authored qty. */
+export function shopStockLeft(
+  state: GameState,
+  npcId: string,
+  entry: { itemId: string; qty?: number }
+): number | undefined {
+  if (entry.qty === undefined) return undefined; // unlimited
+  return state.shop_stock?.[`${npcId}:${entry.itemId}`] ?? entry.qty;
+}
+
+/** The vendor's current wallet: today's session balance, else the authored float. */
+export function shopGoldLeft(state: GameState, npc: PlacedNpc): number | undefined {
+  if (npc.shopGold === undefined) return undefined; // unlimited
+  return state.shop_gold?.[npc.id] ?? npc.shopGold;
+}
+
+/** What the vendor pays for an item THEY stock: half their sale price, min 1. */
+export function shopSellPrice(npc: PlacedNpc, itemId: string): number | undefined {
+  const entry = npc.shop?.find((e) => e.itemId === itemId);
+  return entry ? Math.max(1, Math.floor(entry.price / 2)) : undefined;
+}
+
 function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): GameChoice[] {
   if (!npc.shop?.length) return [];
   const faction = npc.factionId
@@ -3970,16 +4010,50 @@ function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): Gam
   for (const entry of npc.shop) {
     const item = context.lootTable.find((l) => l.id === entry.itemId);
     if (!item) continue;
+    // Daily stock — a sold-out entry drops off the list until tomorrow.
+    const left = shopStockLeft(state, npc.id, entry);
+    if (left !== undefined && left <= 0) continue;
     const price = faction ? factionShopPrice(entry.price, rep, faction) : entry.price;
     const repNote =
       faction && price !== entry.price
         ? ` (${faction.name} ${price < entry.price ? 'discount' : 'markup'} from ${entry.price})`
         : '';
+    const stockNote = left !== undefined ? ` (${left} left)` : '';
     out.push({
-      label: `Buy ${item.name} — ${price}cr${repNote}`,
+      label: `Buy ${item.name} — ${price}cr${repNote}${stockNote}`,
       action: { type: 'buy', itemId: entry.itemId, price },
       kind: 'vendor',
     });
+  }
+  // SELL side — the vendor buys back items THEY stock, at half their sale
+  // price, capped by their wallet. One choice per distinct item the active
+  // character carries unequipped/unattuned; each click sells one.
+  const active = state.characters.find((c) => c.id === state.active_character_id);
+  if (active) {
+    const equippedIds = new Set(Object.values(active.equipment ?? {}));
+    const attuned = new Set(active.attuned_items ?? []);
+    const wallet = shopGoldLeft(state, npc);
+    const offered = new Set<string>();
+    for (const item of active.inventory ?? []) {
+      if (offered.has(item.id)) continue;
+      const price = shopSellPrice(npc, item.id);
+      if (price === undefined) continue; // the vendor doesn't deal in it
+      const sellable = (active.inventory ?? []).filter(
+        (i) =>
+          i.id === item.id &&
+          !equippedIds.has(i.instance_id ?? '') &&
+          !attuned.has(i.instance_id ?? '')
+      );
+      if (sellable.length === 0) continue;
+      if (wallet !== undefined && wallet < price) continue; // can't afford it today
+      offered.add(item.id);
+      const haveNote = sellable.length > 1 ? ` (have ${sellable.length})` : '';
+      out.push({
+        label: `Sell ${item.name} — ${price}cr${haveNote}`,
+        action: { type: 'sell', itemId: item.id },
+        kind: 'vendor',
+      });
+    }
   }
   return out;
 }

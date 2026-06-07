@@ -870,6 +870,8 @@ describe('RegionEditorScreen', () => {
       // Defaults to the first catalog item; flip to rope, set a price.
       fireEvent.change(screen.getByLabelText('NPC 1 ware 1 item'), { target: { value: 'rope' } });
       fireEvent.change(screen.getByLabelText('NPC 1 ware 1 price'), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText('NPC 1 ware 1 qty'), { target: { value: '5' } });
+      fireEvent.change(screen.getByLabelText('VENDOR GOLD / DAY'), { target: { value: '40' } });
       // The faction tie lights the tier pricing.
       fireEvent.change(screen.getByLabelText('FACTION (TIER PRICING)'), {
         target: { value: 'millers' },
@@ -881,7 +883,8 @@ describe('RegionEditorScreen', () => {
         npcs?: Array<Record<string, unknown>>;
       }>;
       const hob = saved.find((r) => r.id === 'cellar')!.npcs![0];
-      expect(hob.shop).toEqual([{ itemId: 'rope', price: 3 }]);
+      expect(hob.shop).toEqual([{ itemId: 'rope', price: 3, qty: 5 }]);
+      expect(hob.shopGold).toBe(40);
       expect(hob.factionId).toBe('millers');
     });
 

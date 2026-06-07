@@ -710,6 +710,8 @@ export type StructuredAction =
   | { type: 'marker_move'; to: GridPos }
   // SRD Travel Pace — set the party's overland stance (regional map, free).
   | { type: 'set_pace'; pace: 'fast' | 'normal' | 'slow' }
+  // Sell one item (by id) to the open vendor — half their sale price.
+  | { type: 'sell'; itemId: string }
   // Town teleportation (Teleport / Teleportation Circle interstitial).
   | { type: 'teleport_to'; townId: string }
   | { type: 'cancel_teleport' }
@@ -1017,6 +1019,10 @@ export interface RoomObject {
 export interface NpcShopEntry {
   itemId: string;
   price: number;
+  // Stock per in-game day (absent = unlimited). Remaining count is session
+  // state (GameState.shop_stock); every vendor restocks at the start of
+  // each in-game day.
+  qty?: number;
 }
 
 export interface NpcTemplate {
@@ -1059,6 +1065,10 @@ export interface NpcTemplate {
   persuasionDC?: number; // CHA check DC when indifferent (default 12)
   // Trade
   shop?: NpcShopEntry[];
+  // The vendor's wallet per in-game day (absent = unlimited). Caps what they
+  // can pay when the party SELLS; the party's purchases replenish it.
+  // Session balance lives in GameState.shop_gold; restocks daily.
+  shopGold?: number;
   // Associates the NPC's shop with a faction so price modifiers can apply
   // (campaignEngine.factionShopPrice). Optional — NPCs without a faction
   // tag charge their static shop entry price.

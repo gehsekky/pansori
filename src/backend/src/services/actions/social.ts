@@ -4,9 +4,13 @@ import {
   applyConsequence,
   consumeLuckForCheck,
   getNpcAttitude,
+  maybeRestockShops,
   npcById,
   npcIsKilled,
   npcsInRoom,
+  shopGoldLeft,
+  shopSellPrice,
+  shopStockLeft,
 } from '../gameEngine.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import { onceKey, visibleResponses } from '../dialogueGating.js';
@@ -329,8 +333,12 @@ export const handleEnterShop: ActionHandler<{ type: 'enter_shop' }> = (ctx) => {
     ctx.narrative = `${npc.name} has nothing to sell you.`;
     return;
   }
+  ctx.st = maybeRestockShops(ctx.st);
   ctx.st = { ...ctx.st, active_shop: { npcId: conv.npcId, roomId: conv.roomId } };
-  ctx.narrative = `You browse ${npc.name}'s wares.`;
+  const wallet = shopGoldLeft(ctx.st, npc);
+  ctx.narrative = `You browse ${npc.name}'s wares.${
+    wallet !== undefined ? ` (${npc.name} is carrying ${wallet}cr.)` : ''
+  }`;
 };
 
 /**
@@ -379,11 +387,91 @@ export const handleBuy: ActionHandler<{
     ctx.narrative = 'That item is not available.';
     return;
   }
+  // Vendor economy — the day may have rolled since the pane opened.
+  ctx.st = maybeRestockShops(ctx.st);
+  const entry = npc.shop?.find((e) => e.itemId === action.itemId);
+  const left = entry ? shopStockLeft(ctx.st, npc.id, entry) : undefined;
+  if (left !== undefined && left <= 0) {
+    ctx.narrative = `${npc.name} is sold out of ${lootEntry.name} — try again tomorrow.`;
+    return;
+  }
+  if (left !== undefined) {
+    ctx.st = {
+      ...ctx.st,
+      shop_stock: { ...(ctx.st.shop_stock ?? {}), [`${npc.id}:${action.itemId}`]: left - 1 },
+    };
+  }
+  // The party's coin lands in the vendor's wallet (tracked only when finite) —
+  // it's the budget they can pay back out when the party SELLS.
+  const wallet = shopGoldLeft(ctx.st, npc);
+  if (wallet !== undefined) {
+    ctx.st = {
+      ...ctx.st,
+      shop_gold: { ...(ctx.st.shop_gold ?? {}), [npc.id]: wallet + action.price },
+    };
+  }
   updatePcActor(ctx, {
     gold: char.gold - action.price,
     inventory: [...char.inventory, { ...lootEntry, instance_id: randomUUID() }],
   });
   ctx.narrative = `You hand over ${action.price}cr and receive ${lootEntry.name}. ${npc.name} pockets the credits with a nod.`;
+};
+
+/**
+ * `sell`: trade one item from the active character's pack to the open
+ * vendor. The vendor only buys what THEY stock, at half their sale price
+ * (min 1cr), and — when their wallet is finite — only while they can pay;
+ * the party's purchases replenish that wallet. Equipped / attuned items
+ * must be freed first.
+ */
+export const handleSell: ActionHandler<{ type: 'sell'; itemId: string }> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can sell.' };
+  const { char } = ctx.actor;
+  const npc = ctx.st.active_shop
+    ? npcById(ctx.seed, ctx.st.active_shop.npcId)
+    : npcsInRoom(ctx.seed, ctx.roomId)[0];
+  if (!npc) {
+    ctx.narrative = 'There is no one to sell to.';
+    return;
+  }
+  if (getNpcAttitude(ctx.st, npc) !== 'friendly') {
+    ctx.narrative = `${npc.name} won't trade with you right now.`;
+    return;
+  }
+  ctx.st = maybeRestockShops(ctx.st);
+  const price = shopSellPrice(npc, action.itemId);
+  if (price === undefined) {
+    ctx.narrative = `${npc.name} doesn't deal in that.`;
+    return;
+  }
+  const equippedIds = new Set(Object.values(char.equipment ?? {}));
+  const attuned = new Set(char.attuned_items ?? []);
+  const instance = (char.inventory ?? []).find(
+    (i) =>
+      i.id === action.itemId &&
+      !equippedIds.has(i.instance_id ?? '') &&
+      !attuned.has(i.instance_id ?? '')
+  );
+  if (!instance) {
+    ctx.narrative = `You have no unequipped ${action.itemId} to sell.`;
+    return;
+  }
+  const wallet = shopGoldLeft(ctx.st, npc);
+  if (wallet !== undefined && wallet < price) {
+    ctx.narrative = `${npc.name} turns out empty pockets — come back tomorrow.`;
+    return;
+  }
+  if (wallet !== undefined) {
+    ctx.st = {
+      ...ctx.st,
+      shop_gold: { ...(ctx.st.shop_gold ?? {}), [npc.id]: wallet - price },
+    };
+  }
+  updatePcActor(ctx, {
+    gold: char.gold + price,
+    inventory: (char.inventory ?? []).filter((i) => i.instance_id !== instance.instance_id),
+  });
+  ctx.narrative = `${npc.name} looks ${instance.name} over and counts out ${price}cr.`;
 };
 
 /**

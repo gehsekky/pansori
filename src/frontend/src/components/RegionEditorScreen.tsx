@@ -144,7 +144,8 @@ interface EditorNpc {
   pos?: { x: number; y: number };
   icon?: string;
   responses?: DialogueNode[];
-  shop?: Array<{ itemId: string; price: number }>;
+  shop?: Array<{ itemId: string; price: number; qty?: number }>;
+  shopGold?: number;
   factionId?: string;
   [key: string]: unknown;
 }
@@ -783,6 +784,11 @@ function RegionEditorScreen({
             if (!c.firstGoodbye) delete c.firstGoodbye;
             if (!c.responses || c.responses.length === 0) delete c.responses;
             if (!c.shop || c.shop.length === 0) delete c.shop;
+            else
+              c.shop = c.shop.map((w) =>
+                w.qty === undefined ? { itemId: w.itemId, price: w.price } : w
+              );
+            if (c.shopGold === undefined) delete c.shopGold;
             if (!c.factionId) delete c.factionId;
             return c;
           });
@@ -2306,6 +2312,31 @@ function RegionEditorScreen({
                           </button>
                           {(n.shop ?? []).length > 0 && (
                             <div>
+                              <label className={styles.formLbl} htmlFor={`npc-shopgold-${i}`}>
+                                VENDOR GOLD / DAY
+                              </label>
+                              <input
+                                id={`npc-shopgold-${i}`}
+                                className={styles.formInp}
+                                style={{ width: 110 }}
+                                type="number"
+                                min={0}
+                                placeholder="unlimited"
+                                value={n.shopGold ?? ''}
+                                onChange={(ev) => {
+                                  const v = ev.target.value;
+                                  const shopGold = v === '' ? undefined : Number(v);
+                                  setPlacedNpcs((prev) =>
+                                    prev.map((p, j) => (j === i ? { ...p, shopGold } : p))
+                                  );
+                                  setDirty(true);
+                                  setSaved(false);
+                                }}
+                              />
+                            </div>
+                          )}
+                          {(n.shop ?? []).length > 0 && (
+                            <div>
                               <label className={styles.formLbl} htmlFor={`npc-faction-${i}`}>
                                 FACTION (TIER PRICING)
                               </label>
@@ -2396,6 +2427,34 @@ function RegionEditorScreen({
                               }}
                             />
                             <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>cr</span>
+                            <input
+                              className={styles.formInp}
+                              style={{ width: 80 }}
+                              type="number"
+                              min={1}
+                              placeholder="∞"
+                              aria-label={`NPC ${i + 1} ware ${wi + 1} qty`}
+                              value={w.qty ?? ''}
+                              onChange={(ev) => {
+                                const v = ev.target.value;
+                                const qty = v === '' ? undefined : Number(v);
+                                setPlacedNpcs((prev) =>
+                                  prev.map((p, j) =>
+                                    j === i
+                                      ? {
+                                          ...p,
+                                          shop: p.shop!.map((x, k) =>
+                                            k === wi ? { ...x, qty } : x
+                                          ),
+                                        }
+                                      : p
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            />
+                            <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>/day</span>
                             <button
                               className={styles.ghostBtn}
                               style={{ padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}

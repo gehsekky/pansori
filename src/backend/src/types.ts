@@ -1684,6 +1684,14 @@ export interface GameState {
   // `enter_shop`, cleared by `exit_shop` or `end_conversation`.
   active_shop?: { npcId: string; roomId: string };
 
+  // Vendor economy session state — remaining stock for FINITE shop entries
+  // ('npcId:itemId' → count left) and current wallet for FINITE vendors
+  // (npcId → gold). Cleared wholesale at the start of each in-game day
+  // (shop_restock_day) — every vendor restocks daily.
+  shop_stock?: Record<string, number>;
+  shop_gold?: Record<string, number>;
+  shop_restock_day?: number;
+
   // Leveling pane — player-driven level-up for one party member. While set (out
   // of combat), generateChoices offers ONLY that member's level-up cascade
   // (class pick → ASI/feat → weapon mastery) + a Back control. Opened by

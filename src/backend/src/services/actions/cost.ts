@@ -104,6 +104,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   exit_leveling: 'managed',
   marker_move: 'managed', // out-of-combat map movement; no combat action economy
   set_pace: 'managed', // SRD Travel Pace stance — free, out of combat
+  sell: 'managed', // vendor pane — out-of-combat trade, no action economy
   teleport_to: 'managed', // resolves the town-teleport interstitial (slot already spent)
   cancel_teleport: 'managed', // abandons the interstitial (the slot stays spent)
   approach: 'managed', // out-of-combat walk up to a loot/object token

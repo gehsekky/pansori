@@ -719,7 +719,8 @@ export interface CampaignRoomNpc {
   persuasionDC?: number;
   pos?: GridPos;
   icon?: string;
-  shop?: Array<{ itemId: string; price: number }>;
+  shop?: Array<{ itemId: string; price: number; qty?: number }>;
+  shopGold?: number;
   factionId?: string;
   hp?: number;
   ac?: number;
@@ -1302,6 +1303,7 @@ function materializeRoomNpcs(
         ...(n.pos ? { pos: n.pos } : {}),
         ...(n.icon ? { icon: n.icon } : {}),
         ...(shop.length > 0 ? { shop } : {}),
+        ...(n.shopGold !== undefined ? { shopGold: n.shopGold } : {}),
         ...(n.factionId ? { factionId: n.factionId } : {}),
         hp: n.hp ?? 4,
         ac: n.ac ?? 10,
