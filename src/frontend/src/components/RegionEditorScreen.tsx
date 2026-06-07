@@ -1588,7 +1588,9 @@ function RegionEditorScreen({
                         ))}
                       </select>
                     </div>
-                    <div style={{ flex: '1 1 110px', alignSelf: 'flex-end' }}>
+                    {/* No label-above-input stack here, so bottom-align and pad
+                        up to the neighbours' input centreline. */}
+                    <div style={{ flex: '1 1 110px', alignSelf: 'flex-end', paddingBottom: 8 }}>
                       <label
                         style={{
                           display: 'flex',
