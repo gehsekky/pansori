@@ -141,6 +141,9 @@ describe('RegionEditorScreen', () => {
   it('resizing preserves painted content and fills new cells with plains', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
+    // SIZE is its own tool — the width/height inputs show when it's selected.
+    expect(screen.queryByLabelText('Grid width')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'SIZE' }));
     fireEvent.change(screen.getByLabelText('Grid width'), { target: { value: '4' } });
     expect(screen.getByText(/4×2/)).toBeTruthy();
     expect(screen.getByTestId('cell-3-0').getAttribute('aria-label')).toContain('plains');

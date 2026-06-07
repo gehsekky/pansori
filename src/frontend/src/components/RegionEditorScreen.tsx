@@ -201,7 +201,7 @@ const TERRAIN_COLORS: Record<TerrainType, string> = {
 
 const TERRAIN_TYPES = Object.keys(TERRAIN) as TerrainType[];
 
-type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech';
+type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech' | 'size';
 
 const CELL_PX = 30;
 
@@ -878,6 +878,7 @@ function RegionEditorScreen({
                         ...(kind === 'room' ? [['mech', 'MECHANICS'] as [Tool, string]] : []),
                         ['start', kind === 'room' ? 'ENTRY POS' : 'START POS'],
                         ['site', `${markerNoun}S`],
+                        ['size', 'SIZE'],
                       ] as Array<[Tool, string]>
                     ).map(([t, label]) => (
                       <button
@@ -1249,32 +1250,34 @@ function RegionEditorScreen({
                   </div>
                 )}
 
-                <div>
-                  <p className={styles.formLbl}>SIZE</p>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input
-                      className={styles.formInp}
-                      style={{ width: 64 }}
-                      type="number"
-                      min={1}
-                      max={200}
-                      aria-label="Grid width"
-                      value={width}
-                      onChange={(e) => resize(parseInt(e.target.value, 10) || width, height)}
-                    />
-                    <span style={{ color: 'var(--t-dim)' }}>×</span>
-                    <input
-                      className={styles.formInp}
-                      style={{ width: 64 }}
-                      type="number"
-                      min={1}
-                      max={200}
-                      aria-label="Grid height"
-                      value={height}
-                      onChange={(e) => resize(width, parseInt(e.target.value, 10) || height)}
-                    />
+                {tool === 'size' && (
+                  <div>
+                    <p className={styles.formLbl}>SIZE (CELLS) — SHRINKING TRIMS THE EDGES</p>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input
+                        className={styles.formInp}
+                        style={{ width: 64 }}
+                        type="number"
+                        min={1}
+                        max={200}
+                        aria-label="Grid width"
+                        value={width}
+                        onChange={(e) => resize(parseInt(e.target.value, 10) || width, height)}
+                      />
+                      <span style={{ color: 'var(--t-dim)' }}>×</span>
+                      <input
+                        className={styles.formInp}
+                        style={{ width: 64 }}
+                        type="number"
+                        min={1}
+                        max={200}
+                        aria-label="Grid height"
+                        value={height}
+                        onChange={(e) => resize(width, parseInt(e.target.value, 10) || height)}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
