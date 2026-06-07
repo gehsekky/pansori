@@ -81,6 +81,78 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['minotaur', 3, 85, 14, '1d12+4', 6, 700],
   ['giant_scorpion', 3, 52, 15, '1d8+3', 5, 700, 3],
   ['warrior_veteran', 3, 65, 17, '2d6+3', 5, 700, 2],
+  // Animals appendix batch (2026-06-07) — the full SRD 5.2.1 animal roster.
+  ['baboon', 0, 3, 12, '1', 1, 10],
+  ['badger', 0, 5, 11, '1', 2, 10],
+  ['bat', 0, 1, 12, '1', 4, 10],
+  ['cat', 0, 2, 12, '1', 4, 10],
+  ['crab', 0, 3, 11, '1', 2, 10],
+  ['deer', 0, 4, 13, '1d4', 2, 10],
+  ['eagle', 0, 4, 12, '1d4+2', 4, 10],
+  ['frog', 0, 1, 11, '1', 3, 10],
+  ['giant_fire_beetle', 0, 4, 13, '1', 1, 10],
+  ['goat', 0, 4, 10, '1', 2, 10],
+  ['hawk', 0, 1, 13, '1', 5, 10],
+  ['jackal', 0, 3, 12, '1', 1, 10],
+  ['lizard', 0, 2, 10, '1', 2, 10],
+  ['octopus', 0, 3, 12, '1', 4, 10],
+  ['owl', 0, 1, 11, '1', 3, 10],
+  ['piranha', 0, 1, 13, '1', 5, 10],
+  ['rat', 0, 1, 10, '1', 2, 10],
+  ['raven', 0, 2, 12, '1', 4, 10],
+  ['scorpion', 0, 1, 11, '1', 2, 10],
+  ['spider', 0, 1, 12, '1', 4, 10],
+  ['vulture', 0, 5, 10, '1d4', 2, 10],
+  ['weasel', 0, 1, 13, '1', 5, 10],
+  ['blood_hawk', 0.125, 7, 12, '1d4+2', 4, 25],
+  ['camel', 0.125, 17, 10, '1d4+2', 4, 25],
+  ['flying_snake', 0.125, 5, 14, '1', 4, 25],
+  ['giant_weasel', 0.125, 9, 13, '1d4+3', 5, 25],
+  ['mastiff', 0.125, 5, 12, '1d6+1', 3, 25],
+  ['mule', 0.125, 11, 10, '1d4+2', 4, 25],
+  ['pony', 0.125, 11, 10, '1d4+2', 4, 25],
+  ['venomous_snake', 0.125, 5, 12, '1d4+2', 4, 25],
+  ['boar', 0.25, 13, 11, '1d6+1', 3, 50],
+  ['draft_horse', 0.25, 15, 10, '1d4+4', 6, 50],
+  ['elk', 0.25, 11, 10, '1d6+3', 5, 50],
+  ['giant_badger', 0.25, 15, 13, '2d4+1', 3, 50],
+  ['giant_bat', 0.25, 22, 13, '1d6+3', 5, 50],
+  ['giant_centipede', 0.25, 9, 14, '1d4+2', 4, 50],
+  ['giant_frog', 0.25, 18, 11, '1d6+2', 3, 50],
+  ['giant_lizard', 0.25, 19, 12, '1d8+2', 4, 50],
+  ['giant_owl', 0.25, 19, 12, '1d10+2', 4, 50],
+  ['giant_venomous_snake', 0.25, 11, 14, '1d4+4', 6, 50],
+  ['panther', 0.25, 13, 13, '1d6+3', 5, 50],
+  ['pteranodon', 0.25, 13, 13, '1d8+2', 4, 50],
+  ['riding_horse', 0.25, 13, 11, '1d8+3', 5, 50],
+  ['swarm_of_bats', 0.25, 11, 12, '2d4', 4, 50],
+  ['swarm_of_rats', 0.25, 14, 10, '2d4', 2, 50],
+  ['swarm_of_ravens', 0.25, 11, 12, '1d6+2', 4, 50],
+  ['giant_goat', 0.5, 19, 11, '1d6+3', 5, 100],
+  ['giant_seahorse', 0.5, 16, 14, '2d6+2', 4, 100],
+  ['giant_wasp', 0.5, 22, 13, '1d6+2', 4, 100],
+  ['reef_shark', 0.5, 22, 12, '2d4+2', 4, 100],
+  ['swarm_of_insects', 0.5, 19, 11, '2d4+1', 3, 100],
+  ['warhorse', 0.5, 19, 11, '2d4+4', 6, 100],
+  ['giant_octopus', 1, 45, 11, '2d6+3', 5, 200],
+  ['giant_toad', 1, 39, 11, '1d6+2', 4, 200],
+  ['giant_vulture', 1, 25, 10, '2d6+2', 4, 200],
+  ['swarm_of_piranhas', 1, 28, 13, '2d4+3', 5, 200],
+  ['allosaurus', 2, 51, 13, '2d10+4', 6, 450],
+  ['giant_elk', 2, 42, 14, '2d6+4', 6, 450],
+  ['hunter_shark', 2, 45, 12, '3d6+4', 6, 450],
+  ['plesiosaurus', 2, 68, 13, '2d6+4', 6, 450],
+  ['rhinoceros', 2, 45, 13, '2d8+5', 7, 450],
+  ['swarm_of_venomous_snakes', 2, 36, 14, '1d8+4', 6, 450],
+  ['ankylosaurus', 3, 68, 15, '1d10+4', 6, 700, 2],
+  ['killer_whale', 3, 90, 12, '5d6+4', 6, 700],
+  ['archelon', 4, 90, 17, '3d6+4', 6, 1100, 2],
+  ['elephant', 4, 76, 12, '2d8+6', 8, 1100, 2],
+  ['hippopotamus', 4, 82, 14, '2d10+5', 7, 1100, 2],
+  ['giant_crocodile', 5, 85, 14, '3d10+5', 8, 1800, 2],
+  ['giant_shark', 5, 92, 13, '3d10+6', 9, 1800, 2],
+  ['triceratops', 5, 114, 14, '2d12+6', 9, 1800, 2],
+  ['tyrannosaurus_rex', 8, 136, 13, '4d12+7', 10, 3900, 2],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -460,5 +532,102 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.awakened_tree.attackReachFt).toBe(10);
     expect(SRD_MONSTERS.minotaur.attackReachFt).toBe(10);
     expect(SRD_MONSTERS.minotaur.bonusDamageType).toBe('necrotic');
+  });
+});
+
+describe('Animals appendix batch — effect fields', () => {
+  it('every appendix animal carries the beast creature type (Celestials/Monstrosities excepted)', () => {
+    // The four appendix entries that are NOT Beasts in SRD 5.2.1 (the
+    // creatureType union has no celestial/monstrosity — left unspecified).
+    const notBeasts = ['giant_owl', 'giant_elk', 'flying_snake', 'giant_vulture'];
+    for (const id of notBeasts) expect(SRD_MONSTERS[id].creatureType, id).toBeUndefined();
+    for (const id of ['rat', 'panther', 'elephant', 'tyrannosaurus_rex', 'swarm_of_rats'])
+      expect(SRD_MONSTERS[id].creatureType, id).toBe('beast');
+  });
+
+  it('swarms share the swarm kit: weapon resistance + the crowd-control immunity suite', () => {
+    const swarms = [
+      'swarm_of_bats',
+      'swarm_of_rats',
+      'swarm_of_ravens',
+      'swarm_of_insects',
+      'swarm_of_piranhas',
+      'swarm_of_venomous_snakes',
+    ];
+    for (const id of swarms) {
+      expect(SRD_MONSTERS[id].resistances, id).toEqual(['bludgeoning', 'piercing', 'slashing']);
+      expect(SRD_MONSTERS[id].condition_immunities, id).toEqual([
+        'charmed',
+        'frightened',
+        'grappled',
+        'paralyzed',
+        'petrified',
+        'prone',
+        'restrained',
+        'stunned',
+      ]);
+    }
+    // The snake swarm's bites carry the 3d6 poison rider.
+    expect(SRD_MONSTERS.swarm_of_venomous_snakes.bonusDamage).toBe('3d6');
+    expect(SRD_MONSTERS.swarm_of_venomous_snakes.bonusDamageType).toBe('poison');
+  });
+
+  it('venomous fauna carry their poison riders', () => {
+    const riders: Array<[string, string]> = [
+      ['scorpion', '1d6'],
+      ['spider', '1d4'],
+      ['flying_snake', '2d4'],
+      ['venomous_snake', '1d6'],
+      ['giant_venomous_snake', '1d8'],
+      ['giant_wasp', '2d4'],
+      ['giant_toad', '2d4'],
+    ];
+    for (const [id, dice] of riders) {
+      expect(SRD_MONSTERS[id].bonusDamage, id).toBe(dice);
+      expect(SRD_MONSTERS[id].bonusDamageType, id).toBe('poison');
+    }
+  });
+
+  it('the big grapplers pin on a hit at their SRD escape DCs', () => {
+    const grapplers: Array<[string, number]> = [
+      ['giant_frog', 11],
+      ['giant_toad', 12],
+      ['giant_octopus', 13],
+      ['giant_crocodile', 15],
+      ['tyrannosaurus_rex', 17],
+    ];
+    for (const [id, escapeDc] of grapplers)
+      expect(SRD_MONSTERS[id].onHitEffect, id).toMatchObject({ condition: 'grappled', escapeDc });
+  });
+
+  it('auto-condition riders: knockdown bites and lingering poison', () => {
+    expect(SRD_MONSTERS.mastiff.onHitEffect).toEqual({ condition: 'prone' });
+    expect(SRD_MONSTERS.ankylosaurus.onHitEffect).toEqual({ condition: 'prone' });
+    expect(SRD_MONSTERS.giant_centipede.onHitEffect).toEqual({ condition: 'poisoned' });
+    expect(SRD_MONSTERS.giant_vulture.onHitEffect).toEqual({ condition: 'poisoned' });
+  });
+
+  it('pack hunters have Pack Tactics (the SRD 5.2.1 carriers, not folk memory)', () => {
+    for (const id of ['baboon', 'blood_hawk', 'giant_vulture', 'reef_shark', 'vulture'])
+      expect(SRD_MONSTERS[id].packTactics, id).toBe(true);
+    // Jackal and Mastiff do NOT carry it in 5.2.1.
+    expect(SRD_MONSTERS.jackal.packTactics).toBeUndefined();
+    expect(SRD_MONSTERS.mastiff.packTactics).toBeUndefined();
+  });
+
+  it('the Celestial fauna carry their radiant kit', () => {
+    expect(SRD_MONSTERS.giant_elk.bonusDamage).toBe('2d4');
+    expect(SRD_MONSTERS.giant_elk.bonusDamageType).toBe('radiant');
+    expect(SRD_MONSTERS.giant_elk.resistances).toEqual(['necrotic', 'radiant']);
+    expect(SRD_MONSTERS.giant_owl.resistances).toEqual(['necrotic', 'radiant']);
+    expect(SRD_MONSTERS.giant_owl.darkvision_ft).toBe(120);
+  });
+
+  it('flyers and swimmers carry their dominant movement speed', () => {
+    expect(SRD_MONSTERS.giant_owl.speedFt).toBe(60); // fly
+    expect(SRD_MONSTERS.pteranodon.speedFt).toBe(60); // fly
+    expect(SRD_MONSTERS.killer_whale.speedFt).toBe(60); // swim
+    expect(SRD_MONSTERS.giant_shark.speedFt).toBe(60); // swim
+    expect(SRD_MONSTERS.allosaurus.speedFt).toBe(60); // ground sprinter
   });
 });
