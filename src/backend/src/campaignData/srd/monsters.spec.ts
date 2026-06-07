@@ -273,6 +273,61 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['ancient_silver_dragon', 23, 468, 22, '2d8+10', 17, 50000, 3],
   ['ancient_gold_dragon', 24, 546, 22, '2d8+10', 17, 62000, 3],
   ['ancient_red_dragon', 24, 507, 22, '2d8+10', 17, 62000, 3],
+  // Planar + top-end batch (2026-06-07) — the final batch.
+  ['lemure', 0, 9, 9, '1d4', 2, 10],
+  ['animated_flying_sword', 0.25, 14, 17, '1d8+2', 4, 50],
+  ['axe_beak', 0.25, 19, 11, '1d8+2', 4, 50],
+  ['dretch', 0.25, 18, 11, '1d6+1', 3, 50],
+  ['imp', 1, 21, 13, '1d6+3', 5, 200],
+  ['quasit', 1, 25, 13, '1d4+3', 5, 200],
+  ['sphinx_of_wonder', 1, 24, 13, '1d4+3', 5, 200],
+  ['animated_rug_of_smothering', 2, 27, 12, '2d6+3', 5, 450],
+  ['bearded_devil', 3, 58, 13, '1d8+3', 5, 700, 2],
+  ['chuul', 4, 76, 16, '1d10+4', 6, 1100, 2],
+  ['couatl', 4, 60, 19, '1d12+5', 7, 1100],
+  ['incubus', 4, 66, 15, '3d6+5', 7, 1100, 2],
+  ['succubus', 4, 71, 15, '2d10+5', 7, 1100],
+  ['barbed_devil', 5, 110, 15, '2d6+3', 6, 1800, 2],
+  ['flesh_golem', 5, 127, 9, '2d8+4', 7, 1800, 2],
+  ['unicorn', 5, 97, 12, '2d6+4', 7, 1800],
+  ['drider', 6, 123, 19, '2d8+4', 7, 2300, 3],
+  ['vrock', 6, 152, 15, '2d6+3', 6, 2300, 2],
+  ['oni', 7, 119, 17, '1d12+4', 7, 2900, 2],
+  ['shield_guardian', 7, 142, 17, '2d6+4', 7, 2900, 2],
+  ['chain_devil', 8, 85, 15, '2d6+4', 7, 3900, 2],
+  ['hezrou', 8, 157, 18, '1d4+4', 7, 3900, 3],
+  ['bone_devil', 9, 161, 16, '2d8+4', 8, 5000, 2],
+  ['clay_golem', 9, 123, 14, '1d10+5', 9, 5000, 2],
+  ['glabrezu', 9, 189, 17, '2d10+5', 9, 5000, 2],
+  ['aboleth', 10, 150, 17, '2d6+5', 9, 5900, 2],
+  ['deva', 10, 229, 17, '1d6+4', 8, 5900, 2],
+  ['stone_golem', 10, 220, 18, '2d8+6', 10, 5900, 2],
+  ['behir', 11, 168, 17, '2d12+6', 10, 7200],
+  ['djinni', 11, 218, 17, '2d6+5', 9, 7200, 3],
+  ['efreeti', 11, 212, 17, '2d6+6', 10, 7200, 3],
+  ['horned_devil', 11, 199, 18, '2d8+6', 10, 7200, 3],
+  ['remorhaz', 11, 195, 17, '2d10+7', 11, 7200],
+  ['roc', 11, 248, 15, '3d12+9', 13, 7200, 2],
+  ['sphinx_of_lore', 11, 170, 17, '3d6+4', 8, 7200, 3],
+  ['erinyes', 12, 178, 18, '2d8+4', 8, 8400, 3],
+  ['nalfeshnee', 13, 184, 18, '2d10+5', 10, 10000, 3],
+  ['rakshasa', 13, 221, 17, '2d6+5', 10, 10000, 3],
+  ['storm_giant', 13, 230, 16, '4d6+9', 14, 10000, 2],
+  ['vampire', 13, 195, 16, '1d8+4', 9, 10000, 2],
+  ['ice_devil', 14, 228, 18, '3d6+5', 10, 11500, 3],
+  ['mummy_lord', 15, 187, 17, '2d10+4', 9, 13000],
+  ['purple_worm', 15, 247, 18, '3d8+9', 14, 13000],
+  ['iron_golem', 16, 252, 20, '3d8+7', 12, 15000, 2],
+  ['marilith', 16, 220, 16, '1d10+5', 10, 15000, 6],
+  ['planetar', 16, 262, 19, '2d6+7', 12, 15000, 3],
+  ['dragon_turtle', 17, 356, 20, '3d10+7', 13, 18000, 3],
+  ['sphinx_of_valor', 17, 199, 17, '4d6+6', 12, 18000, 2],
+  ['balor', 19, 287, 19, '3d8+8', 14, 22000, 2],
+  ['pit_fiend', 20, 337, 21, '3d6+8', 14, 25000, 4],
+  ['lich', 21, 315, 20, '3d6+5', 12, 33000, 3],
+  ['solar', 21, 297, 21, '4d6+8', 15, 33000, 2],
+  ['kraken', 23, 481, 18, '4d6+10', 17, 50000, 2],
+  ['tarrasque', 30, 697, 25, '4d8+10', 19, 155000, 4],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -985,14 +1040,19 @@ describe('Full-bestiary SRD audit — cr / hp / ac / xp match the printed blocks
     const lines = srdText.split('\n');
     const sizeType =
       /^(Tiny|Small|Medium|Large|Huge|Gargantuan)( or [\w-]+)? (Aberration|Beast|Celestial|Construct|Dragon|Elemental|Fey|Fiend|Giant|Humanoid|Monstrosity|Ooze|Plant|Undead|Swarm[\w ()]*?)( ?\([\w /]+\))?,/;
-    const crLine = /CR ([\d/]+) \((?:XP ([\d,]+)|([\d,]+) XP)/;
+    // The extraction sometimes spaces the thousands ('XP 7 ,200').
+    const crLine = /CR ([\d/]+) \((?:XP ([\d, ]+?)|([\d, ]+?) XP)[;)]/;
     // name → { cr, hp, ac, xp } parsed from the first matching block.
     const blocks = new Map<string, { cr: number; hp: number; ac: number; xp: number }>();
     for (let i = 1; i < lines.length; i++) {
       if (!sizeType.test(lines[i].trim())) continue;
       const name = lines[i - 1].trim();
       if (blocks.has(name)) continue;
-      const chunk = lines.slice(i, i + 40).join('\n');
+      // Join wrapped thousands ('XP 7,\n200') before matching the CR line.
+      const chunk = lines
+        .slice(i, i + 40)
+        .join('\n')
+        .replace(/,\s*\n\s*/g, ',');
       const hp = chunk.match(/^HP (\d+)/m);
       const ac = chunk.match(/^AC (\d+)/m);
       const cr = chunk.match(crLine);
@@ -1004,7 +1064,7 @@ describe('Full-bestiary SRD audit — cr / hp / ac / xp match the printed blocks
         cr: crNum,
         hp: Number(hp[1]),
         ac: Number(ac[1]),
-        xp: Number((cr[2] ?? cr[3]).replace(/,/g, '')),
+        xp: Number((cr[2] ?? cr[3]).replace(/[ ,]/g, '')),
       });
     }
     expect(blocks.size).toBeGreaterThan(300);
@@ -1018,5 +1078,104 @@ describe('Full-bestiary SRD audit — cr / hp / ac / xp match the printed blocks
         );
     }
     expect(drift).toEqual([]);
+  });
+});
+
+describe('Planar + top-end batch — effect fields', () => {
+  it('the bestiary is complete: every SRD attack-capable stat block is in', () => {
+    // 330 SRD blocks − Seahorse − Shrieker Fungus (no attack actions)
+    // − the 2014-only names = every name maps. The SRD-exact + full-audit
+    // tests cover correctness; this one covers COMPLETENESS.
+    expect(Object.keys(SRD_MONSTERS).length).toBe(328);
+  });
+
+  it('the demon and devil ladders carry the fiendish kits', () => {
+    for (const id of ['dretch', 'vrock', 'hezrou', 'glabrezu', 'nalfeshnee', 'marilith', 'balor'])
+      expect(SRD_MONSTERS[id].creatureType, id).toBe('fiend');
+    // Demons resist the elemental trio; devils burn-proof and resist cold.
+    expect(SRD_MONSTERS.marilith.resistances).toEqual(['cold', 'fire', 'lightning']);
+    expect(SRD_MONSTERS.pit_fiend.immunities).toEqual(['fire', 'poison']);
+    expect(SRD_MONSTERS.pit_fiend.resistances).toEqual(['cold']);
+    expect(SRD_MONSTERS.marilith.multiattack).toBe(6); // six pact blades
+    expect(SRD_MONSTERS.hezrou.aura).toMatchObject({ radiusFt: 10, condition: 'poisoned' });
+    expect(SRD_MONSTERS.balor.bonusDamage).toBe('4d10');
+  });
+
+  it('the apex undead regenerate, paralyze, and drain', () => {
+    expect(SRD_MONSTERS.vampire.regeneration).toBe(20);
+    expect(SRD_MONSTERS.vampire.regenBlockedBy).toEqual(['radiant']);
+    expect(SRD_MONSTERS.vampire.sunlightSensitivity).toBe(true);
+    expect(SRD_MONSTERS.lich.onHitEffect).toEqual({ condition: 'paralyzed' });
+    expect(SRD_MONSTERS.mummy_lord.vulnerabilities).toEqual(['fire']);
+    expect(SRD_MONSTERS.oni.regenBlockedBy).toEqual([]); // nothing shuts it off
+  });
+
+  it('legendary attack options ride the extra_attack system', () => {
+    const legends: Array<[string, string]> = [
+      ['aboleth', 'Lash'],
+      ['kraken', 'Storm Bolt'],
+      ['sphinx_of_lore', 'Arcane Prowl'],
+      ['sphinx_of_valor', 'Arcane Prowl'],
+      ['tarrasque', 'Onslaught'],
+      ['unicorn', 'Charging Horn'],
+    ];
+    for (const [id, name] of legends) {
+      expect(SRD_MONSTERS[id].legendary_actions?.[0], id).toMatchObject({
+        name,
+        kind: 'extra_attack',
+      });
+      expect(SRD_MONSTERS[id].legendary_pool, id).toBe(3);
+    }
+  });
+
+  it('the recharge AoEs: golem breath, sphinx roar, turtle steam, the Bellow', () => {
+    expect(SRD_MONSTERS.iron_golem.breathWeapon).toMatchObject({
+      dice: '10d10',
+      damageType: 'poison',
+      rechargeMin: 6,
+    });
+    expect(SRD_MONSTERS.sphinx_of_lore.breathWeapon).toMatchObject({
+      dice: '10d6',
+      damageType: 'psychic',
+      savingThrow: 'wis',
+    });
+    expect(SRD_MONSTERS.dragon_turtle.breathWeapon).toMatchObject({ dice: '16d6', saveDC: 19 });
+    expect(SRD_MONSTERS.tarrasque.breathWeapon).toMatchObject({
+      dice: '12d12',
+      damageType: 'thunder',
+      saveDC: 27,
+    });
+  });
+
+  it('the Tarrasque is the catalog apex: CR 30, grapple bite, weapon resistance', () => {
+    const t = SRD_MONSTERS.tarrasque;
+    expect(t.cr).toBe(30);
+    expect(t.hp).toBe(697);
+    expect(t.ac).toBe(25);
+    expect(t.multiattack).toBe(4);
+    expect(t.resistances).toEqual(['bludgeoning', 'piercing', 'slashing']);
+    expect(t.onHitEffect).toMatchObject({ condition: 'grappled', escapeDc: 20 });
+  });
+
+  it('the big grapplers pin at their SRD escape DCs', () => {
+    const g: Array<[string, number]> = [
+      ['aboleth', 14],
+      ['chuul', 14],
+      ['chain_devil', 14],
+      ['glabrezu', 15],
+      ['remorhaz', 17],
+      ['purple_worm', 19],
+      ['kraken', 20],
+    ];
+    for (const [id, dc] of g)
+      expect(SRD_MONSTERS[id].onHitEffect, id).toMatchObject({
+        condition: 'grappled',
+        escapeDc: dc,
+      });
+  });
+
+  it('Clay Golem fists drain the HP maximum via the Life Drain hook', () => {
+    expect(SRD_MONSTERS.clay_golem.lifeDrain).toBe(true);
+    expect(SRD_MONSTERS.clay_golem.bonusDamageType).toBe('acid');
   });
 });
