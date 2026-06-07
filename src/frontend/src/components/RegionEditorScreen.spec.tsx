@@ -709,6 +709,109 @@ describe('RegionEditorScreen', () => {
       });
     });
 
+    it('OBJECTS card: name guard, loot chips, PLACE flow, optional-field pruning', async () => {
+      renderRoom('cellar');
+      await screen.findByTestId('cell-0-0');
+      expect(await screen.findByText(/Nothing to poke at/)).toBeTruthy();
+      fireEvent.click(screen.getByTestId('add-object-btn'));
+      // A nameless object blocks the save client-side.
+      fireEvent.click(screen.getByText('SAVE'));
+      expect(await screen.findByText(/object needs a name/)).toBeTruthy();
+      expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+      fireEvent.change(screen.getByLabelText('NAME', { selector: '#obj-name-0' }), {
+        target: { value: 'Mead Barrel' },
+      });
+      fireEvent.change(screen.getByLabelText('INTERACT TEXT'), {
+        target: { value: 'It sloshes.' },
+      });
+      fireEvent.change(screen.getByLabelText('SEARCH DC'), { target: { value: '14' } });
+      // The loot select carries customs + catalog; picking adds a chip.
+      const lootSel = screen.getByLabelText('Add loot to object 1') as HTMLSelectElement;
+      expect([...lootSel.options].map((o) => o.value)).toEqual([
+        '',
+        'hexed-coin',
+        'dagger',
+        'rope',
+      ]);
+      fireEvent.change(lootSel, { target: { value: 'dagger' } });
+      expect(screen.getByText(/Dagger ✕/)).toBeTruthy();
+      // Arm PLACE → the next grid click drops the ▣ token there.
+      fireEvent.click(screen.getByTestId('place-object-0'));
+      expect(screen.getByText(/CLICK A GRID CELL TO PLACE/)).toBeTruthy();
+      fireEvent.mouseDown(screen.getByTestId('cell-1-0'));
+      expect(screen.getByText('AT (1,0)')).toBeTruthy();
+      expect(screen.getByTestId('cell-1-0').getAttribute('aria-label')).toContain(
+        'object: Mead Barrel'
+      );
+      // A second object with only a name saves without the optional keys.
+      fireEvent.click(screen.getByTestId('add-object-btn'));
+      fireEvent.change(screen.getByLabelText('NAME', { selector: '#obj-name-1' }), {
+        target: { value: 'Cracked Shrine' },
+      });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        objects?: Array<Record<string, unknown>>;
+      }>;
+      expect(saved.find((r) => r.id === 'cellar')!.objects).toEqual([
+        {
+          id: 'obj-1',
+          name: 'Mead Barrel',
+          interactText: 'It sloshes.',
+          searchDC: 14,
+          lootIds: ['dagger'],
+          pos: { x: 1, y: 0 },
+        },
+        { id: 'obj-2', name: 'Cracked Shrine' },
+      ]);
+    });
+
+    it('TRAP card: defaults, name guard, save folds the trap; REMOVE drops the key', async () => {
+      renderRoom('cellar');
+      await screen.findByTestId('cell-0-0');
+      expect(await screen.findByText(/No trap\./)).toBeTruthy();
+      fireEvent.click(screen.getByTestId('toggle-trap-btn')); // + ADD TRAP
+      // Sensible draft defaults appear pre-filled.
+      expect((screen.getByLabelText('DC') as HTMLInputElement).value).toBe('12');
+      expect((screen.getByLabelText('DAMAGE') as HTMLInputElement).value).toBe('1d6');
+      expect((screen.getByLabelText('DAMAGE TYPE') as HTMLSelectElement).value).toBe('piercing');
+      // A nameless trap blocks the save client-side.
+      fireEvent.click(screen.getByText('SAVE'));
+      expect(await screen.findByText(/trap needs a name/)).toBeTruthy();
+      expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+      fireEvent.change(screen.getByLabelText('NAME', { selector: '#trap-name' }), {
+        target: { value: 'Loose Step' },
+      });
+      fireEvent.change(screen.getByLabelText('DAMAGE'), { target: { value: '1d4' } });
+      fireEvent.change(screen.getByLabelText('DAMAGE TYPE'), {
+        target: { value: 'bludgeoning' },
+      });
+      fireEvent.change(screen.getByLabelText('CONDITION'), { target: { value: 'prone' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        trap?: Record<string, unknown>;
+      }>;
+      expect(saved.find((r) => r.id === 'cellar')!.trap).toEqual({
+        name: 'Loose Step',
+        dc: 12,
+        damage: '1d4',
+        damageType: 'bludgeoning',
+        condition: 'prone',
+      });
+      // REMOVE TRAP clears the draft; the next save drops the key.
+      fireEvent.click(screen.getByTestId('toggle-trap-btn')); // REMOVE TRAP
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(2));
+      const saved2 = mocked.putCampaignSection.mock.calls[1][2] as Array<{
+        id: string;
+        trap?: Record<string, unknown>;
+      }>;
+      expect('trap' in saved2.find((r) => r.id === 'cellar')!).toBe(false);
+    });
+
     it('removing every placement drops the enemies key from the save', async () => {
       // The taproom fixture carries a placement — remove it and save.
       mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>

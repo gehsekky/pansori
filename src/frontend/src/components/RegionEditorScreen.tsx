@@ -96,6 +96,31 @@ interface EditorRegion {
   enemies?: Array<{ name: string; count?: number }>; // rooms only
   loot?: Array<{ itemId: string; pos?: { x: number; y: number } }>; // rooms only
   npcs?: EditorNpc[]; // rooms only
+  objects?: EditorObject[]; // rooms only
+  trap?: EditorTrap; // rooms only
+  [key: string]: unknown;
+}
+
+// A searchable/interactable object as the painter edits it. desc/found/
+// empty texts are preserved on save but edited via the ROOMS JSON.
+interface EditorObject {
+  id: string;
+  name: string;
+  interactText?: string;
+  searchDC?: number;
+  lootIds?: string[];
+  pos?: { x: number; y: number };
+  [key: string]: unknown;
+}
+
+// The room's (at most one) trap. The painter edits the mechanics; the
+// narrative overrides live in the ROOMS JSON and are preserved on save.
+interface EditorTrap {
+  name: string;
+  dc: number;
+  damage: string;
+  damageType: string;
+  condition?: string;
   [key: string]: unknown;
 }
 
@@ -241,9 +266,14 @@ function RegionEditorScreen({
   const [itemOptions, setItemOptions] = useState<Array<{ id: string; name: string }>>([]);
   // Rooms only: bespoke placed NPCs.
   const [placedNpcs, setPlacedNpcs] = useState<EditorNpc[]>([]);
-  // Armed by a loot/NPC row's PLACE button: the next grid click drops that
-  // row's token on the clicked cell.
-  const [placeArm, setPlaceArm] = useState<{ kind: 'loot' | 'npc'; idx: number } | null>(null);
+  // Rooms only: searchable/interactable objects + the (single) trap.
+  const [placedObjects, setPlacedObjects] = useState<EditorObject[]>([]);
+  const [trapDraft, setTrapDraft] = useState<EditorTrap | null>(null);
+  // Armed by a loot/NPC/object row's PLACE button: the next grid click
+  // drops that row's token on the clicked cell.
+  const [placeArm, setPlaceArm] = useState<{ kind: 'loot' | 'npc' | 'object'; idx: number } | null>(
+    null
+  );
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -301,6 +331,8 @@ function RegionEditorScreen({
         setPlacedEnemies((r.enemies ?? []).map((e) => ({ name: e.name, count: e.count ?? 1 })));
         setPlacedLoot((r.loot ?? []).map((l) => ({ ...l })));
         setPlacedNpcs((r.npcs ?? []).map((n) => ({ ...n })));
+        setPlacedObjects((r.objects ?? []).map((o) => ({ ...o })));
+        setTrapDraft(r.trap ? { ...r.trap } : null);
         setPlaceArm(null);
         setSelectedSiteId(null);
         setMoveArmed(false);
@@ -367,15 +399,19 @@ function RegionEditorScreen({
   const applyTool = useCallback(
     (x: number, y: number) => {
       setSaved(false);
-      // An armed loot/NPC PLACE wins the next click regardless of tool.
+      // An armed loot/NPC/object PLACE wins the next click regardless of tool.
       if (placeArm !== null) {
         if (placeArm.kind === 'loot') {
           setPlacedLoot((prev) =>
             prev.map((l, i) => (i === placeArm.idx ? { ...l, pos: { x, y } } : l))
           );
-        } else {
+        } else if (placeArm.kind === 'npc') {
           setPlacedNpcs((prev) =>
             prev.map((n, i) => (i === placeArm.idx ? { ...n, pos: { x, y } } : n))
+          );
+        } else {
+          setPlacedObjects((prev) =>
+            prev.map((o, i) => (i === placeArm.idx ? { ...o, pos: { x, y } } : o))
           );
         }
         setPlaceArm(null);
@@ -507,6 +543,11 @@ function RegionEditorScreen({
         n.pos ? { ...n, pos: { x: Math.min(n.pos.x, w - 1), y: Math.min(n.pos.y, h - 1) } } : n
       )
     );
+    setPlacedObjects((prev) =>
+      prev.map((o) =>
+        o.pos ? { ...o, pos: { x: Math.min(o.pos.x, w - 1), y: Math.min(o.pos.y, h - 1) } } : o
+      )
+    );
     setDirty(true);
     setSaved(false);
   }
@@ -554,6 +595,16 @@ function RegionEditorScreen({
     }
     if (kind === 'room' && placedNpcs.some((n) => !n.name.trim() || !n.greeting.trim())) {
       return { error: 'Every NPC needs a name and a greeting.' };
+    }
+    if (kind === 'room' && placedObjects.some((o) => !o.name.trim())) {
+      return { error: 'Every object needs a name.' };
+    }
+    if (
+      kind === 'room' &&
+      trapDraft &&
+      (!trapDraft.name.trim() || !trapDraft.damage.trim() || !trapDraft.damageType)
+    ) {
+      return { error: 'The trap needs a name, damage dice and a damage type.' };
     }
     if (kind === 'town' && sites.some((s) => s.kind === 'interior' && !s.entryRoomId)) {
       return { error: 'Every interior venue needs an ENTRY ROOM (or flip it to GATE).' };
@@ -633,6 +684,25 @@ function RegionEditorScreen({
         } else {
           delete next.npcs;
         }
+        if (placedObjects.length > 0) {
+          next.objects = placedObjects.map((o) => {
+            const c: EditorObject = { ...o, name: o.name.trim() };
+            if (!c.interactText) delete c.interactText;
+            if (c.searchDC === undefined) delete c.searchDC;
+            if (!c.lootIds || c.lootIds.length === 0) delete c.lootIds;
+            if (!c.pos) delete c.pos;
+            return c;
+          });
+        } else {
+          delete next.objects;
+        }
+        if (trapDraft) {
+          const t: EditorTrap = { ...trapDraft, name: trapDraft.name.trim() };
+          if (!t.condition) delete t.condition;
+          next.trap = t;
+        } else {
+          delete next.trap;
+        }
       }
     }
     return next;
@@ -686,6 +756,9 @@ function RegionEditorScreen({
   // Positioned NPC tokens (rooms) — rendered as ☺ on the grid.
   const npcAt = (x: number, y: number) =>
     placedNpcs.find((n) => n.pos && n.pos.x === x && n.pos.y === y);
+  // Positioned object tokens (rooms) — rendered as ▣ on the grid.
+  const objectAt = (x: number, y: number) =>
+    placedObjects.find((o) => o.pos && o.pos.x === x && o.pos.y === y);
   const defaultScale = kind === 'region' ? 5280 : kind === 'town' ? 25 : 5;
   // Exit targets for the room form: every room in the section.
   const roomIds = kind === 'room' ? (regions ?? []).map((r) => r.id) : [];
@@ -1163,13 +1236,14 @@ function RegionEditorScreen({
                     const site = siteAt(x, y);
                     const cellLoot = lootAt(x, y);
                     const cellNpc = npcAt(x, y);
+                    const cellObject = objectAt(x, y);
                     const isStart = startPos.x === x && startPos.y === y;
                     return (
                       <div
                         key={`${x},${y}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}${cellNpc ? ` (npc: ${cellNpc.name})` : ''}`}
+                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}${cellNpc ? ` (npc: ${cellNpc.name})` : ''}${cellObject ? ` (object: ${cellObject.name})` : ''}`}
                         data-testid={`cell-${x}-${y}`}
                         title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${site ? ` — ${site.name}` : ''}`}
                         style={{
@@ -1259,6 +1333,14 @@ function RegionEditorScreen({
                             style={{ color: '#e6c878', textShadow: '0 0 3px #000' }}
                           >
                             ☺
+                          </span>
+                        )}
+                        {cellObject && !site && !isStart && !cellLoot && !cellNpc && (
+                          <span
+                            aria-hidden="true"
+                            style={{ color: '#c8a06a', textShadow: '0 0 3px #000' }}
+                          >
+                            ▣
                           </span>
                         )}
                         {site && (
@@ -1946,6 +2028,406 @@ function RegionEditorScreen({
                       </div>
                     </div>
                   ))
+                )}
+              </div>
+            )}
+
+            {/* ── Objects (rooms only) — searchable chests / interactable
+                fixtures. Loot inside comes from the campaign's loot table
+                by id; desc / found / empty texts edit via the ROOMS JSON. */}
+            {kind === 'room' && (
+              <div className={styles.card} style={{ marginTop: '1rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
+                    OBJECTS
+                    {placeArm?.kind === 'object' && (
+                      <span style={{ color: 'var(--t-hp-mid)' }}>
+                        {' '}
+                        — CLICK A GRID CELL TO PLACE THE TOKEN
+                      </span>
+                    )}
+                  </p>
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    data-testid="add-object-btn"
+                    onClick={() => {
+                      const taken = new Set(placedObjects.map((o) => o.id));
+                      let i = placedObjects.length + 1;
+                      while (taken.has(`obj-${i}`)) i++;
+                      setPlacedObjects((prev) => [...prev, { id: `obj-${i}`, name: '' }]);
+                      setDirty(true);
+                      setSaved(false);
+                    }}
+                  >
+                    + ADD OBJECT
+                  </button>
+                </div>
+                {placedObjects.length === 0 ? (
+                  <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
+                    Nothing to poke at. Objects with loot are searchable chests (Investigation check
+                    vs the DC); without loot they&apos;re one-shot flavor.
+                  </p>
+                ) : (
+                  placedObjects.map((o, i) => (
+                    <div
+                      key={o.id}
+                      style={{ padding: '0.3rem 0', borderBottom: '1px solid var(--t-separator)' }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          alignItems: 'flex-end',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div style={{ flex: '2 1 140px' }}>
+                          <label className={styles.formLbl} htmlFor={`obj-name-${i}`}>
+                            NAME
+                          </label>
+                          <input
+                            id={`obj-name-${i}`}
+                            className={styles.formInp}
+                            value={o.name}
+                            onChange={(ev) => {
+                              const name = ev.target.value;
+                              setPlacedObjects((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, name } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: '3 1 200px' }}>
+                          <label className={styles.formLbl} htmlFor={`obj-interact-${i}`}>
+                            INTERACT TEXT
+                          </label>
+                          <input
+                            id={`obj-interact-${i}`}
+                            className={styles.formInp}
+                            placeholder="default"
+                            value={o.interactText ?? ''}
+                            onChange={(ev) => {
+                              const interactText = ev.target.value;
+                              setPlacedObjects((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, interactText } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: '0 1 90px' }}>
+                          <label className={styles.formLbl} htmlFor={`obj-dc-${i}`}>
+                            SEARCH DC
+                          </label>
+                          <input
+                            id={`obj-dc-${i}`}
+                            className={styles.formInp}
+                            type="number"
+                            min={1}
+                            max={30}
+                            placeholder="—"
+                            value={o.searchDC ?? ''}
+                            onChange={(ev) => {
+                              const v = ev.target.value;
+                              const searchDC = v === '' ? undefined : Number(v);
+                              setPlacedObjects((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, searchDC } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            color: 'var(--t-dim)',
+                            minWidth: 70,
+                            paddingBottom: 8,
+                          }}
+                        >
+                          {o.pos ? `AT (${o.pos.x},${o.pos.y})` : 'UNPLACED'}
+                        </span>
+                        <div style={{ display: 'flex', gap: 6, paddingBottom: 4 }}>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                            aria-pressed={placeArm?.kind === 'object' && placeArm.idx === i}
+                            data-testid={`place-object-${i}`}
+                            onClick={() =>
+                              setPlaceArm((v) =>
+                                v?.kind === 'object' && v.idx === i
+                                  ? null
+                                  : { kind: 'object', idx: i }
+                              )
+                            }
+                          >
+                            PLACE
+                          </button>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                            aria-label={`Remove object ${i + 1}`}
+                            onClick={() => {
+                              setPlacedObjects((prev) => prev.filter((_, j) => j !== i));
+                              setPlaceArm(null);
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            <span aria-hidden="true">✕</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 6,
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          marginTop: 6,
+                        }}
+                      >
+                        <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>LOOT:</span>
+                        {(o.lootIds ?? []).map((id) => (
+                          <button
+                            key={id}
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                            title="Remove from the object"
+                            onClick={() => {
+                              setPlacedObjects((prev) =>
+                                prev.map((p, j) =>
+                                  j === i
+                                    ? { ...p, lootIds: (p.lootIds ?? []).filter((l) => l !== id) }
+                                    : p
+                                )
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            {itemName(id)} ✕
+                          </button>
+                        ))}
+                        <select
+                          className={styles.formInp}
+                          style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
+                          aria-label={`Add loot to object ${i + 1}`}
+                          value=""
+                          onChange={(ev) => {
+                            const id = ev.target.value;
+                            if (!id) return;
+                            setPlacedObjects((prev) =>
+                              prev.map((p, j) =>
+                                j === i && !(p.lootIds ?? []).includes(id)
+                                  ? { ...p, lootIds: [...(p.lootIds ?? []), id] }
+                                  : p
+                              )
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        >
+                          <option value="">+ ADD ITEM…</option>
+                          {itemOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ── Trap (rooms only, at most one). The painter edits the
+                mechanics; narrative overrides ({name}/{dmg} substitution)
+                live in the ROOMS JSON and default sensibly. */}
+            {kind === 'room' && (
+              <div className={styles.card} style={{ marginTop: '1rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
+                    TRAP
+                  </p>
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    data-testid="toggle-trap-btn"
+                    onClick={() => {
+                      setTrapDraft((t) =>
+                        t ? null : { name: '', dc: 12, damage: '1d6', damageType: 'piercing' }
+                      );
+                      setDirty(true);
+                      setSaved(false);
+                    }}
+                  >
+                    {trapDraft ? 'REMOVE TRAP' : '+ ADD TRAP'}
+                  </button>
+                </div>
+                {!trapDraft ? (
+                  <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
+                    No trap. One per room: Perception (vs DC) to spot it, Dexterity to disarm,
+                    damage + an optional condition on trigger. Narrative overrides edit via the
+                    ROOMS JSON.
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'flex-end',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ flex: '2 1 140px' }}>
+                      <label className={styles.formLbl} htmlFor="trap-name">
+                        NAME
+                      </label>
+                      <input
+                        id="trap-name"
+                        className={styles.formInp}
+                        value={trapDraft.name}
+                        onChange={(ev) => {
+                          const name = ev.target.value;
+                          setTrapDraft((t) => (t ? { ...t, name } : t));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: '0 1 80px' }}>
+                      <label className={styles.formLbl} htmlFor="trap-dc">
+                        DC
+                      </label>
+                      <input
+                        id="trap-dc"
+                        className={styles.formInp}
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={trapDraft.dc}
+                        onChange={(ev) => {
+                          const dc = Math.max(1, Math.min(30, parseInt(ev.target.value, 10) || 1));
+                          setTrapDraft((t) => (t ? { ...t, dc } : t));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: '0 1 100px' }}>
+                      <label className={styles.formLbl} htmlFor="trap-damage">
+                        DAMAGE
+                      </label>
+                      <input
+                        id="trap-damage"
+                        className={styles.formInp}
+                        placeholder="2d6"
+                        value={trapDraft.damage}
+                        onChange={(ev) => {
+                          const damage = ev.target.value;
+                          setTrapDraft((t) => (t ? { ...t, damage } : t));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 120px' }}>
+                      <label className={styles.formLbl} htmlFor="trap-damage-type">
+                        DAMAGE TYPE
+                      </label>
+                      <select
+                        id="trap-damage-type"
+                        className={styles.formInp}
+                        style={{ cursor: 'pointer' }}
+                        value={trapDraft.damageType}
+                        onChange={(ev) => {
+                          const damageType = ev.target.value;
+                          setTrapDraft((t) => (t ? { ...t, damageType } : t));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        {[
+                          'acid',
+                          'bludgeoning',
+                          'cold',
+                          'fire',
+                          'force',
+                          'lightning',
+                          'necrotic',
+                          'piercing',
+                          'poison',
+                          'psychic',
+                          'radiant',
+                          'slashing',
+                          'thunder',
+                        ].map((d) => (
+                          <option key={d} value={d}>
+                            {d.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: '1 1 130px' }}>
+                      <label className={styles.formLbl} htmlFor="trap-condition">
+                        CONDITION
+                      </label>
+                      <select
+                        id="trap-condition"
+                        className={styles.formInp}
+                        style={{ cursor: 'pointer' }}
+                        value={trapDraft.condition ?? ''}
+                        onChange={(ev) => {
+                          const condition = ev.target.value || undefined;
+                          setTrapDraft((t) => (t ? { ...t, condition } : t));
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        <option value="">— NONE —</option>
+                        {[
+                          'blinded',
+                          'charmed',
+                          'deafened',
+                          'frightened',
+                          'grappled',
+                          'incapacitated',
+                          'paralyzed',
+                          'petrified',
+                          'poisoned',
+                          'prone',
+                          'restrained',
+                          'stunned',
+                          'unconscious',
+                        ].map((c) => (
+                          <option key={c} value={c}>
+                            {c.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

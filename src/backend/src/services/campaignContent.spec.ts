@@ -65,7 +65,7 @@ function makeContentDb(initial: {
   // campaignId → room insert params after campaign_id: [id, sort_order,
   // name, description, feet_per_square, gridJson, entry_x, entry_y,
   // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson, npcsJson,
-  // on_enter, on_first_enter, on_exit, on_first_exit]
+  // on_enter, on_first_enter, on_exit, on_first_exit, objectsJson, trapJson]
   const rooms = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
@@ -178,6 +178,8 @@ function makeContentDb(initial: {
         on_first_enter: p[16],
         on_exit: p[17],
         on_first_exit: p[18],
+        objects: JSON.parse(p[19] as string),
+        trap: p[20] === null ? null : JSON.parse(p[20] as string),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -356,6 +358,23 @@ const ROOM_A: CampaignRoom = {
   onFirstExit: 'Hob calls after you: "mind the cellar!"',
   enemies: [{ name: 'Goblin', count: 2 }, { name: 'Wolf' }],
   loot: [{ itemId: 'dagger', pos: { x: 1, y: 1 } }, { itemId: 'rope' }],
+  objects: [
+    {
+      id: 'barrel-cache',
+      name: 'Tapped Barrel',
+      interactText: 'Mostly dregs.',
+      searchDC: 12,
+      lootIds: ['dagger'],
+      pos: { x: 6, y: 1 },
+    },
+  ],
+  trap: {
+    name: 'Loose Step',
+    dc: 12,
+    damage: '1d6',
+    damageType: 'bludgeoning',
+    condition: 'prone',
+  },
   npcs: [
     {
       id: 'old-hob',
@@ -538,6 +557,68 @@ describe('editable sections registry', () => {
     // Duplicate ids and empty lists rejected.
     expect(rooms.safeParse([ROOM_B, { ...ROOM_B, name: 'Other' }]).success).toBe(false);
     expect(rooms.safeParse([]).success).toBe(false);
+  });
+
+  it('rooms schema validates objects + trap: shapes, bounds, room-unique ids', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const chest = {
+      id: 'iron-chest',
+      name: 'Iron Chest',
+      searchDC: 13,
+      lootIds: ['dagger'],
+      pos: { x: 2, y: 2 },
+    };
+    const trap = { name: 'Dart Trap', dc: 12, damage: '1d4', damageType: 'piercing' };
+    const ok = rooms.safeParse([{ ...ROOM_B, objects: [chest], trap }]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // Object: out-of-grid pos, dup ids in one room, extra key.
+    expect(
+      rooms.safeParse([{ ...ROOM_B, objects: [{ ...chest, pos: { x: 4, y: 0 } }] }]).success
+    ).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, objects: [chest, chest] }]).success).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, objects: [{ ...chest, locked: true }] }]).success).toBe(
+      false
+    );
+    // Trap: off-enum damage type / condition, missing mechanics.
+    expect(rooms.safeParse([{ ...ROOM_B, trap: { ...trap, damageType: 'sarcasm' } }]).success).toBe(
+      false
+    );
+    expect(
+      rooms.safeParse([{ ...ROOM_B, trap: { ...trap, condition: 'faerie_fired' } }]).success
+    ).toBe(false);
+    expect(rooms.safeParse([{ ...ROOM_B, trap: { name: 'Dartless', dc: 12 } }]).success).toBe(
+      false
+    );
+  });
+
+  it('dbRoomsToEngine fills object/trap defaults', () => {
+    const [room] = dbRoomsToEngine([
+      {
+        ...ROOM_B,
+        objects: [{ id: 'shrine', name: 'Cracked Shrine' }],
+        trap: { name: 'Loose Step', dc: 12, damage: '1d6', damageType: 'bludgeoning' },
+      },
+    ]);
+    // Object text defaults; no loot → searchable stays unset (flavor only).
+    expect(room.objects?.[0]).toEqual({
+      id: 'shrine',
+      name: 'Cracked Shrine',
+      desc: '',
+      interactText: 'You examine the Cracked Shrine.',
+    });
+    // A chest with loot is searchable without an explicit flag.
+    const [chest] = dbRoomsToEngine([
+      { ...ROOM_B, objects: [{ id: 'c', name: 'Chest', lootIds: ['dagger'] }] },
+    ]);
+    expect(chest.objects?.[0].searchable).toBe(true);
+    // Trap id + narrative defaults; mechanics pass through.
+    expect(room.trap?.id).toBe('cellar-trap');
+    expect(room.trap?.dc).toBe(12);
+    expect(room.trap?.triggerNarrative).toContain('{name}');
+    expect(room.trap?.triggerNarrative).toContain('{dmg}');
+    expect(room.trap?.detectNarrative).toContain('Loose Step');
+    expect(room.trap?.disarmSuccess).toContain('disarmed');
+    expect(room.trap?.disarmFail).toBeTruthy();
   });
 
   it('rooms schema validates NPCs: recursive dialogue, campaign-unique ids, bounds', () => {

@@ -817,6 +817,74 @@ const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
     .strict()
 );
 
+// A searchable / interactable room object. desc / interactText default at
+// overlay time; lootIds resolve against the composed loot table at
+// interact time (the engine skips unknown ids).
+const RoomObjectSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(80),
+    desc: z.string().min(1).max(2000).optional(),
+    interactText: z.string().min(1).max(2000).optional(),
+    searchable: z.boolean().optional(),
+    searchDC: z.number().int().min(1).max(30).optional(),
+    lootIds: z.array(z.string().min(1).max(80)).max(10).optional(),
+    foundText: z.string().min(1).max(2000).optional(),
+    emptyText: z.string().min(1).max(2000).optional(),
+    pos: GridPosSchema.optional(),
+  })
+  .strict();
+
+// At most one trap per room. Mechanics are authored; the narrative
+// strings default at overlay time ({name} = the triggering character,
+// {dmg} = the rolled damage in triggerNarrative).
+const SRD_DAMAGE_TYPES = [
+  'acid',
+  'bludgeoning',
+  'cold',
+  'fire',
+  'force',
+  'lightning',
+  'necrotic',
+  'piercing',
+  'poison',
+  'psychic',
+  'radiant',
+  'slashing',
+  'thunder',
+] as const;
+const SRD_TRAP_CONDITIONS = [
+  'blinded',
+  'charmed',
+  'deafened',
+  'frightened',
+  'grappled',
+  'incapacitated',
+  'paralyzed',
+  'petrified',
+  'poisoned',
+  'prone',
+  'restrained',
+  'stunned',
+  'unconscious',
+] as const;
+const RoomTrapSchema = z
+  .object({
+    id: SLUG.optional(),
+    name: z.string().min(1).max(80),
+    desc: z.string().min(1).max(2000).optional(),
+    dc: z.number().int().min(1).max(30),
+    damage: z.string().min(1).max(20),
+    damageType: z.enum(SRD_DAMAGE_TYPES),
+    condition: z.enum(SRD_TRAP_CONDITIONS).optional(),
+    conditionDuration: z.number().int().min(1).max(99).optional(),
+    triggerNarrative: z.string().min(1).max(2000).optional(),
+    detectNarrative: z.string().min(1).max(2000).optional(),
+    disarmSuccess: z.string().min(1).max(2000).optional(),
+    disarmFail: z.string().min(1).max(2000).optional(),
+  })
+  .strict();
+
 // A bespoke placed NPC. The stat block is optional (overlay defaults it to
 // an SRD Commoner-style block); shop item ids resolve against the composed
 // loot table at overlay time (unknown ids dropped with a warning).
@@ -896,6 +964,10 @@ const RoomsSchema = z
         // not catalog references. Ids must be CAMPAIGN-unique (the
         // payload-level superRefine checks across rooms).
         npcs: z.array(RoomNpcSchema).max(8).optional(),
+        // Searchable / interactable objects (room-unique ids) + at most
+        // one trap.
+        objects: z.array(RoomObjectSchema).max(10).optional(),
+        trap: RoomTrapSchema.optional(),
       })
       .strict()
       .superRefine((r, ctx) => {
@@ -948,6 +1020,24 @@ const RoomsSchema = z
               code: z.ZodIssueCode.custom,
               message: `NPC "${n.id}" pos (${n.pos.x},${n.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
               path: ['npcs', i, 'pos'],
+            });
+          }
+        });
+        const objectIds = new Set<string>();
+        (r.objects ?? []).forEach((o, i) => {
+          if (objectIds.has(o.id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `duplicate object id "${o.id}"`,
+              path: ['objects', i, 'id'],
+            });
+          }
+          objectIds.add(o.id);
+          if (o.pos && (o.pos.x >= gridWidth || o.pos.y >= gridHeight)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `object "${o.id}" pos (${o.pos.x},${o.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+              path: ['objects', i, 'pos'],
             });
           }
         });

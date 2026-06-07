@@ -626,6 +626,41 @@ export interface CampaignRoomNpcResponse {
   reply?: string;
   responses?: CampaignRoomNpcResponse[];
 }
+// A searchable / interactable object (chest, lever, shrine). Mirrors the
+// engine's RoomObject; desc / interactText default at overlay time so the
+// painter only requires a name. lootIds reference the composed loot table
+// and resolve at INTERACT time (the engine skips unknown ids).
+export interface CampaignRoomObject {
+  id: string;
+  name: string;
+  desc?: string;
+  interactText?: string;
+  searchable?: boolean;
+  searchDC?: number;
+  lootIds?: string[];
+  foundText?: string;
+  emptyText?: string;
+  pos?: GridPos;
+}
+
+// At most one trap per room (the engine's Trap shape). The mechanical
+// fields are authored; the id/desc/narrative strings default at overlay
+// time when left off.
+export interface CampaignRoomTrap {
+  id?: string;
+  name: string;
+  desc?: string;
+  dc: number;
+  damage: string;
+  damageType: string;
+  condition?: string;
+  conditionDuration?: number;
+  triggerNarrative?: string;
+  detectNarrative?: string;
+  disarmSuccess?: string;
+  disarmFail?: string;
+}
+
 export interface CampaignRoomNpc {
   id: string; // campaign-unique — keys the campaign.npcs map
   name: string;
@@ -663,6 +698,8 @@ export interface CampaignRoom {
   enemies?: CampaignRoomEnemy[];
   loot?: CampaignRoomLoot[];
   npcs?: CampaignRoomNpc[];
+  objects?: CampaignRoomObject[];
+  trap?: CampaignRoomTrap;
 }
 
 interface RoomRow {
@@ -684,12 +721,14 @@ interface RoomRow {
   enemies: CampaignRoomEnemy[];
   loot: CampaignRoomLoot[];
   npcs: CampaignRoomNpc[];
+  objects: CampaignRoomObject[];
+  trap: CampaignRoomTrap | null;
 }
 
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
-            lighting, floor, can_rest, enemies, loot, npcs,
+            lighting, floor, can_rest, enemies, loot, npcs, objects, trap,
             on_enter, on_first_enter, on_exit, on_first_exit
        FROM campaign_rooms
       WHERE campaign_id = $1
@@ -714,6 +753,8 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.enemies.length > 0 ? { enemies: r.enemies } : {}),
     ...(r.loot.length > 0 ? { loot: r.loot } : {}),
     ...(r.npcs.length > 0 ? { npcs: r.npcs } : {}),
+    ...(r.objects.length > 0 ? { objects: r.objects } : {}),
+    ...(r.trap !== null ? { trap: r.trap } : {}),
   }));
 }
 
@@ -738,9 +779,9 @@ export async function putCampaignRooms(
         `INSERT INTO campaign_rooms
            (campaign_id, id, sort_order, name, description, feet_per_square,
             grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot, npcs,
-            on_enter, on_first_enter, on_exit, on_first_exit)
+            on_enter, on_first_enter, on_exit, on_first_exit, objects, trap)
          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb,
-                 $15::jsonb, $16::jsonb, $17, $18, $19, $20)`,
+                 $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21::jsonb, $22::jsonb)`,
         [
           campaignId,
           r.id,
@@ -762,6 +803,8 @@ export async function putCampaignRooms(
           r.onFirstEnter ?? null,
           r.onExit ?? null,
           r.onFirstExit ?? null,
+          JSON.stringify(r.objects ?? []),
+          r.trap ? JSON.stringify(r.trap) : null,
         ]
       );
     }
@@ -830,6 +873,43 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
       // painter's CAN REST HERE checkbox promises the opposite — an
       // unchecked room must actually forbid resting, so emit false.
       canRest: r.canRest ?? false,
+      ...(r.objects && r.objects.length > 0
+        ? {
+            objects: r.objects.map((o) => ({
+              ...o,
+              desc: o.desc ?? '',
+              interactText: o.interactText ?? `You examine the ${o.name}.`,
+              // A chest is searchable by virtue of holding loot — authors
+              // shouldn't need a separate flag for the common case.
+              ...(o.searchable === undefined && (o.lootIds?.length ?? 0) > 0
+                ? { searchable: true }
+                : {}),
+            })),
+          }
+        : {}),
+      ...(r.trap
+        ? {
+            trap: {
+              id: r.trap.id ?? `${r.id}-trap`,
+              name: r.trap.name,
+              desc: r.trap.desc ?? `A hidden ${r.trap.name.toLowerCase()}.`,
+              dc: r.trap.dc,
+              damage: r.trap.damage,
+              damageType: r.trap.damageType,
+              ...(r.trap.condition ? { condition: r.trap.condition as never } : {}),
+              ...(r.trap.conditionDuration !== undefined
+                ? { conditionDuration: r.trap.conditionDuration }
+                : {}),
+              // {name} = the triggering character, {dmg} = the rolled damage.
+              triggerNarrative:
+                r.trap.triggerNarrative ?? `{name} sets off the ${r.trap.name} — {dmg} damage!`,
+              detectNarrative:
+                r.trap.detectNarrative ?? `You spot the ${r.trap.name} before it springs.`,
+              disarmSuccess: r.trap.disarmSuccess ?? `The ${r.trap.name} is disarmed.`,
+              disarmFail: r.trap.disarmFail ?? `The attempt slips — the ${r.trap.name} fires!`,
+            },
+          }
+        : {}),
     };
   });
 }
