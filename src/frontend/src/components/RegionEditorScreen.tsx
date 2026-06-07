@@ -200,6 +200,13 @@ const TERRAIN_COLORS: Record<TerrainType, string> = {
 };
 
 const TERRAIN_TYPES = Object.keys(TERRAIN) as TerrainType[];
+// The TERRAIN brush panel splits by the scale a type belongs to: the
+// settlement tiles are explicit, everything else (incl. future natural
+// types) is regional.
+const LOCAL_TERRAINS = ['cobblestone', 'garden', 'town_wall'].filter((t) =>
+  TERRAIN_TYPES.includes(t as TerrainType)
+) as TerrainType[];
+const REGIONAL_TERRAINS = TERRAIN_TYPES.filter((t) => !LOCAL_TERRAINS.includes(t));
 
 type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech' | 'size';
 
@@ -898,62 +905,75 @@ function RegionEditorScreen({
                   </div>
                 </div>
 
-                {tool === 'terrain' && (
-                  <div>
-                    <p className={styles.formLbl}>
-                      TERRAIN{kind === 'room' ? ' (COSMETIC PAINT OVER THE FLOOR)' : ''}
-                    </p>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {kind === 'room' && (
-                        <button
-                          aria-pressed={terrainBrush === ''}
-                          className={styles.ghostBtn}
+                {tool === 'terrain' &&
+                  (() => {
+                    const brushBtn = (t: TerrainType) => (
+                      <button
+                        key={t}
+                        aria-pressed={terrainBrush === t}
+                        title={`${TERRAIN[t].label}${TERRAIN[t].passable ? '' : ' (impassable)'} · travel ×${TERRAIN[t].travelMult} · encounters ×${TERRAIN[t].encounterMult}`}
+                        style={{
+                          padding: '0.25rem 0.55rem',
+                          fontSize: '0.7rem',
+                          letterSpacing: '0.04em',
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                          background: terrainBrush === t ? 'var(--t-separator)' : 'transparent',
+                          border: `1px solid ${terrainBrush === t ? 'var(--t-primary)' : 'var(--t-border)'}`,
+                          color: terrainBrush === t ? 'var(--t-primary)' : 'var(--t-dim)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                        onClick={() => setTerrainBrush(t)}
+                      >
+                        <span
+                          aria-hidden="true"
                           style={{
-                            padding: '0.25rem 0.6rem',
-                            fontSize: '0.7rem',
-                            borderColor: terrainBrush === '' ? 'var(--t-primary)' : undefined,
+                            width: 12,
+                            height: 12,
+                            display: 'inline-block',
+                            background: TERRAIN_COLORS[t],
+                            border: '1px solid rgba(0,0,0,0.4)',
                           }}
-                          onClick={() => setTerrainBrush('')}
-                        >
-                          NONE (FLOOR)
-                        </button>
-                      )}
-                      {TERRAIN_TYPES.map((t) => (
-                        <button
-                          key={t}
-                          aria-pressed={terrainBrush === t}
-                          title={`${TERRAIN[t].label}${TERRAIN[t].passable ? '' : ' (impassable)'} · travel ×${TERRAIN[t].travelMult} · encounters ×${TERRAIN[t].encounterMult}`}
-                          style={{
-                            padding: '0.25rem 0.55rem',
-                            fontSize: '0.7rem',
-                            letterSpacing: '0.04em',
-                            fontFamily: 'inherit',
-                            cursor: 'pointer',
-                            background: terrainBrush === t ? 'var(--t-separator)' : 'transparent',
-                            border: `1px solid ${terrainBrush === t ? 'var(--t-primary)' : 'var(--t-border)'}`,
-                            color: terrainBrush === t ? 'var(--t-primary)' : 'var(--t-dim)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                          onClick={() => setTerrainBrush(t)}
-                        >
-                          <span
-                            aria-hidden="true"
-                            style={{
-                              width: 12,
-                              height: 12,
-                              display: 'inline-block',
-                              background: TERRAIN_COLORS[t],
-                              border: '1px solid rgba(0,0,0,0.4)',
-                            }}
-                          />
-                          {TERRAIN[t].label.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        />
+                        {TERRAIN[t].label.toUpperCase()}
+                      </button>
+                    );
+                    return (
+                      <div>
+                        <p className={styles.formLbl}>
+                          TERRAIN{kind === 'room' ? ' (COSMETIC PAINT OVER THE FLOOR)' : ''}
+                        </p>
+                        <p className={styles.formLbl} style={{ color: 'var(--t-dim)' }}>
+                          REGIONAL
+                        </p>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                          {REGIONAL_TERRAINS.map(brushBtn)}
+                        </div>
+                        <p className={styles.formLbl} style={{ color: 'var(--t-dim)' }}>
+                          TOWN / LOCAL
+                        </p>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {kind === 'room' && (
+                            <button
+                              aria-pressed={terrainBrush === ''}
+                              className={styles.ghostBtn}
+                              style={{
+                                padding: '0.25rem 0.6rem',
+                                fontSize: '0.7rem',
+                                borderColor: terrainBrush === '' ? 'var(--t-primary)' : undefined,
+                              }}
+                              onClick={() => setTerrainBrush('')}
+                            >
+                              NONE (FLOOR)
+                            </button>
+                          )}
+                          {LOCAL_TERRAINS.map(brushBtn)}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                 {tool === 'tier' && (
                   <div>
