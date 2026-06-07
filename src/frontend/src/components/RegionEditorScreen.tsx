@@ -1998,9 +1998,17 @@ function RegionEditorScreen({
                   </p>
                 ) : (
                   placedNpcs.map((n, i) => (
+                    // Each NPC is a bordered block — the card spans several
+                    // rows (identity, narrative hooks, an open dialogue tree),
+                    // so a box keeps neighbours visually apart.
                     <div
                       key={n.id}
-                      style={{ padding: '0.3rem 0', borderBottom: '1px solid var(--t-separator)' }}
+                      style={{
+                        padding: '0.5rem 0.6rem',
+                        marginBottom: '0.6rem',
+                        border: '1px solid var(--t-border)',
+                        borderRadius: 4,
+                      }}
                     >
                       <div
                         style={{
