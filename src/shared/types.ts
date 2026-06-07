@@ -321,9 +321,63 @@ export const TERRAIN_TILES = {
 
 export type TerrainTileId = keyof typeof TERRAIN_TILES;
 
-// A campaign's terrain-art overrides: type → tile id. Empty / absent =
-// every type renders its default tile.
-export type TerrainArtMap = Partial<Record<TerrainType, TerrainTileId>>;
+// Marker tiles — the painted POI art drawn on a regional site cell in
+// place of the cell's terrain tile (so far: town sites). Same 256×384
+// bottom-anchored 2.5D format as the terrain tiles; each composites a
+// settlement/building onto the plains ground so it replaces the cell
+// tile cleanly. Files live at /art/markers/<base>.png.
+export interface MarkerTileSpec {
+  base: 'village' | 'castle' | 'monastery' | 'tower' | 'house' | 'barracks';
+  label: string;
+  // CSS filter recoloring the base PNG; omitted = the art as painted.
+  filter?: string;
+}
+
+export const MARKER_TILES = {
+  village: { base: 'village', label: 'village' }, // the default town marker
+  castle: { base: 'castle', label: 'castle' },
+  monastery: { base: 'monastery', label: 'monastery' },
+  tower: { base: 'tower', label: 'tower' },
+  house: { base: 'house', label: 'lone house' },
+  barracks: { base: 'barracks', label: 'barracks' },
+} as const satisfies Record<string, MarkerTileSpec>;
+
+export type MarkerTileId = keyof typeof MARKER_TILES;
+
+// An author tint over a tile: a structured recolor the renderer compiles
+// to a CSS filter (see `compileTint`). Structured rather than a raw
+// filter string so the editor can drive it with sliders and the schema
+// can bound it. All knobs optional; identity values mean "no change".
+export interface TileTint {
+  hue?: number; // hue-rotate, degrees: -180..180
+  saturate?: number; // 0..3 (1 = as painted)
+  brightness?: number; // 0..2 (1 = as painted)
+}
+
+// A terrain-art entry: the bare tile id (back-compat — every stored map
+// so far), or a tile + an author tint layered over the catalog's own
+// recolor filter.
+export type TileChoice = TerrainTileId | { tile: TerrainTileId; tint?: TileTint };
+export type MarkerChoice = MarkerTileId | { tile: MarkerTileId; tint?: TileTint };
+
+// Compile a structured tint to its CSS filter string; undefined when the
+// tint is absent or all-identity (so the renderer can skip the style).
+export function compileTint(tint?: TileTint): string | undefined {
+  if (!tint) return undefined;
+  const parts: string[] = [];
+  if (tint.hue) parts.push(`hue-rotate(${tint.hue}deg)`);
+  if (tint.saturate !== undefined && tint.saturate !== 1) parts.push(`saturate(${tint.saturate})`);
+  if (tint.brightness !== undefined && tint.brightness !== 1)
+    parts.push(`brightness(${tint.brightness})`);
+  return parts.length ? parts.join(' ') : undefined;
+}
+
+// A campaign's terrain-art overrides: terrain type → tile choice, plus
+// the marker slots (POI art on the regional map — `markers.town` skins
+// every town site). Empty / absent = all defaults.
+export type TerrainArtMap = Partial<Record<TerrainType, TileChoice>> & {
+  markers?: { town?: MarkerChoice };
+};
 
 /**
  * Which combat side an entity fights for: PCs and their allies

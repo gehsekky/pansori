@@ -86,9 +86,11 @@ export function baseContextFor(campaignId: string): Context {
 // loadOverlay folds into campaign.intro (the first narrative entry of a
 // new game), replacing the code/template opening.
 //
-// 'terrainArt' is the campaign's tile skin (terrain type → TERRAIN_TILES
-// id): a campaigns.data key that overlays Context.terrainArt top-level and
-// rides into the seed (procgen) so the FE map renders it.
+// 'terrainArt' is the campaign's tile skin (terrain type → tile choice —
+// a TERRAIN_TILES id or { tile, tint } — plus `markers.town` for the
+// regional town-site art): a campaigns.data key that overlays
+// Context.terrainArt top-level and rides into the seed (procgen) so the
+// FE map renders it.
 //
 // 'customItems' / 'customMonsters' are a campaign's OWN content on top of
 // the ambient SRD catalogs (services/itemCatalog.ts / monsterCatalog.ts):

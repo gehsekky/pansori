@@ -253,6 +253,66 @@ describe('GridMapView', () => {
     );
   });
 
+  it('a { tile, tint } choice layers the author tint after the catalog recolor', () => {
+    const { container } = render(
+      <GridMapView
+        grid={terrainGrid}
+        markerPos={{ x: 0, y: 0 }}
+        terrainArt={{
+          // Tinted recolor variant: catalog filter first, then the tint.
+          forest: { tile: 'forest-dead', tint: { hue: 30, brightness: 0.8 } },
+          // Tinted base tile (no catalog filter) — just the tint.
+          plains: { tile: 'plains', tint: { saturate: 0.5 } },
+        }}
+      />
+    );
+    const forest = cell(container, 1, 2).querySelector('img')!;
+    expect(forest.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(forest.style.filter).toContain('sepia'); // the catalog recolor kept
+    expect(forest.style.filter).toContain('hue-rotate(30deg) brightness(0.8)'); // tint after it
+    const plains = cell(container, 4, 2).querySelector('img')!;
+    expect(plains.style.filter).toBe('saturate(0.5)');
+    // An all-identity tint compiles away — no filter style at all.
+    const { container: c2 } = render(
+      <GridMapView
+        grid={terrainGrid}
+        markerPos={{ x: 0, y: 0 }}
+        terrainArt={{ plains: { tile: 'plains', tint: { hue: 0, saturate: 1, brightness: 1 } } }}
+      />
+    );
+    expect(cell(c2, 4, 2).querySelector('img')!.style.filter).toBe('');
+  });
+
+  it('markers.town skins every town site with a marker tile (+ optional tint)', () => {
+    // grid has the town site at (3,0). A bare marker id swaps the village art.
+    const { container, rerender } = render(
+      <GridMapView
+        grid={grid}
+        markerPos={{ x: 0, y: 0 }}
+        terrainArt={{ markers: { town: 'castle' } }}
+      />
+    );
+    const img = cell(container, 3, 0).querySelector('img')!;
+    expect(img.getAttribute('src')).toContain('/art/markers/castle.png');
+    expect(img.style.filter).toBe('');
+    // A tinted marker choice compiles its filter.
+    rerender(
+      <GridMapView
+        grid={grid}
+        markerPos={{ x: 0, y: 0 }}
+        terrainArt={{ markers: { town: { tile: 'monastery', tint: { hue: -40 } } } }}
+      />
+    );
+    const tinted = cell(container, 3, 0).querySelector('img')!;
+    expect(tinted.getAttribute('src')).toContain('/art/markers/monastery.png');
+    expect(tinted.style.filter).toBe('hue-rotate(-40deg)');
+    // No marker slot → the default painted village tile (back-compat).
+    rerender(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} terrainArt={{}} />);
+    expect(cell(container, 3, 0).querySelector('img')!.getAttribute('src')).toContain(
+      '/art/tiles/town.png'
+    );
+  });
+
   it('renders the road terrain tile on a regional road cell (still clickable)', () => {
     // terrainGrid has a road at (0,1).
     const onMarkerMove = vi.fn();

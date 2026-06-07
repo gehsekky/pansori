@@ -1,5 +1,5 @@
 import { type CampaignSectionInfo, type CampaignSectionSource, api } from '../lib/api.ts';
-import { TERRAIN_TILES, type TerrainArtMap } from '../types.ts';
+import { MARKER_TILES, TERRAIN_TILES, type TerrainArtMap } from '../types.ts';
 import { useCallback, useEffect, useState } from 'react';
 import styles from '../styles.module.css';
 
@@ -236,6 +236,12 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
               </div>
               <p style={{ fontSize: '0.68rem', color: 'var(--t-dim)', marginTop: 6 }}>
                 TILES: {Object.keys(TERRAIN_TILES).join(' · ')}
+              </p>
+              <p style={{ fontSize: '0.68rem', color: 'var(--t-dim)', marginTop: 4 }}>
+                TOWN MARKERS (&#34;markers&#34;: {'{'}&#34;town&#34;: …{'}'}):{' '}
+                {Object.keys(MARKER_TILES).join(' · ')} — ANY ENTRY MAY ALSO BE {'{'}&#34;tile&#34;:
+                …, &#34;tint&#34;: {'{'}&#34;hue&#34;, &#34;saturate&#34;, &#34;brightness&#34;{'}'}
+                {'}'}
               </p>
             </div>
           )}

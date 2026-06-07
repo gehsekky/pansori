@@ -3,11 +3,12 @@ import type {
   FloorType,
   GridPos,
   MapTransition,
+  MarkerTileSpec,
   TerrainArtMap,
   TerrainTileSpec,
   TerrainType,
 } from '../types';
-import { TERRAIN, TERRAIN_TILES } from '../types';
+import { MARKER_TILES, TERRAIN, TERRAIN_TILES, compileTint } from '../types';
 import GameIcon from './GameIcon';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
@@ -130,8 +131,16 @@ const TERRAIN_TILE: Partial<Record<TerrainType, string>> = {
 };
 
 // A town site on the regional map renders as this hand-painted village tile
-// (David Baumgart's dirtVillage) instead of the generic village glyph.
+// (David Baumgart's dirtVillage) instead of the generic village glyph —
+// unless the campaign skin picks a marker tile (terrainArt.markers.town).
 const TOWN_SITE_TILE = '/art/tiles/town.png';
+
+// A tile's effective CSS filter: the catalog's recolor first, then the
+// author tint layered over it (order matters — tint adjusts the themed look).
+const joinFilters = (...filters: Array<string | undefined>): string | undefined => {
+  const parts = filters.filter(Boolean);
+  return parts.length ? parts.join(' ') : undefined;
+};
 
 // game-icons glyphs for non-site transitions (town venues + local room exits /
 // ascents). Sites are handled separately (towns → village, dungeons → their
@@ -269,16 +278,31 @@ function GridMapView({
   readOnly,
   terrainArt,
 }: Props) {
-  // Resolve a terrain type's tile through the campaign skin: an override id
-  // picks its catalog entry (base PNG + recolor filter); otherwise the type's
-  // default tile (no filter). Types with no tile at all return src undefined
-  // and fall through to the tint + glyph path.
+  // Resolve a terrain type's tile through the campaign skin: an override
+  // picks its catalog entry (base PNG + recolor filter), with any author
+  // tint compiled and layered after the catalog filter; otherwise the
+  // type's default tile (no filter). Types with no tile at all return src
+  // undefined and fall through to the tint + glyph path.
   const tileFor = (t: TerrainType): { src?: string; filter?: string } => {
-    const override = terrainArt?.[t];
+    const choice = terrainArt?.[t];
+    const id = typeof choice === 'string' ? choice : choice?.tile;
     // Widen past the catalog's per-entry literal types (filter is optional).
-    const spec: TerrainTileSpec | undefined = override ? TERRAIN_TILES[override] : undefined;
-    if (spec) return { src: `/art/tiles/${spec.base}.png`, filter: spec.filter };
+    const spec: TerrainTileSpec | undefined = id ? TERRAIN_TILES[id] : undefined;
+    if (spec) {
+      const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
+      return { src: `/art/tiles/${spec.base}.png`, filter: joinFilters(spec.filter, tint) };
+    }
     return { src: TERRAIN_TILE[t] };
+  };
+  // The town-site marker through the campaign skin: `markers.town` picks a
+  // MARKER_TILES entry (+ optional tint); absent = the painted village tile.
+  const townMarkerTile = (): { src: string; filter?: string } => {
+    const choice = terrainArt?.markers?.town;
+    const id = typeof choice === 'string' ? choice : choice?.tile;
+    const spec: MarkerTileSpec | undefined = id ? MARKER_TILES[id] : undefined;
+    if (!spec) return { src: TOWN_SITE_TILE };
+    const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
+    return { src: `/art/markers/${spec.base}.png`, filter: joinFilters(spec.filter, tint) };
   };
   // Square size per map level: the sparse overland map gets the biggest squares
   // so it reads like a map and the terrain tiles have room; town is mid-size;
@@ -388,7 +412,7 @@ function GridMapView({
       const cellTile = fogged
         ? {}
         : isTownSite
-          ? { src: TOWN_SITE_TILE }
+          ? townMarkerTile()
           : siteTileName
             ? { src: `/art/tiles/${siteTileName}.png` }
             : terrainType

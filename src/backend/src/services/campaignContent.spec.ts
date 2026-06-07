@@ -964,6 +964,32 @@ describe('editable sections registry', () => {
     expect(art.safeParse({ plains: { base: 'snow' } }).success).toBe(false);
   });
 
+  it('terrainArt schema: { tile, tint } choices with bounded tints, + marker slots', () => {
+    const art = CAMPAIGN_SECTION_SCHEMAS.terrainArt;
+    // The structured choice: a tile + an optional bounded tint.
+    expect(art.safeParse({ plains: { tile: 'snow' } }).success).toBe(true);
+    expect(
+      art.safeParse({
+        forest: { tile: 'forest-dead', tint: { hue: 30, saturate: 0.5, brightness: 0.8 } },
+      }).success
+    ).toBe(true);
+    // Tint knobs are bounded: hue ±180, saturate 0..3, brightness 0..2.
+    expect(art.safeParse({ plains: { tile: 'snow', tint: { hue: 200 } } }).success).toBe(false);
+    expect(art.safeParse({ plains: { tile: 'snow', tint: { saturate: 4 } } }).success).toBe(false);
+    expect(art.safeParse({ plains: { tile: 'snow', tint: { brightness: -1 } } }).success).toBe(
+      false
+    );
+    // The town-marker slot: a MARKER_TILES id, bare or tinted.
+    expect(art.safeParse({ markers: { town: 'castle' } }).success).toBe(true);
+    expect(
+      art.safeParse({ markers: { town: { tile: 'monastery', tint: { hue: -40 } } } }).success
+    ).toBe(true);
+    // Unknown marker ids / slots rejected; terrain TILE ids aren't marker ids.
+    expect(art.safeParse({ markers: { town: 'lava-flow' } }).success).toBe(false);
+    expect(art.safeParse({ markers: { town: 'plains-ash' } }).success).toBe(false);
+    expect(art.safeParse({ markers: { dungeon: 'castle' } }).success).toBe(false);
+  });
+
   it('gameStart schema is a plain narration string', () => {
     const gameStart = CAMPAIGN_SECTION_SCHEMAS.gameStart;
     expect(gameStart.safeParse('The road south is long and the coin pouch light.').success).toBe(

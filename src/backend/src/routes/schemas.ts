@@ -1,5 +1,5 @@
+import { MARKER_TILES, TERRAIN, TERRAIN_TILES } from '../shared-types.js';
 import type { NextFunction, Request, Response } from 'express';
-import { TERRAIN, TERRAIN_TILES } from '../shared-types.js';
 import { z } from 'zod';
 
 // Zod schemas for request bodies on the auth + game routes. Each handler
@@ -1335,11 +1335,33 @@ const RoomsSchema = z
     );
   });
 
-// Campaign terrain skin: terrain type → tile id from the shared catalog.
-// Every key optional ({} = all defaults); unknown types / tile ids rejected.
+// Campaign terrain skin: terrain type → tile choice from the shared
+// catalog — a bare tile id, or { tile, tint } with a bounded structured
+// recolor (compiled to a CSS filter FE-side). `markers.town` skins the
+// regional town-site marker the same way from the MARKER_TILES catalog.
+// Every key optional ({} = all defaults); unknown types / ids rejected.
+const TILE_TINT = z
+  .object({
+    hue: z.number().min(-180).max(180).optional(),
+    saturate: z.number().min(0).max(3).optional(),
+    brightness: z.number().min(0).max(2).optional(),
+  })
+  .strict();
 const TILE_ID = z.enum(Object.keys(TERRAIN_TILES) as [string, ...string[]]);
+const TILE_CHOICE = z.union([
+  TILE_ID,
+  z.object({ tile: TILE_ID, tint: TILE_TINT.optional() }).strict(),
+]);
+const MARKER_ID = z.enum(Object.keys(MARKER_TILES) as [string, ...string[]]);
+const MARKER_CHOICE = z.union([
+  MARKER_ID,
+  z.object({ tile: MARKER_ID, tint: TILE_TINT.optional() }).strict(),
+]);
 const TerrainArtSchema = z
-  .object(Object.fromEntries(Object.keys(TERRAIN).map((t) => [t, TILE_ID.optional()])))
+  .object({
+    ...Object.fromEntries(Object.keys(TERRAIN).map((t) => [t, TILE_CHOICE.optional()])),
+    markers: z.object({ town: MARKER_CHOICE.optional() }).strict().optional(),
+  })
   .strict();
 
 // ─── Quests + factions (campaigns.data JSONB sections) ───────────────────────
