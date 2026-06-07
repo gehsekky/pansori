@@ -4990,6 +4990,57 @@ describe('interact_object retry on fail', () => {
     // Flavor objects still one-shot — repeat clicks add nothing.
     expect(result.newState.objects_searched).toContain('test_room:painting');
   });
+
+  it('an undetected trap fires on the interact AND its trigger text survives', async () => {
+    // The hidden-trap announcement is seeded into ctx.narrative BEFORE the
+    // handler runs; the handler must append, not overwrite (a silent trap
+    // would deal its damage with no prose explaining it).
+    const sd: Seed = {
+      ...buildSearchableSeed(),
+      rooms: [
+        {
+          id: 'test_room',
+          name: 'Test Room',
+          desc: '',
+          trap: {
+            id: 'test_trap',
+            name: 'Loose Step',
+            desc: 'A hidden loose step.',
+            dc: 30, // nobody's passive Perception detects it
+            damage: '1d4',
+            damageType: 'bludgeoning',
+            condition: 'prone',
+            triggerNarrative: '{name} sets off the Loose Step — {dmg} damage!',
+            detectNarrative: 'You spot the Loose Step.',
+            disarmSuccess: 'Disarmed.',
+            disarmFail: 'It fires!',
+          },
+          objects: [
+            {
+              id: 'painting',
+              name: 'Painting',
+              desc: '',
+              interactText: 'A faded portrait.',
+            },
+          ],
+        },
+      ],
+    };
+    const st = makeState({}, { current_room: 'test_room' });
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'painting' },
+      history: [],
+      state: st,
+      seed: sd,
+      context: ctx,
+    });
+    expect(result.newState.traps_triggered).toContain('test_room');
+    expect(result.narrative).toMatch(/sets off the Loose Step/);
+    expect(result.narrative).toMatch(/A faded portrait\./);
+    const hurt = result.newState.characters[0];
+    expect(hurt.hp).toBeLessThan(hurt.max_hp);
+    expect(hurt.conditions).toContain('prone');
+  });
 });
 
 describe('interact_object — lighting-adjusted active search', () => {

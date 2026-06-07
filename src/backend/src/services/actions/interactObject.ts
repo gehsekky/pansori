@@ -27,6 +27,11 @@ import { updatePcActor } from './actor.js';
  * fire whether the item was floor-loot or container-loot. On
  * failure: object stays in the choice list so the player can retry
  * (the seenKey written by takeAction dims the button visually).
+ *
+ * ctx.narrative is APPENDED to, never overwritten — takeAction seeds it
+ * with the hidden-trap trigger text (an undetected room trap fires on the
+ * first non-move action) and an overwrite would swallow that announcement
+ * while its damage/condition still landed.
  */
 export const handleInteractObject: ActionHandler<{
   type: 'interact_object';
@@ -37,13 +42,13 @@ export const handleInteractObject: ActionHandler<{
   const currentSeedRoom = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
   const obj = currentSeedRoom?.objects?.find((o) => o.id === action.objectId);
   if (!obj) {
-    ctx.narrative = 'There is nothing like that here.';
+    ctx.narrative = (ctx.narrative ?? '') + 'There is nothing like that here.';
     return;
   }
 
   const searchKey = `${ctx.roomId}:${obj.id}`;
   if ((ctx.st.objects_searched ?? []).includes(searchKey)) {
-    ctx.narrative = `You have already searched the ${obj.name}.`;
+    ctx.narrative = (ctx.narrative ?? '') + `You have already searched the ${obj.name}.`;
     return;
   }
 
@@ -51,7 +56,7 @@ export const handleInteractObject: ActionHandler<{
   let nextSt = ctx.st;
 
   if (nextSt.combat_active) {
-    ctx.narrative = 'You cannot interact with objects during combat.';
+    ctx.narrative = (ctx.narrative ?? '') + 'You cannot interact with objects during combat.';
     return;
   }
 
@@ -59,7 +64,7 @@ export const handleInteractObject: ActionHandler<{
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
     updatePcActor(ctx, nextChar);
     ctx.st = nextSt;
-    ctx.narrative = obj.interactText;
+    ctx.narrative = (ctx.narrative ?? '') + obj.interactText;
     return;
   }
 
@@ -135,5 +140,5 @@ export const handleInteractObject: ActionHandler<{
   }
   updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
-  ctx.narrative = narrative;
+  ctx.narrative = (ctx.narrative ?? '') + narrative;
 };
