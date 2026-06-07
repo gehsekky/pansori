@@ -289,6 +289,12 @@ async function sectionCodeFallback(campaignId: string, section: string): Promise
     const code = CODE_CONTEXTS[campaignId] ?? baseContextFor(campaignId);
     return code.campaign?.intro ?? null;
   }
+  if (section === 'worldName') {
+    // Same never-null convention as gameStart: DB-born campaigns resolve
+    // over the base template, so its world name is the effective value.
+    const code = CODE_CONTEXTS[campaignId] ?? baseContextFor(campaignId);
+    return code.campaign?.world_name ?? null;
+  }
   if (section === 'quests' || section === 'factions') {
     // Campaign-block fields, not top-level Context keys — a code campaign's
     // quest/faction lists are the editing starting point.

@@ -196,6 +196,10 @@ gameRouter.get('/contexts', async (req, res) => {
       return {
         id: c.id,
         displayName: names.get(c.id) ?? c.displayNoun,
+        // Picker presentation — DB-editable sections (overlay top level);
+        // code campaigns carry theirs in the FE context, so absent is fine.
+        tagline: c.tagline,
+        previewArt: c.previewArt,
         classes: Object.keys(c.classPrimaryStats),
         // Per-class "choose N from options" skill proficiencies + the curated
         // default selection — drives the creation-screen skill picker.

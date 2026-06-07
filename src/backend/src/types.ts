@@ -1832,6 +1832,10 @@ export interface Context {
   // section — the picker shows campaigns.name; this remains the registry-down
   // fallback only.)
   displayNoun: string;
+  // Picker presentation (DB-editable sections; code campaigns carry theirs
+  // in the FE context instead): a one-line pitch + an ASCII preview panel.
+  tagline?: string;
+  previewArt?: string;
   // Campaign-scoped terrain art: terrain type → tile id from the shared
   // TERRAIN_TILES catalog. Unmapped types render their default tile. Editable
   // section ('terrainArt'); copied into the seed so the FE map can skin itself.

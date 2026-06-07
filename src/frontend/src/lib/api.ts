@@ -174,6 +174,10 @@ export type CharacterInput = {
 export interface BackendContextSummary {
   id: string;
   displayName: string;
+  // Picker presentation for DB campaigns (absent for code campaigns — the
+  // FE context carries theirs).
+  tagline?: string;
+  previewArt?: string;
   classes: string[];
   // Per-class "choose N from options" skill proficiencies + the curated
   // default selection, for the creation-screen skill picker.

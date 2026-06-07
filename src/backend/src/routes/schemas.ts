@@ -1434,6 +1434,12 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Narration hook: the first narrative entry of a new game (overlays the
   // code/template campaign.intro).
   gameStart: z.string().min(1).max(4000),
+  // The prose world name (campaign.world_name — distinct from campaigns.name,
+  // the picker/header identity: "The Sky Has Fallen" can be set in "Auria").
+  worldName: z.string().min(1).max(120),
+  // Picker presentation: a one-line pitch + an ASCII preview panel.
+  tagline: z.string().min(1).max(200),
+  previewArt: z.string().min(1).max(4000),
   narratives: NarrativesSchema,
   rooms: RoomsSchema,
   // Quests + factions: campaign-block script content (campaigns.data keys

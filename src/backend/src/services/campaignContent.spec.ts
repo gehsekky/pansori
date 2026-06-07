@@ -1476,6 +1476,32 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.malgovia.campaign?.factions).toBeUndefined();
   });
 
+  it('worldName folds into campaign.world_name; tagline/previewArt overlay top-level', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: { world_name: 'Old Name', intro: 'x', rooms: [] } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    await putCampaignSection(db.pool, 'malgovia', 'worldName', 'Auria');
+    await putCampaignSection(
+      db.pool,
+      'malgovia',
+      'tagline',
+      'The sky has fallen. Walk the shards.'
+    );
+    await putCampaignSection(db.pool, 'malgovia', 'previewArt', '  /\\\n /  \\\n/____\\');
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.world_name).toBe('Auria');
+    expect('worldName' in contexts.malgovia).toBe(false); // folded, not top-level
+    expect(contexts.malgovia.tagline).toBe('The sky has fallen. Walk the shards.');
+    expect(contexts.malgovia.previewArt).toContain('/____');
+    // Delete reverts the world name to code.
+    await deleteCampaignSection(db.pool, 'malgovia', 'worldName');
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.world_name).toBe('Old Name');
+  });
+
   it('terrainArt overlays the context top-level and reverts to none on delete', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const code = codeCtx({ id: 'malgovia' });

@@ -40,7 +40,7 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
 // no JSON quoting in the textarea. The API request body is JSON, so
 // escaping happens on the wire automatically; on load the string value
 // displays verbatim.
-const PLAIN_TEXT_SECTIONS = new Set(['gameStart']);
+const PLAIN_TEXT_SECTIONS = new Set(['gameStart', 'worldName', 'tagline', 'previewArt']);
 
 // Curated terrain-art themes: each pre-fills the terrainArt JSON with a
 // per-type override map (the author can hand-tweak entries after). CLASSIC

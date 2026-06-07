@@ -196,6 +196,7 @@ describe('CharScreen — campaign selector includes DB-only campaigns', () => {
       ...wizardSummary,
       id: 'mistwood',
       displayName: 'Mistwood',
+      tagline: 'Where the fog keeps its secrets.',
     } as BackendContextSummary;
     const sandboxSummary = { ...wizardSummary, id: ctx.id } as BackendContextSummary;
     vi.spyOn(api, 'listContexts').mockResolvedValue([sandboxSummary, mistwoodSummary]);
@@ -205,7 +206,9 @@ describe('CharScreen — campaign selector includes DB-only campaigns', () => {
     // The DB-only campaign gets a card once the BE list loads…
     const card = await findByTestId('world-picker-mistwood');
     expect(card.textContent).toContain('Mistwood');
-    expect(card.textContent).toContain('creator-built');
+    // A served tagline beats the generic creator-built line.
+    expect(card.textContent).toContain('Where the fog keeps its secrets.');
+    expect(card.textContent).not.toContain('creator-built');
     // …and selecting it keeps the donor's class machinery working.
     fireEvent.click(card);
     expect(getByText('PARTY LEADER')).toBeTruthy();

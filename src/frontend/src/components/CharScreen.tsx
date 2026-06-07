@@ -450,8 +450,8 @@ function CharScreen({
           ...donorCtx,
           id: b.id,
           displayName: b.displayName,
-          tagline: 'A creator-built campaign.',
-          previewArt: '',
+          tagline: b.tagline ?? 'A creator-built campaign.',
+          previewArt: b.previewArt ?? '',
           hidden: false,
         }));
   const pickerContexts = beLoaded

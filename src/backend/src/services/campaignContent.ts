@@ -101,8 +101,14 @@ export function baseContextFor(campaignId: string): Context {
 // entirely, same for factions). Quest steps + dialogue gates share one
 // condition vocabulary; quest ids are what dialogue start_quest
 // consequences and quests_active/steps_done facts reference.
+// 'worldName' folds into campaign.world_name (the prose world the seed
+// carries); 'tagline' / 'previewArt' are picker presentation, overlaying
+// the Context top level (served by GET /game/contexts).
 export const EDITABLE_SECTIONS = [
   'gameStart',
+  'worldName',
+  'tagline',
+  'previewArt',
   'narratives',
   'regions',
   'towns',
@@ -1159,6 +1165,8 @@ async function loadOverlay(
   // narrative entry), not as a top-level Context field.
   const gameStart = typeof overlay.gameStart === 'string' ? overlay.gameStart : undefined;
   delete overlay.gameStart;
+  const worldName = typeof overlay.worldName === 'string' ? overlay.worldName : undefined;
+  delete overlay.worldName;
 
   // Quests + factions are campaign-block fields too — extracted here and
   // folded below (wholesale replace), never left as top-level keys.
@@ -1201,12 +1209,14 @@ async function loadOverlay(
     dbTowns.length > 0 ||
     dbRooms.length > 0 ||
     gameStart !== undefined ||
+    worldName !== undefined ||
     dbQuests !== undefined ||
     dbFactions !== undefined
   ) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
       ...(gameStart !== undefined ? { intro: gameStart } : {}),
+      ...(worldName !== undefined ? { world_name: worldName } : {}),
       ...(dbQuests !== undefined ? { quests: dbQuests } : {}),
       ...(dbFactions !== undefined ? { factions: dbFactions } : {}),
       ...(dbRegions.length > 0
