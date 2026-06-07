@@ -294,6 +294,23 @@ describe('RegionEditorScreen', () => {
     expect('icon' in added).toBe(false);
   });
 
+  it('ENCOUNTER TABLE: chips add/remove from the bestiary picker; save folds the list', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    // The picker carries the mocked catalog names.
+    const add = screen.getByLabelText('Add encounter creature') as HTMLSelectElement;
+    expect([...add.options].map((o) => o.value)).toEqual(['', 'Goblin', 'Wolf']);
+    fireEvent.change(add, { target: { value: 'Wolf' } });
+    fireEvent.change(add, { target: { value: 'Goblin' } });
+    expect(screen.getByText('Wolf ✕')).toBeTruthy();
+    // Removing a chip drops it from the save.
+    fireEvent.click(screen.getByText('Goblin ✕'));
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    expect(saved[0].encounterTable).toEqual(['Wolf']);
+  });
+
   it('REGION GATE sites: kind option, TO REGION picker, save folds regionId', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');

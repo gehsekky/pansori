@@ -245,8 +245,9 @@ const NarrativesSchema = z
 // (feetPerSquare / gridWidth / gridHeight) and startPos are REQUIRED —
 // every region must declare the grid its future children (terrain, sites,
 // tierZones) will sit on; desc / encounterChance / baseTier are optional
-// flavor + tuning. encounterTable waits for the entities section (its ids
-// need cross-validation); legacy obstacles/difficultTerrain never migrate.
+// flavor + tuning. encounterTable carries composed-bestiary creature NAMES
+// (cross-validation is overlay-time warn-skip, like room enemy placements);
+// legacy obstacles/difficultTerrain never migrate.
 const GridPosSchema = z
   .object({
     x: z.number().int().nonnegative(),
@@ -330,6 +331,9 @@ const RegionsSchema = z
         startPos: GridPosSchema,
         // Random-encounter roll per square crossed (0–1).
         encounterChance: z.number().min(0).max(1).optional(),
+        // The creatures those rolls materialize — composed-bestiary names
+        // (unknown names warn-and-skip at overlay time).
+        encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
         // SRD tiers of play (1 ≈ L1–4, 2 ≈ L5–7, 3 ≈ L8–10).
         baseTier: z.number().int().min(1).max(4).optional(),
         // Transition cells. Omitted = a region with no sites (yet).

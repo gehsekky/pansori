@@ -89,6 +89,7 @@ interface EditorRegion {
   onExit?: string;
   onFirstExit?: string;
   encounterChance?: number; // regions only
+  encounterTable?: string[]; // regions only — wilderness creature names
   baseTier?: number; // regions only
   floor?: string; // towns + rooms
   lighting?: string; // rooms only
@@ -277,6 +278,8 @@ function RegionEditorScreen({
   // names that feed the picker (ambient catalog + campaign customs).
   const [placedEnemies, setPlacedEnemies] = useState<Array<{ name: string; count: number }>>([]);
   const [monsterNames, setMonsterNames] = useState<string[]>([]);
+  // Region wilderness encounter table (creature names), edited as chips.
+  const [encounterTable, setEncounterTable] = useState<string[]>([]);
   // Rooms only: loot placements ({item id, optional grid pos}) + the item
   // options that feed the picker (id + display name).
   const [placedLoot, setPlacedLoot] = useState<
@@ -346,6 +349,7 @@ function RegionEditorScreen({
         setDetails(detailsFrom(r));
         setMakeStarter(false);
         setCanRest(!!r.canRest);
+        setEncounterTable([...(r.encounterTable ?? [])]);
         setSites(
           kind === 'room'
             ? exitsToSites(r.exits)
@@ -362,8 +366,9 @@ function RegionEditorScreen({
       })
       .catch(() => setLoadErr('Could not load this campaign’s regions.'));
     // Room pages need the bestiary names (enemy picker) and the item list
-    // (loot picker): the ambient SRD catalogs plus the campaign's customs.
-    if (kind === 'room') {
+    // (loot picker); region pages need the bestiary too (the wilderness
+    // ENCOUNTER TABLE picker). Ambient SRD catalogs + the campaign's customs.
+    if (kind === 'room' || kind === 'region') {
       Promise.all([
         api.getMonsterCatalog().catch(() => []),
         api
@@ -729,6 +734,8 @@ function RegionEditorScreen({
       }
       if (details.baseTier === '') delete next.baseTier;
       else next.baseTier = Number(details.baseTier);
+      if (encounterTable.length > 0) next.encounterTable = encounterTable;
+      else delete next.encounterTable;
       if (makeStarter) next.isStartingRegion = true;
     } else {
       if (details.floor === '') delete next.floor;
@@ -1583,6 +1590,52 @@ function RegionEditorScreen({
                           </option>
                         ))}
                       </select>
+                    </div>
+                    {/* Wilderness encounter table — the creatures the
+                        per-square ENCOUNTER CHANCE rolls materialize. */}
+                    <div style={{ flexBasis: '100%' }}>
+                      <p className={styles.formLbl}>ENCOUNTER TABLE (rolled by ENCOUNTER CHANCE)</p>
+                      <div
+                        style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}
+                      >
+                        {encounterTable.map((name) => (
+                          <button
+                            key={name}
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                            title="Remove from the table"
+                            onClick={() => {
+                              setEncounterTable((prev) => prev.filter((n) => n !== name));
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            {name} ✕
+                          </button>
+                        ))}
+                        <select
+                          className={styles.formInp}
+                          style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
+                          aria-label="Add encounter creature"
+                          value=""
+                          onChange={(ev) => {
+                            const name = ev.target.value;
+                            if (!name) return;
+                            setEncounterTable((prev) =>
+                              prev.includes(name) ? prev : [...prev, name]
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        >
+                          <option value="">+ ADD CREATURE…</option>
+                          {monsterNames.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </>
                 )}

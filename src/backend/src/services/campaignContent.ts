@@ -182,6 +182,9 @@ export interface CampaignRegion {
   grid: CampaignRegionCell[][];
   startPos: { x: number; y: number };
   encounterChance?: number;
+  // Wilderness-encounter creature names (composed bestiary). Unknown names
+  // warn-and-skip at overlay; absent/empty = no random encounters here.
+  encounterTable?: string[];
   baseTier?: number;
   // Transition cells — stored in campaign_region_sites, authored inside
   // the region's JSON. Present only when the region has sites.
@@ -202,6 +205,7 @@ interface RegionRow {
   start_x: number;
   start_y: number;
   encounter_chance: number | null;
+  encounter_table: string[];
   base_tier: number | null;
 }
 
@@ -219,13 +223,14 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     grid: r.grid,
     startPos: { x: r.start_x, y: r.start_y },
     ...(r.encounter_chance !== null ? { encounterChance: r.encounter_chance } : {}),
+    ...(r.encounter_table.length > 0 ? { encounterTable: r.encounter_table } : {}),
     ...(r.base_tier !== null ? { baseTier: r.base_tier } : {}),
   };
 }
 
 const REGION_COLUMNS = `id, name, is_starting_region, description, on_enter, feet_per_square,
        grid, start_x, start_y, encounter_chance, base_tier, on_first_enter, on_exit,
-       on_first_exit`;
+       on_first_exit, encounter_table`;
 
 interface SiteRow {
   region_id: string;
@@ -318,8 +323,9 @@ export async function putCampaignRegions(
         `INSERT INTO campaign_regions
            (campaign_id, id, sort_order, name, is_starting_region, description,
             on_enter, feet_per_square, grid, start_x, start_y, encounter_chance, base_tier,
-            on_first_enter, on_exit, on_first_exit)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16)`,
+            on_first_enter, on_exit, on_first_exit, encounter_table)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16,
+                 $17::jsonb)`,
         [
           campaignId,
           r.id,
@@ -337,6 +343,7 @@ export async function putCampaignRegions(
           r.onFirstEnter ?? null,
           r.onExit ?? null,
           r.onFirstExit ?? null,
+          JSON.stringify(r.encounterTable ?? []),
         ]
       );
       const sites = r.sites ?? [];
@@ -989,6 +996,9 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
       startPos: r.startPos,
       sites: (r.sites ?? []).map((s) => ({ ...s })),
       ...(r.encounterChance !== undefined ? { encounterChance: r.encounterChance } : {}),
+      ...(r.encounterTable && r.encounterTable.length > 0
+        ? { encounterTable: r.encounterTable }
+        : {}),
       ...(r.baseTier !== undefined ? { baseTier: r.baseTier } : {}),
       ...(tierZones.length > 0 ? { tierZones } : {}),
     };
@@ -1199,7 +1209,13 @@ async function loadOverlay(
       ...(gameStart !== undefined ? { intro: gameStart } : {}),
       ...(dbQuests !== undefined ? { quests: dbQuests } : {}),
       ...(dbFactions !== undefined ? { factions: dbFactions } : {}),
-      ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
+      ...(dbRegions.length > 0
+        ? {
+            regions: dbRegionsToEngine(
+              filterEncounterTables(campaignId, dbRegions, enemyTemplates)
+            ),
+          }
+        : {}),
       ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
       // Rooms-wholesale semantics extend to their enemies: DB rooms bring
       // their own placed-enemy map (possibly empty), replacing the code one
@@ -1216,6 +1232,29 @@ async function loadOverlay(
   }
 
   return overlay;
+}
+
+// Filter each region's wilderness encounterTable against the composed
+// bestiary — an unknown name (deleted custom) is dropped with a warning
+// rather than rolling an encounter the engine can't materialize (the roll
+// path also fails soft, but a warning at overlay is when the author can
+// actually fix it).
+function filterEncounterTables(
+  campaignId: string,
+  regions: CampaignRegion[],
+  templates: EnemyTemplate[]
+): CampaignRegion[] {
+  return regions.map((r) => {
+    if (!r.encounterTable || r.encounterTable.length === 0) return r;
+    const kept = r.encounterTable.filter((name) => {
+      if (templates.some((t) => t.name === name)) return true;
+      console.warn(
+        `[campaignContent] ${campaignId}/${r.id}: no enemy template named "${name}" — encounter entry dropped`
+      );
+      return false;
+    });
+    return kept.length === r.encounterTable.length ? r : { ...r, encounterTable: kept };
+  });
 }
 
 // Build the campaign.npcs map from each DB room's authored NPCs: the

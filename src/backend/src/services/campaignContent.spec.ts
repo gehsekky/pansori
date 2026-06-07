@@ -238,6 +238,7 @@ function makeContentDb(initial: {
         on_first_enter: p[12],
         on_exit: p[13],
         on_first_exit: p[14],
+        encounter_table: p[15] !== undefined ? JSON.parse(p[15] as string) : [],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -987,6 +988,10 @@ describe('editable sections registry', () => {
     ];
     const ok = regions.safeParse(pair(gate({ entryPos: { x: 1, y: 1 } })));
     expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // The wilderness encounter table: a list of creature names (composed-
+    // bestiary cross-check is overlay-time warn-skip, not schema).
+    expect(regions.safeParse([region({ encounterTable: ['Wolf', 'Goblin'] })]).success).toBe(true);
+    expect(regions.safeParse([region({ encounterTable: [''] })]).success).toBe(false);
     // A gate needs a target…
     expect(regions.safeParse(pair(gate({ regionId: undefined }))).success).toBe(false);
     // …that exists in the payload…
@@ -1596,6 +1601,25 @@ describe('section CRUD + live refresh', () => {
     expect(smuggler?.responses).toEqual([gated, oneShot]);
   });
 
+  it('region encounter tables warn-skip unknown creatures on refresh', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      enemyTemplates: [{ name: 'Wolf', hp: 11, ac: 13, damage: '2d4', toHit: 4, xp: 50 }] as never,
+      campaign: { world_name: 'Malgovia', intro: 'x', rooms: [] } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [
+      { ...REGION_A, encounterTable: ['Wolf', 'Vanished Horror'] },
+    ]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    // The known creature survives; the unknown one is dropped with a warning.
+    expect(contexts.malgovia.campaign?.regions?.[0].encounterTable).toEqual(['Wolf']);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Vanished Horror'));
+    warn.mockRestore();
+  });
+
   it('room loot placements materialize against the composed loot table on refresh', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const dagger = { id: 'dagger', name: 'Dagger', type: 'weapon', damage: '1d4' };
@@ -1741,6 +1765,7 @@ describe('section CRUD + live refresh', () => {
     const withSites: CampaignRegion = {
       ...REGION_A,
       onEnter: 'The mists part as you crest the ridge.',
+      encounterTable: ['Wolf', 'Goblin'],
       sites: [
         { id: 'oakvale', name: 'Oakvale', pos: { x: 1, y: 1 }, kind: 'town', townId: 'oakvale' },
         {
