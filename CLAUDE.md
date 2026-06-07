@@ -57,7 +57,7 @@ grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1
 | Origin feats | 4 (+ Magic Initiate's 3 list variants) | 6 |
 | General feats | 2 (ASI + Grappler) | 0 (neither fits the choose-a-feat surface today) |
 | Species | 9 standalone + Drow as Elf-lineage | 9 |
-| Spells | ~332 | all (full SRD coverage; the un-modelable utility/meta spells are narrative-only — see note below) |
+| Spells | ~340 | all (full SRD coverage; ~108 un-modelable utility/meta spells are narrative-only — see note below) |
 
 All SRD 5.2.1 spells are now in the catalog. The combat-relevant ones
 are fully mechanical; spells whose RAW effect needs systems pansori

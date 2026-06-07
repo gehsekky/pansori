@@ -139,7 +139,7 @@ prettier clean).
 
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
-| Spells                    | **274** (27 cantrips + 247 leveled, through L9)  | ~330                             |
+| Spells                    | **340** in the catalog (~232 mechanical, ~108 narrative-only) | full SRD coverage |
 | Shared SRD monster pool   | **50** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
@@ -156,11 +156,20 @@ on existing patterns and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [x] **Spells** — full SRD coverage (~332; see CLAUDE.md). Combat-relevant
-      spells are mechanical; un-modelable utility/meta spells are registered
-      as narrative-only and graduate as their systems land (anti-magic,
-      Time Stop, Shapechange and basic Wish already have). Remaining work is
-      graduating narrative spells, not catalog gaps.
+- [x] **Spells** — full SRD coverage: **340** catalog entries (census
+      2026-06-08: ~232 mechanical, ~108 narrative-only). Combat staples once
+      assumed missing (Dispel Magic, Sanctuary, Mirror Image, Blur, Silence,
+      Freedom of Movement, Darkness/Daylight…) are ALL implemented. Recent
+      graduations: anti-magic, Time Stop, Shapechange, basic Wish, and the
+      teleport family (Teleport / Teleportation Circle / Word of Recall →
+      visited-town relocation) + Remove Curse (breaks cursed attunements).
+      The remaining narrative tail clusters by missing SYSTEM, not by data
+      entry: illusions (silent/major image, seeming…), divination/scrying
+      (commune, locate-*, scrying, legend lore…), planar travel (plane
+      shift, etherealness, astral projection…), terrain shaping (stone
+      shape, move earth, passwall…), and pure-flavor utility (mending,
+      prestidigitation, tiny hut…) — several of those are
+      narrative-by-design and should stay that way.
 - [ ] **Monsters** — stat-block content breadth. The ambient catalog is at
       **88** (synced to the DB, served to every campaign; customs shadow by
       name), on the supported fields (multiattack, onHitEffect incl.
