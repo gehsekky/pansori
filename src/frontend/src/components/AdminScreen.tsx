@@ -8,7 +8,9 @@ import {
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
 import CampaignContentEditor from './CampaignContentEditor.tsx';
+import FactionsPanel from './FactionsPanel.tsx';
 import MapsPanel from './MapsPanel.tsx';
+import QuestsPanel from './QuestsPanel.tsx';
 import styles from '../styles.module.css';
 
 // Map the backend's mutation-failure reasons (routes/campaigns.ts) to
@@ -627,6 +629,11 @@ function AdminScreen({
             ))}
           </>
         )}
+
+        {/* ── Story content: quests + factions (structured section panels;
+            dialogue references both — start_quest effects, tier gates). ── */}
+        {selected && <QuestsPanel campaignId={selected.id} />}
+        {selected && <FactionsPanel campaignId={selected.id} />}
       </div>
     </div>
   );

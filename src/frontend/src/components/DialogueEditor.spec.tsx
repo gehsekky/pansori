@@ -1,9 +1,5 @@
-import DialogueEditor, {
-  type CondRow,
-  type DialogueNode,
-  compileCondition,
-  parseCondition,
-} from './DialogueEditor';
+import { type CondRow, compileCondition, parseCondition } from './conditionEffectRows';
+import DialogueEditor, { type DialogueNode } from './DialogueEditor';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
