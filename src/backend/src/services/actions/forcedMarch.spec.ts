@@ -119,16 +119,18 @@ function ctxFor(travelMinutes: number): ActionContext {
 describe('handleMarkerMove — forced-march wiring', () => {
   it('a regional move pushes past 8h and fatigues the party on a failed save', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // CON save fails
-    const ctxM = ctxFor(470); // 470 min already; a 4-mile (80 min) move crosses 8h
+    // 540 min = 1h past the 8h budget already; the hour-per-click travel turn
+    // adds 60 more (3 squares at Normal pace), completing a second past-8 hour.
+    const ctxM = ctxFor(540);
     handleMarkerMove(ctxM, { type: 'marker_move', to: { x: 4, y: 0 } });
-    expect(ctxM.st.travel_minutes_today).toBe(550); // 470 + 80
+    expect(ctxM.st.travel_minutes_today).toBe(600); // 540 + the hour's 60
     expect(ctxM.st.characters[0].exhaustion_level).toBe(1);
     expect(ctxM.narrative).toContain('forced march');
   });
 
   it('halts the march on the square where a member collapses (short of the destination)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // every CON save fails
-    const ctxM = ctxFor(470);
+    const ctxM = ctxFor(540); // the next completed past-8 hour kills
     ctxM.st.characters[0].exhaustion_level = 5; // one failed save from death
     handleMarkerMove(ctxM, { type: 'marker_move', to: { x: 8, y: 0 } });
     expect(ctxM.st.characters[0].dead).toBe(true);

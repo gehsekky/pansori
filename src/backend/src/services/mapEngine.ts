@@ -45,7 +45,15 @@ function terrainTypeAt(terrain: TerrainCell[] | undefined, pos: GridPos): Terrai
 const DEFAULT_LOCAL_GRID = 10;
 const DEFAULT_LOCAL_SCALE = 5;
 const FEET_PER_MILE = 5280;
-const NORMAL_MILES_PER_HOUR = 3; // SRD Travel Pace — Normal (3 mi/hr, 24 mi/day)
+// SRD Travel Pace — miles per hour by pace (Fast 4 / Normal 3 / Slow 2;
+// 30 / 24 / 18 miles per 8-hour travel day).
+export const PACE_MILES_PER_HOUR = { fast: 4, normal: 3, slow: 2 } as const;
+export type TravelPace = keyof typeof PACE_MILES_PER_HOUR;
+// One marker_move click spends AT MOST one hour of overland travel — the
+// SRD's natural travel quantum (the pace table's per-hour column, forced
+// march per hour past 8, mounted sprints of 1 hour). The marker halts where
+// the hour runs out; the journey is a sequence of clicks.
+export const TRAVEL_TURN_MIN = 60;
 
 // The transient room id a wilderness encounter fights in. Not an authored room —
 // `activeGrid` returns null for it (no marker movement mid-fight); combat uses the
@@ -416,6 +424,8 @@ export function resolveMarkerMove(
   if (grid.level === 'regional') {
     const region = regionById(campaign, st.current_region_id);
     const milesPerSquare = grid.feetPerSquare / FEET_PER_MILE;
+    const pace: TravelPace = st.travel_pace ?? 'normal';
+    const mph = PACE_MILES_PER_HOUR[pace];
     const chance = region?.encounterChance ?? 0;
     const table = region?.encounterTable ?? [];
     // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
@@ -429,10 +439,20 @@ export function resolveMarkerMove(
     const crossed: GridPos[] = [from];
     let stopCell: GridPos = to;
     let elapsedMin = 0;
+    let hourSpent = false;
     for (const cell of path) {
       const spec = TERRAIN[terrainTypeAt(region?.terrain, cell)];
-      // SRD: Travel Pace — Normal 3 mi/hr. Minutes to cross this (weighted) square.
-      const cellMin = Math.round((spec.travelMult * milesPerSquare * 60) / NORMAL_MILES_PER_HOUR);
+      // SRD: Travel Pace — minutes to cross this (terrain-weighted) square at
+      // the party's chosen pace.
+      const cellMin = Math.round((spec.travelMult * milesPerSquare * 60) / mph);
+      // The hour cap: stop BEFORE a square that would bust the travel turn —
+      // except the first square, so a slow slog can always inch forward.
+      if (crossed.length > 1 && elapsedMin + cellMin > TRAVEL_TURN_MIN) {
+        stopCell = crossed[crossed.length - 1];
+        reachedDest = false;
+        hourSpent = true;
+        break;
+      }
       // Fatigue accrues as we cross the square; a collapse stops the party here.
       if (applyFatigue && cellMin > 0) {
         const r = applyFatigue(next, cellMin);
@@ -460,6 +480,10 @@ export function resolveMarkerMove(
     elapsedHours = elapsedMin / 60;
     squaresMoved = crossed.length - 1;
     fatigueNote = fatigueNotes.join('');
+    if (hourSpent) {
+      const miles = Math.round(squaresMoved * milesPerSquare);
+      narrative = ` The hour's march covers ${miles} mile${miles === 1 ? '' : 's'}; the journey continues.`;
+    }
     next = {
       ...next,
       marker_pos: stopCell,

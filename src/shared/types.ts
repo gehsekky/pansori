@@ -708,6 +708,8 @@ export type StructuredAction =
   // Arriving on a transition cell (site / venue / room exit) resolves it
   // (descend / ascend / change room).
   | { type: 'marker_move'; to: GridPos }
+  // SRD Travel Pace — set the party's overland stance (regional map, free).
+  | { type: 'set_pace'; pace: 'fast' | 'normal' | 'slow' }
   | { type: 'accept_quest'; questId: string }
   | { type: 'complete_quest'; questId: string }
   | { type: 'dash' }

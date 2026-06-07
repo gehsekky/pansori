@@ -3648,11 +3648,19 @@ export function trapSpent(state: GameState, roomId: string): boolean {
   );
 }
 
-export function partyDetectsTrap(characters: Character[], trap: Trap): boolean {
+// SRD Travel Pace check effects, surfaced through PASSIVE Perception (SRD
+// passive rules: Advantage +5 / Disadvantage −5): Fast pace imposes
+// Disadvantage on Wisdom (Perception) — the hurrying party spots less —
+// and Slow grants Advantage. Normal is 0.
+export function pacePerceptionMod(state: GameState): number {
+  return state.travel_pace === 'fast' ? -5 : state.travel_pace === 'slow' ? 5 : 0;
+}
+
+export function partyDetectsTrap(characters: Character[], trap: Trap, paceMod = 0): boolean {
   return characters.some((c) => {
     if (c.dead) return false;
     const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
-    return passivePerception(c.wis, c.level, proficient) >= trap.dc;
+    return passivePerception(c.wis, c.level, proficient) + paceMod >= trap.dc;
   });
 }
 
@@ -3838,7 +3846,7 @@ export function buildArrivalNarrative(
   // Passive trap detection (5e DMG ch.5)
   const trap = getRoomTrap(targetId, seed, context);
   if (trap && !trapSpent(state, targetId)) {
-    if (partyDetectsTrap(state.characters, trap)) {
+    if (partyDetectsTrap(state.characters, trap, pacePerceptionMod(state))) {
       text += ' ' + trap.detectNarrative;
     }
     // If not detected, trap fires silently on next action — handled in takeAction
@@ -4437,7 +4445,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (
     roomTrap &&
     !trapSpent(state, roomId) &&
-    partyDetectsTrap(state.characters, roomTrap) &&
+    partyDetectsTrap(state.characters, roomTrap, pacePerceptionMod(state)) &&
     trapDisarmActionAvailable
   ) {
     choices.push({
@@ -4649,6 +4657,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         label: `Parley with ${npc.name}`,
         action: { type: 'talk', npcId: npc.id },
       });
+    }
+  }
+
+  // SRD Travel Pace — the overland stance dial, offered on the regional map
+  // out of combat (one choice per pace the party is NOT already at). Each
+  // click of travel spends up to an hour at the chosen speed; Fast/Slow also
+  // swing passive Perception ∓5/+5 (the table's check effects).
+  if (!state.combat_active && state.map_level === 'regional') {
+    const currentPace = state.travel_pace ?? 'normal';
+    const PACES: Array<['fast' | 'normal' | 'slow', string]> = [
+      ['fast', 'Fast — 4 mi/hr, but the party spots less (Perception −5)'],
+      ['normal', 'Normal — 3 mi/hr'],
+      ['slow', 'Slow — 2 mi/hr, eyes sharp (Perception +5)'],
+    ];
+    for (const [pace, label] of PACES) {
+      if (pace === currentPace) continue;
+      choices.push({ label: `Set travel pace: ${label}`, action: { type: 'set_pace', pace } });
     }
   }
 
@@ -9974,7 +9999,11 @@ export async function takeAction({
   //  where no character's passive Perception beat the trap DC.)
   if (action.type !== 'disarm_trap' && action.type !== 'marker_move') {
     const hiddenTrap = getRoomTrap(roomId, seed, context);
-    if (hiddenTrap && !trapSpent(st, roomId) && !partyDetectsTrap(st.characters, hiddenTrap)) {
+    if (
+      hiddenTrap &&
+      !trapSpent(st, roomId) &&
+      !partyDetectsTrap(st.characters, hiddenTrap, pacePerceptionMod(st))
+    ) {
       st.traps_triggered = [...(st.traps_triggered ?? []), roomId];
       const trapDmg = rollDice(hiddenTrap.damage);
       const dmgResult = applyDamage(char, st, trapDmg);

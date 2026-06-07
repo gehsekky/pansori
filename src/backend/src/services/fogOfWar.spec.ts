@@ -120,8 +120,17 @@ describe('travel reveals fog along the WHOLE route (not just the destination)', 
       current_region_id: 'corr',
       marker_pos: { x: 0, y: 0 },
     } as unknown as GameState;
-    const res = resolveMarkerMove(corridor, [], st, { x: 11, y: 0 });
+    // The hour-per-click travel turn marches 3 squares per click at Normal
+    // pace — march the corridor in legs until the destination is reached.
+    let cur = st;
+    let res = resolveMarkerMove(corridor, [], cur, { x: 11, y: 0 });
     expect(res.rejected).toBeUndefined();
+    expect(res.st.marker_pos).toEqual({ x: 3, y: 0 }); // first hour's leg
+    for (let leg = 0; leg < 3; leg++) {
+      cur = res.st;
+      res = resolveMarkerMove(corridor, [], cur, { x: 11, y: 0 });
+    }
+    expect(res.st.marker_pos).toEqual({ x: 11, y: 0 });
     const s = new Set(res.st.revealed_cells?.corr ?? []);
     // Destination radius-3 around (11,0) only reaches x ≥ 8 — so (5,0) proves
     // the route itself was revealed, not just where the party ended up.

@@ -1739,6 +1739,11 @@ export interface GameState {
   // The world_minute at which the last long rest completed; gates SRD's "one
   // long rest per 24 hours" (a second is blocked until 1440 min have passed).
   last_long_rest_minute?: number;
+  // SRD Travel Pace — the party's overland stance (default 'normal'). Drives
+  // miles-per-hour on the regional map and the pace check effects (Fast:
+  // Disadvantage on Wisdom (Perception) → passive −5; Slow: Advantage → +5),
+  // surfaced through passive trap/ambush detection.
+  travel_pace?: 'fast' | 'normal' | 'slow';
   // SRD 5.2.1 Extended Travel ("forced march") — minutes of overland travel
   // accrued since the last long rest. Beyond 8 hours (480), each further full
   // hour forces a CON save (DC 10 + hours past 8) or a level of Exhaustion

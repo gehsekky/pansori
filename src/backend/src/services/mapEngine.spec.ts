@@ -72,7 +72,7 @@ const campaign: CampaignData = {
         {
           id: 's_crypt',
           name: 'Shattered Crypt',
-          pos: { x: 5, y: 0 },
+          pos: { x: 3, y: 0 },
           kind: 'local',
           entryRoomId: 'crypt_entrance',
         },
@@ -166,11 +166,11 @@ describe('resolveMarkerMove — descent / room change / ascent', () => {
 
   it('region local site → room, then room→room via an exit cell, then ascends to region', () => {
     let st = start();
-    let r = move(st, 5, 0); // onto the crypt site
+    let r = move(st, 3, 0); // onto the crypt site
     st = r.st;
     expect(st.map_level).toBe('local');
     expect(st.current_room).toBe('crypt_entrance');
-    expect(st.region_marker_pos).toEqual({ x: 5, y: 0 });
+    expect(st.region_marker_pos).toEqual({ x: 3, y: 0 });
 
     r = move(st, 9, 9); // stairs down → crypt_hall, arriving at its entrancePos
     st = r.st;
@@ -185,17 +185,42 @@ describe('resolveMarkerMove — descent / room change / ascent', () => {
     r = move(st, 0, 1); // ascend exit → region (no town, so straight to region)
     st = r.st;
     expect(st.map_level).toBe('regional');
-    expect(st.marker_pos).toEqual({ x: 5, y: 0 });
+    expect(st.marker_pos).toEqual({ x: 3, y: 0 });
   });
 
-  it('a plain move (no transition cell) just relocates the marker + spends travel time', () => {
+  it('one click spends at most an hour: the march halts where the hour runs out', () => {
+    // 4 diagonal squares at Normal pace = 80 min — the 4th square would bust
+    // the 60-minute travel turn, so the marker halts 3 squares along.
     const r = move(start(), 4, 4);
     expect(r.transitioned).toBe(false);
-    expect(r.st.marker_pos).toEqual({ x: 4, y: 4 });
-    expect(r.st.map_level).toBe('regional');
-    // 4 squares × 1 mile/square ÷ 3 mi/hr (Normal pace) ≈ 1.33 hr = 80 min.
-    expect(r.elapsedHours).toBeCloseTo(4 / 3, 5);
-    expect(r.st.world_minute).toBe(80);
+    expect(r.st.marker_pos).toEqual({ x: 3, y: 3 });
+    expect(r.squaresMoved).toBe(3);
+    expect(r.elapsedHours).toBeCloseTo(1, 5);
+    expect(r.st.world_minute).toBe(60);
+    expect(r.narrative).toContain("The hour's march covers 3 miles");
+    // The next click finishes the leg.
+    const r2 = move(r.st, 4, 4);
+    expect(r2.st.marker_pos).toEqual({ x: 4, y: 4 });
+    expect(r2.st.world_minute).toBe(80);
+  });
+
+  it('a fast pace covers 4 squares in the hour; a slow pace only 2', () => {
+    const fast = resolveMarkerMove(
+      campaign,
+      rooms,
+      { ...start(), travel_pace: 'fast' },
+      { x: 6, y: 0 }
+    );
+    expect(fast.st.marker_pos).toEqual({ x: 4, y: 0 }); // 4 mi/hr
+    expect(fast.st.world_minute).toBe(60);
+    const slow = resolveMarkerMove(
+      campaign,
+      rooms,
+      { ...start(), travel_pace: 'slow' },
+      { x: 6, y: 0 }
+    );
+    expect(slow.st.marker_pos).toEqual({ x: 2, y: 0 }); // 2 mi/hr
+    expect(slow.st.world_minute).toBe(60);
   });
 
   it('rejects an off-map destination', () => {
@@ -340,7 +365,7 @@ describe('narration hooks', () => {
           ? { ...rm, onFirstEnter: 'Bones. Bones everywhere.' }
           : rm
     );
-    let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 5, y: 0 }); // → crypt
+    let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 3, y: 0 }); // → crypt
     r = resolveMarkerMove(campaign, hookedRooms, r.st, { x: 9, y: 9 }); // → hall
     expect(r.narrative).toContain('The doorway breathes cold at your back.');
     expect(r.narrative).toContain('You pass into Crypt Hall. Bones. Bones everywhere.');
@@ -351,7 +376,7 @@ describe('narration hooks', () => {
     const hookedRooms = rooms.map((rm) =>
       rm.id === 'crypt_entrance' ? { ...rm, onExit: 'Daylight, finally.' } : rm
     );
-    let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 5, y: 0 });
+    let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 3, y: 0 });
     r = resolveMarkerMove(campaign, hookedRooms, r.st, { x: 0, y: 1 }); // ascend exit
     expect(r.narrative).toContain('Daylight, finally.');
     expect(r.narrative).toContain('You return to The Vale.');
@@ -386,11 +411,11 @@ describe('narration hooks', () => {
         },
       ],
     };
-    let r = resolveMarkerMove(hooked, rooms, start(), { x: 5, y: 0 });
+    let r = resolveMarkerMove(hooked, rooms, start(), { x: 3, y: 0 });
     expect(r.narrative).toContain('You enter Crypt Entrance. Cold air breathes up from the dark.');
     // Leave and land again — the hook fires every time.
     r = resolveMarkerMove(hooked, rooms, r.st, { x: 0, y: 1 }); // ascend
-    r = resolveMarkerMove(hooked, rooms, r.st, { x: 5, y: 0 }); // re-enter
+    r = resolveMarkerMove(hooked, rooms, r.st, { x: 3, y: 0 }); // re-enter
     expect(r.narrative).toContain('Cold air breathes up from the dark.');
   });
 
@@ -451,7 +476,7 @@ describe('region-to-region travel (region gates)', () => {
     resolveMarkerMove(twoRegions, rooms, st, { x, y });
 
   it('first crossing: exit FIRST hook, site hook, target first-enter chain, state swap', () => {
-    const st = { ...start(), visited_regions: ['reg1'] };
+    const st = { ...start(), marker_pos: { x: 9, y: 0 }, visited_regions: ['reg1'] };
     const r = cross(st, 11, 0);
     expect(r.rejected).toBeUndefined();
     expect(r.st.current_region_id).toBe('reg2');
@@ -472,6 +497,7 @@ describe('region-to-region travel (region gates)', () => {
     // Both regions already visited/exited — every hook drops to its plain form.
     let st: GameState = {
       ...start(),
+      marker_pos: { x: 9, y: 0 },
       visited_regions: ['reg1', 'reg2'],
       exited_regions: ['reg1', 'reg2'],
     };
@@ -485,6 +511,55 @@ describe('region-to-region travel (region gates)', () => {
     expect(back.st.current_region_id).toBe('reg1');
     expect(back.st.marker_pos).toEqual({ x: 0, y: 0 });
     expect(back.narrative).toContain('Vale air again — pine and millsmoke.');
+  });
+});
+
+describe('SRD travel pace (set_pace + perception effects)', () => {
+  it('set_pace stores the stance and narrates it', async () => {
+    const { takeAction } = await import('./gameEngine.js');
+    const { makeState } = await import('../test-fixtures.js');
+    const { context: sandbox } = await import('../campaignData/sandbox.js');
+    const st = {
+      ...makeState({ id: 'pc-1' }, {}),
+      map_level: 'regional' as const,
+      current_region_id: 'reg1',
+      marker_pos: { x: 0, y: 0 },
+    };
+    const seed = {
+      context_id: sandbox.id,
+      world_name: 'x',
+      ship_name: 'x',
+      intro: '',
+      seed_id: 'pace',
+      rooms: [],
+      enemies: {},
+      loot: {},
+      npcs: {},
+    } as never;
+    const r = await takeAction({
+      action: { type: 'set_pace', pace: 'fast' },
+      history: [],
+      state: st,
+      seed,
+      context: sandbox,
+    });
+    expect(r.newState.travel_pace).toBe('fast');
+    expect(r.narrative).toContain('fast pace');
+  });
+
+  it('pacePerceptionMod: fast −5 / slow +5 swings passive trap detection', async () => {
+    const { pacePerceptionMod, partyDetectsTrap } = await import('./gameEngine.js');
+    const chars = [
+      { dead: false, wis: 14, level: 1, skill_proficiencies: ['Perception'] },
+    ] as never[];
+    // Passive Perception 10 + 2 (WIS) + 2 (prof) = 14.
+    const trap = { dc: 14 } as never;
+    expect(partyDetectsTrap(chars as never, trap, 0)).toBe(true);
+    expect(partyDetectsTrap(chars as never, trap, -5)).toBe(false); // fast pace
+    expect(partyDetectsTrap(chars as never, { dc: 19 } as never, 5)).toBe(true); // slow pace
+    expect(pacePerceptionMod({ travel_pace: 'fast' } as never)).toBe(-5);
+    expect(pacePerceptionMod({ travel_pace: 'slow' } as never)).toBe(5);
+    expect(pacePerceptionMod({} as never)).toBe(0);
   });
 });
 

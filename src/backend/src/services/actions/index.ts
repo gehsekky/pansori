@@ -75,6 +75,7 @@ import { handleMarkerMove } from './markerMove.js';
 import { handleMoveZone } from './moveZone.js';
 import { handleRecoverSlots } from './recoverSlots.js';
 import { handleRecurringSpellAttack } from './recurringSpellAttack.js';
+import { handleSetPace } from './setPace.js';
 import { handleSneak } from './sneak.js';
 import { handleThrowItem } from './throwItem.js';
 import { handleTwoWeaponAttack } from './twoWeaponAttack.js';
@@ -138,6 +139,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   enter_shop: handleEnterShop as ActionHandler,
   exit_shop: handleExitShop as ActionHandler,
   marker_move: handleMarkerMove as ActionHandler,
+  set_pace: handleSetPace as ActionHandler,
   approach: handleApproach as ActionHandler,
   accept_quest: handleAcceptQuest as ActionHandler,
   complete_quest: handleCompleteQuest as ActionHandler,

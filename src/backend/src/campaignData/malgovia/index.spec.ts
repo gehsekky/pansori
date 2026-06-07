@@ -259,7 +259,20 @@ describe('Malgovia — scripted playthrough', () => {
   }
 
   // Move the party marker to a cell (the 3-level map navigation primitive).
-  const markerMove = (x: number, y: number) => dispatch({ type: 'marker_move', to: { x, y } });
+  // Overland travel is hour-per-click now (SRD travel turn): a long regional
+  // leg takes several clicks, so march until the marker arrives (or a
+  // transition fires and the map level changes).
+  const markerMove = async (x: number, y: number) => {
+    for (let leg = 0; leg < 20; leg++) {
+      const before = `${state.map_level}|${state.current_room}|${state.current_town_id}`;
+      await dispatch({ type: 'marker_move', to: { x, y } });
+      const after = `${state.map_level}|${state.current_room}|${state.current_town_id}`;
+      if (after !== before) return; // transitioned (town / room / region)
+      const here = state.marker_pos;
+      if (here && here.x === x && here.y === y) return;
+    }
+    throw new Error(`march to (${x},${y}) never arrived`);
+  };
 
   it('walks the full Malgovia playthrough — region → town → crypt → 3 quests turned in', async () => {
     // ── Stage 0: regional grid start ───────────────────────────────────────
