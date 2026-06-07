@@ -704,6 +704,8 @@ const EnemyTemplateSchema = z
     bonusDamageType: z.string().min(1).max(20).optional(),
     undeadFortitude: z.boolean().optional(),
     lifeDrain: z.boolean().optional(),
+    regeneration: z.number().int().min(1).max(40).optional(),
+    regenBlockedBy: z.array(z.string().min(1).max(20)).max(4).optional(),
     parry: z.boolean().optional(),
     parryBonus: z.number().int().min(1).max(5).optional(),
     rampage: z.boolean().optional(),

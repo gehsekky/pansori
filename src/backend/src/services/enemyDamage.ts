@@ -9,6 +9,13 @@ export interface EnemyDamageSubject {
   undeadFortitude?: boolean;
   con?: number;
   name?: string;
+  // SRD Regeneration — when a blocking damage type lands, the floor sets
+  // `regen_blocked` IN PLACE on the subject (the live seed Enemy; the same
+  // runtime-mutation pattern boss phases use). The enemy turn loop consumes
+  // and clears the flag at the creature's next turn start.
+  regeneration?: number;
+  regenBlockedBy?: string[];
+  regen_blocked?: boolean;
 }
 
 export interface EnemyDamageOpts {
@@ -47,6 +54,16 @@ export function enemyHpAfterDamage(
   dmgToHp: number,
   opts: EnemyDamageOpts = {}
 ): { hp: number; note: string; fortitudeSaved: boolean } {
+  // SRD Regeneration suppression — ANY instance of a blocking damage type
+  // (lethal or not) shuts off the creature's next regeneration tick. Set
+  // before the early return so chip damage counts too.
+  if (
+    enemy?.regeneration &&
+    dmgToHp > 0 &&
+    (enemy.regenBlockedBy ?? ['acid', 'fire']).includes(opts.damageType?.toLowerCase() ?? '')
+  ) {
+    enemy.regen_blocked = true;
+  }
   const remaining = curHp - dmgToHp;
   if (remaining > 0) return { hp: remaining, note: '', fortitudeSaved: false };
   // The instance would drop the enemy to 0 — Undead Fortitude gets a save.

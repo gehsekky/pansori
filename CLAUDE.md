@@ -95,6 +95,15 @@ Use `// SRD: <section name>` for SRD-derived comments. Page
 numbers shift across PHB printings; SRD section names are stable.
 Never cite PHB pages — pansori doesn't carry PHB content.
 
+## Bestiary naming
+
+`SRD_MONSTERS` names follow SRD 5.2.1 **exactly** (the
+`SRD-exact naming` test in monsters.spec enforces it against the
+SRD txt). Campaign flavor names are campaign-level clones —
+`{ ...SRD_MONSTERS.skeleton, name: 'Skeleton Warrior' }` — never
+bestiary renames. Creatures the SRD dropped (e.g. the 2014 Orc
+stat block) live inline in the campaigns that use them.
+
 ## Workflow for new content
 
 1. **Confirm SRD coverage first.** `grep` the relevant header in

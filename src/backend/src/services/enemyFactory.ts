@@ -56,10 +56,15 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     bonusDamageType: template.bonusDamageType,
     undeadFortitude: template.undeadFortitude,
     lifeDrain: template.lifeDrain,
+    regeneration: template.regeneration,
+    regenBlockedBy: template.regenBlockedBy,
     parry: template.parry,
     parryBonus: template.parryBonus,
     rampage: template.rampage,
     aura: template.aura,
+    // Recharge AoE — previously dropped here, so wilderness-encounter and
+    // DB-placed breath monsters lost their breath weapon entirely.
+    breathWeapon: template.breathWeapon,
     legendary_actions: template.legendary_actions,
     legendary_pool: template.legendary_pool,
     legendary_action_points: template.legendary_actions

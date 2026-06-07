@@ -88,11 +88,28 @@ export const context: Context = {
   spellcastingAbility: { ...SRD_SPELLCASTING_ABILITY },
 
   // ─── Enemy templates ──────────────────────────────────────────────────────────
-  // Pure SRD bestiary roster — no themed overrides.
+  // SRD bestiary roster + one campaign-local creature: the Orc. SRD 5.2.1
+  // carries Orc only as a player species (the 2014 monster was cut), so the
+  // classic raider lives here as sandbox's own stat block — the clone-and-
+  // rename pattern campaign creatures use.
   enemyTemplates: [
     SRD_MONSTERS.goblin,
     SRD_MONSTERS.skeleton,
-    SRD_MONSTERS.orc,
+    {
+      name: 'Orc',
+      cr: 0.5,
+      hp: 15,
+      ac: 13,
+      damage: '1d12+3',
+      toHit: 5,
+      xp: 100,
+      str: 16,
+      dex: 12,
+      con: 16,
+      int: 7,
+      wis: 11,
+      cha: 10,
+    },
     SRD_MONSTERS.cult_fanatic,
     SRD_MONSTERS.ogre,
   ],
@@ -434,10 +451,11 @@ export const context: Context = {
       Ranger: ["with hunter's instinct", 'with practiced aim', 'reading the terrain'],
     },
     enemyReactions: {
-      Goblin: ['shrieks', 'snarls', 'snaps its teeth', 'chatters angrily'],
+      // Keys follow the templates' SRD 5.2.1 names.
+      'Goblin Warrior': ['shrieks', 'snarls', 'snaps its teeth', 'chatters angrily'],
       Skeleton: ['rattles its bones', 'clacks its jaw', 'advances silently'],
       Orc: ['roars', 'bellows', 'lets out a war cry'],
-      'Cult Fanatic': ['mutters a dark prayer', 'snarls with zealous fury', 'raises a dagger'],
+      'Cultist Fanatic': ['mutters a dark prayer', 'snarls with zealous fury', 'raises a dagger'],
       Ogre: ['bellows', 'slams its fists together', 'stomps the ground'],
     },
     deathSaveStatus: {

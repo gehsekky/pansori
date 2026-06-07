@@ -45,7 +45,18 @@ export async function syncMonsterCatalog(pool: Pool): Promise<void> {
       [id, def.name, def.cr, JSON.stringify(def)]
     );
   }
-  console.log(`[monsterCatalog] Synced ${entries.length} catalog monster(s)`);
+  // The catalog is code-canonical: prune rows whose id left SRD_MONSTERS
+  // (e.g. the Orc, which SRD 5.2.1 carries only as a species — it moved to
+  // a campaign-local template). Without this, a removed entry would stay
+  // ambient in every campaign forever.
+  const { rowCount: pruned } = await pool.query(
+    `DELETE FROM monsters WHERE id <> ALL($1::text[])`,
+    [entries.map(([id]) => id)]
+  );
+  console.log(
+    `[monsterCatalog] Synced ${entries.length} catalog monster(s)` +
+      (pruned ? `, pruned ${pruned} stale` : '')
+  );
 }
 
 // The full bestiary with catalog ids, ordered for display (CR ascending,

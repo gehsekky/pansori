@@ -49,6 +49,17 @@ function makeMonstersDb(initial: { campaigns?: string[] }) {
       customs.delete(params[0] as string);
       return { rows: [], rowCount: 0 };
     }
+    if (sql.includes('DELETE FROM monsters')) {
+      // The sync prune: drop catalog rows whose id left SRD_MONSTERS.
+      const keep = new Set(params[0] as string[]);
+      let pruned = 0;
+      for (const id of [...catalog.keys()])
+        if (!keep.has(id)) {
+          catalog.delete(id);
+          pruned++;
+        }
+      return { rows: [], rowCount: pruned };
+    }
     if (sql.includes('INSERT INTO campaign_custom_monsters')) {
       const [campaignId, monsterId, sortOrder, def] = params as [string, string, number, string];
       const list = customs.get(campaignId) ?? [];

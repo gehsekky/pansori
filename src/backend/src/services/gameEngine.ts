@@ -9702,6 +9702,31 @@ export async function runEnemyTurns(args: {
       // SRD — legendary action pool refreshes at the start of the
       // legendary creature's own turn.
       if (rm.legendary_actions?.length) refreshLegendaryPool(args.seed, rm.id);
+      // SRD Regeneration (Troll, Vampire Spawn, Hydra) — regain HP at the
+      // start of this creature's turn, unless a blocking damage type landed
+      // since its last turn (`regen_blocked`, set by the enemyHpAfterDamage
+      // floor; consumed + cleared here). A creature at 0 HP stays down —
+      // kills are final, simplifying the RAW "dies only if it can't
+      // regenerate at 0" window.
+      if (rm.regeneration) {
+        const regenEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
+        if (regenEnt && regenEnt.hp > 0) {
+          if (rm.regen_blocked) {
+            rm.regen_blocked = false;
+            narrative += `\n\n${fmt.note(`[${rm.name}'s wounds smolder — no regeneration this turn.]`)}`;
+          } else if (regenEnt.hp < regenEnt.maxHp) {
+            const healedTo = Math.min(regenEnt.maxHp, regenEnt.hp + rm.regeneration);
+            const gained = healedTo - regenEnt.hp;
+            st = {
+              ...st,
+              entities: (st.entities ?? []).map((e) =>
+                e.id === eEntry.id && e.isEnemy ? { ...e, hp: healedTo } : e
+              ),
+            };
+            narrative += `\n\n${fmt.note(`[${rm.name} regenerates ${gained} HP (${healedTo}/${regenEnt.maxHp}).]`)}`;
+          }
+        }
+      }
       const { actorEnt: eEnt, targetCharIdx } = selectTarget(eEntry.id, st);
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];

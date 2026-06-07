@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { SRD_MONSTERS } from './monsters.js';
+import { readFileSync } from 'fs';
 
 // [id, cr, hp, ac, damage, toHit, xp, multiattack?]
 const NEW_MONSTERS: Array<[string, number, number, number, string, number, number, number?]> = [
@@ -171,6 +172,69 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['guard_captain', 4, 75, 18, '2d10+4', 6, 1100, 2],
   ['tough_boss', 4, 82, 16, '2d8+3', 5, 1100, 2],
   ['pirate_captain', 6, 84, 17, '2d8+4', 7, 2300, 3],
+  // Dungeon classics batch (2026-06-07).
+  ['awakened_shrub', 0, 10, 9, '1', 1, 10],
+  ['homunculus', 0, 4, 13, '1', 4, 10],
+  ['stirge', 0.125, 5, 13, '1d6+3', 5, 25],
+  ['blink_dog', 0.25, 22, 13, '1d4+3', 5, 50],
+  ['grimlock', 0.25, 11, 11, '1d6+3', 5, 50],
+  ['pseudodragon', 0.25, 10, 14, '1d4+2', 4, 50, 2],
+  ['sprite', 0.25, 10, 15, '1d4+4', 6, 50],
+  ['steam_mephit', 0.25, 17, 10, '1d4', 2, 50],
+  ['violet_fungus', 0.25, 18, 5, '1d8', 2, 50, 2],
+  ['darkmantle', 0.5, 22, 11, '1d6+3', 5, 100],
+  ['dust_mephit', 0.5, 17, 12, '1d4+2', 4, 100],
+  ['gray_ooze', 0.5, 22, 9, '2d8+1', 3, 100],
+  ['magma_mephit', 0.5, 18, 11, '1d4+1', 3, 100],
+  ['magmin', 0.5, 13, 14, '2d4+2', 4, 100],
+  ['rust_monster', 0.5, 33, 14, '1d8+1', 3, 100],
+  ['troll_limb', 0.5, 14, 13, '2d4+4', 6, 100],
+  ['warhorse_skeleton', 0.5, 22, 13, '1d6+4', 6, 100],
+  ['death_dog', 1, 39, 12, '1d4+2', 4, 200, 2],
+  ['dryad', 1, 22, 16, '1d8+4', 6, 200],
+  ['harpy', 1, 38, 11, '2d4+1', 3, 200],
+  ['ettercap', 2, 44, 13, '1d6+2', 4, 450],
+  ['gargoyle', 2, 67, 15, '2d4+2', 4, 450, 2],
+  ['gelatinous_cube', 2, 63, 6, '3d6+2', 4, 450],
+  ['gibbering_mouther', 2, 52, 9, '2d6', 2, 450],
+  ['grick', 2, 54, 14, '2d6+2', 4, 450, 2],
+  ['minotaur_skeleton', 2, 45, 12, '2d6+4', 6, 450],
+  ['ochre_jelly', 2, 52, 8, '3d6+2', 4, 450],
+  ['ogre_zombie', 2, 85, 8, '2d8+4', 6, 450],
+  ['sea_hag', 2, 52, 14, '2d6+3', 5, 450],
+  ['wererat', 2, 60, 13, '1d6+3', 5, 450, 2],
+  ['will_o_wisp', 2, 27, 19, '2d8+2', 4, 450],
+  ['basilisk', 3, 52, 15, '2d6+3', 5, 700],
+  ['green_hag', 3, 82, 17, '1d8+4', 6, 700, 2],
+  ['nightmare', 3, 68, 13, '2d8+4', 6, 700],
+  ['phase_spider', 3, 45, 14, '1d10+3', 5, 700, 2],
+  ['swarm_of_crawling_claws', 3, 49, 12, '4d8+2', 4, 700],
+  ['vampire_familiar', 3, 65, 15, '1d4+3', 5, 700, 2],
+  ['werewolf', 3, 71, 15, '2d6+3', 5, 700, 2],
+  ['winter_wolf', 3, 75, 13, '2d6+4', 6, 700],
+  ['black_pudding', 4, 68, 7, '4d6+3', 5, 1100],
+  ['ghost', 4, 45, 11, '3d10+3', 5, 1100, 2],
+  ['lamia', 4, 97, 13, '1d8+3', 5, 1100, 2],
+  ['wereboar', 4, 97, 15, '2d8+3', 5, 1100, 2],
+  ['weretiger', 4, 120, 12, '2d6+3', 5, 1100, 2],
+  ['gorgon', 5, 114, 19, '2d12+5', 8, 1800],
+  ['half_dragon', 5, 105, 18, '1d4+4', 7, 1800, 2],
+  ['night_hag', 5, 112, 17, '2d8+4', 7, 1800, 2],
+  ['otyugh', 5, 104, 14, '2d4+4', 6, 1800, 3],
+  ['roper', 5, 93, 20, '3d8+4', 7, 1800, 2],
+  ['shambling_mound', 5, 110, 15, '1d6+4', 7, 1800, 3],
+  ['troll', 5, 94, 15, '2d6+4', 7, 1800, 3],
+  ['vampire_spawn', 5, 90, 16, '2d4+3', 6, 1800, 2],
+  ['werebear', 5, 135, 15, '2d12+4', 7, 1800, 2],
+  ['xorn', 5, 84, 19, '1d10+3', 6, 1800, 4],
+  ['chimera', 6, 114, 14, '2d6+4', 7, 2300, 3],
+  ['invisible_stalker', 6, 97, 14, '2d6+4', 7, 2300, 3],
+  ['medusa', 6, 127, 15, '2d6+3', 6, 2300, 3],
+  ['cloaker', 8, 91, 14, '3d6+3', 6, 3900, 2],
+  ['hydra', 8, 184, 15, '1d10+5', 8, 3900, 5],
+  ['spirit_naga', 8, 135, 17, '1d6+4', 7, 3900, 3],
+  ['treant', 9, 138, 16, '3d6+6', 10, 5000, 2],
+  ['guardian_naga', 10, 136, 18, '2d12+4', 8, 5900, 2],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -689,5 +753,147 @@ describe('Humanoid foes batch — effect fields', () => {
     expect(SRD_MONSTERS.centaur_trooper.speedFt).toBe(50);
     expect(SRD_MONSTERS.sahuagin_warrior.speedFt).toBe(40); // swim
     expect(SRD_MONSTERS.sahuagin_warrior.darkvision_ft).toBe(120);
+  });
+});
+
+describe('Dungeon classics batch — effect fields', () => {
+  it('the regenerators carry their SRD rates and blockers', () => {
+    expect(SRD_MONSTERS.troll.regeneration).toBe(15);
+    expect(SRD_MONSTERS.troll.regenBlockedBy).toBeUndefined(); // acid/fire default
+    expect(SRD_MONSTERS.troll_limb.regeneration).toBe(5);
+    expect(SRD_MONSTERS.vampire_spawn.regeneration).toBe(10);
+    expect(SRD_MONSTERS.vampire_spawn.regenBlockedBy).toEqual(['radiant']);
+    expect(SRD_MONSTERS.hydra.regeneration).toBe(10);
+    expect(SRD_MONSTERS.hydra.regenBlockedBy).toEqual(['fire']);
+  });
+
+  it('breath weapons: Winter Wolf, the fiery mephits, Half-Dragon, Chimera', () => {
+    expect(SRD_MONSTERS.winter_wolf.breathWeapon).toMatchObject({
+      dice: '4d8',
+      damageType: 'cold',
+      savingThrow: 'con',
+      saveDC: 12,
+      rechargeMin: 5,
+    });
+    expect(SRD_MONSTERS.magma_mephit.breathWeapon).toMatchObject({
+      dice: '2d6',
+      damageType: 'fire',
+      saveDC: 11,
+      rechargeMin: 6,
+    });
+    expect(SRD_MONSTERS.steam_mephit.breathWeapon).toMatchObject({
+      dice: '2d4',
+      savingThrow: 'con',
+      saveDC: 10,
+    });
+    expect(SRD_MONSTERS.half_dragon.breathWeapon).toMatchObject({ dice: '8d6', saveDC: 14 });
+    expect(SRD_MONSTERS.chimera.breathWeapon).toMatchObject({
+      dice: '7d8',
+      damageType: 'fire',
+      saveDC: 15,
+    });
+  });
+
+  it('the oozes share blind ferocity: acid attacks, sense immunities, no darkvision', () => {
+    for (const id of ['gray_ooze', 'gelatinous_cube', 'ochre_jelly', 'black_pudding']) {
+      expect(SRD_MONSTERS[id].damageType, id).toBe('acid');
+      expect(SRD_MONSTERS[id].darkvision_ft, id).toBe(0);
+      expect(SRD_MONSTERS[id].condition_immunities, id).toContain('exhaustion');
+    }
+    expect(SRD_MONSTERS.black_pudding.immunities).toEqual([
+      'acid',
+      'cold',
+      'lightning',
+      'slashing',
+    ]);
+    expect(SRD_MONSTERS.ochre_jelly.resistances).toEqual(['acid']);
+  });
+
+  it('the Harpy lures: a 30-ft charm aura (clamped from the RAW 300-ft song)', () => {
+    expect(SRD_MONSTERS.harpy.aura).toEqual({
+      radiusFt: 30,
+      save: { ability: 'wis', dc: 11 },
+      condition: 'charmed',
+      name: 'Luring Song',
+    });
+  });
+
+  it('grapplers and pinners: darkmantle, roper, otyugh, vampire spawn claws', () => {
+    expect(SRD_MONSTERS.darkmantle.onHitEffect).toMatchObject({
+      condition: 'grappled',
+      escapeDc: 13,
+    });
+    expect(SRD_MONSTERS.roper.onHitEffect).toMatchObject({ condition: 'grappled', escapeDc: 14 });
+    expect(SRD_MONSTERS.otyugh.onHitEffect).toMatchObject({ condition: 'grappled', escapeDc: 13 });
+    expect(SRD_MONSTERS.vampire_spawn.onHitEffect).toMatchObject({
+      condition: 'grappled',
+      escapeDc: 13,
+    });
+  });
+
+  it('the undead kit: ghost incorporeality, skeleton vulnerability, Ogre Zombie fortitude', () => {
+    expect(SRD_MONSTERS.ghost.creatureType).toBe('undead');
+    expect(SRD_MONSTERS.ghost.resistances).toContain('bludgeoning');
+    expect(SRD_MONSTERS.ghost.immunities).toEqual(['necrotic', 'poison']);
+    expect(SRD_MONSTERS.warhorse_skeleton.vulnerabilities).toEqual(['bludgeoning']);
+    expect(SRD_MONSTERS.minotaur_skeleton.vulnerabilities).toEqual(['bludgeoning']);
+    expect(SRD_MONSTERS.ogre_zombie.undeadFortitude).toBe(true);
+    expect(SRD_MONSTERS.will_o_wisp.name).toBe('Will-o’-Wisp'); // the exact SRD name
+  });
+
+  it('poison riders: basilisk bite, phase spider, the nagas, nightmare fire', () => {
+    expect(SRD_MONSTERS.basilisk.bonusDamage).toBe('2d6');
+    expect(SRD_MONSTERS.phase_spider.bonusDamage).toBe('2d8');
+    expect(SRD_MONSTERS.spirit_naga.bonusDamage).toBe('4d6');
+    expect(SRD_MONSTERS.guardian_naga.bonusDamage).toBe('4d10');
+    expect(SRD_MONSTERS.nightmare.bonusDamageType).toBe('fire');
+    expect(SRD_MONSTERS.nightmare.creatureType).toBe('fiend');
+  });
+
+  it('the lycanthrope family fights in beast form at CR 2-5', () => {
+    const weres: Array<[string, number]> = [
+      ['wererat', 2],
+      ['werewolf', 3],
+      ['wereboar', 4],
+      ['weretiger', 4],
+      ['werebear', 5],
+    ];
+    for (const [id, cr] of weres) {
+      expect(SRD_MONSTERS[id].cr, id).toBe(cr);
+      expect(SRD_MONSTERS[id].multiattack, id).toBe(2);
+    }
+  });
+});
+
+describe('SRD-exact naming', () => {
+  it('every bestiary entry carries an exact SRD 5.2.1 stat-block name', () => {
+    // The bestiary follows the SRD exactly — campaign flavor names are
+    // campaign-level clones, never bestiary renames. Stat-block names are
+    // extracted from docs/srd-5.2.1.txt (a name line directly above a
+    // size/type line); the test fails on any entry whose name is not one.
+    const srdText = readFileSync(
+      new URL('../../../../../docs/srd-5.2.1.txt', import.meta.url),
+      'utf-8'
+    );
+    const lines = srdText.split('\n');
+    const sizeType =
+      /^(Tiny|Small|Medium|Large|Huge|Gargantuan)( or [\w-]+)? (Aberration|Beast|Celestial|Construct|Dragon|Elemental|Fey|Fiend|Giant|Humanoid|Monstrosity|Ooze|Plant|Undead|Swarm[\w ()]*?)( ?\([\w /]+\))?,/;
+    const srdNames = new Set<string>();
+    for (let i = 1; i < lines.length; i++) {
+      if (sizeType.test(lines[i].trim())) srdNames.add(lines[i - 1].trim());
+    }
+    expect(srdNames.size).toBeGreaterThan(300); // the extraction itself works
+    const offenders = Object.values(SRD_MONSTERS)
+      .map((m) => m.name)
+      .filter((n) => !srdNames.has(n));
+    expect(offenders).toEqual([]);
+  });
+
+  it('the 5.2.1 renames landed (and the Orc left for sandbox)', () => {
+    expect(SRD_MONSTERS.goblin.name).toBe('Goblin Warrior');
+    expect(SRD_MONSTERS.kobold.name).toBe('Kobold Warrior');
+    expect(SRD_MONSTERS.gnoll.name).toBe('Gnoll Warrior');
+    expect(SRD_MONSTERS.cult_fanatic.name).toBe('Cultist Fanatic');
+    expect(SRD_MONSTERS.orc).toBeUndefined();
   });
 });

@@ -295,6 +295,17 @@ export interface EnemyTemplate {
   // attack; Wight: the necrotic `bonusDamage` rider). Read in
   // `computeEnemyAttack`.
   lifeDrain?: boolean;
+  // SRD Regeneration (Troll, Vampire Spawn, Hydra) — the creature regains
+  // this many HP at the start of each of its turns, unless it took a
+  // `regenBlockedBy` damage type since its last turn (the central
+  // `enemyHpAfterDamage` floor flags the block; the enemy turn loop
+  // consumes it). A creature at 0 HP stays down — RAW "dies only if it
+  // starts its turn at 0 and doesn't regenerate" is simplified to kills
+  // being final.
+  regeneration?: number;
+  // Damage types that suppress the next regeneration tick. Defaults to
+  // ['acid', 'fire'] (the Troll's); Vampire Spawn uses ['radiant'].
+  regenBlockedBy?: string[];
   // SRD Parry (Bandit Captain reaction) — when hit by a melee attack roll while
   // holding a weapon, the creature adds 2 to its AC against that attack,
   // possibly turning the hit into a miss. Once per round; the engine spends it
@@ -395,6 +406,13 @@ export interface Enemy {
   bonusDamageType?: string;
   undeadFortitude?: boolean;
   lifeDrain?: boolean;
+  // SRD Regeneration — see EnemyTemplate.regeneration. `regen_blocked` is
+  // RUNTIME state set in-place by `enemyHpAfterDamage` when a blocking
+  // damage type lands (the same in-place seed-enemy mutation pattern boss
+  // phases use), consumed + cleared at this creature's next turn start.
+  regeneration?: number;
+  regenBlockedBy?: string[];
+  regen_blocked?: boolean;
   // SRD Parry reaction — see EnemyTemplate.parry. Mirrored here + carried
   // through procgen; read in `resolveOneAttack`.
   parry?: boolean;
