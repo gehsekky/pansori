@@ -2063,25 +2063,6 @@ function RegionEditorScreen({
                             ))}
                           </select>
                         </div>
-                        <div style={{ flex: '3 1 220px' }}>
-                          <label className={styles.formLbl} htmlFor={`npc-greeting-${i}`}>
-                            GREETING
-                          </label>
-                          <input
-                            id={`npc-greeting-${i}`}
-                            className={styles.formInp}
-                            placeholder="What they say when the party talks to them"
-                            value={n.greeting}
-                            onChange={(ev) => {
-                              const greeting = ev.target.value;
-                              setPlacedNpcs((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, greeting } : p))
-                              );
-                              setDirty(true);
-                              setSaved(false);
-                            }}
-                          />
-                        </div>
                         <div style={{ flex: '1 1 90px' }}>
                           <label className={styles.formLbl} htmlFor={`npc-icon-${i}`}>
                             ICON
@@ -2150,45 +2131,39 @@ function RegionEditorScreen({
                           </button>
                         </div>
                       </div>
-                      {/* NPC narrative hooks — FIRST overrides the plain one
-                          once (first talk / first end of conversation). */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          alignItems: 'flex-end',
-                          flexWrap: 'wrap',
-                          marginTop: 4,
-                        }}
-                      >
-                        {(
-                          [
-                            ['firstGreeting', 'FIRST GREETING', 'defaults to greeting'],
-                            ['goodbye', 'GOODBYE', 'none'],
-                            ['firstGoodbye', 'FIRST GOODBYE', 'defaults to goodbye'],
-                          ] as const
-                        ).map(([key, label, ph]) => (
-                          <div key={key} style={{ flex: '1 1 180px' }}>
-                            <label className={styles.formLbl} htmlFor={`npc-${key}-${i}`}>
-                              {label}
-                            </label>
-                            <input
-                              id={`npc-${key}-${i}`}
-                              className={styles.formInp}
-                              placeholder={ph}
-                              value={(n[key] as string) ?? ''}
-                              onChange={(ev) => {
-                                const v = ev.target.value;
-                                setPlacedNpcs((prev) =>
-                                  prev.map((p, j) => (j === i ? { ...p, [key]: v } : p))
-                                );
-                                setDirty(true);
-                                setSaved(false);
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                      {/* NPC narrative fields — one full-width row each, like
+                          the room NARRATION HOOKS card. FIRST overrides the
+                          plain one once (first talk / first end). */}
+                      {(
+                        [
+                          ['greeting', 'GREETING', 'What they say when the party talks to them'],
+                          ['firstGreeting', 'FIRST GREETING', 'defaults to greeting'],
+                          ['goodbye', 'GOODBYE', 'none'],
+                          ['firstGoodbye', 'FIRST GOODBYE', 'defaults to goodbye'],
+                        ] as const
+                      ).map(([key, label, ph]) => (
+                        <div key={key} style={{ marginTop: 6 }}>
+                          <label className={styles.formLbl} htmlFor={`npc-${key}-${i}`}>
+                            {label}
+                          </label>
+                          <textarea
+                            id={`npc-${key}-${i}`}
+                            className={styles.formInp}
+                            rows={3}
+                            style={{ resize: 'vertical' }}
+                            placeholder={ph}
+                            value={(n[key] as string) ?? ''}
+                            onChange={(ev) => {
+                              const v = ev.target.value;
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, [key]: v } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                      ))}
                       {dialogueOpen === i && (
                         <div style={{ marginTop: 6 }}>
                           <DialogueEditor
