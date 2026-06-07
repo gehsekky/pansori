@@ -200,6 +200,50 @@ describe('gated dialogue (condition + once)', () => {
     );
   });
 
+  it('character rewards (give_gold / give_item) survive the action epilogue', async () => {
+    // Regression: applyConsequence writes gold/items into ctx.st, but the
+    // epilogue's commitChar used to write the PRE-consequence actor char back
+    // over them — the narrative said "+10 gold" while the gold vanished.
+    // give_item here exercises the composed-loot-table fallback too: 'dagger'
+    // is in the sandbox lootTable but NOT placed in this seed's rooms.
+    const rewardNpc: PlacedNpc = {
+      ...gatedNpc,
+      id: 'patron',
+      name: 'The Patron',
+      responses: [
+        {
+          label: 'I did the job',
+          reply: 'So you did. Payment, as agreed.',
+          consequences: [
+            { type: 'give_gold', amount: 10 },
+            { type: 'give_item', itemId: 'dagger' },
+          ],
+        },
+      ],
+    };
+    const rewardSeed = { ...seed, npcs: { patron: rewardNpc } } as unknown as Seed;
+    const st = makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['patron'] });
+    const goldBefore = st.characters[0].gold;
+    let r = await takeAction({
+      action: { type: 'talk', npcId: 'patron' },
+      history: [],
+      state: st,
+      seed: rewardSeed,
+      context: ctx,
+    });
+    r = await takeAction({
+      action: { type: 'talk_response', responseIdx: 0 },
+      history: [],
+      state: r.newState,
+      seed: rewardSeed,
+      context: ctx,
+    });
+    expect(r.narrative).toContain('+10 gold');
+    const pc = r.newState.characters[0];
+    expect(pc.gold).toBe(goldBefore + 10);
+    expect(pc.inventory.some((i) => i.id === 'dagger')).toBe(true);
+  });
+
   it('once persists for the playthrough: re-opening the talk keeps it spent', async () => {
     let r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
     r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });

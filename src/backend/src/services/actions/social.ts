@@ -168,6 +168,12 @@ export const handleTalkResponse: ActionHandler<{
       ctx.st = applyConsequence(c, ctx.st, ctx.seed, char.id, narrativeParts, ctx.context);
     }
     if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
+    // applyConsequence writes character changes (give_gold / give_xp /
+    // give_item) into ctx.st — refresh the actor from it, or the epilogue's
+    // commitChar would write the PRE-consequence character back over the
+    // reward (the narrative would say "+10 gold" while the gold vanished).
+    const enriched = ctx.st.characters.find((c2) => c2.id === char.id);
+    if (enriched) updatePcActor(ctx, enriched);
   }
   // Walk the conversation: a branch (has children) descends a level; a leaf
   // keeps the current options. The prompt becomes the NPC's reply either way.

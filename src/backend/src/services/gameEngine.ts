@@ -6733,11 +6733,15 @@ export function applyConsequence(
     case 'give_item': {
       const targetId = c.characterId ?? activeCharId;
       // `seed.loot` is keyed by room id and holds positioned-loot lists, so look
-      // the item up by id across every room's placement list.
+      // the item up by id across every room's placement list — then fall back to
+      // the composed loot table (context), so a dialogue/quest reward can grant
+      // ANY catalog or custom item, not only ones already placed in a room.
       const lootEntry =
         Object.values(seed.loot ?? {})
           .flat()
-          .find((l) => l?.id === c.itemId) ?? null;
+          .find((l) => l?.id === c.itemId) ??
+        context?.lootTable.find((l) => l.id === c.itemId) ??
+        null;
       if (!lootEntry) return st;
       const newItem = { ...lootEntry, instance_id: randomUUID() };
       const characters = st.characters.map((ch) =>
