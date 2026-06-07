@@ -904,6 +904,23 @@ describe('RegionEditorScreen', () => {
       expect('enemies' in saved[0]).toBe(false);
     });
 
+    it('lighting: absent key shows BRIGHT; picking BRIGHT saves as omitted key', async () => {
+      renderRoom('cellar'); // CELLAR has no lighting key
+      await screen.findByTestId('cell-0-0');
+      const sel = screen.getByLabelText('LIGHTING') as HTMLSelectElement;
+      // No "—" pseudo-option: the engine defaults absent to bright, so the
+      // form just shows BRIGHT.
+      expect([...sel.options].map((o) => o.value)).toEqual(['bright', 'dim', 'dark', 'sunlight']);
+      expect(sel.value).toBe('bright');
+      // Flip to DARK and back to BRIGHT: the save omits the default key.
+      fireEvent.change(sel, { target: { value: 'dark' } });
+      fireEvent.change(sel, { target: { value: 'bright' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+      expect('lighting' in saved.find((r) => r.id === 'cellar')!).toBe(false);
+    });
+
     it('details: entry pos tool, lighting/floor/can-rest, desc required', async () => {
       renderRoom();
       await screen.findByTestId('cell-0-0');

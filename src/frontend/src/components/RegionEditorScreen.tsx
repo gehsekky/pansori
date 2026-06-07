@@ -179,7 +179,9 @@ function detailsFrom(r: EditorRegion): Details {
     encounterChance: r.encounterChance !== undefined ? String(r.encounterChance) : '',
     baseTier: r.baseTier !== undefined ? String(r.baseTier) : '',
     floor: r.floor ?? '',
-    lighting: r.lighting ?? '',
+    // An absent lighting key IS bright (the engine defaults it everywhere),
+    // so the form shows BRIGHT rather than exposing the omitted-key detail.
+    lighting: r.lighting ?? 'bright',
   };
 }
 
@@ -705,7 +707,9 @@ function RegionEditorScreen({
       if (details.floor === '') delete next.floor;
       else next.floor = details.floor;
       if (kind === 'room') {
-        if (details.lighting === '') delete next.lighting;
+        // BRIGHT is the engine default — save it as an omitted key so the
+        // stored JSON stays minimal (round-trips back to BRIGHT in the form).
+        if (details.lighting === 'bright' || details.lighting === '') delete next.lighting;
         else next.lighting = details.lighting;
         if (canRest) next.canRest = true;
         else delete next.canRest;
@@ -1540,7 +1544,6 @@ function RegionEditorScreen({
                         value={details.lighting}
                         onChange={(e) => updateDetail('lighting', e.target.value)}
                       >
-                        <option value="">— (BRIGHT)</option>
                         {['bright', 'dim', 'dark', 'sunlight'].map((l) => (
                           <option key={l} value={l}>
                             {l.toUpperCase()}
