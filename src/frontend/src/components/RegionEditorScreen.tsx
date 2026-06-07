@@ -1596,38 +1596,6 @@ function RegionEditorScreen({
                   onChange={(e) => updateDetail('desc', e.target.value)}
                 />
               </div>
-              {/* Level narration hooks — ON FIRST overrides the plain one
-                  the first time; the plain one fires every other time.
-                  Region exits stay dormant until region travel exists. */}
-              <div style={{ marginTop: '0.75rem' }}>
-                <p className={styles.formLbl}>
-                  NARRATION HOOKS — &quot;FIRST&quot; OVERRIDES THE PLAIN ONE ONCE
-                  {kind === 'region' ? ' · FIRST ENTER FALLS BACK TO DESCRIPTION' : ''}
-                </p>
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  {(
-                    [
-                      ['onEnter', 'ON ENTER'],
-                      ['onFirstEnter', 'ON FIRST ENTER'],
-                      ['onExit', 'ON EXIT'],
-                      ['onFirstExit', 'ON FIRST EXIT'],
-                    ] as Array<[keyof Details, string]>
-                  ).map(([key, label]) => (
-                    <div key={key} style={{ flex: '1 1 45%' }}>
-                      <label className={styles.formLbl} htmlFor={`map-hook-${key}`}>
-                        {label}
-                      </label>
-                      <input
-                        id={`map-hook-${key}`}
-                        className={styles.formInp}
-                        placeholder="none"
-                        value={details[key]}
-                        onChange={(e) => updateDetail(key, e.target.value)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
               {kind === 'region' && (
                 <div
                   style={{
@@ -1664,6 +1632,46 @@ function RegionEditorScreen({
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* ── Narration hooks — one row per hook. ON FIRST overrides the
+                plain one the first time; the plain one fires every other
+                time. Region exits stay dormant until region travel exists. */}
+            <div className={styles.card} style={{ marginTop: '1rem' }}>
+              <p
+                style={{
+                  fontSize: '0.8rem',
+                  letterSpacing: '0.12em',
+                  color: 'var(--t-mid)',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                NARRATION HOOKS — &quot;FIRST&quot; OVERRIDES THE PLAIN ONE ONCE
+                {kind === 'region' ? ' · FIRST ENTER FALLS BACK TO DESCRIPTION' : ''}
+              </p>
+              {(
+                [
+                  ['onEnter', 'ON ENTER'],
+                  ['onFirstEnter', 'ON FIRST ENTER'],
+                  ['onExit', 'ON EXIT'],
+                  ['onFirstExit', 'ON FIRST EXIT'],
+                ] as Array<[keyof Details, string]>
+              ).map(([key, label]) => (
+                <div key={key} style={{ marginBottom: '0.75rem' }}>
+                  <label className={styles.formLbl} htmlFor={`map-hook-${key}`}>
+                    {label}
+                  </label>
+                  <textarea
+                    id={`map-hook-${key}`}
+                    className={styles.formInp}
+                    rows={3}
+                    style={{ resize: 'vertical' }}
+                    placeholder="none"
+                    value={details[key]}
+                    onChange={(e) => updateDetail(key, e.target.value)}
+                  />
+                </div>
+              ))}
             </div>
 
             {/* ── Enemies (rooms only) — placement specs against the
