@@ -517,20 +517,24 @@ describe('GridMapView', () => {
     expect(enemyCell.querySelector('.game-icon-daemon-skull')).toBeTruthy();
   });
 
-  it('renders an NPC token with the default glyph, or a per-NPC icon override', () => {
+  it('renders an icon-less NPC as the default pawn sprite; a glyph icon overrides', () => {
     const { container } = render(
       <GridMapView
         grid={localGrid}
         markerPos={{ x: 3, y: 6 }}
         npcs={[
-          { id: 'npc_a', pos: { x: 1, y: 1 }, name: 'Townsfolk' }, // no icon → default
-          { id: 'npc_bram', pos: { x: 2, y: 1 }, name: 'Bram', icon: 'wood-axe' }, // override
+          { id: 'npc_a', pos: { x: 1, y: 1 }, name: 'Townsfolk' }, // no icon → pawn sprite
+          { id: 'npc_bram', pos: { x: 2, y: 1 }, name: 'Bram', icon: 'wood-axe' }, // glyph override
         ]}
         onNpcClick={vi.fn()}
         onMarkerMove={vi.fn()}
       />
     );
-    expect(cell(container, 1, 1).querySelector('.game-icon-conversation')).toBeTruthy();
+    const sprite = cell(container, 1, 1).querySelector(
+      '[class*="gridMapNpcSprite"]'
+    ) as HTMLElement | null;
+    expect(sprite).toBeTruthy();
+    expect(sprite!.style.getPropertyValue('--sprite-url')).toContain('pawn_purple_idle.png');
     expect(cell(container, 2, 1).querySelector('.game-icon-wood-axe')).toBeTruthy();
   });
 

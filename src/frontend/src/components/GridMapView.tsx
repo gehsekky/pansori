@@ -164,9 +164,10 @@ const TERRAIN_FLOOR: Partial<Record<TerrainType, FloorType>> = {
   garden: 'grass',
 };
 
-// Talkable-NPC token: a warm gold glyph. Each NPC may override the glyph via
-// PlacedNpc.icon (e.g. 'wood-axe'); this is the fallback when none is set.
-const DEFAULT_NPC_ICON = 'conversation';
+// Talkable-NPC token. The default (no PlacedNpc.icon) is the animated purple
+// pawn sprite strip; an explicit icon either names another sprite strip
+// ('sprite:<stem>') or a game-icons glyph (e.g. 'wood-axe', rendered gold).
+const DEFAULT_NPC_SPRITE = 'pawn_purple_idle';
 const NPC_GOLD = 'rgba(230, 200, 120, 1)';
 
 // Ground-loot token: a green item glyph. Interactable objects (chests) use a
@@ -503,11 +504,14 @@ function GridMapView({
       } else if (isNpc) {
         // A talkable NPC. An `icon` of `sprite:<stem>` renders an animated Tiny
         // Swords sprite strip (feet-anchored, overhanging the cell like the party
-        // marker) from /art/sprites/<stem>.png; otherwise a gold game-icons glyph
-        // (per-NPC override, else the default NPC glyph). Either way, a name label.
+        // marker) from /art/sprites/<stem>.png — and NO icon at all defaults to
+        // the purple pawn strip. An explicit non-sprite icon renders as a gold
+        // game-icons glyph. Either way, a name label.
         const npcSprite = cellNpc!.icon?.startsWith('sprite:')
           ? cellNpc!.icon.slice('sprite:'.length)
-          : null;
+          : cellNpc!.icon
+            ? null
+            : DEFAULT_NPC_SPRITE;
         token = npcSprite ? (
           <>
             <div
@@ -529,7 +533,7 @@ function GridMapView({
         ) : (
           <>
             <GameIcon
-              name={cellNpc!.icon ?? DEFAULT_NPC_ICON}
+              name={cellNpc!.icon!}
               className={styles.gridMapGlyph}
               style={{ fontSize: iconFontSize, color: NPC_GOLD }}
             />
