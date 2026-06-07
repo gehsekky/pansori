@@ -1058,7 +1058,6 @@ const RoomsSchema = z
         // on leaving to another room or ascending).
         ...LEVEL_HOOK_FIELDS,
         // SRD tactical scale: 5 ft per square (the default when omitted).
-        feetPerSquare: z.number().positive().optional(),
         grid: RoomGridSchema,
         entryPos: GridPosSchema,
         exits: z.array(RoomExitSchema).max(20).optional(),

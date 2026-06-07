@@ -228,7 +228,7 @@ function roomGrid(room: Room): { width: number; height: number; scale: number; e
   return {
     width,
     height,
-    scale: room.feetPerSquare ?? DEFAULT_LOCAL_SCALE,
+    scale: DEFAULT_LOCAL_SCALE, // rooms are locked to the SRD 5-ft tactical scale
     entry: room.entryPos ?? { x: Math.floor(width / 2), y: Math.floor(height / 2) },
   };
 }

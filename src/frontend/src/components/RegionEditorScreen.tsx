@@ -677,8 +677,10 @@ function RegionEditorScreen({
     }
     if (details.desc.trim()) next.desc = details.desc.trim();
     else delete next.desc;
-    if (kind === 'room' && details.feetPerSquare.trim() === '') {
-      delete next.feetPerSquare; // rooms default to 5 ft implicitly
+    if (kind === 'room') {
+      // Rooms are LOCKED to the SRD 5-ft tactical scale (combat math assumes
+      // it) — no scale key is stored and the form doesn't offer the field.
+      delete next.feetPerSquare;
     } else {
       const fps = Number(details.feetPerSquare);
       if (!Number.isFinite(fps) || fps <= 0) {
@@ -1458,19 +1460,23 @@ function RegionEditorScreen({
                     onChange={(e) => updateDetail('name', e.target.value)}
                   />
                 </div>
-                <div style={{ flex: '1 1 120px' }}>
-                  <label className={styles.formLbl} htmlFor="map-detail-fps">
-                    FEET PER SQUARE
-                  </label>
-                  <input
-                    id="map-detail-fps"
-                    className={styles.formInp}
-                    type="number"
-                    min={1}
-                    value={details.feetPerSquare}
-                    onChange={(e) => updateDetail('feetPerSquare', e.target.value)}
-                  />
-                </div>
+                {/* Rooms are locked to the SRD 5-ft tactical scale (the
+                    header shows it); regions/towns carry a real scale. */}
+                {kind !== 'room' && (
+                  <div style={{ flex: '1 1 120px' }}>
+                    <label className={styles.formLbl} htmlFor="map-detail-fps">
+                      FEET PER SQUARE
+                    </label>
+                    <input
+                      id="map-detail-fps"
+                      className={styles.formInp}
+                      type="number"
+                      min={1}
+                      value={details.feetPerSquare}
+                      onChange={(e) => updateDetail('feetPerSquare', e.target.value)}
+                    />
+                  </div>
+                )}
                 {kind === 'region' && (
                   <>
                     <div style={{ flex: '1 1 120px' }}>

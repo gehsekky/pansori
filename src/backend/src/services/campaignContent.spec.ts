@@ -163,23 +163,22 @@ function makeContentDb(initial: {
         sort_order: p[1],
         name: p[2],
         description: p[3],
-        feet_per_square: p[4],
-        grid: JSON.parse(p[5] as string),
-        entry_x: p[6],
-        entry_y: p[7],
-        exits: JSON.parse(p[8] as string),
-        lighting: p[9],
-        floor: p[10],
-        can_rest: p[11],
-        enemies: JSON.parse(p[12] as string),
-        loot: JSON.parse(p[13] as string),
-        npcs: JSON.parse(p[14] as string),
-        on_enter: p[15],
-        on_first_enter: p[16],
-        on_exit: p[17],
-        on_first_exit: p[18],
-        objects: JSON.parse(p[19] as string),
-        trap: p[20] === null ? null : JSON.parse(p[20] as string),
+        grid: JSON.parse(p[4] as string),
+        entry_x: p[5],
+        entry_y: p[6],
+        exits: JSON.parse(p[7] as string),
+        lighting: p[8],
+        floor: p[9],
+        can_rest: p[10],
+        enemies: JSON.parse(p[11] as string),
+        loot: JSON.parse(p[12] as string),
+        npcs: JSON.parse(p[13] as string),
+        on_enter: p[14],
+        on_first_enter: p[15],
+        on_exit: p[16],
+        on_first_exit: p[17],
+        objects: JSON.parse(p[18] as string),
+        trap: p[19] === null ? null : JSON.parse(p[19] as string),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -534,6 +533,9 @@ describe('editable sections registry', () => {
     const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
     const ok = rooms.safeParse([ROOM_A, ROOM_B]);
     expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // Rooms are LOCKED to the SRD 5-ft tactical scale — a feetPerSquare key
+    // is rejected (it never did anything for combat anyway).
+    expect(rooms.safeParse([{ ...ROOM_B, feetPerSquare: 10 }]).success).toBe(false);
     // An exit pointing at a room NOT in the payload is rejected.
     expect(rooms.safeParse([ROOM_A]).success).toBe(false); // 'cellar' missing
     // entrancePos must fit the TARGET room's grid (cellar is 4x4).
@@ -1220,7 +1222,7 @@ describe('rooms table store', () => {
     expect('lighting' in back[1]).toBe(false);
     expect('floor' in back[1]).toBe(false);
     expect('canRest' in back[1]).toBe(false);
-    expect('feetPerSquare' in back[1]).toBe(false); // default 5 stays implicit
+    expect('feetPerSquare' in back[1]).toBe(false); // rooms are LOCKED to 5 ft — no scale key
   });
 
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {

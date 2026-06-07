@@ -706,7 +706,6 @@ export interface CampaignRoom {
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;
-  feetPerSquare?: number; // default 5 (SRD tactical scale)
   grid: CampaignRoomCell[][];
   entryPos: GridPos;
   exits?: CampaignRoomExit[];
@@ -745,7 +744,7 @@ interface RoomRow {
 
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
-    `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
+    `SELECT id, name, description, grid, entry_x, entry_y, exits,
             lighting, floor, can_rest, enemies, loot, npcs, objects, trap,
             on_enter, on_first_enter, on_exit, on_first_exit
        FROM campaign_rooms
@@ -761,7 +760,6 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
     ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
     ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
-    ...(r.feet_per_square !== 5 ? { feetPerSquare: r.feet_per_square } : {}),
     grid: r.grid,
     entryPos: { x: r.entry_x, y: r.entry_y },
     ...(r.exits.length > 0 ? { exits: r.exits } : {}),
@@ -795,18 +793,17 @@ export async function putCampaignRooms(
       const r = rooms[i];
       await client.query(
         `INSERT INTO campaign_rooms
-           (campaign_id, id, sort_order, name, description, feet_per_square,
+           (campaign_id, id, sort_order, name, description,
             grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot, npcs,
             on_enter, on_first_enter, on_exit, on_first_exit, objects, trap)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb,
-                 $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21::jsonb, $22::jsonb)`,
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9::jsonb, $10, $11, $12, $13::jsonb,
+                 $14::jsonb, $15::jsonb, $16, $17, $18, $19, $20::jsonb, $21::jsonb)`,
         [
           campaignId,
           r.id,
           i,
           r.name,
           r.desc,
-          r.feetPerSquare ?? 5,
           JSON.stringify(r.grid),
           r.entryPos.x,
           r.entryPos.y,
@@ -873,7 +870,6 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
       ...(r.onFirstExit !== undefined ? { onFirstExit: r.onFirstExit } : {}),
       gridWidth: r.grid[0]?.length ?? 0,
       gridHeight: r.grid.length,
-      ...(r.feetPerSquare !== undefined ? { feetPerSquare: r.feetPerSquare } : {}),
       entryPos: r.entryPos,
       ...(r.exits && r.exits.length > 0
         ? { exits: r.exits.map((e) => ({ ...e }) as RoomExit) }

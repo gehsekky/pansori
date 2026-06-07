@@ -904,6 +904,27 @@ describe('RegionEditorScreen', () => {
       expect('enemies' in saved[0]).toBe(false);
     });
 
+    it('rooms are locked to 5 ft: no FPS field; a legacy scale key is stripped on save', async () => {
+      // A legacy room that still carries feetPerSquare from before the lock.
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? { section, source: 'db', value: [{ ...TAPROOM, feetPerSquare: 10 }, CELLAR] }
+          : { section, source: 'db', value: [] }
+      );
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      render(
+        <RegionEditorScreen campaignId="sandbox" regionId="taproom" kind="room" onBack={vi.fn()} />
+      );
+      await screen.findByTestId('cell-0-0');
+      // The scale field isn't offered for rooms (regions/towns keep it).
+      expect(screen.queryByLabelText('FEET PER SQUARE')).toBeNull();
+      fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: 'd' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+      expect('feetPerSquare' in saved[0]).toBe(false);
+    });
+
     it('lighting: absent key shows BRIGHT; picking BRIGHT saves as omitted key', async () => {
       renderRoom('cellar'); // CELLAR has no lighting key
       await screen.findByTestId('cell-0-0');

@@ -72,13 +72,13 @@ export interface Room extends LevelNarrationHooks {
   id: string;
   name: string;
   desc: string;
-  // Local rooms are self-contained grids. `feetPerSquare` defaults to 5 (SRD
-  // tactical). `entryPos` is where the party marker arrives when entering this
-  // room from a site/venue (or an exit with no explicit entrancePos); defaults
+  // Local rooms are self-contained grids, LOCKED to the SRD tactical scale
+  // (5 ft per square — gridEngine.SQUARE_SIZE; combat math assumes it).
+  // `entryPos` is where the party marker arrives when entering this room
+  // from a site/venue (or an exit with no explicit entrancePos); defaults
   // to the grid centre. `exits` are the per-cell room connections (see RoomExit).
   gridWidth?: number;
   gridHeight?: number;
-  feetPerSquare?: number;
   entryPos?: GridPos;
   exits?: RoomExit[];
   canRest?: boolean;
