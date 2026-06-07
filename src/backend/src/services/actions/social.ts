@@ -60,7 +60,13 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
     return;
   }
   const attitude = getNpcAttitude(ctx.st, npc);
-  if (attitude === 'hostile') {
+  // Parley: a hostile with an AUTHORED dialogue tree can be talked to before
+  // swords are drawn (out of combat only) — the conversation opens straight
+  // on the greeting, no CHA gate (per-node check/condition nodes are the
+  // gate). A hostile with no dialogue stays exactly that.
+  const canParley =
+    attitude === 'hostile' && !ctx.st.combat_active && (npc.responses?.length ?? 0) > 0;
+  if (attitude === 'hostile' && !canParley) {
     ctx.narrative = `${npc.name} snarls at you and attacks!`;
     return;
   }

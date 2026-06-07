@@ -2700,9 +2700,13 @@ function npcAsEnemy(npc: PlacedNpc): Enemy {
 function getLivingRoomEnemies(state: GameState, seed: Seed, roomId: string): Enemy[] {
   const killed = state.enemies_killed ?? [];
   const base = getRoomEnemies(seed, roomId).filter((e) => !killed.includes(e.id));
-  // Include every hostile-flipped NPC in this room as an enemy.
+  // Include every EFFECTIVELY hostile NPC in this room as an enemy — flipped
+  // via state (attack_npc, a parley gone wrong) or AUTHORED hostile (a boss
+  // statted as an NPC so it can parley). A successful parley that shifts the
+  // attitude off hostile removes them from this list — they stand down.
   for (const npc of npcsInRoom(seed, roomId)) {
-    if (state.npc_attitudes?.[npc.id] === 'hostile' && !killed.includes(`npc:${npc.id}`)) {
+    const attitude = state.npc_attitudes?.[npc.id] ?? npc.attitude;
+    if (attitude === 'hostile' && !killed.includes(`npc:${npc.id}`)) {
       base.push(npcAsEnemy(npc));
     }
   }
@@ -4627,6 +4631,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Attack ${npc.name} (makes hostile)`,
         action: { type: 'attack_npc', npcId: npc.id },
+      });
+    }
+  }
+
+  // Parley — the third option next to Attack / Sneak when a hostile holds the
+  // room: a hostile NPC WITH an authored dialogue tree can be talked to before
+  // combat starts. Outcomes ride the dialogue's consequences (a stand-down is
+  // set_npc_attitude off hostile, which drops them from the enemy list).
+  // Bestiary monsters never parley — only authored NPCs can carry dialogue.
+  if (enemyAlive && !state.combat_active) {
+    for (const npc of npcsInRoom(seed, roomId)) {
+      if (npcIsKilled(state, npc.id)) continue;
+      if (getNpcAttitude(state, npc) !== 'hostile') continue;
+      if ((npc.responses?.length ?? 0) === 0) continue;
+      choices.push({
+        label: `Parley with ${npc.name}`,
+        action: { type: 'talk', npcId: npc.id },
       });
     }
   }

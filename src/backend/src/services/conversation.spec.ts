@@ -366,3 +366,91 @@ describe('gated dialogue (condition + once)', () => {
     expect(again.newState.flags?.knows_password).toBe(true); // not double-fired (still just set)
   });
 });
+
+describe('parley (hostile NPCs with dialogue)', () => {
+  // A bandit captain: an SRD monster statted as an NPC, AUTHORED hostile,
+  // carrying a parley tree whose Intimidation check can make it stand down.
+  const captain: PlacedNpc = {
+    roomId: ROOM,
+    id: 'captain',
+    name: 'The Bandit Captain',
+    attitude: 'hostile',
+    hp: 12,
+    ac: 14,
+    damage: '1d8',
+    toHit: 4,
+    xp: 100,
+    greeting: 'One more step and you bleed.',
+    responses: [
+      {
+        label: 'Stand down — you are outmatched',
+        check: {
+          skill: 'intimidation',
+          dc: 5, // low so a mocked d20=20 AND the success path are easy to drive
+          successReply: 'Easy now. We want no trouble.',
+          failReply: 'Hah! Take them!',
+          onSuccess: [{ type: 'set_npc_attitude', npcId: 'captain', attitude: 'indifferent' }],
+        },
+      },
+    ],
+  };
+  const mute: PlacedNpc = { ...captain, id: 'mute', name: 'The Silent Brute', responses: [] };
+  const pSeed = (npcs: Record<string, PlacedNpc>) => ({ ...seed, npcs }) as unknown as Seed;
+  const pAct = (
+    s: Seed,
+    state: ReturnType<typeof makeState>,
+    action: Parameters<typeof takeAction>[0]['action']
+  ) => takeAction({ action, history: [], state, seed: s, context: ctx });
+
+  it('an authored-hostile NPC is a room enemy; Parley joins Attack as a choice', () => {
+    const s = pSeed({ captain });
+    const st = makeState({ id: 'pc-1' }, { current_room: ROOM });
+    const choices = generateChoices(st, s, ctx);
+    const labels2 = choices.map((c) => c.label);
+    // It surfaces as a fightable enemy (not as a social "Talk to").
+    expect(choices.some((c) => c.action.type === 'attack')).toBe(true);
+    expect(labels2).not.toContain('Talk to The Bandit Captain');
+    expect(labels2).toContain('Parley with The Bandit Captain');
+  });
+
+  it('a hostile WITHOUT dialogue cannot parley — it just snarls', async () => {
+    const s = pSeed({ mute });
+    const st = makeState({ id: 'pc-1' }, { current_room: ROOM });
+    expect(generateChoices(st, s, ctx).map((c) => c.label)).not.toContain(
+      'Parley with The Silent Brute'
+    );
+    const r = await pAct(s, st, { type: 'talk', npcId: 'mute' });
+    expect(r.narrative).toContain('snarls at you');
+    expect(r.newState.active_conversation).toBeUndefined();
+  });
+
+  it('a successful parley check stands the hostile down (off the enemy list)', async () => {
+    const s = pSeed({ captain });
+    let r = await pAct(s, makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM }), {
+      type: 'talk',
+      npcId: 'captain',
+    });
+    // Parley opens straight on the greeting — no CHA gate at the door.
+    expect(r.newState.active_conversation?.prompt).toBe('One more step and you bleed.');
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20
+    r = await pAct(s, r.newState, { type: 'talk_response', responseIdx: 0 });
+    expect(r.narrative).toContain('Easy now. We want no trouble.');
+    expect(r.newState.npc_attitudes?.captain).toBe('indifferent');
+    r = await pAct(s, r.newState, { type: 'end_conversation' });
+    // Stood down: no longer an enemy, back to the social surface.
+    const after = generateChoices(r.newState, s, ctx).map((c) => c.label);
+    expect(after).not.toContain('Parley with The Bandit Captain');
+    expect(after).toContain('Talk to The Bandit Captain (CHA check DC 12)');
+  });
+
+  it('no parley once combat is active', () => {
+    const s = pSeed({ captain });
+    const st = {
+      ...makeState({ id: 'pc-1' }, { current_room: ROOM }),
+      combat_active: true,
+    } as ReturnType<typeof makeState>;
+    expect(generateChoices(st, s, ctx).map((c) => c.label)).not.toContain(
+      'Parley with The Bandit Captain'
+    );
+  });
+});
