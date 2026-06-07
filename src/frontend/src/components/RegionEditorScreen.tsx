@@ -55,6 +55,8 @@ interface EditorSite {
   kind: string;
   townId?: string;
   entryRoomId?: string;
+  regionId?: string; // region gates only — target region
+  entryPos?: { x: number; y: number }; // region gates — preserved, not edited
   toRoomId?: string; // rooms only — exit target
   entrancePos?: { x: number; y: number }; // rooms only — preserved, not edited
   desc?: string;
@@ -537,9 +539,17 @@ function RegionEditorScreen({
       prev.map((s) => {
         if (s.id !== id) return s;
         const next = { ...s, ...patch };
-        if (patch.kind === 'town') delete next.entryRoomId;
+        if (patch.kind === 'town') {
+          delete next.entryRoomId;
+          delete next.regionId;
+        }
         if (patch.kind === 'local' || patch.kind === 'interior' || patch.kind === 'gate') {
           delete next.townId;
+          delete next.regionId;
+        }
+        if (patch.kind === 'region') {
+          delete next.townId;
+          delete next.entryRoomId;
         }
         if (patch.kind === 'ascend') delete next.toRoomId;
         return next;
@@ -617,7 +627,7 @@ function RegionEditorScreen({
     }
     const cleaned = sites.map((s) => {
       const c: EditorSite = { ...s };
-      for (const k of ['townId', 'entryRoomId', 'desc', 'onEnter', 'icon'] as const) {
+      for (const k of ['townId', 'entryRoomId', 'regionId', 'desc', 'onEnter', 'icon'] as const) {
         if (!c[k]) delete c[k];
       }
       return c;
@@ -681,6 +691,9 @@ function RegionEditorScreen({
     }
     if (kind === 'region' && sites.some((s) => s.kind === 'town' && !s.townId)) {
       return { error: 'Every town site needs a TOWN target (or flip it to LOCAL).' };
+    }
+    if (kind === 'region' && sites.some((s) => s.kind === 'region' && !s.regionId)) {
+      return { error: 'Every region gate needs a TO REGION target.' };
     }
     mergeSites(next);
     next.name = details.name.trim() || r.name;
@@ -1117,6 +1130,7 @@ function RegionEditorScreen({
                               ? [
                                   ['local', 'LOCAL (DUNGEON)'],
                                   ['town', 'TOWN'],
+                                  ['region', 'REGION GATE'],
                                 ]
                               : kind === 'town'
                                 ? [
@@ -1179,6 +1193,31 @@ function RegionEditorScreen({
                                   {id}
                                 </option>
                               ))}
+                            </select>
+                          </div>
+                        )}
+                        {selectedSite.kind === 'region' && (
+                          <div style={{ flex: '1 1 130px' }}>
+                            <label className={styles.formLbl} htmlFor="site-region">
+                              TO REGION
+                            </label>
+                            <select
+                              id="site-region"
+                              className={styles.formInp}
+                              style={{ cursor: 'pointer' }}
+                              value={selectedSite.regionId ?? ''}
+                              onChange={(e) =>
+                                updateSite(selectedSite.id, { regionId: e.target.value })
+                              }
+                            >
+                              <option value="">— PICK A REGION —</option>
+                              {(regions ?? [])
+                                .filter((r) => r.id !== regionId)
+                                .map((r) => (
+                                  <option key={r.id} value={r.id}>
+                                    {r.name}
+                                  </option>
+                                ))}
                             </select>
                           </div>
                         )}

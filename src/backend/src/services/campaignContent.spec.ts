@@ -109,6 +109,9 @@ function makeContentDb(initial: {
         description: p[9],
         on_enter: p[10],
         icon: p[11],
+        target_region_id: p[12] ?? null,
+        entry_x: p[13] ?? null,
+        entry_y: p[14] ?? null,
       }));
       return { rows, rowCount: rows.length };
     }
@@ -968,6 +971,32 @@ describe('editable sections registry', () => {
     expect(gameStart.safeParse({ text: 'nope' }).success).toBe(false);
   });
 
+  it('regions schema validates region gates: target resolves, no self-target, entry bounds', () => {
+    const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
+    const gate = (over: Record<string, unknown> = {}) => ({
+      id: 'north-pass',
+      name: 'The North Pass',
+      pos: { x: 2, y: 0 },
+      kind: 'region',
+      regionId: 'frost-reach',
+      ...over,
+    });
+    const pair = (g: Record<string, unknown>) => [
+      region({ sites: [g] }),
+      region({ id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false }),
+    ];
+    const ok = regions.safeParse(pair(gate({ entryPos: { x: 1, y: 1 } })));
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // A gate needs a target…
+    expect(regions.safeParse(pair(gate({ regionId: undefined }))).success).toBe(false);
+    // …that exists in the payload…
+    expect(regions.safeParse(pair(gate({ regionId: 'nowhere' }))).success).toBe(false);
+    // …and isn't its own region.
+    expect(regions.safeParse(pair(gate({ regionId: 'malgovia' }))).success).toBe(false);
+    // entryPos must fit the TARGET region's grid (12x10).
+    expect(regions.safeParse(pair(gate({ entryPos: { x: 12, y: 0 } }))).success).toBe(false);
+  });
+
   it('regions schema requires scale, grid, and startPos', () => {
     const regions = CAMPAIGN_SECTION_SCHEMAS.regions;
     for (const missing of ['feetPerSquare', 'grid', 'startPos']) {
@@ -1723,6 +1752,14 @@ describe('section CRUD + live refresh', () => {
           icon: 'tombstone',
           desc: 'A sunken door in the hillside.',
           onEnter: 'Cold air breathes up from the dark.',
+        },
+        {
+          id: 'north-pass',
+          name: 'The North Pass',
+          pos: { x: 2, y: 0 },
+          kind: 'region',
+          regionId: REGION_B.id,
+          entryPos: { x: 0, y: 3 },
         },
       ],
     };

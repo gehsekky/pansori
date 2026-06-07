@@ -1989,9 +1989,14 @@ export interface MapSite {
   id: string;
   name: string;
   pos: GridPos;
-  kind: 'town' | 'local';
+  kind: 'town' | 'local' | 'region';
   townId?: string; // kind 'town' → the Town grid to open
   entryRoomId?: string; // kind 'local' → the local room to drop into
+  // kind 'region' → a GATE to another region (mountain pass, ferry, the
+  // road out). Crossing fires the full region hook matrix; arrival is at
+  // `entryPos` when authored, else the target region's startPos.
+  regionId?: string;
+  entryPos?: GridPos;
   desc?: string;
   // Narration hook — authored flavor appended to the "You enter X." line
   // every time the party lands on this site's square.
@@ -2020,8 +2025,8 @@ export interface Region extends LevelNarrationHooks {
   name: string;
   desc?: string;
   // (Region first-enter falls back to `desc` when no enter hook is set —
-  // game start counts as entering the starting region. Region EXIT hooks
-  // are dormant until region-to-region travel exists.)
+  // game start counts as entering the starting region. Exit hooks fire on
+  // crossing a region GATE site to another region.)
   feetPerSquare: number; // 5280 (1 mile per square — SRD Travel Pace scale)
   gridWidth: number;
   gridHeight: number;

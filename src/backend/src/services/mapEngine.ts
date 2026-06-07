@@ -168,7 +168,8 @@ export interface MapTransition {
   // resolution payloads (by kind)
   toTownId?: string; // site → town
   toRoomId?: string; // site/venue → local room, or room_exit → next room
-  entrancePos?: GridPos; // arrival cell in the destination room
+  toRegionId?: string; // site → another region (a region GATE)
+  entrancePos?: GridPos; // arrival cell in the destination room / region
   ascendTo?: 'town' | 'region'; // ascend / gate
   // Narration hook (site enter) — authored flavor appended to the
   // "You enter X." line when the transition resolves.
@@ -254,6 +255,8 @@ export function activeGrid(
       label: s.name,
       toTownId: s.kind === 'town' ? s.townId : undefined,
       toRoomId: s.kind === 'local' ? s.entryRoomId : undefined,
+      toRegionId: s.kind === 'region' ? s.regionId : undefined,
+      entrancePos: s.kind === 'region' ? s.entryPos : undefined,
       onEnter: s.onEnter,
     }));
     return {
@@ -492,6 +495,37 @@ export function resolveTransition(
   // The site-enter narration hook: authored flavor follows the
   // announcement line every time the party lands on the site's square.
   const hook = t.onEnter ? ` ${t.onEnter}` : '';
+  // ── Cross into another region (a region GATE site) ───────────────────
+  if (t.kind === 'site' && t.toRegionId) {
+    const next = regionById(campaign, t.toRegionId);
+    if (!next) return { st, narrative: '' };
+    const prev = regionById(campaign, st.current_region_id);
+    const exit = prev
+      ? markFirst(st.exited_regions, prev.id)
+      : { first: false, list: st.exited_regions ?? [] };
+    const visit = markFirst(st.visited_regions, next.id);
+    // First entry uses the regionEnterNarration chain (onFirstEnter ??
+    // onEnter ?? desc) so authored regions narrate for free; re-entry
+    // plays the plain onEnter.
+    const enterText = visit.first ? (next.onFirstEnter ?? next.onEnter ?? next.desc) : next.onEnter;
+    return {
+      st: {
+        ...st,
+        map_level: 'regional',
+        current_region_id: next.id,
+        marker_pos: t.entrancePos ?? next.startPos,
+        current_room: '',
+        current_town_id: undefined,
+        // The old region's descend bookmark means nothing here.
+        region_marker_pos: undefined,
+        visited_regions: visit.list,
+        exited_regions: exit.list,
+      },
+      narrative: `${levelHook(prev, 'exit', exit.first)} You cross into ${next.name}.${hook}${
+        enterText ? ` ${enterText}` : ''
+      }`,
+    };
+  }
   // ── Descend into a town ──────────────────────────────────────────────
   if (t.kind === 'site' && t.toTownId) {
     const town = townById(campaign, t.toTownId);

@@ -142,9 +142,13 @@ export interface CampaignRegionSite {
   id: string;
   name: string;
   pos: { x: number; y: number };
-  kind: 'town' | 'local';
+  kind: 'town' | 'local' | 'region';
   townId?: string;
   entryRoomId?: string;
+  // kind 'region' — a GATE to another region; arrival at entryPos (else the
+  // target's startPos).
+  regionId?: string;
+  entryPos?: { x: number; y: number };
   desc?: string;
   // Narration hook — fires every time the party lands on this site.
   onEnter?: string;
@@ -229,12 +233,15 @@ interface SiteRow {
   name: string;
   pos_x: number;
   pos_y: number;
-  kind: 'town' | 'local';
+  kind: 'town' | 'local' | 'region';
   town_id: string | null;
   entry_room_id: string | null;
   description: string | null;
   on_enter: string | null;
   icon: string | null;
+  target_region_id: string | null;
+  entry_x: number | null;
+  entry_y: number | null;
 }
 
 function rowToSite(r: SiteRow): CampaignRegionSite {
@@ -245,6 +252,10 @@ function rowToSite(r: SiteRow): CampaignRegionSite {
     kind: r.kind,
     ...(r.town_id !== null ? { townId: r.town_id } : {}),
     ...(r.entry_room_id !== null ? { entryRoomId: r.entry_room_id } : {}),
+    ...(r.target_region_id !== null ? { regionId: r.target_region_id } : {}),
+    ...(r.entry_x !== null && r.entry_y !== null
+      ? { entryPos: { x: r.entry_x, y: r.entry_y } }
+      : {}),
     ...(r.description !== null ? { desc: r.description } : {}),
     ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
     ...(r.icon !== null ? { icon: r.icon } : {}),
@@ -265,7 +276,7 @@ export async function getCampaignRegions(
   if (rows.length === 0) return [];
   const { rows: siteRows } = await pool.query<SiteRow>(
     `SELECT region_id, id, name, pos_x, pos_y, kind, town_id, entry_room_id, description,
-            on_enter, icon
+            on_enter, icon, target_region_id, entry_x, entry_y
        FROM campaign_region_sites
       WHERE campaign_id = $1
       ORDER BY region_id, sort_order, id`,
@@ -334,8 +345,9 @@ export async function putCampaignRegions(
         await client.query(
           `INSERT INTO campaign_region_sites
              (campaign_id, region_id, id, sort_order, name, pos_x, pos_y, kind,
-              town_id, entry_room_id, description, on_enter, icon)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              town_id, entry_room_id, description, on_enter, icon,
+              target_region_id, entry_x, entry_y)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             campaignId,
             r.id,
@@ -350,6 +362,9 @@ export async function putCampaignRegions(
             s.desc ?? null,
             s.onEnter ?? null,
             s.icon ?? null,
+            s.regionId ?? null,
+            s.entryPos?.x ?? null,
+            s.entryPos?.y ?? null,
           ]
         );
       }

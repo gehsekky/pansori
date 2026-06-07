@@ -401,6 +401,93 @@ describe('narration hooks', () => {
   });
 });
 
+describe('region-to-region travel (region gates)', () => {
+  // Two regions joined by a pass: reg1 gains a gate to reg2 (explicit entry
+  // cell) and reg2 a gate back (default arrival = reg1.startPos).
+  const twoRegions: CampaignData = {
+    ...campaign,
+    regions: [
+      {
+        ...campaign.regions![0],
+        onExit: 'The vale road bends behind you.',
+        onFirstExit: 'For the first time, you leave the vale.',
+        onEnter: 'Vale air again — pine and millsmoke.',
+        sites: [
+          ...campaign.regions![0].sites,
+          {
+            id: 's_pass',
+            name: 'The North Pass',
+            pos: { x: 11, y: 0 },
+            kind: 'region',
+            regionId: 'reg2',
+            entryPos: { x: 1, y: 7 },
+            onEnter: 'Wind screams between the cliff walls.',
+          },
+        ],
+      },
+      {
+        id: 'reg2',
+        name: 'The Frost Reach',
+        desc: 'White hills under a low sun.',
+        onFirstEnter: 'The Frost Reach opens before you, blinding white.',
+        onEnter: 'Snow again.',
+        feetPerSquare: 5280,
+        gridWidth: 8,
+        gridHeight: 8,
+        startPos: { x: 4, y: 4 },
+        sites: [
+          {
+            id: 's_pass_south',
+            name: 'The Pass South',
+            pos: { x: 1, y: 7 },
+            kind: 'region',
+            regionId: 'reg1',
+          },
+        ],
+      },
+    ],
+  };
+  const cross = (st: GameState, x: number, y: number) =>
+    resolveMarkerMove(twoRegions, rooms, st, { x, y });
+
+  it('first crossing: exit FIRST hook, site hook, target first-enter chain, state swap', () => {
+    const st = { ...start(), visited_regions: ['reg1'] };
+    const r = cross(st, 11, 0);
+    expect(r.rejected).toBeUndefined();
+    expect(r.st.current_region_id).toBe('reg2');
+    expect(r.st.map_level).toBe('regional');
+    expect(r.st.marker_pos).toEqual({ x: 1, y: 7 }); // the authored entry cell
+    expect(r.st.visited_regions).toEqual(['reg1', 'reg2']);
+    expect(r.st.exited_regions).toEqual(['reg1']);
+    // Exit FIRST overrides plain; the site hook follows the announcement;
+    // reg2's first entry uses onFirstEnter (?? onEnter ?? desc).
+    expect(r.narrative).toContain('For the first time, you leave the vale.');
+    expect(r.narrative).not.toContain('The vale road bends');
+    expect(r.narrative).toContain('You cross into The Frost Reach.');
+    expect(r.narrative).toContain('Wind screams between the cliff walls.');
+    expect(r.narrative).toContain('The Frost Reach opens before you, blinding white.');
+  });
+
+  it('re-crossing plays the plain hooks; return arrives at startPos by default', () => {
+    // Both regions already visited/exited — every hook drops to its plain form.
+    let st: GameState = {
+      ...start(),
+      visited_regions: ['reg1', 'reg2'],
+      exited_regions: ['reg1', 'reg2'],
+    };
+    const out = cross(st, 11, 0);
+    expect(out.narrative).toContain('The vale road bends behind you.');
+    expect(out.narrative).toContain('Snow again.');
+    expect(out.narrative).not.toContain('blinding white');
+    st = out.st;
+    // Back through the south pass: no entryPos → reg1.startPos.
+    const back = cross(st, 1, 7);
+    expect(back.st.current_region_id).toBe('reg1');
+    expect(back.st.marker_pos).toEqual({ x: 0, y: 0 });
+    expect(back.narrative).toContain('Vale air again — pine and millsmoke.');
+  });
+});
+
 describe('regional encounters', () => {
   const encounterCampaign: CampaignData = {
     world_name: 'Enc',

@@ -294,6 +294,39 @@ describe('RegionEditorScreen', () => {
     expect('icon' in added).toBe(false);
   });
 
+  it('REGION GATE sites: kind option, TO REGION picker, save folds regionId', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-1-0')); // place a new site
+    fireEvent.change(screen.getByLabelText('KIND'), { target: { value: 'region' } });
+    fireEvent.change(screen.getByLabelText('NAME', { selector: '#site-name' }), {
+      target: { value: 'The North Pass' },
+    });
+    // No target picked yet — the save is blocked client-side.
+    fireEvent.click(screen.getByText('SAVE'));
+    expect(await screen.findByText(/region gate needs a TO REGION target/)).toBeTruthy();
+    expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+    // The picker offers the OTHER regions only (by name, not the edited one).
+    const toRegion = screen.getByLabelText('TO REGION') as HTMLSelectElement;
+    expect([...toRegion.options].map((o) => o.textContent)).toEqual([
+      '— PICK A REGION —',
+      'The Frost Reach',
+    ]);
+    fireEvent.change(toRegion, { target: { value: 'frost-reach' } });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+      id: string;
+      sites?: Array<Record<string, unknown>>;
+    }>;
+    const gate = saved[0].sites!.find((s) => s.name === 'The North Pass')!;
+    expect(gate.kind).toBe('region');
+    expect(gate.regionId).toBe('frost-reach');
+    expect('townId' in gate).toBe(false);
+    expect('entryRoomId' in gate).toBe(false);
+  });
+
   it('the marker tool lists every existing marker; clicking one selects it', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');

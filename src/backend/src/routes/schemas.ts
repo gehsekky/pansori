@@ -296,9 +296,13 @@ const RegionSiteSchema = z
     id: SLUG,
     name: z.string().min(1).max(80),
     pos: GridPosSchema,
-    kind: z.enum(['town', 'local']),
+    kind: z.enum(['town', 'local', 'region']),
     townId: SLUG.optional(),
     entryRoomId: SLUG.optional(),
+    // kind 'region' — a GATE to another region in this payload; arrival at
+    // entryPos (validated against the TARGET region's grid) or its startPos.
+    regionId: SLUG.optional(),
+    entryPos: GridPosSchema.optional(),
     desc: z.string().min(1).max(2000).optional(),
     // Narration hook — appended to "You enter X." on every landing.
     onEnter: z.string().min(1).max(2000).optional(),
@@ -383,6 +387,13 @@ const RegionsSchema = z
               path: ['sites', i, 'entryRoomId'],
             });
           }
+          if (s.kind === 'region' && !s.regionId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `site "${s.id}" is a region gate and needs regionId`,
+              path: ['sites', i, 'regionId'],
+            });
+          }
         });
       })
   )
@@ -402,6 +413,42 @@ const RegionsSchema = z
         message: `exactly one region must have isStartingRegion true (found ${starts})`,
       });
     }
+    // Region gates must lead somewhere real: the target resolves within this
+    // payload, isn't the gate's own region, and an explicit entryPos fits the
+    // TARGET region's grid — the room-exit rules, one level up.
+    regions.forEach((r, ri) =>
+      (r.sites ?? []).forEach((s, si) => {
+        if (s.kind !== 'region' || !s.regionId) return;
+        if (s.regionId === r.id) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `region "${r.id}" gate "${s.id}" points at its own region`,
+            path: [ri, 'sites', si, 'regionId'],
+          });
+          return;
+        }
+        const target = regions.find((t) => t.id === s.regionId);
+        if (!target) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `region "${r.id}" gate "${s.id}" points at unknown region "${s.regionId}"`,
+            path: [ri, 'sites', si, 'regionId'],
+          });
+          return;
+        }
+        if (s.entryPos) {
+          const th = target.grid.length;
+          const tw = target.grid[0]?.length ?? 0;
+          if (s.entryPos.x >= tw || s.entryPos.y >= th) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `region "${r.id}" gate "${s.id}" entryPos is outside "${target.id}"'s ${tw}x${th} grid`,
+              path: [ri, 'sites', si, 'entryPos'],
+            });
+          }
+        }
+      })
+    );
   });
 
 // Loot table — full LootItem definitions (shared/types.ts). Structural
