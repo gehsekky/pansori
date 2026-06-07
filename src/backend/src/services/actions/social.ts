@@ -184,6 +184,11 @@ export const handleTalkResponse: ActionHandler<{
     return narrativeParts.length ? ' ' + narrativeParts.join(' ') : '';
   };
 
+  // The player's side of the exchange — the chosen line reads as the
+  // character speaking it, so the narrative pane carries BOTH halves of
+  // the conversation (authors write labels as spoken player lines).
+  const playerLine = `${char.name}: "${response.label}"`;
+
   // Skill-gated node: roll the CHA-based social check, pick the outcome's
   // reply + consequences; children open ONLY on success. Without `once`, a
   // failed check stays on the menu for a retry.
@@ -206,7 +211,7 @@ export const handleTalkResponse: ActionHandler<{
     );
     const skillLabel = chk.skill.charAt(0).toUpperCase() + chk.skill.slice(1);
     const outcomeReply = result.success ? chk.successReply : chk.failReply;
-    let narrative = `${char.name} (${skillLabel} ${result.total} vs DC ${chk.dc} — ${
+    let narrative = `${playerLine} (${skillLabel} ${result.total} vs DC ${chk.dc} — ${
       result.success ? 'success' : 'fail'
     }). ${npc.name}: "${outcomeReply}"`;
     narrative += runConsequences(result.success ? chk.onSuccess : chk.onFail);
@@ -225,7 +230,9 @@ export const handleTalkResponse: ActionHandler<{
     return;
   }
 
-  let narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
+  let narrative = `${playerLine} ${
+    response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`
+  }`;
   narrative += runConsequences(response.consequences);
   // Walk the conversation: a branch (has children) descends a level; a leaf
   // keeps the current options. The prompt becomes the NPC's reply either way.

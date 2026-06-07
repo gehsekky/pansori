@@ -88,6 +88,10 @@ describe('conversation mode', () => {
     r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // "Tell me about the crypt"
     expect(r.newState.active_conversation?.path).toEqual([0]);
     expect(r.newState.active_conversation?.prompt).toBe('It is old and cursed.');
+    // The narrative pane carries BOTH halves of the exchange — the player's
+    // chosen line spoken by the character, then the NPC's reply.
+    expect(r.narrative).toContain('Test Hero: "Tell me about the crypt"');
+    expect(r.narrative).toContain('The Sage: "It is old and cursed."');
     const labels = convoLabels(r.newState);
     expect(labels).toContain('<To The Sage> Who built it?');
     expect(labels).toContain('<To The Sage> I have heard enough');
