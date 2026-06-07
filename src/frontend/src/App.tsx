@@ -265,6 +265,22 @@ export default function App() {
             return loadSessions();
           }
         }
+        // Room painter deep link — rooms reached through a town nest under
+        // the full chain: /creator/<cid>/region/<rid>/town/<tid>/room/<room id>.
+        const roomMatch = window.location.pathname.match(
+          /^\/creator\/([a-z0-9_-]+)\/region\/([a-z0-9_-]+)\/town\/([a-z0-9_-]+)\/room\/([a-z0-9_-]+)\/?$/i
+        );
+        if (roomMatch) {
+          setCreatorCampaignId(roomMatch[1]);
+          setPainterStack([
+            { kind: 'region', mapId: roomMatch[2] },
+            { kind: 'town', mapId: roomMatch[3] },
+          ]);
+          setCreatorMapKind('room');
+          setCreatorRegionId(roomMatch[4]);
+          setView('region-editor');
+          return;
+        }
         // Town painter deep link — towns nest under the region they're
         // reached from: /creator/<campaign id>/region/<region id>/town/<town id>.
         const townMatch = window.location.pathname.match(
@@ -499,16 +515,27 @@ export default function App() {
         creatorRegionId &&
         (() => {
           // Painter URL: towns nest under the nearest region in the
-          // breadcrumb stack; regions/rooms stay flat.
+          // breadcrumb stack, and rooms reached through a town nest under
+          // the full region/town chain. Regions — and rooms opened from the
+          // campaign page's ROOMS panel (no town context: dungeon interiors,
+          // region-site rooms) — stay flat.
           const painterUrl = (
             kind: 'region' | 'town' | 'room',
             mapId: string,
             stack: Array<{ kind: string; mapId: string }>
           ) => {
+            const nearest = (k: string) => [...stack].reverse().find((e) => e.kind === k);
             if (kind === 'town') {
-              const parent = [...stack].reverse().find((e) => e.kind === 'region');
+              const parent = nearest('region');
               if (parent) {
                 return `/creator/${creatorCampaignId}/region/${parent.mapId}/town/${mapId}`;
+              }
+            }
+            if (kind === 'room') {
+              const town = nearest('town');
+              const region = nearest('region');
+              if (town && region) {
+                return `/creator/${creatorCampaignId}/region/${region.mapId}/town/${town.mapId}/room/${mapId}`;
               }
             }
             return `/creator/${creatorCampaignId}/${kind}/${mapId}`;
