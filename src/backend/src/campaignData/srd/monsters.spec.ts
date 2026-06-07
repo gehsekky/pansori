@@ -235,6 +235,44 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['spirit_naga', 8, 135, 17, '1d6+4', 7, 3900, 3],
   ['treant', 9, 138, 16, '3d6+6', 10, 5000, 2],
   ['guardian_naga', 10, 136, 18, '2d12+4', 8, 5900, 2],
+  // Dragon families batch (2026-06-07).
+  ['brass_dragon_wyrmling', 1, 22, 15, '1d10+2', 4, 200, 3],
+  ['copper_dragon_wyrmling', 1, 22, 16, '1d10+2', 4, 200, 3],
+  ['bronze_dragon_wyrmling', 2, 39, 15, '1d10+3', 5, 450, 2],
+  ['green_dragon_wyrmling', 2, 38, 17, '1d10+2', 4, 450, 2],
+  ['blue_dragon_wyrmling', 3, 65, 17, '1d10+3', 5, 700, 2],
+  ['red_dragon_wyrmling', 4, 75, 17, '1d10+4', 6, 1100, 2],
+  ['young_brass_dragon', 6, 110, 17, '2d10+4', 7, 2300, 3],
+  ['young_black_dragon', 7, 127, 18, '2d4+4', 7, 2900, 3],
+  ['young_copper_dragon', 7, 119, 17, '2d10+4', 7, 2900, 3],
+  ['young_bronze_dragon', 8, 142, 17, '2d10+5', 8, 3900, 3],
+  ['young_green_dragon', 8, 136, 18, '2d6+4', 7, 3900, 3],
+  ['silver_dragon_wyrmling', 2, 45, 17, '1d10+4', 6, 450, 2],
+  ['young_blue_dragon', 9, 152, 18, '2d6+5', 9, 5000, 3],
+  ['young_silver_dragon', 9, 168, 18, '2d8+6', 10, 5000, 3],
+  ['gold_dragon_wyrmling', 3, 60, 17, '1d10+4', 6, 700, 2],
+  ['young_gold_dragon', 10, 178, 18, '2d10+6', 10, 5900, 3],
+  ['adult_brass_dragon', 13, 172, 18, '2d10+6', 11, 10000, 3],
+  ['adult_white_dragon', 13, 200, 18, '2d6+6', 11, 10000, 3],
+  ['young_white_dragon', 6, 123, 17, '2d4+4', 7, 2300, 3],
+  ['adult_black_dragon', 14, 195, 19, '2d6+6', 11, 11500, 3],
+  ['adult_copper_dragon', 14, 184, 18, '2d10+6', 11, 11500, 3],
+  ['adult_bronze_dragon', 15, 212, 18, '2d8+7', 12, 13000, 3],
+  ['adult_green_dragon', 15, 207, 19, '2d8+6', 11, 13000, 3],
+  ['adult_blue_dragon', 16, 212, 19, '2d8+7', 12, 15000, 3],
+  ['adult_silver_dragon', 16, 216, 19, '2d8+8', 13, 15000, 3],
+  ['adult_gold_dragon', 17, 243, 19, '2d8+8', 14, 18000, 3],
+  ['adult_red_dragon', 17, 256, 19, '1d10+8', 14, 18000, 3],
+  ['ancient_brass_dragon', 20, 332, 20, '2d10+8', 14, 25000, 3],
+  ['ancient_white_dragon', 20, 333, 20, '2d8+8', 14, 25000, 3],
+  ['ancient_black_dragon', 21, 367, 22, '2d8+8', 15, 33000, 3],
+  ['ancient_copper_dragon', 21, 367, 21, '2d10+8', 15, 33000, 3],
+  ['ancient_bronze_dragon', 22, 444, 22, '2d8+9', 16, 41000, 3],
+  ['ancient_green_dragon', 22, 402, 21, '2d8+8', 15, 41000, 3],
+  ['ancient_blue_dragon', 23, 481, 22, '2d8+9', 16, 50000, 3],
+  ['ancient_silver_dragon', 23, 468, 22, '2d8+10', 17, 50000, 3],
+  ['ancient_gold_dragon', 24, 546, 22, '2d8+10', 17, 62000, 3],
+  ['ancient_red_dragon', 24, 507, 22, '2d8+10', 17, 62000, 3],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -895,5 +933,90 @@ describe('SRD-exact naming', () => {
     expect(SRD_MONSTERS.gnoll.name).toBe('Gnoll Warrior');
     expect(SRD_MONSTERS.cult_fanatic.name).toBe('Cultist Fanatic');
     expect(SRD_MONSTERS.orc).toBeUndefined();
+  });
+});
+
+describe('Dragon families batch — effect fields', () => {
+  const DRAGONS = Object.entries(SRD_MONSTERS).filter(
+    ([, m]) => m.creatureType === 'dragon' && / Dragon/.test(m.name) && m.name !== 'Half-Dragon'
+  );
+
+  it('all 40 true dragons: breath weapon + matching elemental immunity + flight', () => {
+    expect(DRAGONS.length).toBe(40); // 37 new + the 3 shipped earlier
+    for (const [id, m] of DRAGONS) {
+      expect(m.breathWeapon, id).toBeDefined();
+      expect(m.immunities, id).toContain(m.breathWeapon!.damageType);
+      expect(m.speedFt ?? 0, id).toBeGreaterThanOrEqual(60); // every dragon flies
+    }
+  });
+
+  it('adults and ancients carry the Pounce legendary action (3-point pool)', () => {
+    const elders = DRAGONS.filter(([, m]) => /^(Adult|Ancient)/.test(m.name));
+    expect(elders.length).toBe(20);
+    for (const [id, m] of elders) {
+      expect(m.legendary_actions, id).toEqual([
+        { id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' },
+      ]);
+      expect(m.legendary_pool, id).toBe(3);
+    }
+    // Younger dragons have none.
+    for (const [id, m] of DRAGONS.filter(([, mm]) => !/^(Adult|Ancient)/.test(mm.name)))
+      expect(m.legendary_actions, id).toBeUndefined();
+  });
+
+  it('the apex blocks: Ancient Red leads the catalog; greens are poison-proofed', () => {
+    expect(SRD_MONSTERS.ancient_red_dragon.cr).toBe(24);
+    expect(SRD_MONSTERS.ancient_red_dragon.breathWeapon).toMatchObject({
+      dice: '26d6',
+      saveDC: 24,
+    });
+    expect(SRD_MONSTERS.ancient_red_dragon.attackReachFt).toBe(15);
+    for (const id of ['green_dragon_wyrmling', 'adult_green_dragon', 'ancient_green_dragon'])
+      expect(SRD_MONSTERS[id].condition_immunities, id).toEqual(['poisoned']);
+  });
+});
+
+describe('Full-bestiary SRD audit — cr / hp / ac / xp match the printed blocks', () => {
+  it('every entry whose name is an SRD stat block carries its exact core numbers', () => {
+    const srdText = readFileSync(
+      new URL('../../../../../docs/srd-5.2.1.txt', import.meta.url),
+      'utf-8'
+    );
+    const lines = srdText.split('\n');
+    const sizeType =
+      /^(Tiny|Small|Medium|Large|Huge|Gargantuan)( or [\w-]+)? (Aberration|Beast|Celestial|Construct|Dragon|Elemental|Fey|Fiend|Giant|Humanoid|Monstrosity|Ooze|Plant|Undead|Swarm[\w ()]*?)( ?\([\w /]+\))?,/;
+    const crLine = /CR ([\d/]+) \((?:XP ([\d,]+)|([\d,]+) XP)/;
+    // name → { cr, hp, ac, xp } parsed from the first matching block.
+    const blocks = new Map<string, { cr: number; hp: number; ac: number; xp: number }>();
+    for (let i = 1; i < lines.length; i++) {
+      if (!sizeType.test(lines[i].trim())) continue;
+      const name = lines[i - 1].trim();
+      if (blocks.has(name)) continue;
+      const chunk = lines.slice(i, i + 40).join('\n');
+      const hp = chunk.match(/^HP (\d+)/m);
+      const ac = chunk.match(/^AC (\d+)/m);
+      const cr = chunk.match(crLine);
+      if (!hp || !ac || !cr) continue;
+      const crNum = cr[1].includes('/')
+        ? Number(cr[1].split('/')[0]) / Number(cr[1].split('/')[1])
+        : Number(cr[1]);
+      blocks.set(name, {
+        cr: crNum,
+        hp: Number(hp[1]),
+        ac: Number(ac[1]),
+        xp: Number((cr[2] ?? cr[3]).replace(/,/g, '')),
+      });
+    }
+    expect(blocks.size).toBeGreaterThan(300);
+    const drift: string[] = [];
+    for (const m of Object.values(SRD_MONSTERS)) {
+      const raw = blocks.get(m.name);
+      if (!raw) continue; // names are separately guarded by the SRD-exact test
+      if (m.cr !== raw.cr || m.hp !== raw.hp || m.ac !== raw.ac || m.xp !== raw.xp)
+        drift.push(
+          `${m.name}: ours cr/hp/ac/xp ${m.cr}/${m.hp}/${m.ac}/${m.xp} vs SRD ${raw.cr}/${raw.hp}/${raw.ac}/${raw.xp}`
+        );
+    }
+    expect(drift).toEqual([]);
   });
 });
