@@ -1,3 +1,4 @@
+import DialogueEditor, { type DialogueNode } from './DialogueEditor.tsx';
 import { TERRAIN, type TerrainType } from '../shared-types.ts';
 import { useCallback, useEffect, useState } from 'react';
 import MapsPanel from './MapsPanel.tsx';
@@ -124,8 +125,9 @@ interface EditorTrap {
   [key: string]: unknown;
 }
 
-// A placed NPC, as the painter edits it. Dialogue trees, shops and custom
-// stat blocks are preserved on save but edited via the ROOMS JSON.
+// A placed NPC, as the painter edits it. The dialogue tree edits through
+// the structured DialogueEditor; shops and custom stat blocks are preserved
+// on save but edited via the ROOMS JSON.
 interface EditorNpc {
   id: string;
   name: string;
@@ -133,6 +135,7 @@ interface EditorNpc {
   greeting: string;
   pos?: { x: number; y: number };
   icon?: string;
+  responses?: DialogueNode[];
   [key: string]: unknown;
 }
 
@@ -264,6 +267,10 @@ function RegionEditorScreen({
     Array<{ itemId: string; pos?: { x: number; y: number } }>
   >([]);
   const [itemOptions, setItemOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [questOptions, setQuestOptions] = useState<Array<{ id: string; title: string }>>([]);
+  const [factionOptions, setFactionOptions] = useState<Array<{ id: string; name: string }>>([]);
+  // Which NPC's dialogue tree is expanded in the NPCS card (index or null).
+  const [dialogueOpen, setDialogueOpen] = useState<number | null>(null);
   // Rooms only: bespoke placed NPCs.
   const [placedNpcs, setPlacedNpcs] = useState<EditorNpc[]>([]);
   // Rooms only: searchable/interactable objects + the (single) trap.
@@ -373,6 +380,33 @@ function RegionEditorScreen({
         const catalogItems = catalog.filter((c) => !seen.has(c.id));
         setItemOptions([...customItems, ...catalogItems]);
       });
+      // Dialogue editor pickers: the campaign's quests (START QUEST effect,
+      // quest-state conditions) and factions (tier conditions). Either list
+      // may simply not exist yet — both default to empty.
+      api
+        .getCampaignSection(campaignId, 'quests')
+        .then((s) => {
+          const list = Array.isArray(s.value)
+            ? (s.value as Array<{ id?: unknown; title?: unknown }>).filter(
+                (q): q is { id: string; title: string } =>
+                  typeof q.id === 'string' && typeof q.title === 'string'
+              )
+            : [];
+          setQuestOptions(list.map((q) => ({ id: q.id, title: q.title })));
+        })
+        .catch(() => setQuestOptions([]));
+      api
+        .getCampaignSection(campaignId, 'factions')
+        .then((s) => {
+          const list = Array.isArray(s.value)
+            ? (s.value as Array<{ id?: unknown; name?: unknown }>).filter(
+                (f): f is { id: string; name: string } =>
+                  typeof f.id === 'string' && typeof f.name === 'string'
+              )
+            : [];
+          setFactionOptions(list.map((f) => ({ id: f.id, name: f.name })));
+        })
+        .catch(() => setFactionOptions([]));
     }
     // Region pages need the room pool for the local-site ENTRY ROOM picker
     // (town pages get it live from their hosted ROOMS panel instead).
@@ -596,6 +630,25 @@ function RegionEditorScreen({
     if (kind === 'room' && placedNpcs.some((n) => !n.name.trim() || !n.greeting.trim())) {
       return { error: 'Every NPC needs a name and a greeting.' };
     }
+    // Dialogue trees: every node needs a player line; a check node needs both
+    // outcome replies. Walked recursively across every NPC.
+    if (kind === 'room') {
+      const badNode = (nodes: DialogueNode[] | undefined): string | null => {
+        for (const node of nodes ?? []) {
+          if (!node.label.trim()) return 'Every dialogue option needs a PLAYER LINE.';
+          if (node.check && (!node.check.successReply.trim() || !node.check.failReply.trim())) {
+            return 'Every dialogue CHECK needs both outcome replies.';
+          }
+          const deeper = badNode(node.responses);
+          if (deeper) return deeper;
+        }
+        return null;
+      };
+      for (const n of placedNpcs) {
+        const err = badNode(n.responses);
+        if (err) return { error: err };
+      }
+    }
     if (kind === 'room' && placedObjects.some((o) => !o.name.trim())) {
       return { error: 'Every object needs a name.' };
     }
@@ -679,6 +732,7 @@ function RegionEditorScreen({
             const c: EditorNpc = { ...n, name: n.name.trim(), greeting: n.greeting.trim() };
             if (!c.icon) delete c.icon;
             if (!c.pos) delete c.pos;
+            if (!c.responses || c.responses.length === 0) delete c.responses;
             return c;
           });
         } else {
@@ -1898,134 +1952,173 @@ function RegionEditorScreen({
                   placedNpcs.map((n, i) => (
                     <div
                       key={n.id}
-                      style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        alignItems: 'flex-end',
-                        flexWrap: 'wrap',
-                        padding: '0.3rem 0',
-                        borderBottom: '1px solid var(--t-separator)',
-                      }}
+                      style={{ padding: '0.3rem 0', borderBottom: '1px solid var(--t-separator)' }}
                     >
-                      <div style={{ flex: '2 1 140px' }}>
-                        <label className={styles.formLbl} htmlFor={`npc-name-${i}`}>
-                          NAME
-                        </label>
-                        <input
-                          id={`npc-name-${i}`}
-                          className={styles.formInp}
-                          value={n.name}
-                          onChange={(ev) => {
-                            const name = ev.target.value;
-                            setPlacedNpcs((prev) =>
-                              prev.map((p, j) => (j === i ? { ...p, name } : p))
-                            );
-                            setDirty(true);
-                            setSaved(false);
-                          }}
-                        />
-                      </div>
-                      <div style={{ flex: '1 1 110px' }}>
-                        <label className={styles.formLbl} htmlFor={`npc-attitude-${i}`}>
-                          ATTITUDE
-                        </label>
-                        <select
-                          id={`npc-attitude-${i}`}
-                          className={styles.formInp}
-                          style={{ cursor: 'pointer' }}
-                          value={n.attitude}
-                          onChange={(ev) => {
-                            const attitude = ev.target.value;
-                            setPlacedNpcs((prev) =>
-                              prev.map((p, j) => (j === i ? { ...p, attitude } : p))
-                            );
-                            setDirty(true);
-                            setSaved(false);
-                          }}
-                        >
-                          {['friendly', 'indifferent', 'hostile'].map((a) => (
-                            <option key={a} value={a}>
-                              {a.toUpperCase()}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div style={{ flex: '3 1 220px' }}>
-                        <label className={styles.formLbl} htmlFor={`npc-greeting-${i}`}>
-                          GREETING
-                        </label>
-                        <input
-                          id={`npc-greeting-${i}`}
-                          className={styles.formInp}
-                          placeholder="What they say when the party talks to them"
-                          value={n.greeting}
-                          onChange={(ev) => {
-                            const greeting = ev.target.value;
-                            setPlacedNpcs((prev) =>
-                              prev.map((p, j) => (j === i ? { ...p, greeting } : p))
-                            );
-                            setDirty(true);
-                            setSaved(false);
-                          }}
-                        />
-                      </div>
-                      <div style={{ flex: '1 1 90px' }}>
-                        <label className={styles.formLbl} htmlFor={`npc-icon-${i}`}>
-                          ICON
-                        </label>
-                        <input
-                          id={`npc-icon-${i}`}
-                          className={styles.formInp}
-                          placeholder="default"
-                          value={n.icon ?? ''}
-                          onChange={(ev) => {
-                            const icon = ev.target.value;
-                            setPlacedNpcs((prev) =>
-                              prev.map((p, j) => (j === i ? { ...p, icon } : p))
-                            );
-                            setDirty(true);
-                            setSaved(false);
-                          }}
-                        />
-                      </div>
-                      <span
+                      <div
                         style={{
-                          fontSize: '0.7rem',
-                          color: 'var(--t-dim)',
-                          minWidth: 70,
-                          paddingBottom: 8,
+                          display: 'flex',
+                          gap: '0.5rem',
+                          alignItems: 'flex-end',
+                          flexWrap: 'wrap',
                         }}
                       >
-                        {n.pos ? `AT (${n.pos.x},${n.pos.y})` : 'UNPLACED'}
-                      </span>
-                      <div style={{ display: 'flex', gap: 6, paddingBottom: 4 }}>
-                        <button
-                          className={styles.ghostBtn}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
-                          aria-pressed={placeArm?.kind === 'npc' && placeArm.idx === i}
-                          data-testid={`place-npc-${i}`}
-                          onClick={() =>
-                            setPlaceArm((v) =>
-                              v?.kind === 'npc' && v.idx === i ? null : { kind: 'npc', idx: i }
-                            )
-                          }
-                        >
-                          PLACE
-                        </button>
-                        <button
-                          className={styles.ghostBtn}
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                          aria-label={`Remove NPC ${i + 1}`}
-                          onClick={() => {
-                            setPlacedNpcs((prev) => prev.filter((_, j) => j !== i));
-                            setPlaceArm(null);
-                            setDirty(true);
-                            setSaved(false);
+                        <div style={{ flex: '2 1 140px' }}>
+                          <label className={styles.formLbl} htmlFor={`npc-name-${i}`}>
+                            NAME
+                          </label>
+                          <input
+                            id={`npc-name-${i}`}
+                            className={styles.formInp}
+                            value={n.name}
+                            onChange={(ev) => {
+                              const name = ev.target.value;
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, name } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: '1 1 110px' }}>
+                          <label className={styles.formLbl} htmlFor={`npc-attitude-${i}`}>
+                            ATTITUDE
+                          </label>
+                          <select
+                            id={`npc-attitude-${i}`}
+                            className={styles.formInp}
+                            style={{ cursor: 'pointer' }}
+                            value={n.attitude}
+                            onChange={(ev) => {
+                              const attitude = ev.target.value;
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, attitude } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            {['friendly', 'indifferent', 'hostile'].map((a) => (
+                              <option key={a} value={a}>
+                                {a.toUpperCase()}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ flex: '3 1 220px' }}>
+                          <label className={styles.formLbl} htmlFor={`npc-greeting-${i}`}>
+                            GREETING
+                          </label>
+                          <input
+                            id={`npc-greeting-${i}`}
+                            className={styles.formInp}
+                            placeholder="What they say when the party talks to them"
+                            value={n.greeting}
+                            onChange={(ev) => {
+                              const greeting = ev.target.value;
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, greeting } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: '1 1 90px' }}>
+                          <label className={styles.formLbl} htmlFor={`npc-icon-${i}`}>
+                            ICON
+                          </label>
+                          <input
+                            id={`npc-icon-${i}`}
+                            className={styles.formInp}
+                            placeholder="default"
+                            value={n.icon ?? ''}
+                            onChange={(ev) => {
+                              const icon = ev.target.value;
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, icon } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            color: 'var(--t-dim)',
+                            minWidth: 70,
+                            paddingBottom: 8,
                           }}
                         >
-                          <span aria-hidden="true">✕</span>
-                        </button>
+                          {n.pos ? `AT (${n.pos.x},${n.pos.y})` : 'UNPLACED'}
+                        </span>
+                        <div style={{ display: 'flex', gap: 6, paddingBottom: 4 }}>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                            aria-pressed={placeArm?.kind === 'npc' && placeArm.idx === i}
+                            data-testid={`place-npc-${i}`}
+                            onClick={() =>
+                              setPlaceArm((v) =>
+                                v?.kind === 'npc' && v.idx === i ? null : { kind: 'npc', idx: i }
+                              )
+                            }
+                          >
+                            PLACE
+                          </button>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                            aria-pressed={dialogueOpen === i}
+                            data-testid={`npc-dialogue-${i}`}
+                            onClick={() => setDialogueOpen((v) => (v === i ? null : i))}
+                          >
+                            DIALOGUE ({(n.responses ?? []).length})
+                          </button>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                            aria-label={`Remove NPC ${i + 1}`}
+                            onClick={() => {
+                              setPlacedNpcs((prev) => prev.filter((_, j) => j !== i));
+                              setPlaceArm(null);
+                              setDialogueOpen(null);
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            <span aria-hidden="true">✕</span>
+                          </button>
+                        </div>
                       </div>
+                      {dialogueOpen === i && (
+                        <div style={{ marginTop: 6 }}>
+                          <DialogueEditor
+                            value={n.responses ?? []}
+                            onChange={(responses) => {
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) =>
+                                  j === i
+                                    ? {
+                                        ...p,
+                                        ...(responses.length
+                                          ? { responses }
+                                          : { responses: undefined }),
+                                      }
+                                    : p
+                                )
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                            items={itemOptions}
+                            quests={questOptions}
+                            factions={factionOptions}
+                            npcIds={placedNpcs.map((p) => p.id)}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

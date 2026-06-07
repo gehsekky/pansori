@@ -709,6 +709,72 @@ describe('RegionEditorScreen', () => {
       });
     });
 
+    it('DIALOGUE editor: a gated, quest-starting option folds into the saved NPC', async () => {
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [
+                TAPROOM,
+                {
+                  ...CELLAR,
+                  npcs: [
+                    { id: 'old-hob', name: 'Old Hob', attitude: 'friendly', greeting: 'Evening.' },
+                  ],
+                },
+              ],
+            }
+          : section === 'quests'
+            ? { section, source: 'db', value: [{ id: 'rat-problem', title: 'The Rat Problem' }] }
+            : section === 'factions'
+              ? { section, source: 'db', value: [] }
+              : { section, source: 'db', value: [] }
+      );
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      render(
+        <RegionEditorScreen campaignId="sandbox" regionId="cellar" kind="room" onBack={vi.fn()} />
+      );
+      await screen.findByTestId('cell-0-0');
+      // Open the tree, add an option — a blank PLAYER LINE blocks the save.
+      fireEvent.click(screen.getByTestId('npc-dialogue-0'));
+      expect(await screen.findByText(/No dialogue yet/)).toBeTruthy();
+      fireEvent.click(screen.getByTestId('add-dialogue-option'));
+      fireEvent.click(screen.getByText('SAVE'));
+      expect(await screen.findByText(/needs a PLAYER LINE/)).toBeTruthy();
+      expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+      // Fill the node: line + reply, a flag condition, a START QUEST effect.
+      fireEvent.change(screen.getByLabelText('PLAYER LINE'), {
+        target: { value: 'Need a hand with anything?' },
+      });
+      fireEvent.change(screen.getByLabelText('NPC REPLY'), {
+        target: { value: 'Rats. Cellar. Coin on completion.' },
+      });
+      fireEvent.change(screen.getByLabelText('Add option 1 condition'), {
+        target: { value: 'flag' },
+      });
+      fireEvent.change(screen.getByLabelText('option 1 condition 1 flag key'), {
+        target: { value: 'met_hob' },
+      });
+      fireEvent.change(screen.getByLabelText('Add option 1 effect'), {
+        target: { value: 'start_quest' },
+      });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        npcs?: Array<Record<string, unknown>>;
+      }>;
+      expect(saved.find((r) => r.id === 'cellar')!.npcs![0].responses).toEqual([
+        {
+          label: 'Need a hand with anything?',
+          reply: 'Rats. Cellar. Coin on completion.',
+          condition: { fact: 'flags', path: '$.met_hob', operator: 'equal', value: true },
+          consequences: [{ type: 'start_quest', questId: 'rat-problem' }],
+        },
+      ]);
+    });
+
     it('OBJECTS card: name guard, loot chips, PLACE flow, optional-field pruning', async () => {
       renderRoom('cellar');
       await screen.findByTestId('cell-0-0');
