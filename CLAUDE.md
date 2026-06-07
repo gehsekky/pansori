@@ -58,6 +58,7 @@ grep -n "^Alert$\|^Magic Initiate$\|^Savage Attacker$\|^Skilled$" docs/srd-5.2.1
 | General feats | 2 (ASI + Grappler) | 0 (neither fits the choose-a-feat surface today) |
 | Species | 9 standalone + Drow as Elf-lineage | 9 |
 | Spells | ~340 | all (full SRD coverage; ~108 un-modelable utility/meta spells are narrative-only — see note below) |
+| Monsters | 330 stat blocks | 328 (every attack-capable block, CR 0 Rat → CR 30 Tarrasque; only Seahorse + Shrieker Fungus skipped — no attack actions). Names + cr/hp/ac/xp are spec-audited against the SRD txt; complex traits deferred per entry with `// Simplification:` notes |
 
 All SRD 5.2.1 spells are now in the catalog. The combat-relevant ones
 are fully mechanical; spells whose RAW effect needs systems pansori
