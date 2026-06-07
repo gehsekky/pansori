@@ -537,6 +537,51 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Remove Curse — end the curses on the target: the Bestow Curse debuff
+  // lifts, and the attunement bond on any CURSED items breaks (the item stays
+  // cursed — it can simply be put down now).
+  if (spell.removesCurses) {
+    const liftFrom = (c: typeof buffTarget): { next: typeof buffTarget; freed: string[] } => {
+      const durs = { ...(c.condition_durations ?? {}) };
+      delete durs.cursed;
+      const cursedAttuned = (c.inventory ?? []).filter(
+        (it) => it.cursed && (c.attuned_items ?? []).includes(it.instance_id ?? '')
+      );
+      return {
+        next: {
+          ...c,
+          conditions: (c.conditions ?? []).filter((x) => x !== 'cursed'),
+          condition_durations: durs,
+          attuned_items: (c.attuned_items ?? []).filter(
+            (id) => !cursedAttuned.some((it) => it.instance_id === id)
+          ),
+        },
+        freed: cursedAttuned.map((it) => it.name),
+      };
+    };
+    let freed: string[] = [];
+    if (isCasterTarget) {
+      const r = liftFrom(char);
+      Object.assign(char, r.next);
+      freed = r.freed;
+    } else {
+      const r = liftFrom(buffTarget);
+      freed = r.freed;
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) => (c.id === buffTarget.id ? r.next : c)),
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === buffTarget.id && !e.isEnemy
+            ? { ...e, conditions: e.conditions.filter((x) => x !== 'cursed') }
+            : e
+        ),
+      };
+    }
+    if (freed.length > 0) {
+      ctx.narrative += ` The attunement bond on ${freed.join(', ')} breaks — the curse no longer holds the item to its bearer.`;
+    }
+  }
+
   // SRD Protection from Evil and Good — ward the target: pansori grants Advantage
   // on saves vs Charmed / Frightened (read in conditionSavingThrow). Concentration;
   // cleared on breakConcentration.

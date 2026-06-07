@@ -509,6 +509,50 @@ export function resolveMarkerMove(
   return { st: next, narrative, squaresMoved, transitioned, elapsedHours, encounter, fatigueNote };
 }
 
+/**
+ * Teleport-style relocation to a VISITED town (Teleport / Teleportation
+ * Circle / Word of Recall): the party arrives at the town's startPos with no
+ * travel time. The hosting region (found via its town site) becomes current,
+ * with the site cell bookmarked so the town gate ascends sensibly. Fires the
+ * town enter hooks like any other arrival. Returns null when the town doesn't
+ * resolve (deleted since it was visited).
+ */
+export function relocateToTown(
+  campaign: CampaignData | undefined,
+  st: GameState,
+  townId: string
+): { st: GameState; narrative: string } | null {
+  const town = townById(campaign, townId);
+  if (!town) return null;
+  // The region that hosts this town (its 'town' site) — current region + the
+  // gate bookmark both come from it. A town no region points at keeps the
+  // party's current region (gate ascent falls back to region startPos).
+  let hostRegionId = st.current_region_id;
+  let siteCell: GridPos | undefined;
+  for (const region of campaign?.regions ?? []) {
+    const site = region.sites.find((s) => s.kind === 'town' && s.townId === townId);
+    if (site) {
+      hostRegionId = region.id;
+      siteCell = site.pos;
+      break;
+    }
+  }
+  const visit = markFirst(st.visited_towns, town.id);
+  return {
+    st: {
+      ...st,
+      map_level: 'town',
+      current_region_id: hostRegionId,
+      current_town_id: town.id,
+      marker_pos: town.startPos,
+      region_marker_pos: siteCell ?? st.region_marker_pos,
+      current_room: '',
+      visited_towns: visit.list,
+    },
+    narrative: ` The world folds and the party stands in ${town.name}.${levelHook(town, 'enter', visit.first)}`,
+  };
+}
+
 /** Apply a transition the marker stepped onto: descend / ascend / change room. */
 export function resolveTransition(
   campaign: CampaignData | undefined,

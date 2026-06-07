@@ -225,6 +225,23 @@ export function runPrecast(
     return { done: true };
   }
 
+  // Town teleportation needs a KNOWN destination — gated before the slot is
+  // spent so a party that hasn't visited any town doesn't burn a high slot.
+  if (spell.townTeleport && (ctx.st.visited_towns ?? []).length === 0) {
+    ctx.narrative = `${spell.name} needs a destination the party knows — visit a town first.`;
+    return { done: true };
+  }
+  // Word of Recall with no sanctuary AND no town to designate fizzles the
+  // same way (cast it IN a town to consecrate the sanctuary).
+  if (
+    spell.recall &&
+    !ctx.st.recall_town_id &&
+    !(ctx.st.map_level === 'town' && ctx.st.current_town_id)
+  ) {
+    ctx.narrative = `${spell.name} has no sanctuary to return to — cast it in a town to designate one.`;
+    return { done: true };
+  }
+
   // SRD anti-magic suppression — Antimagic Field / Globe of Invulnerability. A
   // spell that crosses such a zone fizzles before the slot is spent. Checked at
   // the slot level (upcasts count toward Globe's cap). The suppression spells

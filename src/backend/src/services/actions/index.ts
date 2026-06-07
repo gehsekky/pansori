@@ -38,6 +38,7 @@ import {
   handleTalkResponse,
 } from './social.js';
 import { handleAttune, handleDeAttune, handleUse } from './inventory.js';
+import { handleCancelTeleport, handleTeleportTo } from './teleportTo.js';
 import { handleContinue, handleEndTurn, handlePass } from './utility.js';
 import {
   handleDash,
@@ -140,6 +141,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   exit_shop: handleExitShop as ActionHandler,
   marker_move: handleMarkerMove as ActionHandler,
   set_pace: handleSetPace as ActionHandler,
+  teleport_to: handleTeleportTo as ActionHandler,
+  cancel_teleport: handleCancelTeleport as ActionHandler,
   approach: handleApproach as ActionHandler,
   accept_quest: handleAcceptQuest as ActionHandler,
   complete_quest: handleCompleteQuest as ActionHandler,

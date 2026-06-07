@@ -710,6 +710,9 @@ export type StructuredAction =
   | { type: 'marker_move'; to: GridPos }
   // SRD Travel Pace — set the party's overland stance (regional map, free).
   | { type: 'set_pace'; pace: 'fast' | 'normal' | 'slow' }
+  // Town teleportation (Teleport / Teleportation Circle interstitial).
+  | { type: 'teleport_to'; townId: string }
+  | { type: 'cancel_teleport' }
   | { type: 'accept_quest'; questId: string }
   | { type: 'complete_quest'; questId: string }
   | { type: 'dash' }

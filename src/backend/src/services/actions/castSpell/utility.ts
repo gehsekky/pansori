@@ -5,6 +5,7 @@ import { composeNow } from '../../narrative/compose.js';
 import { concentrationRoundsFor } from './utils.js';
 import { lightReaches } from '../../gridEngine.js';
 import { randomUUID } from 'crypto';
+import { relocateToTown } from '../../mapEngine.js';
 import { rollDice } from '../../rulesEngine.js';
 
 /**
@@ -71,6 +72,33 @@ export function runUtilitySpell(
       rounds_left: concentrationRoundsFor(spell) * (ctx.metamagic?.includes('extended') ? 2 : 1),
     };
     ctx.narrative += ` ${char.name} surges ahead — an extra ${dashSpeed} ft of movement this turn.`;
+  }
+
+  // SRD Teleport / Teleportation Circle — open the destination interstitial:
+  // generateChoices lists the VISITED towns until teleport_to / cancel
+  // resolves it. (Precast guarantees at least one destination exists.)
+  if (spell.townTeleport) {
+    ctx.st = { ...ctx.st, pending_teleport: spell.id };
+    ctx.narrative += ' Destinations shimmer at the edge of thought — choose where to arrive.';
+  }
+
+  // SRD Word of Recall — cast IN a town: designate it the sanctuary; cast
+  // anywhere else: instant return to the designated sanctuary.
+  if (spell.recall) {
+    const hereTown = ctx.st.map_level === 'town' ? ctx.st.current_town_id : undefined;
+    if (hereTown) {
+      ctx.st = { ...ctx.st, recall_town_id: hereTown };
+      const town = ctx.context.campaign?.towns?.find((t) => t.id === hereTown);
+      ctx.narrative += ` ${town?.name ?? 'This town'} is consecrated as the party's sanctuary — Word of Recall will return here.`;
+    } else if (ctx.st.recall_town_id) {
+      const moved = relocateToTown(ctx.context.campaign, ctx.st, ctx.st.recall_town_id);
+      if (moved) {
+        ctx.st = moved.st;
+        ctx.narrative += moved.narrative;
+      } else {
+        ctx.narrative += ' The sanctuary no longer answers the call.';
+      }
+    }
   }
 
   // SRD Vision & Light — Light (20 ft bright) / Daylight (60 ft bright) make the

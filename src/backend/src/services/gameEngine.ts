@@ -4299,6 +4299,24 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // Town-teleport interstitial — a cast Teleport / Teleportation Circle is
+  // waiting on a destination: offer ONLY the visited towns + a cancel.
+  if (state.pending_teleport && !state.combat_active) {
+    const spellName = context.spellTable?.[state.pending_teleport]?.name ?? 'Teleport';
+    const dests: GameChoice[] = (state.visited_towns ?? [])
+      .map((townId) => context.campaign?.towns?.find((t) => t.id === townId))
+      .filter((t): t is NonNullable<typeof t> => !!t)
+      .map((t) => ({
+        label: `${spellName} → ${t.name}`,
+        action: { type: 'teleport_to' as const, townId: t.id },
+      }));
+    dests.push({
+      label: '✕ Let the spell dissipate',
+      action: { type: 'cancel_teleport' as const },
+    });
+    return dests;
+  }
+
   const conv = state.active_conversation;
   if (conv && !state.combat_active && conv.roomId === state.current_room) {
     const cnpc = npcById(seed, conv.npcId);

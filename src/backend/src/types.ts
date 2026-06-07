@@ -965,6 +965,16 @@ export interface Spell {
   shapeshift?: { scope: 'self' | 'allies' };
   // Long casting time (1 min+) — rejected in combat (before slot spend).
   outOfCombatOnly?: boolean;
+  // Town teleportation (Teleport / Teleportation Circle): casting opens a
+  // destination interstitial (GameState.pending_teleport) listing the towns
+  // the party has VISITED; teleport_to relocates instantly (no travel time).
+  townTeleport?: boolean;
+  // Word of Recall: cast in a town to DESIGNATE it the sanctuary
+  // (GameState.recall_town_id); cast anywhere else to return to it instantly.
+  recall?: boolean;
+  // Remove Curse: strips the 'cursed' condition and breaks the attunement
+  // bond on cursed items the target has attuned (the items stay cursed).
+  removesCurses?: boolean;
 }
 
 // ─── Beast Forms (SRD Wild Shape) ───────────────────────────────────────
@@ -1739,6 +1749,12 @@ export interface GameState {
   // The world_minute at which the last long rest completed; gates SRD's "one
   // long rest per 24 hours" (a second is blocked until 1440 min have passed).
   last_long_rest_minute?: number;
+  // Teleportation interstitial — set when a town-teleport spell is cast
+  // (the spell id); generateChoices then offers ONLY the visited-town
+  // destinations + cancel until teleport_to / cancel_teleport clears it.
+  pending_teleport?: string;
+  // Word of Recall's designated sanctuary town (cast in a town to set it).
+  recall_town_id?: string;
   // SRD Travel Pace — the party's overland stance (default 'normal'). Drives
   // miles-per-hour on the regional map and the pace check effects (Fast:
   // Disadvantage on Wisdom (Perception) → passive −5; Slow: Advantage → +5),
