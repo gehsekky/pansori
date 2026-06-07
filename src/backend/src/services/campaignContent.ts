@@ -731,7 +731,11 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
       ...(mech.cover.length > 0 ? { coverPositions: mech.cover } : {}),
       ...(r.lighting !== undefined ? { lighting: r.lighting } : {}),
       ...(r.floor !== undefined ? { floor: r.floor } : {}),
-      ...(r.canRest ? { canRest: true } : {}),
+      // ALWAYS explicit for DB rooms. The engine's default is
+      // allowed-unless-forbidden (canRest === false blocks), but the
+      // painter's CAN REST HERE checkbox promises the opposite — an
+      // unchecked room must actually forbid resting, so emit false.
+      canRest: r.canRest ?? false,
     };
   });
 }

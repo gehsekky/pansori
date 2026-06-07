@@ -875,7 +875,15 @@ describe('dbRoomsToEngine', () => {
     expect('terrain' in room).toBe(false);
     expect('obstacles' in room).toBe(false);
     expect('exits' in room).toBe(false);
-    expect('canRest' in room).toBe(false);
+  });
+
+  it('canRest is ALWAYS explicit on DB rooms — unchecked really forbids resting', () => {
+    // The engine default is allowed-unless-forbidden, but the painter's
+    // CAN REST HERE checkbox promises the opposite. DB rooms emit the
+    // boolean both ways so an unchecked room blocks the rest choices.
+    const [rich, bare] = dbRoomsToEngine([ROOM_A, ROOM_B]);
+    expect(rich.canRest).toBe(true);
+    expect(bare.canRest).toBe(false);
   });
 });
 
