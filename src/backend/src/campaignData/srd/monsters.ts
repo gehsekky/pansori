@@ -3630,4 +3630,385 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     onHitEffect: { condition: 'grappled', escapeDc: 17 },
     // Simplification: RAW one Bite + one Tail; uniform Bite ×2 simplification, grapple kept.
   },
+
+  // ─── Humanoid foes + NPC stat blocks (SRD 5.2.1) — batch 2026-06-07 ─────────
+  // The generic-person blocks campaign authors stat villagers, soldiers and
+  // gang leaders with, plus the goblinoid command tier and the aquatic
+  // raiders. 5.2.1 names kept verbatim; where 5.2.1 renamed a block we
+  // already carry (Goblin/Kobold/Gnoll Warrior, Cultist Fanatic), the
+  // existing template stays under its shipped name — content references
+  // resolve templates BY NAME, so a rename would break placed campaigns.
+
+  commoner: {
+    name: 'Commoner',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 0,
+    hp: 4,
+    ac: 10,
+    damage: '1d4',
+    toHit: 2,
+    xp: 10,
+    str: 10,
+    dex: 10,
+    con: 10,
+    int: 10,
+    wis: 10,
+    cha: 10,
+    damageType: 'bludgeoning', // club
+  },
+
+  warrior_infantry: {
+    name: 'Warrior Infantry',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 0.125,
+    hp: 9,
+    ac: 13,
+    damage: '1d6+1',
+    toHit: 3,
+    xp: 25,
+    str: 13,
+    dex: 11,
+    con: 11,
+    int: 8,
+    wis: 11,
+    cha: 8,
+    damageType: 'piercing', // spear
+    packTactics: true,
+  },
+
+  goblin_minion: {
+    name: 'Goblin Minion',
+    // SRD 5.2.1 type: Fey (Goblinoid) — not in the creatureType union; left
+    // unspecified, matching the shipped Goblin.
+    cr: 0.125,
+    hp: 7,
+    ac: 12,
+    damage: '1d4+2',
+    toHit: 4,
+    xp: 25,
+    str: 8,
+    dex: 15,
+    con: 10,
+    int: 10,
+    wis: 8,
+    cha: 8,
+    damageType: 'piercing', // dagger
+    // Simplification: Nimble Escape (bonus-action Disengage/Hide) deferred.
+  },
+
+  merfolk_skirmisher: {
+    name: 'Merfolk Skirmisher',
+    // SRD 5.2.1 type: Elemental — not in the creatureType union.
+    darkvision_ft: 0, // no darkvision
+    cr: 0.125,
+    hp: 11,
+    ac: 11,
+    damage: '1d6',
+    toHit: 2,
+    xp: 25,
+    str: 10,
+    dex: 13,
+    con: 12,
+    int: 11,
+    wis: 14,
+    cha: 12,
+    damageType: 'piercing', // ocean spear
+    speedFt: 40, // swim
+    bonusDamage: '1d4',
+    bonusDamageType: 'cold',
+    // Simplification: the spear's 10-ft Speed slow rider deferred.
+  },
+
+  priest_acolyte: {
+    name: 'Priest Acolyte',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 0.25,
+    hp: 11,
+    ac: 13,
+    damage: '1d6+2',
+    toHit: 4,
+    xp: 50,
+    str: 14,
+    dex: 10,
+    con: 12,
+    int: 10,
+    wis: 14,
+    cha: 11,
+    damageType: 'bludgeoning', // mace
+    bonusDamage: '1d4',
+    bonusDamageType: 'radiant',
+    // Simplification: utility Spellcasting (Light / Sanctuary …) deferred,
+    // matching the Priest convention (the attack action carries the block).
+  },
+
+  hobgoblin_warrior: {
+    name: 'Hobgoblin Warrior',
+    // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified.
+    cr: 0.5,
+    hp: 11,
+    ac: 18,
+    damage: '2d10+1', // longsword, two-handed
+    toHit: 3,
+    xp: 100,
+    str: 13,
+    dex: 12,
+    con: 12,
+    int: 10,
+    wis: 10,
+    cha: 9,
+    damageType: 'slashing',
+    packTactics: true,
+  },
+
+  sahuagin_warrior: {
+    name: 'Sahuagin Warrior',
+    creatureType: 'fiend', // 5.2.1 sahuagin are Fiends
+    cr: 0.5,
+    hp: 22,
+    ac: 12,
+    damage: '1d6+1',
+    toHit: 3,
+    xp: 100,
+    str: 13,
+    dex: 11,
+    con: 12,
+    int: 12,
+    wis: 13,
+    cha: 9,
+    multiattack: 2, // two Claw attacks
+    damageType: 'slashing',
+    speedFt: 40, // swim
+    darkvision_ft: 120,
+    resistances: ['acid', 'cold'],
+    // Simplification: Blood Frenzy (Advantage vs not-full-HP targets) is a
+    // target-state trait the engine doesn't track — deferred.
+  },
+
+  pirate: {
+    name: 'Pirate',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 1,
+    hp: 33,
+    ac: 14,
+    damage: '1d4+3',
+    toHit: 5,
+    xp: 200,
+    str: 10,
+    dex: 16,
+    con: 12,
+    int: 8,
+    wis: 12,
+    cha: 14,
+    multiattack: 2, // two Dagger attacks
+    damageType: 'piercing',
+    // Simplification: Enthralling Panache (WIS 12, Charmed) deferred.
+  },
+
+  goblin_boss: {
+    name: 'Goblin Boss',
+    // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified.
+    cr: 1,
+    hp: 21,
+    ac: 17,
+    damage: '1d6+2',
+    toHit: 4,
+    xp: 200,
+    str: 10,
+    dex: 15,
+    con: 10,
+    int: 10,
+    wis: 8,
+    cha: 10,
+    multiattack: 2, // two Scimitar attacks
+    damageType: 'slashing',
+    // Simplification: the +1d4 rider when the roll has Advantage, and
+    // Redirect Attack, deferred.
+  },
+
+  azer_sentinel: {
+    name: 'Azer Sentinel',
+    // SRD 5.2.1 type: Elemental — not in the creatureType union.
+    cr: 2,
+    hp: 39,
+    ac: 17,
+    damage: '1d10+3',
+    toHit: 5,
+    xp: 450,
+    str: 17,
+    dex: 12,
+    con: 15,
+    int: 12,
+    wis: 13,
+    cha: 10,
+    damageType: 'bludgeoning', // burning hammer
+    bonusDamage: '1d6',
+    bonusDamageType: 'fire',
+    immunities: ['fire', 'poison'],
+    condition_immunities: ['poisoned'],
+    // SRD: Fire Aura — 5-ft emanation, 1d10 Fire. Modeled via the PC-turn-
+    // start aura hook (RAW end-of-its-turn timing approximated, like the
+    // Fire Elemental).
+    aura: { radiusFt: 5, damage: '1d10', damageType: 'fire', name: 'Fire Aura' },
+  },
+
+  centaur_trooper: {
+    name: 'Centaur Trooper',
+    // SRD 5.2.1 type: Fey — not in the creatureType union.
+    darkvision_ft: 0, // no darkvision
+    cr: 2,
+    hp: 45,
+    ac: 16,
+    damage: '1d10+4',
+    toHit: 6,
+    xp: 450,
+    str: 18,
+    dex: 14,
+    con: 14,
+    int: 9,
+    wis: 13,
+    cha: 11,
+    multiattack: 2, // two Pike attacks
+    attackReachFt: 10,
+    speedFt: 50,
+    damageType: 'piercing',
+    // Simplification: Trampling Charge (Recharge 5-6 hooves + Prone) deferred.
+  },
+
+  druid: {
+    name: 'Druid',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 2,
+    hp: 44,
+    ac: 13,
+    damage: '1d8+3',
+    toHit: 5,
+    xp: 450,
+    str: 10,
+    dex: 12,
+    con: 13,
+    int: 12,
+    wis: 16,
+    cha: 11,
+    multiattack: 2, // two Vine Staff or Verdant Wisp attacks
+    damageType: 'bludgeoning',
+    bonusDamage: '1d4',
+    bonusDamageType: 'poison',
+    // Simplification: utility Spellcasting (Druidcraft / Speak with Animals)
+    // deferred, matching the Priest convention.
+  },
+
+  bugbear_stalker: {
+    name: 'Bugbear Stalker',
+    // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified, matching the
+    // shipped Bugbear Warrior.
+    cr: 3,
+    hp: 65,
+    ac: 15,
+    damage: '2d8+3', // morningstar
+    toHit: 5,
+    xp: 700,
+    str: 17,
+    dex: 14,
+    con: 14,
+    int: 11,
+    wis: 12,
+    cha: 11,
+    multiattack: 2,
+    attackReachFt: 10, // long-limbed
+    damageType: 'piercing',
+    // Simplification: Advantage-vs-own-grapple rider deferred (no grapple
+    // attack on this block's modeled swing).
+  },
+
+  hobgoblin_captain: {
+    name: 'Hobgoblin Captain',
+    // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified.
+    cr: 3,
+    hp: 58,
+    ac: 17,
+    damage: '2d6+2',
+    toHit: 4,
+    xp: 700,
+    str: 15,
+    dex: 14,
+    con: 14,
+    int: 12,
+    wis: 10,
+    cha: 13,
+    multiattack: 2, // two Greatsword attacks
+    damageType: 'slashing',
+    bonusDamage: '1d6',
+    bonusDamageType: 'poison',
+    // Simplification: Aura of Authority (allies gain Advantage in a 10-ft
+    // emanation) buffs ALLIES — the aura hook only debuffs PCs; deferred.
+  },
+
+  guard_captain: {
+    name: 'Guard Captain',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 4,
+    hp: 75,
+    ac: 18,
+    damage: '2d10+4',
+    toHit: 6,
+    xp: 1100,
+    str: 18,
+    dex: 14,
+    con: 16,
+    int: 12,
+    wis: 14,
+    cha: 13,
+    multiattack: 2, // two Longsword attacks
+    damageType: 'slashing',
+  },
+
+  tough_boss: {
+    name: 'Tough Boss',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 4,
+    hp: 82,
+    ac: 16,
+    damage: '2d8+3',
+    toHit: 5,
+    xp: 1100,
+    str: 17,
+    dex: 14,
+    con: 16,
+    int: 11,
+    wis: 10,
+    cha: 11,
+    multiattack: 2, // two Warhammer attacks
+    damageType: 'bludgeoning',
+    packTactics: true,
+    // Simplification: the 10-ft shove rider deferred.
+  },
+
+  pirate_captain: {
+    name: 'Pirate Captain',
+    creatureType: 'humanoid',
+    darkvision_ft: 0, // no darkvision
+    cr: 6,
+    hp: 84,
+    ac: 17,
+    damage: '2d8+4',
+    toHit: 7,
+    xp: 2300,
+    str: 10,
+    dex: 18,
+    con: 14,
+    int: 10,
+    wis: 14,
+    cha: 17,
+    multiattack: 3, // three Rapier attacks
+    damageType: 'piercing',
+    // Simplification: the self-Advantage chain rider and Captain's Charm
+    // deferred.
+  },
 };

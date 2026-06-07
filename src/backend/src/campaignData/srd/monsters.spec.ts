@@ -153,6 +153,24 @@ const NEW_MONSTERS: Array<[string, number, number, number, string, number, numbe
   ['giant_shark', 5, 92, 13, '3d10+6', 9, 1800, 2],
   ['triceratops', 5, 114, 14, '2d12+6', 9, 1800, 2],
   ['tyrannosaurus_rex', 8, 136, 13, '4d12+7', 10, 3900, 2],
+  // Humanoid foes + NPC blocks batch (2026-06-07).
+  ['commoner', 0, 4, 10, '1d4', 2, 10],
+  ['warrior_infantry', 0.125, 9, 13, '1d6+1', 3, 25],
+  ['goblin_minion', 0.125, 7, 12, '1d4+2', 4, 25],
+  ['merfolk_skirmisher', 0.125, 11, 11, '1d6', 2, 25],
+  ['priest_acolyte', 0.25, 11, 13, '1d6+2', 4, 50],
+  ['hobgoblin_warrior', 0.5, 11, 18, '2d10+1', 3, 100],
+  ['sahuagin_warrior', 0.5, 22, 12, '1d6+1', 3, 100, 2],
+  ['pirate', 1, 33, 14, '1d4+3', 5, 200, 2],
+  ['goblin_boss', 1, 21, 17, '1d6+2', 4, 200, 2],
+  ['azer_sentinel', 2, 39, 17, '1d10+3', 5, 450],
+  ['centaur_trooper', 2, 45, 16, '1d10+4', 6, 450, 2],
+  ['druid', 2, 44, 13, '1d8+3', 5, 450, 2],
+  ['bugbear_stalker', 3, 65, 15, '2d8+3', 5, 700, 2],
+  ['hobgoblin_captain', 3, 58, 17, '2d6+2', 4, 700, 2],
+  ['guard_captain', 4, 75, 18, '2d10+4', 6, 1100, 2],
+  ['tough_boss', 4, 82, 16, '2d8+3', 5, 1100, 2],
+  ['pirate_captain', 6, 84, 17, '2d8+4', 7, 2300, 3],
 ];
 
 describe('SRD bestiary additions — core stat lines', () => {
@@ -629,5 +647,47 @@ describe('Animals appendix batch — effect fields', () => {
     expect(SRD_MONSTERS.killer_whale.speedFt).toBe(60); // swim
     expect(SRD_MONSTERS.giant_shark.speedFt).toBe(60); // swim
     expect(SRD_MONSTERS.allosaurus.speedFt).toBe(60); // ground sprinter
+  });
+});
+
+describe('Humanoid foes batch — effect fields', () => {
+  it('the goblinoid tier leaves creatureType unspecified (5.2.1 Fey, no union entry)', () => {
+    for (const id of ['goblin_minion', 'goblin_boss', 'hobgoblin_warrior', 'hobgoblin_captain'])
+      expect(SRD_MONSTERS[id].creatureType, id).toBeUndefined();
+    expect(SRD_MONSTERS.sahuagin_warrior.creatureType).toBe('fiend'); // 5.2.1 reclassification
+  });
+
+  it('the formation fighters carry Pack Tactics', () => {
+    for (const id of ['warrior_infantry', 'hobgoblin_warrior', 'tough_boss'])
+      expect(SRD_MONSTERS[id].packTactics, id).toBe(true);
+  });
+
+  it('Azer Sentinel: fire kit — hammer rider, immunities, and the 5-ft Fire Aura', () => {
+    const azer = SRD_MONSTERS.azer_sentinel;
+    expect(azer.bonusDamage).toBe('1d6');
+    expect(azer.bonusDamageType).toBe('fire');
+    expect(azer.immunities).toEqual(['fire', 'poison']);
+    expect(azer.condition_immunities).toEqual(['poisoned']);
+    expect(azer.aura).toEqual({
+      radiusFt: 5,
+      damage: '1d10',
+      damageType: 'fire',
+      name: 'Fire Aura',
+    });
+  });
+
+  it('damage riders: radiant mace, poison greatsword/staff, cold spear', () => {
+    expect(SRD_MONSTERS.priest_acolyte.bonusDamageType).toBe('radiant');
+    expect(SRD_MONSTERS.hobgoblin_captain.bonusDamageType).toBe('poison');
+    expect(SRD_MONSTERS.druid.bonusDamageType).toBe('poison');
+    expect(SRD_MONSTERS.merfolk_skirmisher.bonusDamageType).toBe('cold');
+  });
+
+  it('reach + speed: the long-limbed stalker and the galloping trooper', () => {
+    expect(SRD_MONSTERS.bugbear_stalker.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.centaur_trooper.attackReachFt).toBe(10);
+    expect(SRD_MONSTERS.centaur_trooper.speedFt).toBe(50);
+    expect(SRD_MONSTERS.sahuagin_warrior.speedFt).toBe(40); // swim
+    expect(SRD_MONSTERS.sahuagin_warrior.darkvision_ft).toBe(120);
   });
 });
