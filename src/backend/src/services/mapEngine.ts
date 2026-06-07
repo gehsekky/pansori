@@ -10,6 +10,7 @@ import {
   type FloorType,
   type GameState,
   type GridPos,
+  type LevelNarrationHooks,
   type MapLevel,
   type Region,
   type Room,
@@ -115,10 +116,37 @@ export function initMapState(campaign: CampaignData | undefined, st: GameState):
   });
 }
 
-// The regionEnter narration hook: authored flavor for FIRST entry to a
-// region (game start counts — the campaign opens in regions[0]). Explicit
-// `onEnter` wins; `desc` is the fallback so already-authored regions narrate
-// for free. Returns '' when the region carries neither.
+// Pick a level's narration hook for an enter/exit. The FIRST variant
+// overrides the plain one on the first occurrence; the plain one fires
+// every other time. Returns '' (no leading space) when nothing applies.
+function levelHook(
+  level: LevelNarrationHooks | undefined,
+  kind: 'enter' | 'exit',
+  first: boolean
+): string {
+  if (!level) return '';
+  const text =
+    kind === 'enter'
+      ? first
+        ? (level.onFirstEnter ?? level.onEnter)
+        : level.onEnter
+      : first
+        ? (level.onFirstExit ?? level.onExit)
+        : level.onExit;
+  return text ? ` ${text}` : '';
+}
+
+// Track a first occurrence in one of the GameState scope lists. Returns
+// whether this was the first time plus the updated list.
+function markFirst(list: string[] | undefined, id: string): { first: boolean; list: string[] } {
+  const cur = list ?? [];
+  return cur.includes(id) ? { first: false, list: cur } : { first: true, list: [...cur, id] };
+}
+
+// The regionEnter narration: authored flavor for FIRST entry to a region
+// (game start counts — the campaign opens in regions[0]). Chain:
+// onFirstEnter ?? onEnter ?? desc — so already-authored regions narrate
+// for free. Returns '' when the region carries none of them.
 //
 // Callers fire this only on first entry (st.visited_regions tracks that);
 // region-to-region travel — when it lands — appends the region id there and
@@ -128,7 +156,7 @@ export function regionEnterNarration(
   regionId: string | undefined
 ): string {
   const region = regionById(campaign, regionId);
-  const text = region?.onEnter ?? region?.desc;
+  const text = region?.onFirstEnter ?? region?.onEnter ?? region?.desc;
   return text ? `\n\n${text}` : '';
 }
 
@@ -468,6 +496,7 @@ export function resolveTransition(
   if (t.kind === 'site' && t.toTownId) {
     const town = townById(campaign, t.toTownId);
     if (!town) return { st, narrative: '' };
+    const visit = markFirst(st.visited_towns, town.id);
     return {
       st: {
         ...st,
@@ -476,8 +505,9 @@ export function resolveTransition(
         marker_pos: town.startPos,
         region_marker_pos: st.marker_pos, // bookmark the region cell for ascent
         current_room: '', // on the town grid, not in any room
+        visited_towns: visit.list,
       },
-      narrative: ` You enter ${town.name}.${hook}`,
+      narrative: ` You enter ${town.name}.${hook}${levelHook(town, 'enter', visit.first)}`,
     };
   }
   // ── Descend into a local room (from a region site or a town interior) ─
@@ -488,19 +518,18 @@ export function resolveTransition(
     if (!room) return { st, narrative: '' };
     const g = roomGrid(room);
     const fromTown = t.kind === 'venue';
+    const visit = markFirst(st.visited_rooms, room.id);
     return {
       st: {
         ...st,
         map_level: 'local',
         current_room: room.id,
         marker_pos: g.entry,
-        visited_rooms: st.visited_rooms.includes(room.id)
-          ? st.visited_rooms
-          : [...st.visited_rooms, room.id],
+        visited_rooms: visit.list,
         // Bookmark the cell to return to on ascent (town venue cell or region site cell).
         ...(fromTown ? { town_marker_pos: st.marker_pos } : { region_marker_pos: st.marker_pos }),
       },
-      narrative: ` You enter ${room.name}.${hook}`,
+      narrative: ` You enter ${room.name}.${hook}${levelHook(room, 'enter', visit.first)}`,
     };
   }
   // ── Move to another local room via an exit cell ──────────────────────
@@ -509,34 +538,65 @@ export function resolveTransition(
     if (!room) return { st, narrative: '' };
     const g = roomGrid(room);
     const arrive = t.entrancePos ?? g.entry;
+    const prev = roomById(rooms, st.current_room);
+    const exit = prev
+      ? markFirst(st.exited_rooms, prev.id)
+      : { first: false, list: st.exited_rooms ?? [] };
+    const visit = markFirst(st.visited_rooms, room.id);
     return {
       st: {
         ...st,
         current_room: room.id,
         marker_pos: arrive,
-        visited_rooms: st.visited_rooms.includes(room.id)
-          ? st.visited_rooms
-          : [...st.visited_rooms, room.id],
+        visited_rooms: visit.list,
+        exited_rooms: exit.list,
       },
-      narrative: ` You pass into ${room.name}.`,
+      narrative: `${levelHook(prev, 'exit', exit.first)} You pass into ${room.name}.${levelHook(room, 'enter', visit.first)}`,
     };
   }
   // ── Ascend: leave a local site / a town back up a level ──────────────
   if (t.kind === 'ascend') {
     if (t.ascendTo === 'town' && st.current_town_id) {
       const town = townById(campaign, st.current_town_id);
+      const prev = roomById(rooms, st.current_room);
+      const exit = prev
+        ? markFirst(st.exited_rooms, prev.id)
+        : { first: false, list: st.exited_rooms ?? [] };
       return {
         st: {
           ...st,
           map_level: 'town',
           current_room: '',
           marker_pos: st.town_marker_pos ?? town?.startPos ?? { x: 0, y: 0 },
+          exited_rooms: exit.list,
         },
-        narrative: town ? ` You return to ${town.name}.` : ' You head back out.',
+        // The town is NOT re-entered — it never left scope while the party
+        // was inside one of its rooms.
+        narrative: `${levelHook(prev, 'exit', exit.first)}${town ? ` You return to ${town.name}.` : ' You head back out.'}`,
       };
     }
-    // → region
+    // → region: from a town gate (exits the TOWN scope) or straight up
+    // from a dungeon room (exits the ROOM). The region itself never left
+    // scope, so no region enter hook fires.
     const region = regionById(campaign, st.current_region_id);
+    let exitText = '';
+    let exitedRooms = st.exited_rooms;
+    let exitedTowns = st.exited_towns;
+    if (st.current_room) {
+      const prev = roomById(rooms, st.current_room);
+      if (prev) {
+        const exit = markFirst(st.exited_rooms, prev.id);
+        exitText = levelHook(prev, 'exit', exit.first);
+        exitedRooms = exit.list;
+      }
+    } else if (st.current_town_id) {
+      const town = townById(campaign, st.current_town_id);
+      if (town) {
+        const exit = markFirst(st.exited_towns, town.id);
+        exitText = levelHook(town, 'exit', exit.first);
+        exitedTowns = exit.list;
+      }
+    }
     return {
       st: {
         ...st,
@@ -544,8 +604,10 @@ export function resolveTransition(
         current_town_id: undefined,
         current_room: '',
         marker_pos: st.region_marker_pos ?? region?.startPos ?? { x: 0, y: 0 },
+        exited_rooms: exitedRooms,
+        exited_towns: exitedTowns,
       },
-      narrative: region ? ` You return to ${region.name}.` : ' You head back to the road.',
+      narrative: `${exitText}${region ? ` You return to ${region.name}.` : ' You head back to the road.'}`,
     };
   }
   return { st, narrative: '' };

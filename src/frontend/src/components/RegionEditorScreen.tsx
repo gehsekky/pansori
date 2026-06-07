@@ -79,7 +79,12 @@ interface EditorRegion {
   desc?: string;
   feetPerSquare?: number;
   isStartingRegion?: boolean; // regions only
-  onEnter?: string; // regions only — first-entry narration (desc fallback)
+  // Level narration hooks (all kinds): FIRST variant overrides plain on
+  // the first scope entry/exit; region first-enter falls back to desc.
+  onEnter?: string;
+  onFirstEnter?: string;
+  onExit?: string;
+  onFirstExit?: string;
   encounterChance?: number; // regions only
   baseTier?: number; // regions only
   floor?: string; // towns + rooms
@@ -124,7 +129,10 @@ interface Details {
   name: string;
   desc: string;
   feetPerSquare: string;
-  onEnter: string; // regions only
+  onEnter: string;
+  onFirstEnter: string;
+  onExit: string;
+  onFirstExit: string;
   encounterChance: string; // regions only
   baseTier: string; // regions only
   floor: string; // towns + rooms
@@ -137,6 +145,9 @@ function detailsFrom(r: EditorRegion): Details {
     desc: r.desc ?? '',
     feetPerSquare: r.feetPerSquare !== undefined ? String(r.feetPerSquare) : '',
     onEnter: r.onEnter ?? '',
+    onFirstEnter: r.onFirstEnter ?? '',
+    onExit: r.onExit ?? '',
+    onFirstExit: r.onFirstExit ?? '',
     encounterChance: r.encounterChance !== undefined ? String(r.encounterChance) : '',
     baseTier: r.baseTier !== undefined ? String(r.baseTier) : '',
     floor: r.floor ?? '',
@@ -569,9 +580,12 @@ function RegionEditorScreen({
       }
       next.feetPerSquare = fps;
     }
+    // Level narration hooks — every kind.
+    for (const key of ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const) {
+      if (details[key].trim()) next[key] = details[key].trim();
+      else delete next[key];
+    }
     if (kind === 'region') {
-      if (details.onEnter.trim()) next.onEnter = details.onEnter.trim();
-      else delete next.onEnter;
       if (details.encounterChance.trim() === '') delete next.encounterChance;
       else {
         const enc = Number(details.encounterChance);
@@ -1437,22 +1451,38 @@ function RegionEditorScreen({
                   onChange={(e) => updateDetail('desc', e.target.value)}
                 />
               </div>
-              {kind === 'region' && (
-                <div style={{ marginTop: '0.75rem' }}>
-                  <label className={styles.formLbl} htmlFor="map-detail-on-enter">
-                    ON ENTER NARRATION (FIRST ENTRY — FALLS BACK TO DESCRIPTION)
-                  </label>
-                  <textarea
-                    id="map-detail-on-enter"
-                    className={styles.formInp}
-                    rows={2}
-                    style={{ resize: 'vertical' }}
-                    placeholder="Narrated the first time the party enters this region — game start counts."
-                    value={details.onEnter}
-                    onChange={(e) => updateDetail('onEnter', e.target.value)}
-                  />
+              {/* Level narration hooks — ON FIRST overrides the plain one
+                  the first time; the plain one fires every other time.
+                  Region exits stay dormant until region travel exists. */}
+              <div style={{ marginTop: '0.75rem' }}>
+                <p className={styles.formLbl}>
+                  NARRATION HOOKS — &quot;FIRST&quot; OVERRIDES THE PLAIN ONE ONCE
+                  {kind === 'region' ? ' · FIRST ENTER FALLS BACK TO DESCRIPTION' : ''}
+                </p>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {(
+                    [
+                      ['onEnter', 'ON ENTER'],
+                      ['onFirstEnter', 'ON FIRST ENTER'],
+                      ['onExit', 'ON EXIT'],
+                      ['onFirstExit', 'ON FIRST EXIT'],
+                    ] as Array<[keyof Details, string]>
+                  ).map(([key, label]) => (
+                    <div key={key} style={{ flex: '1 1 45%' }}>
+                      <label className={styles.formLbl} htmlFor={`map-hook-${key}`}>
+                        {label}
+                      </label>
+                      <input
+                        id={`map-hook-${key}`}
+                        className={styles.formInp}
+                        placeholder="none"
+                        value={details[key]}
+                        onChange={(e) => updateDetail(key, e.target.value)}
+                      />
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
               {kind === 'region' && (
                 <div
                   style={{

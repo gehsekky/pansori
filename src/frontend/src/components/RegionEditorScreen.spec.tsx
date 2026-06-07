@@ -184,16 +184,26 @@ describe('RegionEditorScreen', () => {
     expect(list[0].sites).toEqual(REGION.sites);
   });
 
-  it('ON ENTER narration round-trips through the details form (regions only)', async () => {
+  it('the four narration hooks round-trip through the details form', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
-    fireEvent.change(screen.getByLabelText(/ON ENTER NARRATION/), {
+    fireEvent.change(screen.getByLabelText('ON ENTER'), {
       target: { value: 'The mists part as you crest the ridge.' },
+    });
+    fireEvent.change(screen.getByLabelText('ON FIRST ENTER'), {
+      target: { value: 'For the first time, the vale opens.' },
+    });
+    fireEvent.change(screen.getByLabelText('ON EXIT'), { target: { value: 'The mists close.' } });
+    fireEvent.change(screen.getByLabelText('ON FIRST EXIT'), {
+      target: { value: 'You will not forget the vale.' },
     });
     fireEvent.click(screen.getByText('SAVE'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
-    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{ onEnter?: string }>;
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
     expect(saved[0].onEnter).toBe('The mists part as you crest the ridge.');
+    expect(saved[0].onFirstEnter).toBe('For the first time, the vale opens.');
+    expect(saved[0].onExit).toBe('The mists close.');
+    expect(saved[0].onFirstExit).toBe('You will not forget the vale.');
   });
 
   it('clearing an optional detail removes the key instead of writing empty', async () => {
@@ -208,7 +218,7 @@ describe('RegionEditorScreen', () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
     fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText(/ON ENTER NARRATION/), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('ON ENTER'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('BASE TIER'), { target: { value: '' } });
     fireEvent.click(screen.getByText('SAVE'));

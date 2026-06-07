@@ -241,7 +241,22 @@ describe('initMapState', () => {
 });
 
 describe('narration hooks', () => {
-  it('regionEnterNarration: onEnter wins, desc is the fallback, neither → empty', () => {
+  it('regionEnterNarration: onFirstEnter ?? onEnter ?? desc, neither → empty', () => {
+    const withAll: CampaignData = {
+      ...campaign,
+      regions: [
+        {
+          ...campaign.regions![0],
+          desc: 'A vale of mists.',
+          onEnter: 'The mists part.',
+          onFirstEnter: 'For the first time, the vale opens before you.',
+        },
+      ],
+    };
+    // Game start is a first entry — the FIRST variant wins.
+    expect(regionEnterNarration(withAll, 'reg1')).toBe(
+      '\n\nFor the first time, the vale opens before you.'
+    );
     const withHooks: CampaignData = {
       ...campaign,
       regions: [{ ...campaign.regions![0], desc: 'A vale of mists.', onEnter: 'The mists part.' }],
@@ -255,6 +270,91 @@ describe('narration hooks', () => {
     expect(regionEnterNarration(campaign, 'reg1')).toBe(''); // fixture has neither
     expect(regionEnterNarration(campaign, 'nope')).toBe('');
     expect(regionEnterNarration(undefined, 'reg1')).toBe('');
+  });
+
+  it('town level hooks: FIRST overrides plain on first entry; gate exit fires town exit', () => {
+    const hooked: CampaignData = {
+      ...campaign,
+      towns: [
+        {
+          ...campaign.towns![0],
+          onEnter: 'The mill wheel creaks.',
+          onFirstEnter: 'Millhaven, at last.',
+          onExit: 'The gate thuds shut.',
+          onFirstExit: 'You leave Millhaven for the first time.',
+        },
+      ],
+    };
+    // First entry → onFirstEnter.
+    let r = resolveMarkerMove(hooked, rooms, start(), { x: 2, y: 0 });
+    expect(r.narrative).toContain('You enter Millhaven. Millhaven, at last.');
+    expect(r.st.visited_towns).toEqual(['town1']);
+    // Gate ascend → FIRST exit text; the exit is recorded.
+    r = resolveMarkerMove(hooked, rooms, r.st, { x: 1, y: 1 });
+    expect(r.narrative).toContain('You leave Millhaven for the first time.');
+    expect(r.narrative).toContain('You return to The Vale.');
+    expect(r.st.exited_towns).toEqual(['town1']);
+    // Re-enter + re-exit → the plain variants.
+    r = resolveMarkerMove(hooked, rooms, r.st, { x: 2, y: 0 });
+    expect(r.narrative).toContain('You enter Millhaven. The mill wheel creaks.');
+    r = resolveMarkerMove(hooked, rooms, r.st, { x: 1, y: 1 });
+    expect(r.narrative).toContain('The gate thuds shut.');
+  });
+
+  it('room level hooks fire on enter/exit; town scope survives a venue visit', () => {
+    const hooked: CampaignData = { ...campaign };
+    const hookedRooms = rooms.map((rm) =>
+      rm.id === 'tavern'
+        ? {
+            ...rm,
+            onEnter: 'Sawdust and spilled ale.',
+            onFirstEnter: 'The Salt Hog, in the flesh.',
+            onExit: 'The din fades behind you.',
+            onFirstExit: 'First time stepping OUT of the Hog sober.',
+          }
+        : rm
+    );
+    const st = start();
+    let r = resolveMarkerMove(hooked, hookedRooms, st, { x: 2, y: 0 }); // → town
+    r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 3, y: 3 }); // → tavern (first)
+    expect(r.narrative).toContain('You enter The Salt Hog. The Salt Hog, in the flesh.');
+    // Ascend back to the town: room FIRST exit fires; the town is NOT
+    // re-entered (it never left scope).
+    r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 5, y: 5 });
+    expect(r.narrative).toContain('First time stepping OUT of the Hog sober.');
+    expect(r.narrative).toContain('You return to Millhaven.');
+    expect(r.narrative).not.toContain('mill wheel');
+    expect(r.st.exited_rooms).toEqual(['tavern']);
+    // Second visit → plain variants both ways.
+    r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 3, y: 3 });
+    expect(r.narrative).toContain('You enter The Salt Hog. Sawdust and spilled ale.');
+    r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 5, y: 5 });
+    expect(r.narrative).toContain('The din fades behind you.');
+  });
+
+  it('room→room passage fires the old room exit and the new room enter', () => {
+    const hookedRooms = rooms.map((rm) =>
+      rm.id === 'crypt_entrance'
+        ? { ...rm, onExit: 'The doorway breathes cold at your back.' }
+        : rm.id === 'crypt_hall'
+          ? { ...rm, onFirstEnter: 'Bones. Bones everywhere.' }
+          : rm
+    );
+    let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 5, y: 0 }); // → crypt
+    r = resolveMarkerMove(campaign, hookedRooms, r.st, { x: 9, y: 9 }); // → hall
+    expect(r.narrative).toContain('The doorway breathes cold at your back.');
+    expect(r.narrative).toContain('You pass into Crypt Hall. Bones. Bones everywhere.');
+    expect(r.st.exited_rooms).toEqual(['crypt_entrance']);
+  });
+
+  it('ascending from a dungeon room to the region fires the room exit hook', () => {
+    const hookedRooms = rooms.map((rm) =>
+      rm.id === 'crypt_entrance' ? { ...rm, onExit: 'Daylight, finally.' } : rm
+    );
+    let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 5, y: 0 });
+    r = resolveMarkerMove(campaign, hookedRooms, r.st, { x: 0, y: 1 }); // ascend exit
+    expect(r.narrative).toContain('Daylight, finally.');
+    expect(r.narrative).toContain('You return to The Vale.');
   });
 
   it('a site onEnter hook follows the announcement on town descend', () => {

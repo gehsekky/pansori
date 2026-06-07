@@ -279,6 +279,17 @@ const RegionGridSchema = z.array(z.array(TerrainCellSchema).min(1).max(200)).min
 // A region's transition cells (MapSite): stepping onto one opens a town
 // grid (kind 'town' → townId) or drops into a local room (kind 'local' →
 // entryRoomId). The kind↔target pairing and grid bounds are enforced in
+// Level narration hooks shared by regions/towns/rooms: the FIRST variant
+// overrides the plain one on the first scope entry/exit; the plain one
+// fires every other time.
+const HOOK = z.string().min(1).max(2000).optional();
+const LEVEL_HOOK_FIELDS = {
+  onEnter: HOOK,
+  onFirstEnter: HOOK,
+  onExit: HOOK,
+  onFirstExit: HOOK,
+};
+
 // the region-level superRefine below (they need the region's grid size).
 const RegionSiteSchema = z
   .object({
@@ -304,8 +315,9 @@ const RegionsSchema = z
         name: z.string().min(1).max(80),
         isStartingRegion: z.boolean(),
         desc: z.string().min(1).max(2000).optional(),
-        // Narration hook — fires on first entry; desc is the fallback.
-        onEnter: z.string().min(1).max(2000).optional(),
+        // Level narration hooks (first-enter falls back to desc; exits
+        // dormant until region travel exists).
+        ...LEVEL_HOOK_FIELDS,
         // SRD overland scale: 5280 = 1 mile per square (Travel Pace).
         feetPerSquare: z.number().positive(),
         // The dense terrain grid — dimensions derive from its shape.
@@ -697,6 +709,8 @@ const TownsSchema = z
         id: SLUG,
         name: z.string().min(1).max(80),
         desc: z.string().min(1).max(2000).optional(),
+        // Level narration hooks (enter via a region site; exit via the gate).
+        ...LEVEL_HOOK_FIELDS,
         // Settlement scale: 25 ft per square.
         feetPerSquare: z.number().positive(),
         grid: RegionGridSchema,
@@ -839,6 +853,9 @@ const RoomsSchema = z
         id: SLUG,
         name: z.string().min(1).max(80),
         desc: z.string().min(1).max(4000),
+        // Level narration hooks (enter on every descend/passage in; exit
+        // on leaving to another room or ascending).
+        ...LEVEL_HOOK_FIELDS,
         // SRD tactical scale: 5 ft per square (the default when omitted).
         feetPerSquare: z.number().positive().optional(),
         grid: RoomGridSchema,

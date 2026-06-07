@@ -68,7 +68,7 @@ export interface RoomExit {
   ascends?: boolean; // exit the site → return to the town grid / regional grid
 }
 
-export interface Room {
+export interface Room extends LevelNarrationHooks {
   id: string;
   name: string;
   desc: string;
@@ -1689,10 +1689,14 @@ export interface GameState {
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
-  // Region ids the party has entered — the regionEnter narration hook fires
-  // only on first entry. Seeded with the starting region at init; future
-  // region-to-region travel appends here before firing the hook.
+  // Level-scope visit/exit tracking for the FIRST-variant narration hooks
+  // (visited_rooms above doubles as the rooms' enter tracker). Seeded with
+  // the starting region at init; future region-to-region travel appends.
   visited_regions?: string[];
+  visited_towns?: string[];
+  exited_rooms?: string[];
+  exited_towns?: string[];
+  exited_regions?: string[];
   // Fog of war — permanently-revealed cells per grid, keyed by grid id (the
   // region id for the overland map; towns/local rooms may use it later). Each
   // value is a set of "x,y" cell keys discovered within the party's sight radius.
@@ -1971,13 +1975,26 @@ export interface MapSite {
   icon?: string;
 }
 
-export interface Region {
+// Narration hooks shared by the three map LEVELS (regions / towns /
+// rooms — sites/venues/exits keep their own per-landing onEnter). Enter
+// and exit are SCOPE transitions: descending from a town into one of its
+// rooms does not exit the town (only the gate does), and entering a town
+// does not exit the region. The FIRST variant overrides the plain one on
+// the first occurrence; the plain one fires every other time.
+export interface LevelNarrationHooks {
+  onEnter?: string;
+  onFirstEnter?: string;
+  onExit?: string;
+  onFirstExit?: string;
+}
+
+export interface Region extends LevelNarrationHooks {
   id: string;
   name: string;
   desc?: string;
-  // Narration hook — fires on FIRST entry to the region (game start counts
-  // as entering the starting region). Falls back to `desc` when absent.
-  onEnter?: string;
+  // (Region first-enter falls back to `desc` when no enter hook is set —
+  // game start counts as entering the starting region. Region EXIT hooks
+  // are dormant until region-to-region travel exists.)
   feetPerSquare: number; // 5280 (1 mile per square — SRD Travel Pace scale)
   gridWidth: number;
   gridHeight: number;
@@ -2022,7 +2039,7 @@ export interface MapVenue {
   desc?: string;
 }
 
-export interface Town {
+export interface Town extends LevelNarrationHooks {
   id: string;
   name: string;
   desc?: string;

@@ -117,10 +117,12 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
     ctx.st = { ...ctx.st, active_conversation: undefined };
   }
 
-  // Entering a new local room (a site interior or a room-exit passage): use the
-  // full arrival narrative so the party gets the room description, a "Hostile
-  // here" listing, passive trap detection, and loot-spotting — the same cues the
-  // old room `move` gave. Otherwise fall back to the terse transition / move text.
+  // Entering a new local room (a site interior or a room-exit passage): the
+  // transition narrative FIRST — it carries the announcement plus the authored
+  // narration hooks (the old room's exit hook, the site/venue hook, the new
+  // room's enter hook) — then the full arrival cues (a "Hostile here" listing,
+  // passive trap detection, loot-spotting), the same cues the old room `move`
+  // gave. Plain moves fall back to the terse transition / move text.
   const enteredRoom =
     res.transitioned &&
     ctx.st.current_room &&
@@ -129,7 +131,7 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
       ? ctx.st.current_room
       : undefined;
   const arrival = enteredRoom
-    ? ' ' + buildArrivalNarrative(enteredRoom, ctx.st, ctx.seed, ctx.context)
+    ? `${res.narrative ?? ''} ` + buildArrivalNarrative(enteredRoom, ctx.st, ctx.seed, ctx.context)
     : res.narrative || ' The party moves across the map.';
   ctx.narrative = (ctx.narrative ?? '') + arrival;
   // Regional travel-time flavor (whole-hour granularity reads cleanly).

@@ -155,8 +155,13 @@ export interface CampaignRegion {
   name: string;
   isStartingRegion: boolean;
   desc?: string;
-  // Narration hook — fires on first entry (desc is the fallback).
+  // Level narration hooks (FIRST variant overrides plain on the first
+  // occurrence; region first-enter falls back to desc; region exits are
+  // dormant until region travel exists).
   onEnter?: string;
+  onFirstEnter?: string;
+  onExit?: string;
+  onFirstExit?: string;
   feetPerSquare: number;
   // Dense [y][x] terrain grid — dimensions derive from its shape
   // (validated rectangular at the API). Stored as a JSONB column.
@@ -175,6 +180,9 @@ interface RegionRow {
   is_starting_region: boolean;
   description: string | null;
   on_enter: string | null;
+  on_first_enter: string | null;
+  on_exit: string | null;
+  on_first_exit: string | null;
   feet_per_square: number;
   grid: CampaignRegionCell[][];
   start_x: number;
@@ -190,6 +198,9 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     isStartingRegion: r.is_starting_region,
     ...(r.description !== null ? { desc: r.description } : {}),
     ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
+    ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
+    ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
+    ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
     feetPerSquare: r.feet_per_square,
     grid: r.grid,
     startPos: { x: r.start_x, y: r.start_y },
@@ -199,7 +210,8 @@ function rowToRegion(r: RegionRow): CampaignRegion {
 }
 
 const REGION_COLUMNS = `id, name, is_starting_region, description, on_enter, feet_per_square,
-       grid, start_x, start_y, encounter_chance, base_tier`;
+       grid, start_x, start_y, encounter_chance, base_tier, on_first_enter, on_exit,
+       on_first_exit`;
 
 interface SiteRow {
   region_id: string;
@@ -284,8 +296,9 @@ export async function putCampaignRegions(
       await client.query(
         `INSERT INTO campaign_regions
            (campaign_id, id, sort_order, name, is_starting_region, description,
-            on_enter, feet_per_square, grid, start_x, start_y, encounter_chance, base_tier)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)`,
+            on_enter, feet_per_square, grid, start_x, start_y, encounter_chance, base_tier,
+            on_first_enter, on_exit, on_first_exit)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16)`,
         [
           campaignId,
           r.id,
@@ -300,6 +313,9 @@ export async function putCampaignRegions(
           r.startPos.y,
           r.encounterChance ?? null,
           r.baseTier ?? null,
+          r.onFirstEnter ?? null,
+          r.onExit ?? null,
+          r.onFirstExit ?? null,
         ]
       );
       const sites = r.sites ?? [];
@@ -362,6 +378,12 @@ export interface CampaignTown {
   id: string;
   name: string;
   desc?: string;
+  // Level narration hooks (enter via a region site; exit via the gate —
+  // venue descends stay inside the town's scope).
+  onEnter?: string;
+  onFirstEnter?: string;
+  onExit?: string;
+  onFirstExit?: string;
   feetPerSquare: number;
   grid: CampaignRegionCell[][];
   startPos: { x: number; y: number };
@@ -373,6 +395,10 @@ interface TownRow {
   id: string;
   name: string;
   description: string | null;
+  on_enter: string | null;
+  on_first_enter: string | null;
+  on_exit: string | null;
+  on_first_exit: string | null;
   feet_per_square: number;
   grid: CampaignRegionCell[][];
   start_x: number;
@@ -404,7 +430,8 @@ function rowToVenue(r: VenueRow): CampaignTownVenue {
 
 export async function getCampaignTowns(pool: Pool, campaignId: string): Promise<CampaignTown[]> {
   const { rows } = await pool.query<TownRow>(
-    `SELECT id, name, description, feet_per_square, grid, start_x, start_y, floor
+    `SELECT id, name, description, feet_per_square, grid, start_x, start_y, floor,
+            on_enter, on_first_enter, on_exit, on_first_exit
        FROM campaign_towns
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
@@ -429,6 +456,10 @@ export async function getCampaignTowns(pool: Pool, campaignId: string): Promise<
       id: r.id,
       name: r.name,
       ...(r.description !== null ? { desc: r.description } : {}),
+      ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
+      ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
+      ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
+      ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
       feetPerSquare: r.feet_per_square,
       grid: r.grid,
       startPos: { x: r.start_x, y: r.start_y },
@@ -459,8 +490,8 @@ export async function putCampaignTowns(
       await client.query(
         `INSERT INTO campaign_towns
            (campaign_id, id, sort_order, name, description, feet_per_square,
-            grid, start_x, start_y, floor)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)`,
+            grid, start_x, start_y, floor, on_enter, on_first_enter, on_exit, on_first_exit)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14)`,
         [
           campaignId,
           t.id,
@@ -472,6 +503,10 @@ export async function putCampaignTowns(
           t.startPos.x,
           t.startPos.y,
           t.floor ?? null,
+          t.onEnter ?? null,
+          t.onFirstEnter ?? null,
+          t.onExit ?? null,
+          t.onFirstExit ?? null,
         ]
       );
       const venues = t.venues ?? [];
@@ -529,6 +564,10 @@ export function dbTownsToEngine(towns: CampaignTown[]): Town[] {
       id: t.id,
       name: t.name,
       ...(t.desc !== undefined ? { desc: t.desc } : {}),
+      ...(t.onEnter !== undefined ? { onEnter: t.onEnter } : {}),
+      ...(t.onFirstEnter !== undefined ? { onFirstEnter: t.onFirstEnter } : {}),
+      ...(t.onExit !== undefined ? { onExit: t.onExit } : {}),
+      ...(t.onFirstExit !== undefined ? { onFirstExit: t.onFirstExit } : {}),
       feetPerSquare: t.feetPerSquare,
       gridWidth: t.grid[0]?.length ?? 0,
       gridHeight: t.grid.length,
@@ -608,6 +647,12 @@ export interface CampaignRoom {
   id: string;
   name: string;
   desc: string;
+  // Level narration hooks (enter on every descend/passage into the room;
+  // exit on leaving it — to another room or ascending).
+  onEnter?: string;
+  onFirstEnter?: string;
+  onExit?: string;
+  onFirstExit?: string;
   feetPerSquare?: number; // default 5 (SRD tactical scale)
   grid: CampaignRoomCell[][];
   entryPos: GridPos;
@@ -624,6 +669,10 @@ interface RoomRow {
   id: string;
   name: string;
   description: string;
+  on_enter: string | null;
+  on_first_enter: string | null;
+  on_exit: string | null;
+  on_first_exit: string | null;
   feet_per_square: number;
   grid: CampaignRoomCell[][];
   entry_x: number;
@@ -640,7 +689,8 @@ interface RoomRow {
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
-            lighting, floor, can_rest, enemies, loot, npcs
+            lighting, floor, can_rest, enemies, loot, npcs,
+            on_enter, on_first_enter, on_exit, on_first_exit
        FROM campaign_rooms
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
@@ -650,6 +700,10 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     id: r.id,
     name: r.name,
     desc: r.description,
+    ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
+    ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
+    ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
+    ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
     ...(r.feet_per_square !== 5 ? { feetPerSquare: r.feet_per_square } : {}),
     grid: r.grid,
     entryPos: { x: r.entry_x, y: r.entry_y },
@@ -683,9 +737,10 @@ export async function putCampaignRooms(
       await client.query(
         `INSERT INTO campaign_rooms
            (campaign_id, id, sort_order, name, description, feet_per_square,
-            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot, npcs)
+            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot, npcs,
+            on_enter, on_first_enter, on_exit, on_first_exit)
          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb,
-                 $15::jsonb, $16::jsonb)`,
+                 $15::jsonb, $16::jsonb, $17, $18, $19, $20)`,
         [
           campaignId,
           r.id,
@@ -703,6 +758,10 @@ export async function putCampaignRooms(
           JSON.stringify(r.enemies ?? []),
           JSON.stringify(r.loot ?? []),
           JSON.stringify(r.npcs ?? []),
+          r.onEnter ?? null,
+          r.onFirstEnter ?? null,
+          r.onExit ?? null,
+          r.onFirstExit ?? null,
         ]
       );
     }
@@ -747,6 +806,10 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
       id: r.id,
       name: r.name,
       desc: r.desc,
+      ...(r.onEnter !== undefined ? { onEnter: r.onEnter } : {}),
+      ...(r.onFirstEnter !== undefined ? { onFirstEnter: r.onFirstEnter } : {}),
+      ...(r.onExit !== undefined ? { onExit: r.onExit } : {}),
+      ...(r.onFirstExit !== undefined ? { onFirstExit: r.onFirstExit } : {}),
       gridWidth: r.grid[0]?.length ?? 0,
       gridHeight: r.grid.length,
       ...(r.feetPerSquare !== undefined ? { feetPerSquare: r.feetPerSquare } : {}),
@@ -804,6 +867,9 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
       name: r.name,
       ...(r.desc !== undefined ? { desc: r.desc } : {}),
       ...(r.onEnter !== undefined ? { onEnter: r.onEnter } : {}),
+      ...(r.onFirstEnter !== undefined ? { onFirstEnter: r.onFirstEnter } : {}),
+      ...(r.onExit !== undefined ? { onExit: r.onExit } : {}),
+      ...(r.onFirstExit !== undefined ? { onFirstExit: r.onFirstExit } : {}),
       feetPerSquare: r.feetPerSquare,
       gridWidth: r.grid[0]?.length ?? 0,
       gridHeight: r.grid.length,

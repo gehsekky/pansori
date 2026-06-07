@@ -48,21 +48,24 @@ function makeContentDb(initial: {
   const campaigns = new Map(Object.entries(initial.campaigns ?? {}));
   // Stored as the insert params after campaign_id: [id, sort_order, name,
   // is_starting_region, description, on_enter, feet_per_square, grid,
-  // start_x, start_y, encounter_chance, base_tier]
+  // start_x, start_y, encounter_chance, base_tier, on_first_enter,
+  // on_exit, on_first_exit]
   const regions = new Map<string, unknown[][]>(Object.entries(initial.regions ?? {}));
   // campaignId → site insert params after campaign_id: [region_id, id,
   // sort_order, name, pos_x, pos_y, kind, town_id, entry_room_id,
   // description, on_enter, icon]
   const sites = new Map<string, unknown[][]>();
   // campaignId → town insert params after campaign_id: [id, sort_order,
-  // name, description, feet_per_square, gridJson, start_x, start_y, floor]
+  // name, description, feet_per_square, gridJson, start_x, start_y, floor,
+  // on_enter, on_first_enter, on_exit, on_first_exit]
   const towns = new Map<string, unknown[][]>();
   // campaignId → venue insert params after campaign_id: [town_id, id,
   // sort_order, name, pos_x, pos_y, kind, entry_room_id, description]
   const venues = new Map<string, unknown[][]>();
   // campaignId → room insert params after campaign_id: [id, sort_order,
   // name, description, feet_per_square, gridJson, entry_x, entry_y,
-  // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson, npcsJson]
+  // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson, npcsJson,
+  // on_enter, on_first_enter, on_exit, on_first_exit]
   const rooms = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
@@ -171,6 +174,10 @@ function makeContentDb(initial: {
         enemies: JSON.parse(p[12] as string),
         loot: JSON.parse(p[13] as string),
         npcs: JSON.parse(p[14] as string),
+        on_enter: p[15],
+        on_first_enter: p[16],
+        on_exit: p[17],
+        on_first_exit: p[18],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -200,6 +207,10 @@ function makeContentDb(initial: {
         start_x: p[6],
         start_y: p[7],
         floor: p[8],
+        on_enter: p[9],
+        on_first_enter: p[10],
+        on_exit: p[11],
+        on_first_exit: p[12],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -220,6 +231,9 @@ function makeContentDb(initial: {
         start_y: p[9],
         encounter_chance: p[10],
         base_tier: p[11],
+        on_first_enter: p[12],
+        on_exit: p[13],
+        on_first_exit: p[14],
       }));
       return { rows, rowCount: rows.length };
     }
@@ -284,6 +298,10 @@ const TOWN_A: CampaignTown = {
   id: 'oakvale',
   name: 'Oakvale',
   desc: 'A timber town under the old oak.',
+  onEnter: 'Mud streets, woodsmoke, talk that stops as you pass.',
+  onFirstEnter: 'Oakvale at last — the palisade gates stand open.',
+  onExit: 'The gates creak shut behind you.',
+  onFirstExit: 'You leave Oakvale for the first time, supplies heavier.',
   feetPerSquare: 25,
   grid: G(10, 8),
   startPos: { x: 1, y: 1 },
@@ -332,6 +350,10 @@ const ROOM_A: CampaignRoom = {
   lighting: 'dim',
   floor: 'cobblestone',
   canRest: true,
+  onEnter: 'The taproom hum dips as you enter.',
+  onFirstEnter: 'Every head turns — strangers are rare here.',
+  onExit: 'The door swings shut behind you.',
+  onFirstExit: 'Hob calls after you: "mind the cellar!"',
   enemies: [{ name: 'Goblin', count: 2 }, { name: 'Wolf' }],
   loot: [{ itemId: 'dagger', pos: { x: 1, y: 1 } }, { itemId: 'rope' }],
   npcs: [
