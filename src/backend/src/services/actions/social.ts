@@ -439,7 +439,7 @@ export const handleSell: ActionHandler<{ type: 'sell'; itemId: string }> = (ctx,
     return;
   }
   ctx.st = maybeRestockShops(ctx.st);
-  const price = shopSellPrice(npc, action.itemId);
+  const price = shopSellPrice(npc, action.itemId, ctx.context.lootTable);
   if (price === undefined) {
     ctx.narrative = `${npc.name} doesn't deal in that.`;
     return;

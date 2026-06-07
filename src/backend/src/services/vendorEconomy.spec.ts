@@ -139,12 +139,23 @@ describe('the sell side + the vendor wallet', () => {
     expect(r.newState.shop_gold?.hob).toBe(45);
   });
 
+  it('buys UNSTOCKED loot at half its SRD value (the general buyback)', async () => {
+    // Hob doesn't stock longswords, but the catalog values one at 15cr —
+    // he pays floor(15/2) = 7.
+    const sword = { id: 'longsword', name: 'Longsword', type: 'weapon', instance_id: 's1' };
+    let r = await openShop(shopper(0, [sword]));
+    expect(vendorLabels(r.newState)).toContain('Sell Longsword — 7cr');
+    r = await act(r.newState, { type: 'sell', itemId: 'longsword' });
+    expect(r.newState.characters[0].gold).toBe(7);
+    expect(r.newState.shop_gold?.hob).toBe(13);
+  });
+
   it("won't buy items the vendor doesn't stock, or equipped/attuned instances", async () => {
     const cloak = { id: 'fine_cloak', name: 'Fine Cloak', type: 'misc', instance_id: 'c1' };
     const st = shopper(100, [potion('p1'), cloak]);
     st.characters[0].attuned_items = ['p1'];
     const r = await openShop(st);
-    // The cloak isn't in Hob's stock; the only potion is attuned.
+    // The cloak isn't stocked AND carries no value; the only potion is attuned.
     expect(vendorLabels(r.newState).some((l) => l.startsWith('Sell'))).toBe(false);
     const noDeal = await act(r.newState, { type: 'sell', itemId: 'fine_cloak' });
     expect(noDeal.narrative).toContain("doesn't deal in that");

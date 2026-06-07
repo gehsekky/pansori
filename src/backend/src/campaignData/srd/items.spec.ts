@@ -114,3 +114,20 @@ describe('no drift — shipped contexts reuse the canonical SRD definitions', ()
     });
   }
 });
+
+describe('SRD Equipment values', () => {
+  it('every catalog item carries a purchase value (cr ≈ GP, sub-GP rounded to 1)', () => {
+    for (const item of Object.values(SRD_ITEMS)) {
+      expect(item.value, `${item.id} needs a value`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('spot-checks canonical SRD prices', () => {
+    expect(SRD_ITEMS.dagger.value).toBe(2);
+    expect(SRD_ITEMS.plate_armor.value).toBe(1500); // the SRD crafting example
+    expect(SRD_ITEMS.heavy_crossbow.value).toBe(50); // the SRD time example
+    expect(SRD_ITEMS.healing_potion.value).toBe(50);
+    expect(SRD_ITEMS.longbow.value).toBe(50);
+    expect(SRD_ITEMS.torch.value).toBe(1); // 1 CP rounded up to 1 cr
+  });
+});

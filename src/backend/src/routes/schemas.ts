@@ -483,6 +483,10 @@ const LootItemSchema = z
       .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only'),
     name: z.string().min(1).max(80),
     desc: z.string().min(1).max(2000),
+    // SRD Equipment cost in cr (magic items: the rarity-value table + base
+    // item cost). Drives the vendor buyback price; absent = vendors won't
+    // buy it unless they stock it.
+    value: z.number().int().min(1).max(500000).optional(),
     weight: z.number().nonnegative(),
     type: z.enum(['weapon', 'armor', 'consumable', 'misc']),
     slot: z

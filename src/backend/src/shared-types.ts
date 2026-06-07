@@ -1407,6 +1407,14 @@ export interface LootItem {
   id: string;
   name: string;
   desc: string;
+  // SRD: Equipment — the item's purchase cost in cr (≈ GP). Sub-GP items
+  // round up to 1. Magic items: the SRD's Magic Item Rarities and Values
+  // table (Common 100 / Uncommon 400 / Rare 4,000 / Very Rare 40,000 /
+  // Legendary 200,000; halve consumables; + the base item's cost). Drives
+  // the vendor buyback price (floor(value/2) — a table convention, the SRD
+  // is silent on a used-goods rate). Absent = vendors won't buy it unless
+  // they stock it themselves.
+  value?: number;
   weight: number;
   type: 'weapon' | 'armor' | 'consumable' | 'misc';
   slot: ItemSlot | null;

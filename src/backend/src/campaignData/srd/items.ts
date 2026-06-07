@@ -26,6 +26,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Simple melee weapons ──────────────────────────────────────────────────
   dagger: {
     id: 'dagger',
+    value: 2,
     name: 'Dagger',
     desc: '1d4 piercing, finesse, light, thrown',
     weight: 5,
@@ -45,6 +46,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   handaxe: {
     id: 'handaxe',
+    value: 5,
     name: 'Handaxe',
     desc: '1d6 slashing, light, thrown',
     weight: 5,
@@ -63,6 +65,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   quarterstaff: {
     id: 'quarterstaff',
+    value: 1,
     name: 'Quarterstaff',
     desc: '1d6 bludgeoning one-handed (1d8 two-handed)',
     weight: 4,
@@ -81,6 +84,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   mace: {
     id: 'mace',
+    value: 5,
     name: 'Mace',
     desc: '1d6 bludgeoning',
     weight: 8,
@@ -98,6 +102,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   spear: {
     id: 'spear',
+    value: 1,
     name: 'Spear',
     desc: '1d6 piercing one-handed (1d8 two-handed), thrown 20/60',
     weight: 3,
@@ -117,6 +122,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   dart: {
     id: 'dart',
+    value: 1,
     name: 'Dart',
     desc: '1d4 piercing, finesse, thrown',
     weight: 1,
@@ -136,6 +142,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
 
   club: {
     id: 'club',
+    value: 1,
     name: 'Club',
     desc: '1d4 bludgeoning, light',
     weight: 2,
@@ -154,6 +161,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   greatclub: {
     id: 'greatclub',
+    value: 1,
     name: 'Greatclub',
     desc: '1d8 bludgeoning, two-handed',
     weight: 10,
@@ -171,6 +179,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   javelin: {
     id: 'javelin',
+    value: 1,
     name: 'Javelin',
     desc: '1d6 piercing, thrown 30/120',
     weight: 2,
@@ -189,6 +198,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   light_hammer: {
     id: 'light_hammer',
+    value: 2,
     name: 'Light Hammer',
     desc: '1d4 bludgeoning, light, thrown 20/60',
     weight: 2,
@@ -208,6 +218,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   sickle: {
     id: 'sickle',
+    value: 1,
     name: 'Sickle',
     desc: '1d4 slashing, light',
     weight: 2,
@@ -228,6 +239,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Simple ranged weapons ─────────────────────────────────────────────────
   shortbow: {
     id: 'shortbow',
+    value: 25,
     name: 'Shortbow',
     desc: '1d6 piercing, ranged (80/320)',
     weight: 4,
@@ -245,6 +257,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   light_crossbow: {
     id: 'light_crossbow',
+    value: 25,
     name: 'Light Crossbow',
     desc: '1d8 piercing, ranged (80/320), loading, two-handed',
     weight: 5,
@@ -264,6 +277,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
 
   sling: {
     id: 'sling',
+    value: 1,
     name: 'Sling',
     desc: '1d4 bludgeoning, ranged (30/120)',
     weight: 1,
@@ -283,6 +297,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Martial melee weapons ─────────────────────────────────────────────────
   shortsword: {
     id: 'shortsword',
+    value: 10,
     name: 'Shortsword',
     desc: '1d6 piercing, finesse, light',
     weight: 6,
@@ -302,6 +317,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   rapier: {
     id: 'rapier',
+    value: 25,
     name: 'Rapier',
     desc: '1d8 piercing, finesse',
     weight: 6,
@@ -320,6 +336,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   longsword: {
     id: 'longsword',
+    value: 15,
     name: 'Longsword',
     desc: '1d8 slashing (1d10 two-handed), versatile',
     weight: 6,
@@ -338,6 +355,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   greatsword: {
     id: 'greatsword',
+    value: 50,
     name: 'Greatsword',
     desc: '2d6 slashing, heavy, two-handed',
     weight: 10,
@@ -356,6 +374,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   battleaxe: {
     id: 'battleaxe',
+    value: 10,
     name: 'Battleaxe',
     desc: '1d8 slashing (1d10 two-handed), versatile, Topple mastery',
     weight: 4,
@@ -374,6 +393,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   greataxe: {
     id: 'greataxe',
+    value: 30,
     name: 'Greataxe',
     desc: '1d12 slashing, heavy, two-handed, Cleave mastery',
     weight: 7,
@@ -392,6 +412,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   glaive: {
     id: 'glaive',
+    value: 20,
     name: 'Glaive',
     desc: '1d10 slashing, heavy, two-handed, reach (10 ft)',
     weight: 6,
@@ -411,6 +432,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   halberd: {
     id: 'halberd',
+    value: 20,
     name: 'Halberd',
     desc: '1d10 slashing, heavy, two-handed, reach (10 ft), Cleave mastery',
     weight: 6,
@@ -430,6 +452,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   pike: {
     id: 'pike',
+    value: 5,
     name: 'Pike',
     desc: '1d10 piercing, heavy, two-handed, reach (10 ft)',
     weight: 18,
@@ -449,6 +472,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   warhammer: {
     id: 'warhammer',
+    value: 15,
     name: 'Warhammer',
     desc: '1d8 bludgeoning (1d10 two-handed), versatile',
     weight: 5,
@@ -468,6 +492,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
 
   flail: {
     id: 'flail',
+    value: 10,
     name: 'Flail',
     desc: '1d8 bludgeoning',
     weight: 2,
@@ -485,6 +510,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   lance: {
     id: 'lance',
+    value: 10,
     name: 'Lance',
     desc: '1d10 piercing, heavy, reach (10 ft), two-handed unless mounted',
     weight: 6,
@@ -504,6 +530,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   maul: {
     id: 'maul',
+    value: 10,
     name: 'Maul',
     desc: '2d6 bludgeoning, heavy, two-handed',
     weight: 10,
@@ -522,6 +549,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   morningstar: {
     id: 'morningstar',
+    value: 15,
     name: 'Morningstar',
     desc: '1d8 piercing',
     weight: 4,
@@ -539,6 +567,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   scimitar: {
     id: 'scimitar',
+    value: 25,
     name: 'Scimitar',
     desc: '1d6 slashing, finesse, light',
     weight: 3,
@@ -558,6 +587,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   trident: {
     id: 'trident',
+    value: 5,
     name: 'Trident',
     desc: '1d8 piercing (1d10 two-handed), versatile, thrown 20/60',
     weight: 4,
@@ -577,6 +607,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   war_pick: {
     id: 'war_pick',
+    value: 5,
     name: 'War Pick',
     desc: '1d8 piercing (1d10 two-handed), versatile',
     weight: 2,
@@ -595,6 +626,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   whip: {
     id: 'whip',
+    value: 2,
     name: 'Whip',
     desc: '1d4 slashing, finesse, reach (10 ft)',
     weight: 3,
@@ -616,6 +648,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Martial ranged weapons ────────────────────────────────────────────────
   longbow: {
     id: 'longbow',
+    value: 50,
     name: 'Longbow',
     desc: '1d8 piercing, heavy, ranged (150/600)',
     weight: 4,
@@ -634,6 +667,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   hand_crossbow: {
     id: 'hand_crossbow',
+    value: 75,
     name: 'Hand Crossbow',
     desc: '1d6 piercing, light, ranged (30/120), loading',
     weight: 3,
@@ -653,6 +687,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   heavy_crossbow: {
     id: 'heavy_crossbow',
+    value: 50,
     name: 'Heavy Crossbow',
     desc: '1d10 piercing, heavy, ranged (100/400), loading, two-handed',
     weight: 18,
@@ -673,6 +708,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
 
   blowgun: {
     id: 'blowgun',
+    value: 10,
     name: 'Blowgun',
     desc: '1 piercing, ranged (25/100), loading',
     weight: 1,
@@ -691,6 +727,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   musket: {
     id: 'musket',
+    value: 500,
     name: 'Musket',
     desc: '1d12 piercing, ranged (40/120), loading, two-handed',
     weight: 10,
@@ -709,6 +746,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   pistol: {
     id: 'pistol',
+    value: 250,
     name: 'Pistol',
     desc: '1d10 piercing, ranged (30/90), loading',
     weight: 3,
@@ -729,6 +767,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Armor ─────────────────────────────────────────────────────────────────
   padded_armor: {
     id: 'padded_armor',
+    value: 5,
     name: 'Padded Armor',
     desc: 'AC 11 + DEX modifier, light armor (stealth disadvantage)',
     weight: 8,
@@ -744,6 +783,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   leather_armor: {
     id: 'leather_armor',
+    value: 10,
     name: 'Leather Armor',
     desc: 'AC 11 + DEX modifier, light armor',
     weight: 10,
@@ -759,6 +799,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   studded_leather: {
     id: 'studded_leather',
+    value: 45,
     name: 'Studded Leather',
     desc: 'AC 12 + DEX modifier, light armor',
     weight: 13,
@@ -774,6 +815,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   chain_shirt: {
     id: 'chain_shirt',
+    value: 50,
     name: 'Chain Shirt',
     desc: 'AC 13 + DEX (max +2), medium armor',
     weight: 20,
@@ -790,6 +832,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   scale_mail: {
     id: 'scale_mail',
+    value: 50,
     name: 'Scale Mail',
     desc: 'AC 14 + DEX (max +2), medium armor',
     weight: 6,
@@ -806,6 +849,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   hide_armor: {
     id: 'hide_armor',
+    value: 10,
     name: 'Hide Armor',
     desc: 'AC 12 + DEX (max +2), medium armor',
     weight: 12,
@@ -822,6 +866,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   breastplate: {
     id: 'breastplate',
+    value: 400,
     name: 'Breastplate',
     desc: 'AC 14 + DEX (max +2), medium armor',
     weight: 20,
@@ -838,6 +883,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   half_plate: {
     id: 'half_plate',
+    value: 750,
     name: 'Half Plate Armor',
     desc: 'AC 15 + DEX (max +2), medium armor (stealth disadvantage)',
     weight: 40,
@@ -854,6 +900,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   chain_mail: {
     id: 'chain_mail',
+    value: 75,
     name: 'Chain Mail',
     desc: 'AC 16, heavy armor (STR 13 required)',
     weight: 55,
@@ -870,6 +917,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   plate_armor: {
     id: 'plate_armor',
+    value: 1500,
     name: 'Plate Armor',
     desc: 'AC 18, heavy armor (STR 15 required)',
     weight: 65,
@@ -886,6 +934,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   ring_mail: {
     id: 'ring_mail',
+    value: 30,
     name: 'Ring Mail',
     desc: 'AC 14, heavy armor (stealth disadvantage)',
     weight: 40,
@@ -902,6 +951,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   splint_armor: {
     id: 'splint_armor',
+    value: 200,
     name: 'Splint Armor',
     desc: 'AC 17, heavy armor (STR 15 required, stealth disadvantage)',
     weight: 60,
@@ -918,6 +968,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   shield: {
     id: 'shield',
+    value: 10,
     name: 'Shield',
     desc: '+2 AC while equipped',
     weight: 12,
@@ -934,6 +985,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Adventuring gear / consumables ─────────────────────────────────────────
   healing_potion: {
     id: 'healing_potion',
+    value: 50,
     name: 'Healing Potion',
     desc: 'Restores 2d4+2 HP when consumed.',
     weight: 2,
@@ -951,6 +1003,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // has 10 charges; pansori doesn't yet track per-use charges, so it isn't
     // consumed). Wired via the `stabilize` effect in handleUse.
     id: 'healers_kit',
+    value: 5,
     name: "Healer's Kit",
     desc: 'Bag of bandages, splints, and salves. Use an action to stabilize a dying creature (stops its death saves).',
     weight: 3,
@@ -964,6 +1017,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   holy_symbol: {
     id: 'holy_symbol',
+    value: 5,
     name: 'Holy Symbol',
     desc: 'A holy symbol that serves as a divine spellcasting focus.',
     weight: 2,
@@ -982,6 +1036,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // torch-bearer negates the darkness penalty around them. Mundane, so the
     // Darkness spell can't snuff it (it just can't pierce magical darkness).
     id: 'torch',
+    value: 1,
     name: 'Torch',
     desc: 'Sheds bright light in a 20-foot radius and dim light for an additional 20 feet. Burns for 1 hour.',
     weight: 1,
@@ -998,6 +1053,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // SRD light source — a brighter, steadier alternative to the Torch. Bright
     // light 30 ft, dim to 60 ft. Same `light` worn-effect wiring.
     id: 'hooded_lantern',
+    value: 5,
     name: 'Hooded Lantern',
     desc: 'Sheds bright light in a 30-foot radius and dim light for an additional 30 feet. Burns 6 hours on a flask of oil.',
     weight: 2,
@@ -1012,6 +1068,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   component_pouch: {
     id: 'component_pouch',
+    value: 25,
     name: 'Component Pouch',
     desc: 'A leather pouch of spellcasting components.',
     weight: 2,
@@ -1028,6 +1085,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // RAW 60-ft cone simplified to a radius), dim to 120 ft. Same `light`
     // worn-effect wiring as the Torch / Hooded Lantern.
     id: 'bullseye_lantern',
+    value: 10,
     name: 'Bullseye Lantern',
     desc: 'Casts bright light in a 60-foot cone and dim light for an additional 60 feet. Burns 6 hours on a flask of oil.',
     weight: 2,
@@ -1046,6 +1104,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // SRD — drink to gain Advantage on the next save vs poison. Reuses the
     // consumable `con_advantage` effect (handleUse rolls a CON save w/ advantage).
     id: 'antitoxin',
+    value: 50,
     name: 'Antitoxin',
     desc: 'Drink as an action to gain advantage on your next saving throw against poison for 1 hour.',
     weight: 0,
@@ -1059,6 +1118,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   rations: {
     id: 'rations',
+    value: 1,
     name: 'Rations',
     desc: 'A day of dried food. Eat to stave off hunger on the road.',
     weight: 2,
@@ -1073,6 +1133,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   oil_flask: {
     id: 'oil_flask',
+    value: 1,
     name: 'Oil (flask)',
     desc: 'A flask of lamp oil. Refuels a lantern (6 hours) or can be poured out and set alight.',
     weight: 1,
@@ -1090,6 +1151,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // SRD thrown splash weapon — throw at a foe (DEX ranged attack); on a hit,
     // 2d6 acid. See the `throw_item` action.
     id: 'acid_vial',
+    value: 25,
     name: 'Acid (vial)',
     desc: 'A vial of corrosive acid. Throw it at a creature (ranged attack) for 2d6 acid damage on a hit.',
     weight: 1,
@@ -1106,6 +1168,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // SRD thrown splash weapon — 1d4 fire on a hit, then the target burns (1d4
     // fire at the start of each of its turns; DC 10 DEX to douse).
     id: 'alchemists_fire',
+    value: 50,
     name: "Alchemist's Fire (flask)",
     desc: 'A sticky, volatile fluid. Throw it (ranged attack) for 1d4 fire on a hit; the target then burns for 1d4 fire each turn until it douses the flames (DC 10 DEX).',
     weight: 1,
@@ -1122,6 +1185,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     // SRD thrown splash weapon — 2d6 radiant, but ONLY to Fiends and Undead
     // (gated on Enemy.creatureType). Splashes harmlessly off anything else.
     id: 'holy_water',
+    value: 25,
     name: 'Holy Water (flask)',
     desc: 'Blessed water. Throw it (ranged attack) at a Fiend or Undead for 2d6 radiant damage on a hit; harmless to other creatures.',
     weight: 1,
@@ -1142,6 +1206,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // itself so campaigns can grant, sell, or loot them.
   thieves_tools: {
     id: 'thieves_tools',
+    value: 25,
     name: "Thieves' Tools",
     desc: 'Picks, a file, and small mirrors. Proficiency lets you pick locks and disarm traps.',
     weight: 1,
@@ -1156,6 +1221,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   herbalism_kit: {
     id: 'herbalism_kit',
+    value: 5,
     name: 'Herbalism Kit',
     desc: 'Pouches, clippers, and vials for identifying plants and brewing remedies.',
     weight: 3,
@@ -1169,6 +1235,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   disguise_kit: {
     id: 'disguise_kit',
+    value: 25,
     name: 'Disguise Kit',
     desc: 'Cosmetics, props, and prosthetics for altering your appearance.',
     weight: 3,
@@ -1182,6 +1249,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   forgery_kit: {
     id: 'forgery_kit',
+    value: 15,
     name: 'Forgery Kit',
     desc: 'Papers, inks, seals, and wax for producing convincing fake documents.',
     weight: 5,
@@ -1195,6 +1263,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   navigators_tools: {
     id: 'navigators_tools',
+    value: 25,
     name: "Navigator's Tools",
     desc: 'Charts, a compass, and instruments for plotting a course and avoiding hazards.',
     weight: 2,
@@ -1208,6 +1277,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   poisoners_kit: {
     id: 'poisoners_kit',
+    value: 50,
     name: "Poisoner's Kit",
     desc: 'Vials, chemicals, and gloves for crafting and applying poisons.',
     weight: 2,
@@ -1221,6 +1291,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   artisans_tools: {
     id: 'artisans_tools',
+    value: 20,
     name: "Artisan's Tools",
     desc: "A tradesperson's implements (smith's, carpenter's, mason's, etc.) for crafting goods.",
     weight: 5,
@@ -1234,6 +1305,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   gaming_set: {
     id: 'gaming_set',
+    value: 1,
     name: 'Gaming Set',
     desc: 'Dice or cards for a game of chance — and the social leverage a friendly wager brings.',
     weight: 0,
@@ -1247,6 +1319,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   musical_instrument: {
     id: 'musical_instrument',
+    value: 20,
     name: 'Musical Instrument',
     desc: 'A lute, flute, drum, or horn — a Bard’s focus and a fine way to earn coin.',
     weight: 2,
@@ -1262,6 +1335,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // ─── Adventuring gear ────────────────────────────────────────────────────────
   backpack: {
     id: 'backpack',
+    value: 2,
     name: 'Backpack',
     desc: 'A sturdy pack for hauling your gear.',
     weight: 5,
@@ -1275,6 +1349,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   bedroll: {
     id: 'bedroll',
+    value: 1,
     name: 'Bedroll',
     desc: 'A padded roll for sleeping rough on the road.',
     weight: 7,
@@ -1288,6 +1363,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   rope_hempen: {
     id: 'rope_hempen',
+    value: 1,
     name: 'Hempen Rope (50 ft)',
     desc: '50 feet of hempen rope. Climbing, binding, and a hundred other uses.',
     weight: 10,
@@ -1301,6 +1377,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   grappling_hook: {
     id: 'grappling_hook',
+    value: 2,
     name: 'Grappling Hook',
     desc: 'An iron hook for anchoring a rope to a ledge or wall.',
     weight: 4,
@@ -1314,6 +1391,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   climbers_kit: {
     id: 'climbers_kit',
+    value: 25,
     name: "Climber's Kit",
     desc: 'Pitons, boot tips, gloves, and a harness for scaling sheer surfaces.',
     weight: 12,
@@ -1327,6 +1405,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   crowbar: {
     id: 'crowbar',
+    value: 2,
     name: 'Crowbar',
     desc: 'An iron bar for prying open doors, crates, and lids.',
     weight: 5,
@@ -1340,6 +1419,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   tinderbox: {
     id: 'tinderbox',
+    value: 1,
     name: 'Tinderbox',
     desc: 'Flint, steel, and tinder for starting a fire — or lighting a torch or lantern.',
     weight: 1,
@@ -1353,6 +1433,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   waterskin: {
     id: 'waterskin',
+    value: 1,
     name: 'Waterskin',
     desc: 'A leather skin holding about a day of water.',
     weight: 5,
@@ -1366,6 +1447,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   mess_kit: {
     id: 'mess_kit',
+    value: 1,
     name: 'Mess Kit',
     desc: 'A tin cup, cutlery, and a pan that nest together for eating on the trail.',
     weight: 1,
@@ -1386,6 +1468,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   // firearm_bullet) so the right ammo is matched to the right weapon.
   arrows: {
     id: 'arrows',
+    value: 1,
     name: 'Arrows',
     desc: 'A bundle of arrows for a shortbow or longbow.',
     weight: 1,
@@ -1400,6 +1483,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   crossbow_bolts: {
     id: 'crossbow_bolts',
+    value: 1,
     name: 'Crossbow Bolts',
     desc: 'A case of bolts for a hand, light, or heavy crossbow.',
     weight: 1,
@@ -1414,6 +1498,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   sling_bullets: {
     id: 'sling_bullets',
+    value: 1,
     name: 'Sling Bullets',
     desc: 'A pouch of lead bullets for a sling.',
     weight: 1,
@@ -1428,6 +1513,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   blowgun_needles: {
     id: 'blowgun_needles',
+    value: 1,
     name: 'Blowgun Needles',
     desc: 'A tin of needles for a blowgun.',
     weight: 1,
@@ -1442,6 +1528,7 @@ export const SRD_ITEMS: Record<string, LootItem> = {
   },
   firearm_bullets: {
     id: 'firearm_bullets',
+    value: 3,
     name: 'Firearm Bullets',
     desc: 'A pouch of bullets for a musket or pistol.',
     weight: 2,

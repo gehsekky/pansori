@@ -3994,10 +3994,22 @@ export function shopGoldLeft(state: GameState, npc: PlacedNpc): number | undefin
   return state.shop_gold?.[npc.id] ?? npc.shopGold;
 }
 
-/** What the vendor pays for an item THEY stock: half their sale price, min 1. */
-export function shopSellPrice(npc: PlacedNpc, itemId: string): number | undefined {
+/**
+ * What the vendor pays for an item: half their OWN sale price when they
+ * stock it, else half the item's SRD value (Equipment-table cost; magic
+ * items per the rarity table) — min 1cr either way. Items with neither are
+ * not bought. (Half is a table convention; the SRD is silent on a
+ * used-goods rate.)
+ */
+export function shopSellPrice(
+  npc: PlacedNpc,
+  itemId: string,
+  lootTable: LootItem[]
+): number | undefined {
   const entry = npc.shop?.find((e) => e.itemId === itemId);
-  return entry ? Math.max(1, Math.floor(entry.price / 2)) : undefined;
+  if (entry) return Math.max(1, Math.floor(entry.price / 2));
+  const value = lootTable.find((l) => l.id === itemId)?.value;
+  return value !== undefined ? Math.max(1, Math.floor(value / 2)) : undefined;
 }
 
 function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): GameChoice[] {
@@ -4036,7 +4048,7 @@ function shopBuyChoices(npc: PlacedNpc, state: GameState, context: Context): Gam
     const offered = new Set<string>();
     for (const item of active.inventory ?? []) {
       if (offered.has(item.id)) continue;
-      const price = shopSellPrice(npc, item.id);
+      const price = shopSellPrice(npc, item.id, context.lootTable);
       if (price === undefined) continue; // the vendor doesn't deal in it
       const sellable = (active.inventory ?? []).filter(
         (i) =>
