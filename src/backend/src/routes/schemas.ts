@@ -1,4 +1,4 @@
-import { MARKER_TILES, TERRAIN, TERRAIN_TILES } from '../shared-types.js';
+import { FLOOR_TILES, MARKER_TILES, TERRAIN, TERRAIN_TILES } from '../shared-types.js';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
@@ -1357,10 +1357,21 @@ const MARKER_CHOICE = z.union([
   MARKER_ID,
   z.object({ tile: MARKER_ID, tint: TILE_TINT.optional() }).strict(),
 ]);
+// `floors` skins the town/local ground textures, keyed by the AUTHORED
+// floor type: remap a family to another and/or tint it.
+const FLOOR_ID = z.enum(Object.keys(FLOOR_TILES) as [string, ...string[]]);
+const FLOOR_CHOICE = z.union([
+  FLOOR_ID,
+  z.object({ tile: FLOOR_ID, tint: TILE_TINT.optional() }).strict(),
+]);
 const TerrainArtSchema = z
   .object({
     ...Object.fromEntries(Object.keys(TERRAIN).map((t) => [t, TILE_CHOICE.optional()])),
     markers: z.object({ town: MARKER_CHOICE.optional() }).strict().optional(),
+    floors: z
+      .object(Object.fromEntries(Object.keys(FLOOR_TILES).map((f) => [f, FLOOR_CHOICE.optional()])))
+      .strict()
+      .optional(),
   })
   .strict();
 

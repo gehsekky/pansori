@@ -16,6 +16,7 @@ import type {
   EquipSlot,
   Faction,
   Feat,
+  FloorType,
   GameChoice,
   GameConsequence,
   GridPos,
@@ -123,9 +124,8 @@ export interface Room extends LevelNarrationHooks {
   floor?: FloorType;
 }
 
-// Local-room floor textures (see Room.floor). Each has a few seamless variants
-// under public/art/floors/<type>_<n>.png.
-export type FloorType = 'grass' | 'dirt' | 'cobblestone' | 'sand';
+// `FloorType` is re-exported from ./shared-types (see src/shared/types.ts) —
+// the terrain-art skin remaps + tints floors campaign-wide.
 
 // `ConditionName` is re-exported from ./shared-types (see src/shared/types.ts).
 

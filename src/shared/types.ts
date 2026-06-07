@@ -344,6 +344,22 @@ export const MARKER_TILES = {
 
 export type MarkerTileId = keyof typeof MARKER_TILES;
 
+// Floor textures — the seamless ground drawn under every walkable cell
+// on town + local maps (BE Town.floor / Room.floor pick one per map; a
+// few "ground" terrain types remap per cell). Each has 3 variants under
+// /art/floors/<type>_<n>.png. Lives here (not the per-side types) so the
+// terrain-art skin can remap + tint them campaign-wide.
+export type FloorType = 'grass' | 'dirt' | 'cobblestone' | 'sand';
+
+// The floor catalog for the MAP ART editor — labels + the variant-1 PNG
+// stem for previews (floors are square seamless textures, not 2.5D tiles).
+export const FLOOR_TILES = {
+  grass: { base: 'grass_1', label: 'grass' },
+  dirt: { base: 'dirt_1', label: 'dirt' },
+  cobblestone: { base: 'cobblestone_1', label: 'cobblestone' },
+  sand: { base: 'sand_1', label: 'sand' },
+} as const satisfies Record<FloorType, { base: string; label: string }>;
+
 // An author tint over a tile: a structured recolor the renderer compiles
 // to a CSS filter (see `compileTint`). Structured rather than a raw
 // filter string so the editor can drive it with sliders and the schema
@@ -359,6 +375,9 @@ export interface TileTint {
 // recolor filter.
 export type TileChoice = TerrainTileId | { tile: TerrainTileId; tint?: TileTint };
 export type MarkerChoice = MarkerTileId | { tile: MarkerTileId; tint?: TileTint };
+// A floor skin entry remaps an authored floor family to another (and/or
+// tints it): "wherever grass would draw, draw tinted dirt instead".
+export type FloorChoice = FloorType | { tile: FloorType; tint?: TileTint };
 
 // Compile a structured tint to its CSS filter string; undefined when the
 // tint is absent or all-identity (so the renderer can skip the style).
@@ -372,11 +391,14 @@ export function compileTint(tint?: TileTint): string | undefined {
   return parts.length ? parts.join(' ') : undefined;
 }
 
-// A campaign's terrain-art overrides: terrain type → tile choice, plus
-// the marker slots (POI art on the regional map — `markers.town` skins
-// every town site). Empty / absent = all defaults.
+// A campaign's terrain-art overrides: terrain type → tile choice (applies
+// on EVERY map level a painted cell of that type renders), plus the
+// marker slots (POI art on the regional map — `markers.town` skins every
+// town site) and the floor skins (the town/local ground textures, keyed
+// by the AUTHORED floor type). Empty / absent = all defaults.
 export type TerrainArtMap = Partial<Record<TerrainType, TileChoice>> & {
   markers?: { town?: MarkerChoice };
+  floors?: Partial<Record<FloorType, FloorChoice>>;
 };
 
 /**

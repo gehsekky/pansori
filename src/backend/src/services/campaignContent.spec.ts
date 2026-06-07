@@ -990,6 +990,24 @@ describe('editable sections registry', () => {
     expect(art.safeParse({ markers: { dungeon: 'castle' } }).success).toBe(false);
   });
 
+  it('terrainArt schema: floor skins remap families and carry bounded tints', () => {
+    const art = CAMPAIGN_SECTION_SCHEMAS.terrainArt;
+    // Bare remap, remap + tint, tint over the same family.
+    expect(art.safeParse({ floors: { grass: 'cobblestone' } }).success).toBe(true);
+    expect(
+      art.safeParse({ floors: { dirt: { tile: 'sand', tint: { brightness: 0.8 } } } }).success
+    ).toBe(true);
+    expect(
+      art.safeParse({ floors: { cobblestone: { tile: 'cobblestone', tint: { hue: 15 } } } }).success
+    ).toBe(true);
+    // Floor ids are their own vocabulary — terrain tiles / unknown families rejected.
+    expect(art.safeParse({ floors: { grass: 'plains-ash' } }).success).toBe(false);
+    expect(art.safeParse({ floors: { marble: 'sand' } }).success).toBe(false);
+    expect(art.safeParse({ floors: { grass: { tile: 'sand', tint: { hue: 999 } } } }).success).toBe(
+      false
+    );
+  });
+
   it('gameStart schema is a plain narration string', () => {
     const gameStart = CAMPAIGN_SECTION_SCHEMAS.gameStart;
     expect(gameStart.safeParse('The road south is long and the coin pouch light.').success).toBe(

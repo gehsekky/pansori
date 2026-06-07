@@ -508,6 +508,42 @@ describe('GridMapView', () => {
     expect(fSrc(0, 0)).toMatch(/\/art\/floors\/dirt_[123]\.png$/);
   });
 
+  it('floor skins remap + tint the authored floor family (terrainArt.floors)', () => {
+    const townGrid: ActiveGrid = {
+      level: 'town',
+      id: 'town2',
+      name: 'Ashport',
+      width: 4,
+      height: 4,
+      feetPerSquare: 5,
+      floor: 'dirt',
+      terrain: [{ pos: { x: 3, y: 1 }, type: 'garden' }], // ground terrain → grass floor
+      obstacles: [],
+      startPos: { x: 0, y: 3 },
+      transitions: [],
+    };
+    const { container } = render(
+      <GridMapView
+        grid={townGrid}
+        markerPos={{ x: 0, y: 3 }}
+        terrainArt={{
+          floors: {
+            dirt: { tile: 'sand', tint: { brightness: 0.8 } }, // remap + tint
+            grass: 'cobblestone', // bare remap
+          },
+        }}
+      />
+    );
+    const floorImg = (x: number, y: number) =>
+      cell(container, x, y).querySelector('[class*="gridMapFloor"]') as HTMLImageElement;
+    // The town's dirt default draws tinted sand everywhere…
+    expect(floorImg(0, 0).getAttribute('src')).toMatch(/\/art\/floors\/sand_[123]\.png$/);
+    expect(floorImg(0, 0).style.filter).toBe('brightness(0.8)');
+    // …and the garden cell's grass remaps to cobblestone, untinted.
+    expect(floorImg(3, 1).getAttribute('src')).toMatch(/\/art\/floors\/cobblestone_[123]\.png$/);
+    expect(floorImg(3, 1).style.filter).toBe('');
+  });
+
   it('tiles unpainted plains on the regional map but leaves interior grids bare', () => {
     // Regional: an unpainted cell on a terrain-bearing grid is plains → plains tile.
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);

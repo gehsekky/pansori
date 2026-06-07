@@ -98,11 +98,45 @@ describe('MapArtPanel', () => {
     expect(saved.plains).toBe('plains-ash');
     expect(saved.snow).toBe('snow-ashfall');
     expect(saved.markers).toBeUndefined(); // marker untouched → not stored
+    // The preset lays its mood tint over every floor family too.
+    expect(saved.floors).toEqual({
+      grass: { tile: 'grass', tint: { saturate: 0.45, brightness: 0.75 } },
+      dirt: { tile: 'dirt', tint: { saturate: 0.45, brightness: 0.75 } },
+      cobblestone: { tile: 'cobblestone', tint: { saturate: 0.45, brightness: 0.75 } },
+      sand: { tile: 'sand', tint: { saturate: 0.45, brightness: 0.75 } },
+    });
     // CLASSIC clears back to all-defaults (the extra still survives).
     fireEvent.click(screen.getByTestId('map-art-preset-classic'));
     fireEvent.click(screen.getByTestId('save-map-art-btn'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(2));
     expect(mocked.putCampaignSection.mock.calls[1][2]).toEqual({ garden: 'plains-tundra' });
+  });
+
+  it('the TOWN & LOCAL tab edits floor skins: remap a family and/or tint it', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'terrainArt',
+      source: 'db',
+      value: { floors: { grass: { tile: 'sand', tint: { brightness: 0.8 } } } },
+    });
+    render(<MapArtPanel campaignId="sandbox" />);
+    // Floor rows live behind the TOWN & LOCAL tab; the regional tab shows terrain.
+    expect(await screen.findByLabelText('plains tile')).toBeTruthy();
+    expect(screen.queryByLabelText('grass floor tile')).toBeNull();
+    fireEvent.click(screen.getByTestId('map-art-tab-interior'));
+    expect(screen.queryByLabelText('plains tile')).toBeNull();
+    // The stored remap + tint loaded into the row.
+    expect((screen.getByLabelText('grass floor tile') as HTMLSelectElement).value).toBe('sand');
+    expect((screen.getByLabelText('grass floor bri') as HTMLInputElement).value).toBe('0.8');
+    // Tint another family and save: both ride in the floors slot.
+    fireEvent.change(screen.getByLabelText('cobblestone floor hue'), { target: { value: '15' } });
+    fireEvent.click(screen.getByTestId('save-map-art-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    expect(mocked.putCampaignSection).toHaveBeenCalledWith('sandbox', 'terrainArt', {
+      floors: {
+        grass: { tile: 'sand', tint: { brightness: 0.8 } },
+        cobblestone: { tile: 'cobblestone', tint: { hue: 15 } },
+      },
+    });
   });
 
   it('non-object section values (none / malformed) read as empty and render all defaults', async () => {

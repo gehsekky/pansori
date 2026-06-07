@@ -1,17 +1,24 @@
-import { MARKER_TILES, TERRAIN_TILES, compileTint } from '../types.ts';
+import { FLOOR_TILES, MARKER_TILES, TERRAIN_TILES, compileTint } from '../types.ts';
+import type { FloorType, TerrainTileId, TileChoice, TileTint } from '../types.ts';
 import React, { useEffect, useState } from 'react';
-import type { TerrainTileId, TileChoice, TileTint } from '../types.ts';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
 
 // ─── MAP ART panel (campaign creator) ────────────────────────────────────────
 //
 // Structured editor for the `terrainArt` section — the campaign's visual
-// skin over the shared tile set. One row per overland terrain type: a live
-// preview, a tile pick from the TERRAIN_TILES catalog, and a structured
-// tint (hue / saturation / brightness sliders) layered over the tile's own
-// recolor. Plus the TOWN MARKER row — the art every town site draws on the
-// regional map, picked from the MARKER_TILES catalog the same way.
+// skin over the shared tile set, split by map level:
+//
+//   REGIONAL — one row per overland terrain type (a live preview, a tile
+//   pick from the TERRAIN_TILES catalog, hue / saturation / brightness
+//   tint sliders layered over the tile's own recolor) plus the TOWN
+//   MARKER row (the art every town site draws, from MARKER_TILES). The
+//   terrain picks follow a painted cell onto EVERY map level — a water
+//   square in a room renders the same skinned tile.
+//
+//   TOWN & LOCAL — the floor rows: the seamless ground textures town and
+//   room maps draw under every walkable cell, keyed by the AUTHORED floor
+//   type. A row remaps a family (grass → sand) and/or tints it.
 //
 // Saves the minimal map: an untinted default pick stores nothing, a bare
 // tile pick stores the id, a tinted pick stores { tile, tint }. Entries
@@ -31,27 +38,43 @@ const OVERLAND_TYPES = [
   'mountain',
 ] as const;
 
-// Theme presets — pre-fill every row's tile pick (tints cleared); CLASSIC
-// resets to defaults. Same recolor sets the raw JSON editor offers.
-const PRESETS: Record<string, Partial<Record<(typeof OVERLAND_TYPES)[number], TerrainTileId>>> = {
-  CLASSIC: {},
+const FLOOR_TYPES = Object.keys(FLOOR_TILES) as FloorType[];
+
+// Theme presets — pre-fill every terrain row's tile pick (tints cleared)
+// and lay one shared tint over all four floor families so interiors match
+// the overland mood; CLASSIC resets everything. Same recolor sets the raw
+// JSON editor offers.
+const PRESETS: Record<
+  string,
+  {
+    tiles: Partial<Record<(typeof OVERLAND_TYPES)[number], TerrainTileId>>;
+    floorTint?: TileTint;
+  }
+> = {
+  CLASSIC: { tiles: {} },
   ASHLANDS: {
-    plains: 'plains-ash',
-    road: 'road-cracked',
-    forest: 'forest-dead',
-    hills: 'hills-barren',
-    swamp: 'swamp-blight',
-    water: 'water-murk',
-    mountain: 'mountain-char',
-    snow: 'snow-ashfall',
+    tiles: {
+      plains: 'plains-ash',
+      road: 'road-cracked',
+      forest: 'forest-dead',
+      hills: 'hills-barren',
+      swamp: 'swamp-blight',
+      water: 'water-murk',
+      mountain: 'mountain-char',
+      snow: 'snow-ashfall',
+    },
+    floorTint: { saturate: 0.45, brightness: 0.75 },
   },
   FROSTBOUND: {
-    plains: 'plains-tundra',
-    road: 'road-snowbound',
-    forest: 'forest-frost',
-    hills: 'hills-frost',
-    swamp: 'swamp-frozen',
-    water: 'water-ice',
+    tiles: {
+      plains: 'plains-tundra',
+      road: 'road-snowbound',
+      forest: 'forest-frost',
+      hills: 'hills-frost',
+      swamp: 'swamp-frozen',
+      water: 'water-ice',
+    },
+    floorTint: { saturate: 0.55, brightness: 1.2 },
   },
 };
 
@@ -92,14 +115,15 @@ const buildChoice = (v: RowValue, defaultTile: string): TileChoice | undefined =
 const lbl: React.CSSProperties = { fontSize: '0.65rem', color: 'var(--t-dim)' };
 
 // A live tile preview: the picked tile's base PNG with its catalog recolor
-// + the row tint, in the tiles' own 2:3 (256×384) ratio.
-function Preview({ src, filter }: { src: string; filter?: string }) {
+// + the row tint. Terrain/marker tiles keep their own 2:3 (256×384) ratio;
+// floor textures are square.
+function Preview({ src, filter, square }: { src: string; filter?: string; square?: boolean }) {
   return (
     <img
       src={src}
       alt=""
       width={40}
-      height={60}
+      height={square ? 40 : 60}
       style={{ display: 'block', filter, border: '1px solid var(--t-line)' }}
     />
   );
@@ -147,8 +171,10 @@ function TintSliders({
 }
 
 function MapArtPanel({ campaignId }: { campaignId: string }) {
+  const [tab, setTab] = useState<'regional' | 'interior'>('regional');
   const [rows, setRows] = useState<Record<string, RowValue> | null>(null);
   const [marker, setMarker] = useState<RowValue>({ tile: 'village', tint: { ...IDENTITY } });
+  const [floors, setFloors] = useState<Record<string, RowValue>>({});
   // Entries the panel doesn't surface (other terrain types authored via the
   // raw JSON editor) — carried through saves untouched.
   const [extras, setExtras] = useState<Record<string, unknown>>({});
@@ -176,10 +202,17 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
         for (const t of OVERLAND_TYPES) next[t] = parseChoice(art[t], t);
         const markers = art.markers as { town?: unknown } | undefined;
         setMarker(parseChoice(markers?.town, 'village'));
+        const storedFloors = (
+          art.floors && typeof art.floors === 'object' ? art.floors : {}
+        ) as Record<string, unknown>;
+        setFloors(Object.fromEntries(FLOOR_TYPES.map((f) => [f, parseChoice(storedFloors[f], f)])));
         setExtras(
           Object.fromEntries(
             Object.entries(art).filter(
-              ([k]) => k !== 'markers' && !(OVERLAND_TYPES as readonly string[]).includes(k)
+              ([k]) =>
+                k !== 'markers' &&
+                k !== 'floors' &&
+                !(OVERLAND_TYPES as readonly string[]).includes(k)
             )
           )
         );
@@ -196,6 +229,10 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     setRows((prev) => (prev ? { ...prev, [t]: { ...prev[t], ...patch } } : prev));
     touch();
   };
+  const patchFloor = (f: string, patch: Partial<RowValue>) => {
+    setFloors((prev) => ({ ...prev, [f]: { ...prev[f], ...patch } }));
+    touch();
+  };
 
   async function handleSave() {
     if (!rows || busy) return;
@@ -208,6 +245,12 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     }
     const m = buildChoice(marker, 'village');
     if (m !== undefined) out.markers = { town: m };
+    const floorsOut: Record<string, unknown> = {};
+    for (const f of FLOOR_TYPES) {
+      const c = buildChoice(floors[f], f);
+      if (c !== undefined) floorsOut[f] = c;
+    }
+    if (Object.keys(floorsOut).length) out.floors = floorsOut;
     try {
       await api.putCampaignSection(campaignId, 'terrainArt', out);
       setDirty(false);
@@ -226,7 +269,8 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     catalog: Record<string, { base: string; label: string; filter?: string }>,
     dir: string,
     defaultTile: string,
-    onPatch: (patch: Partial<RowValue>) => void
+    onPatch: (patch: Partial<RowValue>) => void,
+    square = false
   ) => {
     const spec = catalog[value.tile] ?? catalog[defaultTile];
     const tintFilter = compileTint(cleanTint(value.tint));
@@ -245,7 +289,7 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
         }}
       >
         <span style={{ ...lbl, width: 96, letterSpacing: '0.08em' }}>{name.toUpperCase()}</span>
-        <Preview src={`${dir}/${spec.base}.png`} filter={filter} />
+        <Preview src={`${dir}/${spec.base}.png`} filter={filter} square={square} />
         <select
           className={styles.formInp}
           aria-label={`${name} tile`}
@@ -324,10 +368,18 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
                 style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
                 data-testid={`map-art-preset-${preset.toLowerCase()}`}
                 onClick={() => {
+                  // A preset themes the WHOLE skin: terrain tile picks plus
+                  // one shared mood tint over every floor family.
                   const next: Record<string, RowValue> = {};
                   for (const t of OVERLAND_TYPES)
-                    next[t] = { tile: PRESETS[preset][t] ?? t, tint: { ...IDENTITY } };
+                    next[t] = { tile: PRESETS[preset].tiles[t] ?? t, tint: { ...IDENTITY } };
                   setRows(next);
+                  const floorTint = PRESETS[preset].floorTint;
+                  setFloors(
+                    Object.fromEntries(
+                      FLOOR_TYPES.map((f) => [f, { tile: f, tint: { ...IDENTITY, ...floorTint } }])
+                    )
+                  );
                   touch();
                 }}
               >
@@ -335,13 +387,65 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
               </button>
             ))}
           </div>
-          {OVERLAND_TYPES.map((t) =>
-            artRow(t, rows[t], TERRAIN_TILES, '/art/tiles', t, (patch) => patchRow(t, patch))
+          {/* Map-level tabs: terrain + the town marker live on the regional
+              view; floors are the town/local ground. */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: '0.25rem' }}>
+            {(
+              [
+                ['regional', 'REGIONAL'],
+                ['interior', 'TOWN & LOCAL'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                className={styles.ghostBtn}
+                aria-pressed={tab === id}
+                data-testid={`map-art-tab-${id}`}
+                style={{
+                  padding: '0.3rem 0.6rem',
+                  fontSize: '0.7rem',
+                  borderColor: tab === id ? 'var(--t-primary)' : undefined,
+                }}
+                onClick={() => setTab(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {tab === 'regional' && (
+            <>
+              <p style={{ ...lbl, margin: '0.25rem 0 0.25rem' }}>
+                TERRAIN PICKS FOLLOW A PAINTED CELL ONTO EVERY MAP LEVEL — A WATER SQUARE IN A ROOM
+                RENDERS THE SAME SKINNED TILE.
+              </p>
+              {OVERLAND_TYPES.map((t) =>
+                artRow(t, rows[t], TERRAIN_TILES, '/art/tiles', t, (patch) => patchRow(t, patch))
+              )}
+              {artRow('town marker', marker, MARKER_TILES, '/art/markers', 'village', (patch) => {
+                setMarker((prev) => ({ ...prev, ...patch }));
+                touch();
+              })}
+            </>
           )}
-          {artRow('town marker', marker, MARKER_TILES, '/art/markers', 'village', (patch) => {
-            setMarker((prev) => ({ ...prev, ...patch }));
-            touch();
-          })}
+          {tab === 'interior' && (
+            <>
+              <p style={{ ...lbl, margin: '0.25rem 0 0.25rem' }}>
+                THE GROUND TEXTURES TOWN + ROOM MAPS DRAW UNDER EVERY WALKABLE CELL, KEYED BY THE
+                FLOOR THE MAP&#39;S AUTHOR PICKED — REMAP A FAMILY AND/OR TINT IT.
+              </p>
+              {FLOOR_TYPES.map((f) =>
+                artRow(
+                  `${f} floor`,
+                  floors[f],
+                  FLOOR_TILES,
+                  '/art/floors',
+                  f,
+                  (patch) => patchFloor(f, patch),
+                  true
+                )
+              )}
+            </>
+          )}
         </>
       )}
       {error && (

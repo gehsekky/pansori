@@ -18,6 +18,7 @@ import type {
   EquipSlot,
   Faction,
   FactionThresholds,
+  FloorType,
   GameChoice,
   GridPos,
   NpcAttitude,
@@ -466,9 +467,8 @@ export interface ActiveGrid {
   floor?: FloorType;
 }
 
-// Local-room floor textures (mirror of BE Room.floor); seamless tiles under
-// public/art/floors/<type>_<n>.png.
-export type FloorType = 'grass' | 'dirt' | 'cobblestone' | 'sand';
+// `FloorType` is re-exported from ./shared-types (see src/shared/types.ts) —
+// the terrain-art skin remaps + tints floors campaign-wide.
 
 export interface Seed {
   context_id: string;

@@ -304,6 +304,16 @@ function GridMapView({
     const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
     return { src: `/art/markers/${spec.base}.png`, filter: joinFilters(spec.filter, tint) };
   };
+  // A floor family through the campaign skin: `floors.<authored type>` may
+  // remap to another family and/or tint it. Returns the texture family to
+  // draw + the tint filter (the per-cell variant is picked at the call site).
+  const floorFor = (f: FloorType): { type: FloorType; filter?: string } => {
+    const choice = terrainArt?.floors?.[f];
+    if (!choice) return { type: f };
+    const type = typeof choice === 'string' ? choice : choice.tile;
+    const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
+    return { type, filter: tint };
+  };
   // Square size per map level: the sparse overland map gets the biggest squares
   // so it reads like a map and the terrain tiles have room; town is mid-size;
   // local exploration is the most compact.
@@ -432,9 +442,12 @@ function GridMapView({
         floored && grid.floor
           ? ((terrainType ? TERRAIN_FLOOR[terrainType] : undefined) ?? grid.floor)
           : undefined;
+      // The authored floor family resolves through the campaign skin (remap
+      // and/or tint) before picking the per-cell variant.
+      const skinnedFloor = cellFloor ? floorFor(cellFloor) : undefined;
       const floorSrc =
-        cellFloor && !fogged && !isObstacle && !tileSrc
-          ? `/art/floors/${cellFloor}_${floorVariant(x, y)}.png`
+        skinnedFloor && !fogged && !isObstacle && !tileSrc
+          ? `/art/floors/${skinnedFloor.type}_${floorVariant(x, y)}.png`
           : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint
@@ -727,6 +740,7 @@ function GridMapView({
               aria-hidden="true"
               draggable={false}
               className={styles.gridMapFloor}
+              style={skinnedFloor?.filter ? { filter: skinnedFloor.filter } : undefined}
             />
           )}
           {tileSrc && (
