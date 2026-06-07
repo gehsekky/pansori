@@ -619,11 +619,18 @@ export interface CampaignRoomLoot {
 
 // A placed NPC — bespoke (no catalog): identity, social surface and an
 // optional dialogue tree / shop / stat block. The stat block defaults to
-// an SRD Commoner-style block at overlay time; dialogue consequences and
-// faction wiring stay code-side for now.
+// an SRD Commoner-style block at overlay time. Dialogue nodes may be
+// gated (condition / once — see dialogueGating) and may fire the safe
+// consequence subset (set_flag / set_npc_attitude / give_gold / give_xp /
+// give_item); the zod schema constrains the shapes, and the converter
+// passes them through to the engine verbatim. Faction wiring stays
+// code-side for now.
 export interface CampaignRoomNpcResponse {
   label: string;
   reply?: string;
+  condition?: object;
+  once?: boolean;
+  consequences?: Array<Record<string, unknown>>;
   responses?: CampaignRoomNpcResponse[];
 }
 // A searchable / interactable object (chest, lever, shrine). Mirrors the

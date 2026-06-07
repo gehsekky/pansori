@@ -799,12 +799,111 @@ const RoomExitSchema = z
   })
   .strict();
 
+// Dialogue gating condition — the json-rules-engine TopLevelCondition subset
+// the sync evaluator (dialogueGating.evalCondition) understands: all/any/not
+// nesting over {fact, operator, value, path?} leaves. Fact names are
+// restricted to the CampaignFacts the evaluator actually serves, so a typo'd
+// fact is an authoring-time 400 instead of a silently-always-hidden option.
+const DIALOGUE_FACTS = [
+  'room_id',
+  'current_town_id',
+  'enemies_killed',
+  'loot_taken',
+  'visited_rooms',
+  'flags',
+  'campaign_flags',
+  'faction_rep',
+  'quests_active',
+  'quests_completed',
+  'steps_done',
+  'faction_tier',
+  'party_items',
+  'world_minute',
+  'world_day',
+  'active_level',
+  'active_class',
+] as const;
+const DIALOGUE_OPERATORS = [
+  'equal',
+  'notEqual',
+  'in',
+  'notIn',
+  'contains',
+  'doesNotContain',
+  'lessThan',
+  'lessThanInclusive',
+  'greaterThan',
+  'greaterThanInclusive',
+] as const;
+const ConditionScalarSchema = z.union([z.string().max(120), z.number(), z.boolean()]);
+type DialogueConditionShape =
+  | { all: DialogueConditionShape[] }
+  | { any: DialogueConditionShape[] }
+  | { not: DialogueConditionShape }
+  | {
+      fact: (typeof DIALOGUE_FACTS)[number];
+      operator: (typeof DIALOGUE_OPERATORS)[number];
+      value: string | number | boolean | Array<string | number | boolean>;
+      path?: string;
+    };
+const DialogueConditionSchema: z.ZodType<DialogueConditionShape> = z.lazy(() =>
+  z.union([
+    z.object({ all: z.array(DialogueConditionSchema).min(1).max(8) }).strict(),
+    z.object({ any: z.array(DialogueConditionSchema).min(1).max(8) }).strict(),
+    z.object({ not: DialogueConditionSchema }).strict(),
+    z
+      .object({
+        fact: z.enum(DIALOGUE_FACTS),
+        operator: z.enum(DIALOGUE_OPERATORS),
+        value: z.union([ConditionScalarSchema, z.array(ConditionScalarSchema).max(20)]),
+        path: z
+          .string()
+          .regex(/^\$\.[\w.-]+$/, "path must look like '$.key' or '$.key.sub'")
+          .max(80)
+          .optional(),
+      })
+      .strict(),
+  ])
+);
+
+// The consequence subset DB dialogue may fire — the world-state setters
+// (flags for cross-NPC threads, attitude shifts for parley outcomes) and
+// the simple grants. The heavier GameConsequence arms (spawn_enemy,
+// unlock_room, advance_quest, travel_to…) stay code-side until the systems
+// they script are DB-authored too.
+const DialogueConsequenceSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('set_flag'),
+      key: z.string().min(1).max(60),
+      value: ConditionScalarSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('set_npc_attitude'),
+      npcId: SLUG,
+      attitude: z.enum(['friendly', 'indifferent', 'hostile']),
+    })
+    .strict(),
+  z.object({ type: z.literal('give_gold'), amount: z.number().int().min(1).max(100000) }).strict(),
+  z.object({ type: z.literal('give_xp'), amount: z.number().int().min(1).max(100000) }).strict(),
+  z.object({ type: z.literal('give_item'), itemId: z.string().min(1).max(80) }).strict(),
+]);
+type DialogueConsequenceShape = z.infer<typeof DialogueConsequenceSchema>;
+
 // NPC dialogue: a recursive option tree (a response with children is a
-// branch, without is a leaf). Dialogue CONSEQUENCES stay code-side for
-// now — DB dialogue is social flavor, not script triggers.
+// branch, without is a leaf). A response may be GATED (condition — hidden
+// until the facts hold; once — gone after being chosen) and may fire the
+// consequence subset above. give_item resolves against the composed loot
+// table at apply time; set_npc_attitude targets are cross-validated against
+// the payload's NPC ids in the payload superRefine.
 interface RoomNpcResponseShape {
   label: string;
   reply?: string;
+  condition?: DialogueConditionShape;
+  once?: boolean;
+  consequences?: DialogueConsequenceShape[];
   responses?: RoomNpcResponseShape[];
 }
 const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
@@ -812,6 +911,9 @@ const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
     .object({
       label: z.string().min(1).max(120),
       reply: z.string().min(1).max(2000).optional(),
+      condition: DialogueConditionSchema.optional(),
+      once: z.boolean().optional(),
+      consequences: z.array(DialogueConsequenceSchema).max(5).optional(),
       responses: z.array(RoomNpcResponseSchema).max(8).optional(),
     })
     .strict()
@@ -1066,6 +1168,35 @@ const RoomsSchema = z
         }
         npcIds.add(n.id);
       })
+    );
+    // Dialogue set_npc_attitude must target an NPC that exists in this
+    // payload (DB rooms replace the campaign's NPC map wholesale, so the
+    // payload IS the full cast). Walks every response tree recursively.
+    const checkAttitudeTargets = (
+      resp: RoomNpcResponseShape,
+      ri: number,
+      ni: number,
+      where: string
+    ) => {
+      for (const c of resp.consequences ?? []) {
+        if (c.type === 'set_npc_attitude' && !npcIds.has(c.npcId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `dialogue ${where} sets attitude of unknown NPC "${c.npcId}"`,
+            path: [ri, 'npcs', ni, 'responses'],
+          });
+        }
+      }
+      (resp.responses ?? []).forEach((child, ci) =>
+        checkAttitudeTargets(child, ri, ni, `${where}.${ci}`)
+      );
+    };
+    rooms.forEach((r, ri) =>
+      (r.npcs ?? []).forEach((n, ni) =>
+        (n.responses ?? []).forEach((resp, i) =>
+          checkAttitudeTargets(resp, ri, ni, `"${n.id}" response ${i}`)
+        )
+      )
     );
     // Exits must lead somewhere real: toRoomId resolves within this payload,
     // and an explicit entrancePos must fit the TARGET room's grid.

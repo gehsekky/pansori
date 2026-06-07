@@ -657,6 +657,98 @@ describe('editable sections registry', () => {
     ).toBe(false);
   });
 
+  it('rooms schema validates gated dialogue: conditions, consequences, NPC targets', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const smuggler = {
+      id: 'smuggler',
+      name: 'The Smuggler',
+      attitude: 'friendly',
+      greeting: 'Looking for something?',
+      responses: [
+        { label: 'Just browsing', reply: 'Suit yourself.' },
+        {
+          label: 'About that job…',
+          reply: 'Bring the ledger.',
+          condition: {
+            all: [
+              { fact: 'flags', path: '$.knows_password', operator: 'equal', value: true },
+              { not: { fact: 'quests_completed', operator: 'contains', value: 'old-debt' } },
+            ],
+          },
+        },
+        {
+          label: 'A little bird told me a password',
+          reply: 'So you know Hob.',
+          once: true,
+          consequences: [
+            { type: 'set_flag', key: 'knows_password', value: true },
+            { type: 'set_npc_attitude', npcId: 'smuggler', attitude: 'friendly' },
+            { type: 'give_gold', amount: 5 },
+            { type: 'give_item', itemId: 'dagger' },
+            { type: 'give_xp', amount: 25 },
+          ],
+        },
+      ],
+    };
+    const ok = rooms.safeParse([{ ...ROOM_B, npcs: [smuggler] }]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    const withResp = (patch: object) => [
+      { ...ROOM_B, npcs: [{ ...smuggler, responses: [patch] }] },
+    ];
+    // Unknown fact / unknown operator — an authoring-time 400, not a
+    // silently-always-hidden option.
+    expect(
+      rooms.safeParse(
+        withResp({ label: 'X', condition: { fact: 'vibes', operator: 'equal', value: 1 } })
+      ).success
+    ).toBe(false);
+    expect(
+      rooms.safeParse(
+        withResp({ label: 'X', condition: { fact: 'world_day', operator: 'looksLike', value: 1 } })
+      ).success
+    ).toBe(false);
+    // Paths must be $.dot.paths.
+    expect(
+      rooms.safeParse(
+        withResp({
+          label: 'X',
+          condition: { fact: 'flags', path: 'knows_password', operator: 'equal', value: true },
+        })
+      ).success
+    ).toBe(false);
+    // Consequences outside the DB-safe subset stay code-side.
+    expect(
+      rooms.safeParse(
+        withResp({
+          label: 'X',
+          consequences: [{ type: 'spawn_enemy', roomId: 'cellar', enemyId: 'rat' }],
+        })
+      ).success
+    ).toBe(false);
+    // set_npc_attitude must target an NPC in the payload — even on a NESTED node.
+    expect(
+      rooms.safeParse(
+        withResp({
+          label: 'X',
+          consequences: [{ type: 'set_npc_attitude', npcId: 'ghost', attitude: 'hostile' }],
+        })
+      ).success
+    ).toBe(false);
+    expect(
+      rooms.safeParse(
+        withResp({
+          label: 'X',
+          responses: [
+            {
+              label: 'Y',
+              consequences: [{ type: 'set_npc_attitude', npcId: 'ghost', attitude: 'hostile' }],
+            },
+          ],
+        })
+      ).success
+    ).toBe(false);
+  });
+
   it('rooms schema validates loot placements: item id + bounded pos, strict shape', () => {
     const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
     const ok = rooms.safeParse([
@@ -1219,6 +1311,44 @@ describe('section CRUD + live refresh', () => {
     // Rooms-wholesale: the code npcs map is replaced entirely.
     expect(npcs['code-npc']).toBeUndefined();
     warn.mockRestore();
+  });
+
+  it('gated dialogue (condition/once/consequences) passes through to the engine NPC', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: { world_name: 'Malgovia', intro: 'x', rooms: [], npcs: {} } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const gated = {
+      label: 'About that job…',
+      reply: 'Bring the ledger.',
+      condition: { fact: 'flags', path: '$.knows_password', operator: 'equal', value: true },
+    };
+    const oneShot = {
+      label: 'A little bird told me a password',
+      reply: 'So you know Hob.',
+      once: true,
+      consequences: [{ type: 'set_flag', key: 'knows_password', value: true }],
+    };
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+      {
+        ...ROOM_B,
+        npcs: [
+          {
+            id: 'smuggler',
+            name: 'The Smuggler',
+            attitude: 'friendly',
+            greeting: 'Looking for something?',
+            responses: [gated, oneShot],
+          },
+        ],
+      },
+    ]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const smuggler = contexts.malgovia.campaign?.npcs?.['smuggler'];
+    // The dialogue tree reaches the engine verbatim — gates and all.
+    expect(smuggler?.responses).toEqual([gated, oneShot]);
   });
 
   it('room loot placements materialize against the composed loot table on refresh', async () => {
