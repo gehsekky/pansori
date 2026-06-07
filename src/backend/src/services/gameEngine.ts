@@ -4297,10 +4297,15 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const convoChoices: GameChoice[] = visibleResponses(cnpc, conv.path, state, context).map(
         ({ response: r, idx }) => {
           const action = { type: 'talk_response' as const, responseIdx: idx };
+          // Skill-gated options advertise the roll, mirroring the indifferent
+          // NPC talk hint ("(CHA check DC 12)").
+          const checkHint = r.check
+            ? ` (${r.check.skill.charAt(0).toUpperCase() + r.check.skill.slice(1)} DC ${r.check.dc})`
+            : '';
           // This early-return bypasses the end-of-function seenKey pass, so stamp
           // it here — lets the FE dim dialogue options the player already picked.
           return {
-            label: `<To ${cnpc.name}> ${r.label}`,
+            label: `<To ${cnpc.name}> ${r.label}${checkHint}`,
             action,
             kind: 'conversation' as const,
             seenKey: seenKeyForAction(action, state),
@@ -6729,6 +6734,26 @@ export function applyConsequence(
 
     case 'set_flag':
       return { ...st, flags: { ...st.flags, [c.key]: c.value } };
+
+    case 'start_quest': {
+      // Activate a quest from a script trigger (dialogue node, quest reward
+      // chain). Idempotent: an existing progress entry — active, completed
+      // or failed — leaves the state untouched, so a replayed trigger can't
+      // resurrect or duplicate a quest. The activation line mirrors the
+      // route's auto-activation announcement.
+      const def = context?.campaign?.quests?.find((q) => q.id === c.questId);
+      if (!def) {
+        console.warn(`[consequence] start_quest: no quest with id "${c.questId}" — skipped`);
+        return st;
+      }
+      const progress = st.quest_progress ?? [];
+      if (progress.some((qp) => qp.questId === c.questId)) return st;
+      narrativeParts.push(`\n\n✦ Quest accepted — ${def.title}. ${def.desc}`);
+      return {
+        ...st,
+        quest_progress: [...progress, { questId: c.questId, status: 'active', completedSteps: [] }],
+      };
+    }
 
     case 'give_item': {
       const targetId = c.characterId ?? activeCharId;

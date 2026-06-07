@@ -977,6 +977,10 @@ export type GameConsequence =
   | { type: 'spawn_enemy'; roomId: string; enemyId: string }
   | { type: 'set_escape' }
   | { type: 'advance_quest'; questId: string; stepId: string }
+  // Activate a quest by id (no-op if already started or completed; unknown
+  // ids warn and skip). The explicit "this conversation starts the quest"
+  // trigger — clearer to author than the set_flag + step-condition indirection.
+  | { type: 'start_quest'; questId: string }
   | { type: 'set_faction_rep'; factionId: string; delta: number }
   | { type: 'travel_to'; locationId: string }
   | { type: 'give_gold'; amount: number }
@@ -1064,8 +1068,22 @@ export interface NpcDialogueResponse {
   condition?: object;
   // One-shot — once chosen, the option disappears for the REST OF THE
   // PLAYTHROUGH (recorded in GameState.dialogue_chosen, which persists with
-  // the session like objects_searched).
+  // the session like objects_searched). On a `check` node the attempt is
+  // what's spent — set it for one-chance gambits, omit it to allow retries.
   once?: boolean;
+  // Skill-gated branch — picking it rolls a CHA-based social check (SRD:
+  // Persuasion / Deception / Intimidation) against the DC. The outcome picks
+  // the reply and fires the matching consequence list; children (`responses`)
+  // open ONLY on success. A check node uses successReply/failReply INSTEAD of
+  // `reply` and onSuccess/onFail INSTEAD of `consequences`.
+  check?: {
+    skill: 'persuasion' | 'deception' | 'intimidation';
+    dc: number;
+    successReply: string;
+    failReply: string;
+    onSuccess?: GameConsequence[];
+    onFail?: GameConsequence[];
+  };
   // Nested follow-up options. A response WITH children is a branch: picking it
   // descends a level (its `reply` becomes the new prompt, `responses` the new
   // options) and a "Back" choice appears. A response WITHOUT children is a leaf:

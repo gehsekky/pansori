@@ -161,20 +161,66 @@ export const handleTalkResponse: ActionHandler<{
       ],
     };
   }
-  let narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
-  if (response.consequences?.length) {
+  // Shared by the plain and check paths: run a consequence list, then
+  // refresh the actor from the post-consequence state — applyConsequence
+  // writes character changes (give_gold / give_xp / give_item) into ctx.st,
+  // and without the refresh the epilogue's commitChar would write the
+  // PRE-consequence character back over the reward (the narrative would
+  // say "+10 gold" while the gold vanished).
+  const runConsequences = (list: typeof response.consequences): string => {
+    if (!list?.length) return '';
     const narrativeParts: string[] = [];
-    for (const c of response.consequences) {
+    for (const c of list) {
       ctx.st = applyConsequence(c, ctx.st, ctx.seed, char.id, narrativeParts, ctx.context);
     }
-    if (narrativeParts.length) narrative += ' ' + narrativeParts.join(' ');
-    // applyConsequence writes character changes (give_gold / give_xp /
-    // give_item) into ctx.st — refresh the actor from it, or the epilogue's
-    // commitChar would write the PRE-consequence character back over the
-    // reward (the narrative would say "+10 gold" while the gold vanished).
     const enriched = ctx.st.characters.find((c2) => c2.id === char.id);
     if (enriched) updatePcActor(ctx, enriched);
+    return narrativeParts.length ? ' ' + narrativeParts.join(' ') : '';
+  };
+
+  // Skill-gated node: roll the CHA-based social check, pick the outcome's
+  // reply + consequences; children open ONLY on success. Without `once`, a
+  // failed check stays on the menu for a retry.
+  if (response.check) {
+    const chk = response.check;
+    const luckActive = consumeLuckForCheck(char);
+    const result = skillCheck(
+      char.cha,
+      chk.dc,
+      char.skill_proficiencies?.includes(chk.skill) ?? false,
+      char.level,
+      false,
+      hasExpertise(char, chk.skill),
+      hasJackOfAllTrades(char),
+      luckActive,
+      char.species === 'halfling',
+      hasReliableTalent(char),
+      false,
+      d20TestPenalty(char)
+    );
+    const skillLabel = chk.skill.charAt(0).toUpperCase() + chk.skill.slice(1);
+    const outcomeReply = result.success ? chk.successReply : chk.failReply;
+    let narrative = `${char.name} (${skillLabel} ${result.total} vs DC ${chk.dc} — ${
+      result.success ? 'success' : 'fail'
+    }). ${npc.name}: "${outcomeReply}"`;
+    narrative += runConsequences(result.success ? chk.onSuccess : chk.onFail);
+    if (conv) {
+      const descend = result.success && (response.responses?.length ?? 0) > 0;
+      ctx.st = {
+        ...ctx.st,
+        active_conversation: {
+          ...conv,
+          path: descend ? [...path, action.responseIdx] : path,
+          prompt: outcomeReply,
+        },
+      };
+    }
+    ctx.narrative = narrative;
+    return;
   }
+
+  let narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
+  narrative += runConsequences(response.consequences);
   // Walk the conversation: a branch (has children) descends a level; a leaf
   // keeps the current options. The prompt becomes the NPC's reply either way.
   if (conv) {

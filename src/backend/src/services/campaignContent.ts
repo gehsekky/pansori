@@ -28,11 +28,13 @@ import type {
   Context,
   Enemy,
   EnemyTemplate,
+  Faction,
   FloorType,
   GridPos,
   LootItem,
   PlacedLoot,
   PlacedNpc,
+  Quest,
   Region,
   Room,
   RoomExit,
@@ -93,12 +95,20 @@ export function baseContextFor(campaignId: string): Context {
 // every campaign automatically gets the full catalogs; customs add to them
 // and shadow same-id (items) / same-name (monsters) catalog entries. The
 // composed lootTable / enemyTemplates are LIVE engine fields.
+// 'quests' / 'factions' are campaign-block script content stored as
+// campaigns.data keys: loadOverlay folds them into campaign.quests /
+// campaign.factions WHOLESALE (any DB quests replace the code quest list
+// entirely, same for factions). Quest steps + dialogue gates share one
+// condition vocabulary; quest ids are what dialogue start_quest
+// consequences and quests_active/steps_done facts reference.
 export const EDITABLE_SECTIONS = [
   'gameStart',
   'narratives',
   'regions',
   'towns',
   'rooms',
+  'quests',
+  'factions',
   'terrainArt',
   'customItems',
   'customMonsters',
@@ -630,6 +640,7 @@ export interface CampaignRoomNpcResponse {
   reply?: string;
   condition?: object;
   once?: boolean;
+  check?: Record<string, unknown>;
   consequences?: Array<Record<string, unknown>>;
   responses?: CampaignRoomNpcResponse[];
 }
@@ -1125,6 +1136,19 @@ async function loadOverlay(
   const gameStart = typeof overlay.gameStart === 'string' ? overlay.gameStart : undefined;
   delete overlay.gameStart;
 
+  // Quests + factions are campaign-block fields too — extracted here and
+  // folded below (wholesale replace), never left as top-level keys.
+  const dbQuests =
+    Array.isArray(overlay.quests) && overlay.quests.length > 0
+      ? (overlay.quests as Quest[])
+      : undefined;
+  delete overlay.quests;
+  const dbFactions =
+    Array.isArray(overlay.factions) && overlay.factions.length > 0
+      ? (overlay.factions as Faction[])
+      : undefined;
+  delete overlay.factions;
+
   // The composed catalogs come first — room enemy placements resolve
   // against the composed bestiary below.
   const lootTable = composeLootTable(
@@ -1148,10 +1172,19 @@ async function loadOverlay(
   const dbRegions = await getCampaignRegions(pool, campaignId);
   const dbTowns = await getCampaignTowns(pool, campaignId);
   const dbRooms = await getCampaignRooms(pool, campaignId);
-  if (dbRegions.length > 0 || dbTowns.length > 0 || dbRooms.length > 0 || gameStart !== undefined) {
+  if (
+    dbRegions.length > 0 ||
+    dbTowns.length > 0 ||
+    dbRooms.length > 0 ||
+    gameStart !== undefined ||
+    dbQuests !== undefined ||
+    dbFactions !== undefined
+  ) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
       ...(gameStart !== undefined ? { intro: gameStart } : {}),
+      ...(dbQuests !== undefined ? { quests: dbQuests } : {}),
+      ...(dbFactions !== undefined ? { factions: dbFactions } : {}),
       ...(dbRegions.length > 0 ? { regions: dbRegionsToEngine(dbRegions) } : {}),
       ...(dbTowns.length > 0 ? { towns: dbTownsToEngine(dbTowns) } : {}),
       // Rooms-wholesale semantics extend to their enemies: DB rooms bring

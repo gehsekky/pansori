@@ -244,6 +244,114 @@ describe('gated dialogue (condition + once)', () => {
     expect(pc.inventory.some((i) => i.id === 'dagger')).toBe(true);
   });
 
+  it('check nodes: success descends + fires onSuccess; fail stays put for a retry', async () => {
+    const guard: PlacedNpc = {
+      ...gatedNpc,
+      id: 'guard',
+      name: 'The Guard',
+      responses: [
+        {
+          label: 'Let us pass',
+          check: {
+            skill: 'persuasion',
+            dc: 10,
+            successReply: 'Go on, then.',
+            failReply: 'Not a chance.',
+            onSuccess: [{ type: 'set_flag', key: 'gate_open', value: true }],
+            onFail: [{ type: 'set_flag', key: 'guard_annoyed', value: true }],
+          },
+          responses: [{ label: 'Thank you', reply: 'Hm.' }],
+        },
+      ],
+    };
+    const guardSeed = { ...seed, npcs: { guard } } as unknown as Seed;
+    const gStart = () =>
+      makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['guard'] });
+    const gAct = (
+      state: ReturnType<typeof makeState>,
+      action: Parameters<typeof takeAction>[0]['action']
+    ) => takeAction({ action, history: [], state, seed: guardSeed, context: ctx });
+
+    // The choice label advertises the roll.
+    const r = await gAct(gStart(), { type: 'talk', npcId: 'guard' });
+    expect(generateChoices(r.newState, guardSeed, ctx).map((c) => c.label)).toContain(
+      '<To The Guard> Let us pass (Persuasion DC 10)'
+    );
+    // FAIL: d20 → 1. failReply, onFail fires, no descent — option stays for retry.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    let f = await gAct(r.newState, { type: 'talk_response', responseIdx: 0 });
+    expect(f.narrative).toContain('fail');
+    expect(f.narrative).toContain('Not a chance.');
+    expect(f.newState.flags?.guard_annoyed).toBe(true);
+    expect(f.newState.flags?.gate_open).toBeUndefined();
+    expect(f.newState.active_conversation?.path).toEqual([]);
+    // SUCCESS: d20 → 20. successReply, onSuccess fires, descends into children.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    f = await gAct(f.newState, { type: 'talk_response', responseIdx: 0 });
+    expect(f.narrative).toContain('success');
+    expect(f.narrative).toContain('Go on, then.');
+    expect(f.newState.flags?.gate_open).toBe(true);
+    expect(f.newState.active_conversation?.path).toEqual([0]);
+    expect(generateChoices(f.newState, guardSeed, ctx).map((c) => c.label)).toContain(
+      '<To The Guard> Thank you'
+    );
+  });
+
+  it('start_quest consequence activates the quest once, with the accept line', async () => {
+    const QUEST = {
+      id: 'rat-problem',
+      title: 'The Rat Problem',
+      desc: 'Clear the cellar.',
+      steps: [{ id: 's1', desc: 'x', condition: {} }],
+      rewards: [],
+    };
+    const questCtx = {
+      ...ctx,
+      campaign: { ...(ctx.campaign ?? { world_name: 'x', intro: '', rooms: [] }), quests: [QUEST] },
+    } as typeof ctx;
+    const hirer: PlacedNpc = {
+      ...gatedNpc,
+      id: 'hirer',
+      name: 'The Hirer',
+      responses: [
+        {
+          label: 'Need a hand?',
+          reply: 'Rats. Cellar. Coin on completion.',
+          consequences: [{ type: 'start_quest', questId: 'rat-problem' }],
+        },
+        {
+          label: 'Ghost work?',
+          reply: 'Eh?',
+          consequences: [{ type: 'start_quest', questId: 'no-such-quest' }],
+        },
+      ],
+    };
+    const hSeed = { ...seed, npcs: { hirer } } as unknown as Seed;
+    const hAct = (
+      state: ReturnType<typeof makeState>,
+      action: Parameters<typeof takeAction>[0]['action']
+    ) => takeAction({ action, history: [], state, seed: hSeed, context: questCtx });
+    let r = await hAct(
+      makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['hirer'] }),
+      { type: 'talk', npcId: 'hirer' }
+    );
+    r = await hAct(r.newState, { type: 'talk_response', responseIdx: 0 });
+    expect(r.narrative).toContain('✦ Quest accepted — The Rat Problem.');
+    expect(r.newState.quest_progress).toEqual([
+      { questId: 'rat-problem', status: 'active', completedSteps: [] },
+    ]);
+    // Replaying the trigger doesn't duplicate the entry or re-announce.
+    r = await hAct(r.newState, { type: 'talk_response', responseIdx: 0 });
+    expect(r.narrative).not.toContain('Quest accepted');
+    expect(r.newState.quest_progress).toHaveLength(1);
+    // An unknown quest id warns and no-ops.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    r = await hAct(r.newState, { type: 'talk_response', responseIdx: 1 });
+    expect(r.newState.quest_progress).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('no-such-quest'));
+    warn.mockRestore();
+  });
+
   it('once persists for the playthrough: re-opening the talk keeps it spent', async () => {
     let r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
     r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });

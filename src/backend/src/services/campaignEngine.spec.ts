@@ -154,6 +154,45 @@ describe('the opening arrival quest completes on reaching Pinegate', () => {
   });
 });
 
+describe('bare-leaf quest conditions evaluate (DB-authored shape)', () => {
+  // DB quest authors (and the dialogue-side sync evaluator) write bare
+  // {fact, operator, value} conditions; json-rules-engine demands an
+  // all/any/not root — evaluateQuestSteps wraps transparently.
+  const quest: Quest = {
+    id: 'rat-problem',
+    title: 'The Rat Problem',
+    desc: 'x',
+    steps: [
+      {
+        id: 'step_kill',
+        desc: 'x',
+        condition: { fact: 'enemies_killed', operator: 'contains', value: 'cellar#0' },
+      },
+    ],
+    rewards: [],
+  };
+  const cs = (): CampaignState => ({
+    campaign_id: 'c',
+    user_id: 'u',
+    world_minute: 480,
+    current_location: '',
+    quests: [{ questId: 'rat-problem', status: 'active', completedSteps: [] }],
+    flags: {},
+    faction_rep: {},
+    npc_attitudes: {},
+  });
+
+  it('a bare leaf works at the root of a step condition', async () => {
+    const miss = await evaluateQuestSteps(cs(), [quest], { ...FACTS, enemies_killed: [] });
+    expect(miss).toEqual([]);
+    const hit = await evaluateQuestSteps(cs(), [quest], {
+      ...FACTS,
+      enemies_killed: ['cellar#0'],
+    });
+    expect(hit.find((c) => c.questId === 'rat-problem')?.completedStepIds).toEqual(['step_kill']);
+  });
+});
+
 describe('world_minute round-trips through merge/extract', () => {
   const cs = (worldMinute: number): CampaignState => ({
     campaign_id: 'c',

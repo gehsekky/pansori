@@ -289,6 +289,12 @@ async function sectionCodeFallback(campaignId: string, section: string): Promise
     const code = CODE_CONTEXTS[campaignId] ?? baseContextFor(campaignId);
     return code.campaign?.intro ?? null;
   }
+  if (section === 'quests' || section === 'factions') {
+    // Campaign-block fields, not top-level Context keys — a code campaign's
+    // quest/faction lists are the editing starting point.
+    const list = CODE_CONTEXTS[campaignId]?.campaign?.[section];
+    return list && list.length > 0 ? list : null;
+  }
   const code = CODE_CONTEXTS[campaignId] as unknown as Record<string, unknown> | undefined;
   return code?.[section] ?? null;
 }

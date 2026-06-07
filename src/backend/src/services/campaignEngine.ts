@@ -125,10 +125,17 @@ export async function evaluateQuestSteps(
   const results: { questId: string; completedStepIds: string[] }[] = [];
 
   async function matches(stepCondition: unknown, stepId: string): Promise<boolean> {
+    // json-rules-engine requires an all/any/not wrapper at the root, but
+    // authors (and the dialogue-side sync evaluator, which shares the
+    // condition vocabulary) write bare {fact, operator, value} leaves —
+    // wrap those transparently instead of 500ing the action.
+    const bareLeaf =
+      typeof stepCondition === 'object' && stepCondition !== null && 'fact' in stepCondition;
+    const conditions = (bareLeaf ? { all: [stepCondition] } : stepCondition) as TopLevelCondition;
     const engine = new Engine();
     engine.addRule({
       name: stepId,
-      conditions: stepCondition as TopLevelCondition,
+      conditions,
       event: { type: 'step_met' },
     });
     const { results: ruleResults } = await engine.run(facts as unknown as Record<string, unknown>);

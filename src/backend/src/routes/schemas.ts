@@ -836,35 +836,42 @@ const DIALOGUE_OPERATORS = [
   'greaterThanInclusive',
 ] as const;
 const ConditionScalarSchema = z.union([z.string().max(120), z.number(), z.boolean()]);
-type DialogueConditionShape =
-  | { all: DialogueConditionShape[] }
-  | { any: DialogueConditionShape[] }
-  | { not: DialogueConditionShape }
+type ConditionShape =
+  | { all: ConditionShape[] }
+  | { any: ConditionShape[] }
+  | { not: ConditionShape }
   | {
-      fact: (typeof DIALOGUE_FACTS)[number];
+      fact: string;
       operator: (typeof DIALOGUE_OPERATORS)[number];
       value: string | number | boolean | Array<string | number | boolean>;
       path?: string;
     };
-const DialogueConditionSchema: z.ZodType<DialogueConditionShape> = z.lazy(() =>
-  z.union([
-    z.object({ all: z.array(DialogueConditionSchema).min(1).max(8) }).strict(),
-    z.object({ any: z.array(DialogueConditionSchema).min(1).max(8) }).strict(),
-    z.object({ not: DialogueConditionSchema }).strict(),
-    z
-      .object({
-        fact: z.enum(DIALOGUE_FACTS),
-        operator: z.enum(DIALOGUE_OPERATORS),
-        value: z.union([ConditionScalarSchema, z.array(ConditionScalarSchema).max(20)]),
-        path: z
-          .string()
-          .regex(/^\$\.[\w.-]+$/, "path must look like '$.key' or '$.key.sub'")
-          .max(80)
-          .optional(),
-      })
-      .strict(),
-  ])
-);
+// Factory so each condition surface gets its own fact vocabulary: dialogue
+// gates never see a meaningful `action` fact (it's '' there), while quest
+// steps key on it routinely ("the player attacked").
+function conditionSchema(facts: readonly [string, ...string[]]): z.ZodType<ConditionShape> {
+  const self: z.ZodType<ConditionShape> = z.lazy(() =>
+    z.union([
+      z.object({ all: z.array(self).min(1).max(8) }).strict(),
+      z.object({ any: z.array(self).min(1).max(8) }).strict(),
+      z.object({ not: self }).strict(),
+      z
+        .object({
+          fact: z.enum(facts),
+          operator: z.enum(DIALOGUE_OPERATORS),
+          value: z.union([ConditionScalarSchema, z.array(ConditionScalarSchema).max(20)]),
+          path: z
+            .string()
+            .regex(/^\$\.[\w.-]+$/, "path must look like '$.key' or '$.key.sub'")
+            .max(80)
+            .optional(),
+        })
+        .strict(),
+    ])
+  );
+  return self;
+}
+const DialogueConditionSchema = conditionSchema(DIALOGUE_FACTS);
 
 // The consequence subset DB dialogue may fire — the world-state setters
 // (flags for cross-NPC threads, attitude shifts for parley outcomes) and
@@ -889,8 +896,26 @@ const DialogueConsequenceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('give_gold'), amount: z.number().int().min(1).max(100000) }).strict(),
   z.object({ type: z.literal('give_xp'), amount: z.number().int().min(1).max(100000) }).strict(),
   z.object({ type: z.literal('give_item'), itemId: z.string().min(1).max(80) }).strict(),
+  // Quest ids live in the quests SECTION (separate write), so they can't be
+  // cross-validated here — an unknown id warns and no-ops at apply time.
+  z.object({ type: z.literal('start_quest'), questId: SLUG }).strict(),
 ]);
 type DialogueConsequenceShape = z.infer<typeof DialogueConsequenceSchema>;
+
+// Skill-gated dialogue branch: a CHA-based SRD social check. Outcome picks
+// the reply + consequence list; children open only on success. Replaces the
+// node's plain reply/consequences (enforced in the response schema).
+const DialogueCheckSchema = z
+  .object({
+    skill: z.enum(['persuasion', 'deception', 'intimidation']),
+    dc: z.number().int().min(1).max(30),
+    successReply: z.string().min(1).max(2000),
+    failReply: z.string().min(1).max(2000),
+    onSuccess: z.array(DialogueConsequenceSchema).max(5).optional(),
+    onFail: z.array(DialogueConsequenceSchema).max(5).optional(),
+  })
+  .strict();
+type DialogueCheckShape = z.infer<typeof DialogueCheckSchema>;
 
 // NPC dialogue: a recursive option tree (a response with children is a
 // branch, without is a leaf). A response may be GATED (condition — hidden
@@ -901,8 +926,9 @@ type DialogueConsequenceShape = z.infer<typeof DialogueConsequenceSchema>;
 interface RoomNpcResponseShape {
   label: string;
   reply?: string;
-  condition?: DialogueConditionShape;
+  condition?: ConditionShape;
   once?: boolean;
+  check?: DialogueCheckShape;
   consequences?: DialogueConsequenceShape[];
   responses?: RoomNpcResponseShape[];
 }
@@ -913,10 +939,15 @@ const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
       reply: z.string().min(1).max(2000).optional(),
       condition: DialogueConditionSchema.optional(),
       once: z.boolean().optional(),
+      check: DialogueCheckSchema.optional(),
       consequences: z.array(DialogueConsequenceSchema).max(5).optional(),
       responses: z.array(RoomNpcResponseSchema).max(8).optional(),
     })
     .strict()
+    .refine((r) => !(r.check && (r.reply || r.consequences)), {
+      message:
+        'a check node uses successReply/failReply + onSuccess/onFail — not reply/consequences',
+    })
 );
 
 // A searchable / interactable room object. desc / interactText default at
@@ -1178,7 +1209,12 @@ const RoomsSchema = z
       ni: number,
       where: string
     ) => {
-      for (const c of resp.consequences ?? []) {
+      const lists = [
+        resp.consequences ?? [],
+        resp.check?.onSuccess ?? [],
+        resp.check?.onFail ?? [],
+      ];
+      for (const c of lists.flat()) {
         if (c.type === 'set_npc_attitude' && !npcIds.has(c.npcId)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -1234,12 +1270,120 @@ const TerrainArtSchema = z
   .object(Object.fromEntries(Object.keys(TERRAIN).map((t) => [t, TILE_ID.optional()])))
   .strict();
 
+// ─── Quests + factions (campaigns.data JSONB sections) ───────────────────────
+
+// Quest steps reuse the condition vocabulary dialogue gates use, plus the
+// `action` fact (meaningful during quest evaluation — it runs per action).
+const QUEST_FACTS = ['action', ...DIALOGUE_FACTS] as const;
+const QuestConditionSchema = conditionSchema(QUEST_FACTS);
+
+const QuestStepSchema = z
+  .object({
+    id: SLUG,
+    desc: z.string().min(1).max(2000),
+    condition: QuestConditionSchema,
+  })
+  .strict();
+
+// Rewards are the same safe consequence subset DB dialogue may fire —
+// they run through the identical applyConsequence pipeline on completion.
+const QuestSchema = z
+  .object({
+    id: SLUG,
+    title: z.string().min(1).max(120),
+    desc: z.string().min(1).max(2000),
+    giverNpcId: SLUG.optional(),
+    steps: z.array(QuestStepSchema).min(1).max(12),
+    rewards: z.array(DialogueConsequenceSchema).max(8),
+    factionId: SLUG.optional(),
+    repGain: z.number().int().min(-100).max(100).optional(),
+    startActive: z.boolean().optional(),
+  })
+  .strict();
+
+const QuestsSchema = z
+  .array(QuestSchema)
+  .max(50)
+  .superRefine((quests, ctx) => {
+    const ids = new Set<string>();
+    quests.forEach((q, qi) => {
+      if (ids.has(q.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate quest id "${q.id}"`,
+          path: [qi, 'id'],
+        });
+      }
+      ids.add(q.id);
+      const stepIds = new Set<string>();
+      q.steps.forEach((s, si) => {
+        if (stepIds.has(s.id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `quest "${q.id}" has duplicate step id "${s.id}"`,
+            path: [qi, 'steps', si, 'id'],
+          });
+        }
+        stepIds.add(s.id);
+      });
+    });
+  });
+
+const FACTION_TIERS = ['hostile', 'unfriendly', 'neutral', 'friendly', 'exalted'] as const;
+const FactionSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(80),
+    // Rep floor per tier — must ascend (factionAttitude resolves top-down).
+    thresholds: z
+      .object({
+        hostile: z.number().int().min(-1000).max(1000),
+        unfriendly: z.number().int().min(-1000).max(1000),
+        neutral: z.number().int().min(-1000).max(1000),
+        friendly: z.number().int().min(-1000).max(1000),
+        exalted: z.number().int().min(-1000).max(1000),
+      })
+      .strict()
+      .refine(
+        (t) =>
+          t.hostile < t.unfriendly &&
+          t.unfriendly < t.neutral &&
+          t.neutral < t.friendly &&
+          t.friendly < t.exalted,
+        { message: 'thresholds must ascend: hostile < unfriendly < neutral < friendly < exalted' }
+      ),
+    // Attitude tier → shop price multiplier; missing tiers default to 1.0.
+    shopPriceModifiers: z.partialRecord(z.enum(FACTION_TIERS), z.number().min(0.1).max(10)),
+  })
+  .strict();
+
+const FactionsSchema = z
+  .array(FactionSchema)
+  .max(20)
+  .superRefine((factions, ctx) => {
+    const ids = new Set<string>();
+    factions.forEach((f, fi) => {
+      if (ids.has(f.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate faction id "${f.id}"`,
+          path: [fi, 'id'],
+        });
+      }
+      ids.add(f.id);
+    });
+  });
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Narration hook: the first narrative entry of a new game (overlays the
   // code/template campaign.intro).
   gameStart: z.string().min(1).max(4000),
   narratives: NarrativesSchema,
   rooms: RoomsSchema,
+  // Quests + factions: campaign-block script content (campaigns.data keys
+  // folded into campaign.quests / campaign.factions wholesale at overlay).
+  quests: QuestsSchema,
+  factions: FactionsSchema,
   terrainArt: TerrainArtSchema,
   regions: RegionsSchema,
   towns: TownsSchema,

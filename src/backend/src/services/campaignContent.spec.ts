@@ -749,6 +749,153 @@ describe('editable sections registry', () => {
     ).toBe(false);
   });
 
+  it('rooms schema validates check nodes: shape, no reply/consequences overlap', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const guard = (responses: object[]) => [
+      {
+        ...ROOM_B,
+        npcs: [
+          {
+            id: 'guard',
+            name: 'Gate Guard',
+            attitude: 'indifferent',
+            greeting: 'Halt.',
+            responses,
+          },
+        ],
+      },
+    ];
+    const checkNode = {
+      label: 'Let us pass — we mean no harm',
+      check: {
+        skill: 'persuasion',
+        dc: 14,
+        successReply: 'Go on, then.',
+        failReply: 'Not a chance.',
+        onSuccess: [{ type: 'set_flag', key: 'gate_open', value: true }],
+        onFail: [{ type: 'set_npc_attitude', npcId: 'guard', attitude: 'hostile' }],
+      },
+    };
+    const ok = rooms.safeParse(guard([checkNode]));
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // A check node may not ALSO carry plain reply/consequences.
+    expect(rooms.safeParse(guard([{ ...checkNode, reply: 'Hm.' }])).success).toBe(false);
+    expect(
+      rooms.safeParse(guard([{ ...checkNode, consequences: [{ type: 'give_gold', amount: 1 }] }]))
+        .success
+    ).toBe(false);
+    // Off-enum skill / unknown attitude target inside onFail.
+    expect(
+      rooms.safeParse(guard([{ ...checkNode, check: { ...checkNode.check, skill: 'flexing' } }]))
+        .success
+    ).toBe(false);
+    expect(
+      rooms.safeParse(
+        guard([
+          {
+            ...checkNode,
+            check: {
+              ...checkNode.check,
+              onFail: [{ type: 'set_npc_attitude', npcId: 'ghost', attitude: 'hostile' }],
+            },
+          },
+        ])
+      ).success
+    ).toBe(false);
+    // start_quest is part of the DB consequence subset now.
+    expect(
+      rooms.safeParse(
+        guard([{ label: 'Work?', consequences: [{ type: 'start_quest', questId: 'rat-problem' }] }])
+      ).success
+    ).toBe(true);
+  });
+
+  it('quests schema: steps + rewards constrained, ids unique, action fact quest-only', () => {
+    const quests = CAMPAIGN_SECTION_SCHEMAS.quests;
+    const quest = {
+      id: 'rat-problem',
+      title: 'The Rat Problem',
+      desc: 'Clear the cellar.',
+      giverNpcId: 'old-hob',
+      startActive: true,
+      steps: [
+        {
+          id: 'step_kill',
+          desc: 'Deal with the rats',
+          condition: {
+            all: [
+              { fact: 'action', operator: 'equal', value: 'attack' },
+              { fact: 'enemies_killed', operator: 'contains', value: 'cellar#0' },
+            ],
+          },
+        },
+      ],
+      rewards: [
+        { type: 'give_gold', amount: 25 },
+        { type: 'start_quest', questId: 'old-debt' },
+      ],
+    };
+    const ok = quests.safeParse([quest]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // Steps required; ids unique across quests and steps within a quest.
+    expect(quests.safeParse([{ ...quest, steps: [] }]).success).toBe(false);
+    expect(quests.safeParse([quest, quest]).success).toBe(false);
+    expect(quests.safeParse([{ ...quest, steps: [quest.steps[0], quest.steps[0]] }]).success).toBe(
+      false
+    );
+    // Rewards outside the safe subset stay code-side.
+    expect(
+      quests.safeParse([
+        { ...quest, rewards: [{ type: 'spawn_enemy', roomId: 'x', enemyId: 'y' }] },
+      ]).success
+    ).toBe(false);
+    // The `action` fact is for QUEST conditions only — dialogue gates reject it.
+    const roomsSchema = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    expect(
+      roomsSchema.safeParse([
+        {
+          ...ROOM_B,
+          npcs: [
+            {
+              id: 'n',
+              name: 'N',
+              attitude: 'friendly',
+              greeting: 'Hi.',
+              responses: [
+                {
+                  label: 'X',
+                  condition: { fact: 'action', operator: 'equal', value: 'attack' },
+                },
+              ],
+            },
+          ],
+        },
+      ]).success
+    ).toBe(false);
+  });
+
+  it('factions schema: ascending thresholds, tier-keyed modifiers, unique ids', () => {
+    const factions = CAMPAIGN_SECTION_SCHEMAS.factions;
+    const millers = {
+      id: 'millers',
+      name: "The Millers' Guild",
+      thresholds: { hostile: -20, unfriendly: -5, neutral: 0, friendly: 20, exalted: 50 },
+      shopPriceModifiers: { friendly: 0.9, exalted: 0.75 },
+    };
+    const ok = factions.safeParse([millers]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // Thresholds must ascend.
+    expect(
+      factions.safeParse([{ ...millers, thresholds: { ...millers.thresholds, friendly: -10 } }])
+        .success
+    ).toBe(false);
+    // Modifier keys are the five tiers only.
+    expect(factions.safeParse([{ ...millers, shopPriceModifiers: { chummy: 0.5 } }]).success).toBe(
+      false
+    );
+    expect(factions.safeParse([millers, millers]).success).toBe(false);
+  });
+
   it('rooms schema validates loot placements: item id + bounded pos, strict shape', () => {
     const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
     const ok = rooms.safeParse([
@@ -1230,6 +1377,64 @@ describe('section CRUD + live refresh', () => {
     expect(await deleteCampaignSection(db.pool, 'malgovia', 'gameStart')).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
     expect(contexts.malgovia.campaign?.intro).toBe('The code opening.');
+  });
+
+  it('quests + factions fold into the campaign block wholesale; delete restores code', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const codeQuest = {
+      id: 'code-quest',
+      title: 'Old Business',
+      desc: 'From code.',
+      steps: [{ id: 's1', desc: 'x', condition: {} }],
+      rewards: [],
+    };
+    const code = codeCtx({
+      id: 'malgovia',
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
+        quests: [codeQuest],
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const dbQuest = {
+      id: 'rat-problem',
+      title: 'The Rat Problem',
+      desc: 'Clear the cellar.',
+      giverNpcId: 'old-hob',
+      startActive: true,
+      steps: [
+        {
+          id: 'step_kill',
+          desc: 'Deal with the rats',
+          condition: { fact: 'enemies_killed', operator: 'contains', value: 'acorn-cellar#0' },
+        },
+      ],
+      rewards: [{ type: 'give_gold', amount: 25 }],
+    };
+    const faction = {
+      id: 'millers',
+      name: "The Millers' Guild",
+      thresholds: { hostile: -20, unfriendly: -5, neutral: 0, friendly: 20, exalted: 50 },
+      shopPriceModifiers: { friendly: 0.9 },
+    };
+    await putCampaignSection(db.pool, 'malgovia', 'quests', [dbQuest]);
+    await putCampaignSection(db.pool, 'malgovia', 'factions', [faction]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    // Wholesale replace — the code quest is gone, the DB one serves; no
+    // stray top-level keys; the rest of the block survives.
+    expect(contexts.malgovia.campaign?.quests).toEqual([dbQuest]);
+    expect(contexts.malgovia.campaign?.factions).toEqual([faction]);
+    expect('quests' in contexts.malgovia).toBe(false);
+    expect('factions' in contexts.malgovia).toBe(false);
+    expect(contexts.malgovia.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
+    // Delete reverts to the code lists.
+    await deleteCampaignSection(db.pool, 'malgovia', 'quests');
+    await deleteCampaignSection(db.pool, 'malgovia', 'factions');
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.quests?.map((q) => q.id)).toEqual(['code-quest']);
+    expect(contexts.malgovia.campaign?.factions).toBeUndefined();
   });
 
   it('terrainArt overlays the context top-level and reverts to none on delete', async () => {
