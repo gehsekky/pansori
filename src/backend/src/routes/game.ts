@@ -353,7 +353,7 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
     }
     const ctxId = row.seed?.context_id;
     const ctx = ctxId ? CONTEXTS[ctxId] : undefined;
-    res.json({ ...row, campaignMeta: campaignMetaFor(ctx) });
+    res.json({ ...row, campaignMeta: await campaignMetaFor(ctx) });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -786,7 +786,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         });
       }
     }
-    res.json({ session, state: initialState, seed, campaignMeta: campaignMetaFor(ctx) });
+    res.json({ session, state: initialState, seed, campaignMeta: await campaignMetaFor(ctx) });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: (err as Error).message });
@@ -798,10 +798,24 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
 // Campaign metadata helper — returns quests, factions, and locations for a context
 // (only meaningful when the context has campaign mode enabled). Used by the UI to
 // render the quest journal, faction rep display, and town/district navigation.
-function campaignMetaFor(ctx: Context | undefined) {
+async function campaignMetaFor(ctx: Context | undefined) {
   const cmp = ctx?.campaign;
   if (!cmp) return null;
+  // The campaign's display name (campaigns.name — the same identity the
+  // picker shows). DB-born campaigns have no code theme, so without this
+  // the game header falls back to the donor theme's title ("SANDBOX").
+  let displayName: string | null = null;
+  try {
+    const { rows } = await pool.query<{ name: string }>(
+      'SELECT name FROM campaigns WHERE id = $1',
+      [ctx.id]
+    );
+    displayName = rows[0]?.name ?? null;
+  } catch {
+    // Registry hiccup — the header falls back to the theme title.
+  }
   return {
+    displayName,
     quests: cmp.quests ?? [],
     factions: cmp.factions ?? [],
   };

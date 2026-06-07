@@ -17,10 +17,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ---
 
-## Implementation status (code-verified 2026-06-03)
+## Implementation status (code-verified 2026-06-07)
 
-Grounded in a code survey + the full suite: **backend 2250 tests across
-264 files + frontend 176 across 28 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 2755 tests across
+322 files + frontend 327 across 41 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -156,19 +156,18 @@ on existing patterns and a handful of **bounded subsystems**.
 
 ### Content breadth — data on existing patterns (RE-6)
 
-- [ ] **Spells** — **274** / ~330 SRD. Remaining gaps are overwhelmingly
-      utility / divination / planar (Dispel Magic, True Seeing, Teleport, Wish,
-      etc.); the combat-relevant gaps are thinning. (Note: many spells one might
-      reach for — Blink, Cloud of Daggers, Witch Bolt, the non-Searing/Shining
-      smites — are PHB-only and out of scope.) Most remaining categories are
-      already representable on shipped frameworks (zones / recurring attacks /
-      riders / AoE-condition / save-ends / walls / displacement) — data entry.
-- [ ] **Monsters** — stat-block content breadth. The shared pool is at **50**
-      (`SRD_MONSTERS`, CR 1/8–10) plus per-campaign templates, on the supported
-      fields (multiattack, onHitEffect incl. grapple-on-hit, resist/vuln/immune,
-      bonusDamage, packTactics, bloodiedFrenzy, lifeDrain, aura, parry, breath
-      weapon, etc.). Remaining: more breadth + the per-monster specials that need
-      new infra (below). Legendary + lair scaffolding is shipped but unwired to a
+- [x] **Spells** — full SRD coverage (~332; see CLAUDE.md). Combat-relevant
+      spells are mechanical; un-modelable utility/meta spells are registered
+      as narrative-only and graduate as their systems land (anti-magic,
+      Time Stop, Shapechange and basic Wish already have). Remaining work is
+      graduating narrative spells, not catalog gaps.
+- [ ] **Monsters** — stat-block content breadth. The ambient catalog is at
+      **88** (synced to the DB, served to every campaign; customs shadow by
+      name), on the supported fields (multiattack, onHitEffect incl.
+      grapple-on-hit, resist/vuln/immune, bonusDamage, packTactics,
+      bloodiedFrenzy, lifeDrain, aura, parry, breath weapon, etc.).
+      Remaining: more breadth + the per-monster specials that need new infra
+      (below). Legendary + lair scaffolding is shipped but unwired to a
       current boss.
 - [ ] **Magic items** — content; the body-slot + attunement + curse + worn-effect
       infra is shipped (so new wondrous items are largely data + an effect kind).
@@ -276,19 +275,39 @@ on existing patterns and a handful of **bounded subsystems**.
 > promote/demote); `/game/contexts` + `session/new` visibility gating; FE
 > picker intersects with the server-visible set.
 
-- [ ] **Campaign creation** — `POST /api/campaigns` (creator becomes owner,
-      visibility private) + a "new campaign" surface in the admin shell.
-      Blocked on the first DB-content tables existing (a campaign with no
-      content can't be played).
-- [ ] **First DB-backed content table** — pick the pilot (likely
-      `narratives`: pure strings, no cross-refs), editor-gated CRUD, engine
-      reads DB-first with code fallback. The pattern the rest of the content
-      migration follows.
-- [ ] **Content editing UI** — replaces the CONTENT placeholder card in
-      AdminScreen, one section per migrated table.
-- [ ] **Remaining content tables** — entities / map / items / quests /
-      factions on the pilot's pattern, until `campaignData/<name>/` folders
-      are only one source among many.
+> **Shipped — the creator platform (2026-06, this section was the plan; it
+> landed):** campaign creation (`POST /api/campaigns`, owner+private,
+> DB-born campaigns resolve over the base template, playable immediately);
+> campaign rename (owners; `campaigns.name` drives picker + the in-game
+> header via `campaignMeta.displayName`); **ten editable sections** —
+> gameStart, narratives, regions, towns, rooms, quests, factions,
+> terrainArt, customItems, customMonsters — DB-first with code fallback,
+> live via `refreshCampaignOverlay` (no restart). Relational tables for
+> regions/towns/rooms (+ sites/venues children); the rest as
+> `campaigns.data` JSONB keys. Visual painters for region/town/room
+> (terrain rows, tiers, mechanics, SIZE tool, markers, narration-hook
+> cards) with nested URLs (`/creator/<cid>/region/<rid>/town/<tid>/room/<id>`);
+> placed content in rooms (enemies, loot, NPCs, objects, traps); the
+> **conversation platform** (gated dialogue: condition/once/check nodes,
+> safe consequence subset incl. start_quest; parley with authored-hostile
+> NPCs; NPC narrative hooks greeting/firstGreeting/goodbye/firstGoodbye;
+> structured dialogue-tree editor + QUESTS/FACTIONS panels sharing one
+> condition/effect row vocabulary). Rooms locked to the SRD 5-ft scale.
+
+- [ ] **Narratives section editor** — the last JSON-only section with a
+      natural structured surface (keyed string-lists).
+- [ ] **Region-to-region travel** — region `onExit`/`onFirstExit` hooks are
+      authored + stored but dormant until a region-edge transition exists.
+      The next world-model piece; the-sky-has-fallen needs it at region #2.
+- [ ] **Venue-level narration hooks** — venues carry only the per-landing
+      site `onEnter`; no first/exit variants (towns/rooms/regions have all
+      four).
+- [ ] **Dialogue follow-ups (as authoring demands)** — `say` field (menu
+      label vs spoken line), `goto`/node-ids for hub-and-spoke trees,
+      mid-combat surrender, NPC ICON sprite picker (`/art/sprites` stems).
+- [ ] **Region-page ROOMS panel (if needed)** — rooms are created via a
+      town's hosted panel today; dungeon interiors for region local sites
+      have no home-page panel (the top-level one was removed).
 
 ## Content & playtest
 

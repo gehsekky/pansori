@@ -667,7 +667,11 @@ export default function App() {
                       />
                     )}
                     <div>
-                      <h1 className={styles.title}>{ctx.theme.title}</h1>
+                      {/* DB-born campaigns have no code theme — their registry name
+                          beats the donor theme's title ("SANDBOX"). */}
+                      <h1 className={styles.title}>
+                        {(campaignMeta?.displayName || ctx.theme.title).toUpperCase()}
+                      </h1>
                       <p className={styles.sub}>
                         ACTIVE: {activeChar?.name} [{activeChar?.character_class}]
                       </p>

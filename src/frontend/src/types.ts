@@ -583,6 +583,9 @@ export interface SessionSummary {
 // ─── Campaign metadata (delivered alongside session payload) ─────────────────
 
 export interface CampaignMeta {
+  // The campaign's display name (campaigns.name) — drives the game header
+  // for DB-born campaigns, which have no code theme title of their own.
+  displayName?: string | null;
   quests: Quest[];
   factions: Faction[];
 }
