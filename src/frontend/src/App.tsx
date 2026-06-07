@@ -149,9 +149,13 @@ export default function App() {
   // Deep-linked creator selection (/creator/<campaign id>) — consumed by
   // AdminScreen as its initial selection when the creator view opens.
   const [creatorCampaignId, setCreatorCampaignId] = useState<string | null>(null);
-  // Deep-linked map painter (/creator/<campaign id>/(region|town)/<map id>).
+  // Deep-linked map painter (/creator/<campaign id>/(region|room)/<map id>;
+  // towns nest: /creator/<cid>/region/<region id>/town/<town id>).
   const [creatorRegionId, setCreatorRegionId] = useState<string | null>(null);
   const [creatorMapKind, setCreatorMapKind] = useState<'region' | 'town' | 'room'>('region');
+  // The region a town painter was reached through — its URL parent and
+  // where BACK returns to.
+  const [creatorParentRegionId, setCreatorParentRegionId] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -257,13 +261,26 @@ export default function App() {
             return loadSessions();
           }
         }
-        // Map painter deep link: /creator/<campaign id>/(region|town|room)/<map id>.
+        // Town painter deep link — towns nest under the region they're
+        // reached from: /creator/<campaign id>/region/<region id>/town/<town id>.
+        const townMatch = window.location.pathname.match(
+          /^\/creator\/([a-z0-9_-]+)\/region\/([a-z0-9_-]+)\/town\/([a-z0-9_-]+)\/?$/i
+        );
+        if (townMatch) {
+          setCreatorCampaignId(townMatch[1]);
+          setCreatorParentRegionId(townMatch[2]);
+          setCreatorMapKind('town');
+          setCreatorRegionId(townMatch[3]);
+          setView('region-editor');
+          return;
+        }
+        // Map painter deep link: /creator/<campaign id>/(region|room)/<map id>.
         const regionMatch = window.location.pathname.match(
-          /^\/creator\/([a-z0-9_-]+)\/(region|town|room)\/([a-z0-9_-]+)\/?$/i
+          /^\/creator\/([a-z0-9_-]+)\/(region|room)\/([a-z0-9_-]+)\/?$/i
         );
         if (regionMatch) {
           setCreatorCampaignId(regionMatch[1]);
-          setCreatorMapKind(regionMatch[2].toLowerCase() as 'region' | 'town');
+          setCreatorMapKind(regionMatch[2].toLowerCase() as 'region' | 'room');
           setCreatorRegionId(regionMatch[3]);
           setView('region-editor');
           return;
@@ -455,9 +472,12 @@ export default function App() {
             window.history.replaceState(null, '', id ? `/creator/${id}` : '/creator')
           }
           onEditMap={(campaignId, kind, mapId) => {
+            // Only regions/rooms launch from the creator screen — towns are
+            // reached (and URL-nested) through a region's painter page.
             setCreatorCampaignId(campaignId);
             setCreatorMapKind(kind);
             setCreatorRegionId(mapId);
+            setCreatorParentRegionId(null);
             window.history.pushState(null, '', `/creator/${campaignId}/${kind}/${mapId}`);
             setView('region-editor');
           }}
@@ -474,15 +494,34 @@ export default function App() {
           regionId={creatorRegionId}
           kind={creatorMapKind}
           onBack={() => {
+            // A town painter backs out to the region it was reached
+            // through; everything else returns to the creator screen.
+            if (creatorMapKind === 'town' && creatorParentRegionId) {
+              setCreatorMapKind('region');
+              setCreatorRegionId(creatorParentRegionId);
+              setCreatorParentRegionId(null);
+              window.history.pushState(
+                null,
+                '',
+                `/creator/${creatorCampaignId}/region/${creatorParentRegionId}`
+              );
+              return;
+            }
             window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
             setView('creator');
           }}
           // Painter→painter navigation (the region page hosts the TOWNS
-          // panel): swap the edited map in place, same view.
+          // panel): swap the edited map in place, same view. Towns nest
+          // under the region they're opened from.
           onOpenMap={(kind, mapId) => {
+            const url =
+              kind === 'town'
+                ? `/creator/${creatorCampaignId}/region/${creatorRegionId}/town/${mapId}`
+                : `/creator/${creatorCampaignId}/${kind}/${mapId}`;
+            if (kind === 'town') setCreatorParentRegionId(creatorRegionId);
             setCreatorMapKind(kind);
             setCreatorRegionId(mapId);
-            window.history.pushState(null, '', `/creator/${creatorCampaignId}/${kind}/${mapId}`);
+            window.history.pushState(null, '', url);
           }}
         />
       )}
