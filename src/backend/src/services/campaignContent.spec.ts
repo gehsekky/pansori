@@ -62,7 +62,7 @@ function makeContentDb(initial: {
   const venues = new Map<string, unknown[][]>();
   // campaignId → room insert params after campaign_id: [id, sort_order,
   // name, description, feet_per_square, gridJson, entry_x, entry_y,
-  // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson]
+  // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson, npcsJson]
   const rooms = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
@@ -170,6 +170,7 @@ function makeContentDb(initial: {
         can_rest: p[11],
         enemies: JSON.parse(p[12] as string),
         loot: JSON.parse(p[13] as string),
+        npcs: JSON.parse(p[14] as string),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -333,6 +334,21 @@ const ROOM_A: CampaignRoom = {
   canRest: true,
   enemies: [{ name: 'Goblin', count: 2 }, { name: 'Wolf' }],
   loot: [{ itemId: 'dagger', pos: { x: 1, y: 1 } }, { itemId: 'rope' }],
+  npcs: [
+    {
+      id: 'old-hob',
+      name: 'Old Hob',
+      attitude: 'friendly',
+      greeting: 'Mind the third step, it bites.',
+      pos: { x: 4, y: 1 },
+      icon: 'beer-stein',
+      responses: [
+        { label: 'Ask about the cellar', reply: 'Rats. Big ones.' },
+        { label: 'Just nod', responses: [{ label: 'Leave', reply: 'Aye.' }] },
+      ],
+      shop: [{ itemId: 'rope', price: 1 }],
+    },
+  ],
 };
 
 const ROOM_B: CampaignRoom = {
@@ -500,6 +516,42 @@ describe('editable sections registry', () => {
     // Duplicate ids and empty lists rejected.
     expect(rooms.safeParse([ROOM_B, { ...ROOM_B, name: 'Other' }]).success).toBe(false);
     expect(rooms.safeParse([]).success).toBe(false);
+  });
+
+  it('rooms schema validates NPCs: recursive dialogue, campaign-unique ids, bounds', () => {
+    const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
+    const hob = {
+      id: 'old-hob',
+      name: 'Old Hob',
+      attitude: 'friendly',
+      greeting: 'Evening.',
+      responses: [{ label: 'Ask', reply: 'No.', responses: [{ label: 'Press', reply: 'NO.' }] }],
+      shop: [{ itemId: 'rope', price: 1 }],
+      pos: { x: 3, y: 3 },
+    };
+    const ok = rooms.safeParse([{ ...ROOM_B, npcs: [hob] }]);
+    expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
+    // Required social surface + enum + bounds + strictness.
+    expect(rooms.safeParse([{ ...ROOM_B, npcs: [{ ...hob, greeting: undefined }] }]).success).toBe(
+      false
+    );
+    expect(rooms.safeParse([{ ...ROOM_B, npcs: [{ ...hob, attitude: 'smug' }] }]).success).toBe(
+      false
+    );
+    expect(rooms.safeParse([{ ...ROOM_B, npcs: [{ ...hob, pos: { x: 4, y: 0 } }] }]).success).toBe(
+      false
+    );
+    expect(rooms.safeParse([{ ...ROOM_B, npcs: [{ ...hob, questId: 'nope' }] }]).success).toBe(
+      false
+    );
+    // NPC ids are campaign-unique — the same id in TWO rooms is rejected.
+    const roomTwo = { ...ROOM_B, id: 'attic', exits: undefined };
+    expect(
+      rooms.safeParse([
+        { ...ROOM_B, npcs: [hob] },
+        { ...roomTwo, npcs: [{ ...hob, pos: undefined }] },
+      ]).success
+    ).toBe(false);
   });
 
   it('rooms schema validates loot placements: item id + bounded pos, strict shape', () => {
@@ -1008,6 +1060,62 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.ghost.campaign?.intro).toBe('Boo. The tale begins.');
     // Template machinery still present under the overridden opening.
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
+  });
+
+  it('room NPCs build the campaign.npcs map with Commoner defaults on refresh', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const rope = { id: 'rope', name: 'Rope (50 ft)', type: 'gear' };
+    const code = codeCtx({
+      id: 'malgovia',
+      lootTable: [rope] as never,
+      campaign: {
+        world_name: 'Malgovia',
+        intro: 'x',
+        rooms: [],
+        npcs: { 'code-npc': { id: 'code-npc', roomId: 'code-room', name: 'Old Code Friend' } },
+      } as never,
+    });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+      {
+        ...ROOM_B,
+        npcs: [
+          {
+            id: 'old-hob',
+            name: 'Old Hob',
+            attitude: 'friendly',
+            greeting: 'Evening.',
+            pos: { x: 1, y: 1 },
+            shop: [
+              { itemId: 'rope', price: 1 },
+              { itemId: 'vanished-wares', price: 9 },
+            ],
+          },
+        ],
+      },
+    ]);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    const npcs = contexts.malgovia.campaign?.npcs ?? {};
+    const hob = npcs['old-hob']!;
+    // Stamped into its room, social surface intact, SRD Commoner-style
+    // stat-block defaults, dialogue defaults to an empty tree.
+    expect(hob.roomId).toBe('cellar');
+    expect(hob.greeting).toBe('Evening.');
+    expect(hob.attitude).toBe('friendly');
+    expect(hob.pos).toEqual({ x: 1, y: 1 });
+    expect(hob.hp).toBe(4);
+    expect(hob.ac).toBe(10);
+    expect(hob.damage).toBe('1d4');
+    expect(hob.toHit).toBe(2);
+    expect(hob.xp).toBe(0);
+    expect(hob.responses).toEqual([]);
+    // The shop kept the real item and dropped the unknown one (warned).
+    expect(hob.shop).toEqual([{ itemId: 'rope', price: 1 }]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('vanished-wares'));
+    // Rooms-wholesale: the code npcs map is replaced entirely.
+    expect(npcs['code-npc']).toBeUndefined();
+    warn.mockRestore();
   });
 
   it('room loot placements materialize against the composed loot table on refresh', async () => {

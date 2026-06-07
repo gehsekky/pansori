@@ -620,6 +620,85 @@ describe('RegionEditorScreen', () => {
       ]);
     });
 
+    it('NPCS card: name/attitude/greeting/place flow; JSON extras preserved on save', async () => {
+      // The cellar starts with one JSON-authored NPC carrying extras the
+      // card does not edit (dialogue + shop) — they must survive a save.
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [
+                TAPROOM,
+                {
+                  ...CELLAR,
+                  npcs: [
+                    {
+                      id: 'old-hob',
+                      name: 'Old Hob',
+                      attitude: 'friendly',
+                      greeting: 'Evening.',
+                      responses: [{ label: 'Ask', reply: 'No.' }],
+                      shop: [{ itemId: 'rope', price: 1 }],
+                    },
+                  ],
+                },
+              ],
+            }
+          : { section, source: 'db', value: [] }
+      );
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      render(
+        <RegionEditorScreen campaignId="sandbox" regionId="cellar" kind="room" onBack={vi.fn()} />
+      );
+      await screen.findByTestId('cell-0-0');
+      // Pre-filled row from the room.
+      expect(
+        (screen.getByLabelText('NAME', { selector: '#npc-name-0' }) as HTMLInputElement).value
+      ).toBe('Old Hob');
+      // Edit the card fields + place the token.
+      fireEvent.change(screen.getByLabelText('GREETING'), {
+        target: { value: 'Mind the step.' },
+      });
+      fireEvent.click(screen.getByTestId('place-npc-0'));
+      fireEvent.mouseDown(screen.getByTestId('cell-1-1'));
+      expect(screen.getByText('AT (1,1)')).toBeTruthy();
+      expect(screen.getByTestId('cell-1-1').getAttribute('aria-label')).toContain('npc: Old Hob');
+      // Add a second NPC — blank name blocks the save.
+      fireEvent.click(screen.getByTestId('add-npc-btn'));
+      fireEvent.click(screen.getByText('SAVE'));
+      expect(await screen.findByText(/NPC needs a name and a greeting/)).toBeTruthy();
+      fireEvent.change(screen.getByLabelText('NAME', { selector: '#npc-name-1' }), {
+        target: { value: 'Mute Meg' },
+      });
+      fireEvent.change(screen.getByLabelText('GREETING', { selector: '#npc-greeting-1' }), {
+        target: { value: '…' },
+      });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        npcs?: Array<Record<string, unknown>>;
+      }>;
+      const npcs = saved.find((r) => r.id === 'cellar')!.npcs!;
+      expect(npcs[0]).toEqual({
+        id: 'old-hob',
+        name: 'Old Hob',
+        attitude: 'friendly',
+        greeting: 'Mind the step.',
+        pos: { x: 1, y: 1 },
+        // JSON-authored extras preserved untouched.
+        responses: [{ label: 'Ask', reply: 'No.' }],
+        shop: [{ itemId: 'rope', price: 1 }],
+      });
+      expect(npcs[1]).toEqual({
+        id: 'npc-2',
+        name: 'Mute Meg',
+        attitude: 'indifferent',
+        greeting: '…',
+      });
+    });
+
     it('removing every placement drops the enemies key from the save', async () => {
       // The taproom fixture carries a placement — remove it and save.
       mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>

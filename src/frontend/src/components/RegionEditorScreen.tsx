@@ -90,6 +90,19 @@ interface EditorRegion {
   exits?: EditorExit[]; // rooms only
   enemies?: Array<{ name: string; count?: number }>; // rooms only
   loot?: Array<{ itemId: string; pos?: { x: number; y: number } }>; // rooms only
+  npcs?: EditorNpc[]; // rooms only
+  [key: string]: unknown;
+}
+
+// A placed NPC, as the painter edits it. Dialogue trees, shops and custom
+// stat blocks are preserved on save but edited via the ROOMS JSON.
+interface EditorNpc {
+  id: string;
+  name: string;
+  attitude: string;
+  greeting: string;
+  pos?: { x: number; y: number };
+  icon?: string;
   [key: string]: unknown;
 }
 
@@ -215,9 +228,11 @@ function RegionEditorScreen({
     Array<{ itemId: string; pos?: { x: number; y: number } }>
   >([]);
   const [itemOptions, setItemOptions] = useState<Array<{ id: string; name: string }>>([]);
-  // Armed by a loot row's PLACE button: the next grid click drops that
-  // placement's token on the clicked cell.
-  const [lootPlaceIdx, setLootPlaceIdx] = useState<number | null>(null);
+  // Rooms only: bespoke placed NPCs.
+  const [placedNpcs, setPlacedNpcs] = useState<EditorNpc[]>([]);
+  // Armed by a loot/NPC row's PLACE button: the next grid click drops that
+  // row's token on the clicked cell.
+  const [placeArm, setPlaceArm] = useState<{ kind: 'loot' | 'npc'; idx: number } | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const [tool, setTool] = useState<Tool>('terrain');
@@ -274,7 +289,8 @@ function RegionEditorScreen({
         );
         setPlacedEnemies((r.enemies ?? []).map((e) => ({ name: e.name, count: e.count ?? 1 })));
         setPlacedLoot((r.loot ?? []).map((l) => ({ ...l })));
-        setLootPlaceIdx(null);
+        setPlacedNpcs((r.npcs ?? []).map((n) => ({ ...n })));
+        setPlaceArm(null);
         setSelectedSiteId(null);
         setMoveArmed(false);
       })
@@ -340,12 +356,18 @@ function RegionEditorScreen({
   const applyTool = useCallback(
     (x: number, y: number) => {
       setSaved(false);
-      // An armed loot PLACE wins the next click regardless of tool.
-      if (lootPlaceIdx !== null) {
-        setPlacedLoot((prev) =>
-          prev.map((l, i) => (i === lootPlaceIdx ? { ...l, pos: { x, y } } : l))
-        );
-        setLootPlaceIdx(null);
+      // An armed loot/NPC PLACE wins the next click regardless of tool.
+      if (placeArm !== null) {
+        if (placeArm.kind === 'loot') {
+          setPlacedLoot((prev) =>
+            prev.map((l, i) => (i === placeArm.idx ? { ...l, pos: { x, y } } : l))
+          );
+        } else {
+          setPlacedNpcs((prev) =>
+            prev.map((n, i) => (i === placeArm.idx ? { ...n, pos: { x, y } } : n))
+          );
+        }
+        setPlaceArm(null);
         setDirty(true);
         return;
       }
@@ -410,7 +432,7 @@ function RegionEditorScreen({
       });
       setDirty(true);
     },
-    [tool, terrainBrush, tierBrush, mechBrush, sites, selectedSiteId, moveArmed, kind, lootPlaceIdx]
+    [tool, terrainBrush, tierBrush, mechBrush, sites, selectedSiteId, moveArmed, kind, placeArm]
   );
 
   // Patch the selected site; clearing a kind's target also clears the
@@ -469,6 +491,11 @@ function RegionEditorScreen({
         l.pos ? { ...l, pos: { x: Math.min(l.pos.x, w - 1), y: Math.min(l.pos.y, h - 1) } } : l
       )
     );
+    setPlacedNpcs((prev) =>
+      prev.map((n) =>
+        n.pos ? { ...n, pos: { x: Math.min(n.pos.x, w - 1), y: Math.min(n.pos.y, h - 1) } } : n
+      )
+    );
     setDirty(true);
     setSaved(false);
   }
@@ -513,6 +540,9 @@ function RegionEditorScreen({
     }
     if (kind === 'room' && placedLoot.some((l) => !l.itemId)) {
       return { error: 'Every loot placement needs an item picked.' };
+    }
+    if (kind === 'room' && placedNpcs.some((n) => !n.name.trim() || !n.greeting.trim())) {
+      return { error: 'Every NPC needs a name and a greeting.' };
     }
     if (kind === 'town' && sites.some((s) => s.kind === 'interior' && !s.entryRoomId)) {
       return { error: 'Every interior venue needs an ENTRY ROOM (or flip it to GATE).' };
@@ -577,6 +607,18 @@ function RegionEditorScreen({
         } else {
           delete next.loot;
         }
+        if (placedNpcs.length > 0) {
+          // Preserve JSON-authored extras (dialogue / shop / stat block);
+          // prune the painter-managed optionals when emptied.
+          next.npcs = placedNpcs.map((n) => {
+            const c: EditorNpc = { ...n, name: n.name.trim(), greeting: n.greeting.trim() };
+            if (!c.icon) delete c.icon;
+            if (!c.pos) delete c.pos;
+            return c;
+          });
+        } else {
+          delete next.npcs;
+        }
       }
     }
     return next;
@@ -627,6 +669,9 @@ function RegionEditorScreen({
   const lootAt = (x: number, y: number) =>
     placedLoot.find((l) => l.pos && l.pos.x === x && l.pos.y === y);
   const itemName = (id: string) => itemOptions.find((o) => o.id === id)?.name ?? id;
+  // Positioned NPC tokens (rooms) — rendered as ☺ on the grid.
+  const npcAt = (x: number, y: number) =>
+    placedNpcs.find((n) => n.pos && n.pos.x === x && n.pos.y === y);
   const defaultScale = kind === 'region' ? 5280 : kind === 'town' ? 25 : 5;
   // Exit targets for the room form: every room in the section.
   const roomIds = kind === 'room' ? (regions ?? []).map((r) => r.id) : [];
@@ -1103,13 +1148,14 @@ function RegionEditorScreen({
                   row.map((cell, x) => {
                     const site = siteAt(x, y);
                     const cellLoot = lootAt(x, y);
+                    const cellNpc = npcAt(x, y);
                     const isStart = startPos.x === x && startPos.y === y;
                     return (
                       <div
                         key={`${x},${y}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}`}
+                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}${cellNpc ? ` (npc: ${cellNpc.name})` : ''}`}
                         data-testid={`cell-${x}-${y}`}
                         title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${site ? ` — ${site.name}` : ''}`}
                         style={{
@@ -1191,6 +1237,14 @@ function RegionEditorScreen({
                             }}
                           >
                             $
+                          </span>
+                        )}
+                        {cellNpc && !site && !isStart && !cellLoot && (
+                          <span
+                            aria-hidden="true"
+                            style={{ color: '#e6c878', textShadow: '0 0 3px #000' }}
+                          >
+                            ☺
                           </span>
                         )}
                         {site && (
@@ -1563,7 +1617,7 @@ function RegionEditorScreen({
                 >
                   <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
                     LOOT
-                    {lootPlaceIdx !== null && (
+                    {placeArm?.kind === 'loot' && (
                       <span style={{ color: 'var(--t-hp-mid)' }}>
                         {' '}
                         — CLICK A GRID CELL TO PLACE THE TOKEN
@@ -1630,9 +1684,13 @@ function RegionEditorScreen({
                       <button
                         className={styles.ghostBtn}
                         style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
-                        aria-pressed={lootPlaceIdx === i}
+                        aria-pressed={placeArm?.kind === 'loot' && placeArm.idx === i}
                         data-testid={`place-loot-${i}`}
-                        onClick={() => setLootPlaceIdx((v) => (v === i ? null : i))}
+                        onClick={() =>
+                          setPlaceArm((v) =>
+                            v?.kind === 'loot' && v.idx === i ? null : { kind: 'loot', idx: i }
+                          )
+                        }
                       >
                         PLACE
                       </button>
@@ -1658,13 +1716,204 @@ function RegionEditorScreen({
                         aria-label={`Remove loot ${i + 1}`}
                         onClick={() => {
                           setPlacedLoot((prev) => prev.filter((_, j) => j !== i));
-                          setLootPlaceIdx(null);
+                          setPlaceArm(null);
                           setDirty(true);
                           setSaved(false);
                         }}
                       >
                         <span aria-hidden="true">✕</span>
                       </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ── NPCs (rooms only) — bespoke characters: talk (greeting),
+                trade and fight surfaces. Dialogue trees, shops and custom
+                stat blocks are edited via the ROOMS JSON; the card covers
+                the common fields and preserves the rest on save. */}
+            {kind === 'room' && (
+              <div className={styles.card} style={{ marginTop: '1rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', color: 'var(--t-mid)' }}>
+                    NPCS
+                    {placeArm?.kind === 'npc' && (
+                      <span style={{ color: 'var(--t-hp-mid)' }}>
+                        {' '}
+                        — CLICK A GRID CELL TO PLACE THE TOKEN
+                      </span>
+                    )}
+                  </p>
+                  <button
+                    className={styles.ghostBtn}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                    data-testid="add-npc-btn"
+                    onClick={() => {
+                      // NPC ids are campaign-unique — derive against every
+                      // room in the section, not just this one.
+                      const taken = new Set(
+                        (regions ?? []).flatMap((r) => (r.npcs ?? []).map((n) => n.id))
+                      );
+                      placedNpcs.forEach((n) => taken.add(n.id));
+                      let i = taken.size + 1;
+                      while (taken.has(`npc-${i}`)) i++;
+                      setPlacedNpcs((prev) => [
+                        ...prev,
+                        { id: `npc-${i}`, name: '', attitude: 'indifferent', greeting: '' },
+                      ]);
+                      setDirty(true);
+                      setSaved(false);
+                    }}
+                  >
+                    + ADD NPC
+                  </button>
+                </div>
+                {placedNpcs.length === 0 ? (
+                  <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
+                    Nobody home. NPCs talk (greeting + dialogue), trade (shop) and fight if provoked
+                    (SRD Commoner stats unless overridden) — dialogue trees, shops and stat blocks
+                    are edited in the ROOMS JSON.
+                  </p>
+                ) : (
+                  placedNpcs.map((n, i) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'flex-end',
+                        flexWrap: 'wrap',
+                        padding: '0.3rem 0',
+                        borderBottom: '1px solid var(--t-separator)',
+                      }}
+                    >
+                      <div style={{ flex: '2 1 140px' }}>
+                        <label className={styles.formLbl} htmlFor={`npc-name-${i}`}>
+                          NAME
+                        </label>
+                        <input
+                          id={`npc-name-${i}`}
+                          className={styles.formInp}
+                          value={n.name}
+                          onChange={(ev) => {
+                            const name = ev.target.value;
+                            setPlacedNpcs((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, name } : p))
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        />
+                      </div>
+                      <div style={{ flex: '1 1 110px' }}>
+                        <label className={styles.formLbl} htmlFor={`npc-attitude-${i}`}>
+                          ATTITUDE
+                        </label>
+                        <select
+                          id={`npc-attitude-${i}`}
+                          className={styles.formInp}
+                          style={{ cursor: 'pointer' }}
+                          value={n.attitude}
+                          onChange={(ev) => {
+                            const attitude = ev.target.value;
+                            setPlacedNpcs((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, attitude } : p))
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        >
+                          {['friendly', 'indifferent', 'hostile'].map((a) => (
+                            <option key={a} value={a}>
+                              {a.toUpperCase()}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: '3 1 220px' }}>
+                        <label className={styles.formLbl} htmlFor={`npc-greeting-${i}`}>
+                          GREETING
+                        </label>
+                        <input
+                          id={`npc-greeting-${i}`}
+                          className={styles.formInp}
+                          placeholder="What they say when the party talks to them"
+                          value={n.greeting}
+                          onChange={(ev) => {
+                            const greeting = ev.target.value;
+                            setPlacedNpcs((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, greeting } : p))
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        />
+                      </div>
+                      <div style={{ flex: '1 1 90px' }}>
+                        <label className={styles.formLbl} htmlFor={`npc-icon-${i}`}>
+                          ICON
+                        </label>
+                        <input
+                          id={`npc-icon-${i}`}
+                          className={styles.formInp}
+                          placeholder="default"
+                          value={n.icon ?? ''}
+                          onChange={(ev) => {
+                            const icon = ev.target.value;
+                            setPlacedNpcs((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, icon } : p))
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          color: 'var(--t-dim)',
+                          minWidth: 70,
+                          paddingBottom: 8,
+                        }}
+                      >
+                        {n.pos ? `AT (${n.pos.x},${n.pos.y})` : 'UNPLACED'}
+                      </span>
+                      <div style={{ display: 'flex', gap: 6, paddingBottom: 4 }}>
+                        <button
+                          className={styles.ghostBtn}
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                          aria-pressed={placeArm?.kind === 'npc' && placeArm.idx === i}
+                          data-testid={`place-npc-${i}`}
+                          onClick={() =>
+                            setPlaceArm((v) =>
+                              v?.kind === 'npc' && v.idx === i ? null : { kind: 'npc', idx: i }
+                            )
+                          }
+                        >
+                          PLACE
+                        </button>
+                        <button
+                          className={styles.ghostBtn}
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                          aria-label={`Remove NPC ${i + 1}`}
+                          onClick={() => {
+                            setPlacedNpcs((prev) => prev.filter((_, j) => j !== i));
+                            setPlaceArm(null);
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        >
+                          <span aria-hidden="true">✕</span>
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}

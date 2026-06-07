@@ -237,6 +237,13 @@ on existing patterns and a handful of **bounded subsystems**.
       multiclasses into a caster. Bundle with multiclass UX.
 - [ ] **Magic-item attunement — remaining** — short-rest attune gating,
       Remove Curse ↔ `de_attune` interaction, cursed items in seed loot.
+- [ ] **Long Rest → pure SRD 24-hour rule** — today `state.long_rested`
+      caps long rests at ONE per session (never resets), with the SRD
+      one-per-24h world-clock gate (`last_long_rest_minute`) as a
+      backstop. As campaigns grow multi-region, drop the per-session
+      flag and let the 24h gate govern alone — the clock plumbing is
+      already in place (decided 2026-06-07; one-line change in
+      `actions/rest.ts` + choice-label update in `gameEngine.ts`).
 
 ### Narrative pipeline — structured fragments (partial)
 

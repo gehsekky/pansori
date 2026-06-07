@@ -785,6 +785,53 @@ const RoomExitSchema = z
   })
   .strict();
 
+// NPC dialogue: a recursive option tree (a response with children is a
+// branch, without is a leaf). Dialogue CONSEQUENCES stay code-side for
+// now — DB dialogue is social flavor, not script triggers.
+interface RoomNpcResponseShape {
+  label: string;
+  reply?: string;
+  responses?: RoomNpcResponseShape[];
+}
+const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
+  z
+    .object({
+      label: z.string().min(1).max(120),
+      reply: z.string().min(1).max(2000).optional(),
+      responses: z.array(RoomNpcResponseSchema).max(8).optional(),
+    })
+    .strict()
+);
+
+// A bespoke placed NPC. The stat block is optional (overlay defaults it to
+// an SRD Commoner-style block); shop item ids resolve against the composed
+// loot table at overlay time (unknown ids dropped with a warning).
+const RoomNpcSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(80),
+    attitude: z.enum(['friendly', 'indifferent', 'hostile']),
+    greeting: z.string().min(1).max(2000),
+    responses: z.array(RoomNpcResponseSchema).max(8).optional(),
+    persuasionDC: z.number().int().min(1).max(30).optional(),
+    pos: GridPosSchema.optional(),
+    icon: z.string().min(1).max(60).optional(),
+    shop: z
+      .array(
+        z
+          .object({ itemId: z.string().min(1).max(80), price: z.number().int().min(0).max(100000) })
+          .strict()
+      )
+      .max(20)
+      .optional(),
+    hp: z.number().int().min(1).max(500).optional(),
+    ac: z.number().int().min(1).max(30).optional(),
+    damage: z.string().min(1).max(20).optional(),
+    toHit: z.number().int().min(-5).max(15).optional(),
+    xp: z.number().int().min(0).max(50000).optional(),
+  })
+  .strict();
+
 const RoomsSchema = z
   .array(
     z
@@ -828,6 +875,10 @@ const RoomsSchema = z
           )
           .max(10)
           .optional(),
+        // Bespoke placed NPCs (talk / shop / fight) — full definitions,
+        // not catalog references. Ids must be CAMPAIGN-unique (the
+        // payload-level superRefine checks across rooms).
+        npcs: z.array(RoomNpcSchema).max(8).optional(),
       })
       .strict()
       .superRefine((r, ctx) => {
@@ -874,6 +925,15 @@ const RoomsSchema = z
             });
           }
         });
+        (r.npcs ?? []).forEach((n, i) => {
+          if (n.pos && (n.pos.x >= gridWidth || n.pos.y >= gridHeight)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `NPC "${n.id}" pos (${n.pos.x},${n.pos.y}) is outside the ${gridWidth}x${gridHeight} grid`,
+              path: ['npcs', i, 'pos'],
+            });
+          }
+        });
       })
   )
   .min(1)
@@ -886,6 +946,20 @@ const RoomsSchema = z
       }
       ids.add(r.id);
     }
+    // NPC ids key the campaign-level npcs map — unique ACROSS rooms.
+    const npcIds = new Set<string>();
+    rooms.forEach((r, ri) =>
+      (r.npcs ?? []).forEach((n, ni) => {
+        if (npcIds.has(n.id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `duplicate NPC id "${n.id}" (NPC ids are campaign-unique)`,
+            path: [ri, 'npcs', ni, 'id'],
+          });
+        }
+        npcIds.add(n.id);
+      })
+    );
     // Exits must lead somewhere real: toRoomId resolves within this payload,
     // and an explicit entrancePos must fit the TARGET room's grid.
     rooms.forEach((r, ri) =>

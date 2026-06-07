@@ -32,6 +32,7 @@ import type {
   GridPos,
   LootItem,
   PlacedLoot,
+  PlacedNpc,
   Region,
   Room,
   RoomExit,
@@ -577,6 +578,32 @@ export interface CampaignRoomLoot {
   pos?: GridPos;
 }
 
+// A placed NPC — bespoke (no catalog): identity, social surface and an
+// optional dialogue tree / shop / stat block. The stat block defaults to
+// an SRD Commoner-style block at overlay time; dialogue consequences and
+// faction wiring stay code-side for now.
+export interface CampaignRoomNpcResponse {
+  label: string;
+  reply?: string;
+  responses?: CampaignRoomNpcResponse[];
+}
+export interface CampaignRoomNpc {
+  id: string; // campaign-unique — keys the campaign.npcs map
+  name: string;
+  attitude: 'friendly' | 'indifferent' | 'hostile';
+  greeting: string;
+  responses?: CampaignRoomNpcResponse[];
+  persuasionDC?: number;
+  pos?: GridPos;
+  icon?: string;
+  shop?: Array<{ itemId: string; price: number }>;
+  hp?: number;
+  ac?: number;
+  damage?: string;
+  toHit?: number;
+  xp?: number;
+}
+
 export interface CampaignRoom {
   id: string;
   name: string;
@@ -590,6 +617,7 @@ export interface CampaignRoom {
   canRest?: boolean;
   enemies?: CampaignRoomEnemy[];
   loot?: CampaignRoomLoot[];
+  npcs?: CampaignRoomNpc[];
 }
 
 interface RoomRow {
@@ -606,12 +634,13 @@ interface RoomRow {
   can_rest: boolean;
   enemies: CampaignRoomEnemy[];
   loot: CampaignRoomLoot[];
+  npcs: CampaignRoomNpc[];
 }
 
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, feet_per_square, grid, entry_x, entry_y, exits,
-            lighting, floor, can_rest, enemies, loot
+            lighting, floor, can_rest, enemies, loot, npcs
        FROM campaign_rooms
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
@@ -630,6 +659,7 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.can_rest ? { canRest: true } : {}),
     ...(r.enemies.length > 0 ? { enemies: r.enemies } : {}),
     ...(r.loot.length > 0 ? { loot: r.loot } : {}),
+    ...(r.npcs.length > 0 ? { npcs: r.npcs } : {}),
   }));
 }
 
@@ -653,9 +683,9 @@ export async function putCampaignRooms(
       await client.query(
         `INSERT INTO campaign_rooms
            (campaign_id, id, sort_order, name, description, feet_per_square,
-            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot)
+            grid, entry_x, entry_y, exits, lighting, floor, can_rest, enemies, loot, npcs)
          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb,
-                 $15::jsonb)`,
+                 $15::jsonb, $16::jsonb)`,
         [
           campaignId,
           r.id,
@@ -672,6 +702,7 @@ export async function putCampaignRooms(
           r.canRest ?? false,
           JSON.stringify(r.enemies ?? []),
           JSON.stringify(r.loot ?? []),
+          JSON.stringify(r.npcs ?? []),
         ]
       );
     }
@@ -978,12 +1009,55 @@ async function loadOverlay(
             rooms: dbRoomsToEngine(dbRooms),
             enemies: materializeRoomEnemies(campaignId, dbRooms, enemyTemplates),
             loot: materializeRoomLoot(campaignId, dbRooms, lootTable),
+            npcs: materializeRoomNpcs(campaignId, dbRooms, lootTable),
           }
         : {}),
     };
   }
 
   return overlay;
+}
+
+// Build the campaign.npcs map from each DB room's authored NPCs: the
+// DB shape + the room id + an SRD Commoner-style stat-block default
+// (AC 10, HP 4, club +2 1d4, 0 XP) wherever the author left stats off.
+// Shop entries are filtered against the composed loot table (warn +
+// drop unknown item ids) so the vendor flow never serves a dead item.
+function materializeRoomNpcs(
+  campaignId: string,
+  rooms: CampaignRoom[],
+  lootTable: LootItem[]
+): Record<string, PlacedNpc> {
+  const placed: Record<string, PlacedNpc> = {};
+  for (const room of rooms) {
+    for (const n of room.npcs ?? []) {
+      const shop = (n.shop ?? []).filter((entry) => {
+        if (lootTable.some((i) => i.id === entry.itemId)) return true;
+        console.warn(
+          `[campaignContent] ${campaignId}/${room.id}: NPC "${n.id}" sells unknown item "${entry.itemId}" — entry dropped`
+        );
+        return false;
+      });
+      placed[n.id] = {
+        roomId: room.id,
+        id: n.id,
+        name: n.name,
+        attitude: n.attitude,
+        greeting: n.greeting,
+        responses: (n.responses ?? []) as PlacedNpc['responses'],
+        ...(n.persuasionDC !== undefined ? { persuasionDC: n.persuasionDC } : {}),
+        ...(n.pos ? { pos: n.pos } : {}),
+        ...(n.icon ? { icon: n.icon } : {}),
+        ...(shop.length > 0 ? { shop } : {}),
+        hp: n.hp ?? 4,
+        ac: n.ac ?? 10,
+        damage: n.damage ?? '1d4',
+        toHit: n.toHit ?? 2,
+        xp: n.xp ?? 0,
+      };
+    }
+  }
+  return placed;
 }
 
 // Expand each DB room's loot placements ({itemId, pos?}) into PlacedLoot
