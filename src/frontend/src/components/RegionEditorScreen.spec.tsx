@@ -840,6 +840,51 @@ describe('RegionEditorScreen', () => {
       ]);
     });
 
+    it('SHOP rows: add ware + price + faction tie; save folds shop and factionId', async () => {
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [
+                TAPROOM,
+                {
+                  ...CELLAR,
+                  npcs: [
+                    { id: 'old-hob', name: 'Old Hob', attitude: 'friendly', greeting: 'Evening.' },
+                  ],
+                },
+              ],
+            }
+          : section === 'factions'
+            ? { section, source: 'db', value: [{ id: 'millers', name: "The Millers' Guild" }] }
+            : { section, source: 'db', value: [] }
+      );
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      render(
+        <RegionEditorScreen campaignId="sandbox" regionId="cellar" kind="room" onBack={vi.fn()} />
+      );
+      await screen.findByTestId('cell-0-0');
+      expect(screen.getByText(/SHOP — none/)).toBeTruthy();
+      fireEvent.click(screen.getByTestId('npc-add-ware-0'));
+      // Defaults to the first catalog item; flip to rope, set a price.
+      fireEvent.change(screen.getByLabelText('NPC 1 ware 1 item'), { target: { value: 'rope' } });
+      fireEvent.change(screen.getByLabelText('NPC 1 ware 1 price'), { target: { value: '3' } });
+      // The faction tie lights the tier pricing.
+      fireEvent.change(screen.getByLabelText('FACTION (TIER PRICING)'), {
+        target: { value: 'millers' },
+      });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        npcs?: Array<Record<string, unknown>>;
+      }>;
+      const hob = saved.find((r) => r.id === 'cellar')!.npcs![0];
+      expect(hob.shop).toEqual([{ itemId: 'rope', price: 3 }]);
+      expect(hob.factionId).toBe('millers');
+    });
+
     it('OBJECTS card: name guard, loot chips, PLACE flow, optional-field pruning', async () => {
       renderRoom('cellar');
       await screen.findByTestId('cell-0-0');

@@ -720,6 +720,7 @@ export interface CampaignRoomNpc {
   pos?: GridPos;
   icon?: string;
   shop?: Array<{ itemId: string; price: number }>;
+  factionId?: string;
   hp?: number;
   ac?: number;
   damage?: string;
@@ -1301,6 +1302,7 @@ function materializeRoomNpcs(
         ...(n.pos ? { pos: n.pos } : {}),
         ...(n.icon ? { icon: n.icon } : {}),
         ...(shop.length > 0 ? { shop } : {}),
+        ...(n.factionId ? { factionId: n.factionId } : {}),
         hp: n.hp ?? 4,
         ac: n.ac ?? 10,
         damage: n.damage ?? '1d4',

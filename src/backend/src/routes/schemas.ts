@@ -1096,6 +1096,10 @@ const RoomNpcSchema = z
       )
       .max(20)
       .optional(),
+    // Ties the shop to a faction so the tier price multipliers apply
+    // (factionShopPrice). An id with no matching faction fails soft to
+    // flat prices — factions live in their own section.
+    factionId: SLUG.optional(),
     hp: z.number().int().min(1).max(500).optional(),
     ac: z.number().int().min(1).max(30).optional(),
     damage: z.string().min(1).max(20).optional(),

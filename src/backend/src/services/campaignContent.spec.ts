@@ -639,6 +639,7 @@ describe('editable sections registry', () => {
       firstGoodbye: 'Come back for the stew.',
       responses: [{ label: 'Ask', reply: 'No.', responses: [{ label: 'Press', reply: 'NO.' }] }],
       shop: [{ itemId: 'rope', price: 1 }],
+      factionId: 'millers',
       pos: { x: 3, y: 3 },
     };
     const ok = rooms.safeParse([{ ...ROOM_B, npcs: [hob] }]);
@@ -1553,6 +1554,7 @@ describe('section CRUD + live refresh', () => {
             greeting: 'Evening.',
             firstGreeting: 'New faces! Welcome.',
             goodbye: 'Mind the step.',
+            factionId: 'millers',
             pos: { x: 1, y: 1 },
             shop: [
               { itemId: 'rope', price: 1 },
@@ -1581,8 +1583,10 @@ describe('section CRUD + live refresh', () => {
     expect(hob.toHit).toBe(2);
     expect(hob.xp).toBe(0);
     expect(hob.responses).toEqual([]);
-    // The shop kept the real item and dropped the unknown one (warned).
+    // The shop kept the real item and dropped the unknown one (warned);
+    // the faction tie rides through for tier pricing.
     expect(hob.shop).toEqual([{ itemId: 'rope', price: 1 }]);
+    expect(hob.factionId).toBe('millers');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('vanished-wares'));
     // Rooms-wholesale: the code npcs map is replaced entirely.
     expect(npcs['code-npc']).toBeUndefined();

@@ -144,6 +144,8 @@ interface EditorNpc {
   pos?: { x: number; y: number };
   icon?: string;
   responses?: DialogueNode[];
+  shop?: Array<{ itemId: string; price: number }>;
+  factionId?: string;
   [key: string]: unknown;
 }
 
@@ -659,6 +661,12 @@ function RegionEditorScreen({
     if (kind === 'room' && placedNpcs.some((n) => !n.name.trim() || !n.greeting.trim())) {
       return { error: 'Every NPC needs a name and a greeting.' };
     }
+    if (
+      kind === 'room' &&
+      placedNpcs.some((n) => (n.shop ?? []).some((w) => !w.itemId || w.price < 0))
+    ) {
+      return { error: 'Every shop ware needs an item and a non-negative price.' };
+    }
     // Dialogue trees: every node needs a player line; a check node needs both
     // outcome replies. Walked recursively across every NPC.
     if (kind === 'room') {
@@ -774,6 +782,8 @@ function RegionEditorScreen({
             if (!c.goodbye) delete c.goodbye;
             if (!c.firstGoodbye) delete c.firstGoodbye;
             if (!c.responses || c.responses.length === 0) delete c.responses;
+            if (!c.shop || c.shop.length === 0) delete c.shop;
+            if (!c.factionId) delete c.factionId;
             return c;
           });
         } else {
@@ -2256,6 +2266,155 @@ function RegionEditorScreen({
                           />
                         </div>
                       ))}
+                      {/* Shop — wares from the composed item list, with a
+                          faction tie so the tier price multipliers apply. */}
+                      <div style={{ marginTop: 8 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 12,
+                            alignItems: 'flex-end',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <p className={styles.formLbl} style={{ marginBottom: 6 }}>
+                            SHOP {(n.shop ?? []).length === 0 ? '— none (not a vendor)' : ''}
+                          </p>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                            data-testid={`npc-add-ware-${i}`}
+                            onClick={() => {
+                              setPlacedNpcs((prev) =>
+                                prev.map((p, j) =>
+                                  j === i
+                                    ? {
+                                        ...p,
+                                        shop: [
+                                          ...(p.shop ?? []),
+                                          { itemId: itemOptions[0]?.id ?? '', price: 1 },
+                                        ],
+                                      }
+                                    : p
+                                )
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            + ADD WARE
+                          </button>
+                          {(n.shop ?? []).length > 0 && (
+                            <div>
+                              <label className={styles.formLbl} htmlFor={`npc-faction-${i}`}>
+                                FACTION (TIER PRICING)
+                              </label>
+                              <select
+                                id={`npc-faction-${i}`}
+                                className={styles.formInp}
+                                style={{ cursor: 'pointer', width: 'auto' }}
+                                value={n.factionId ?? ''}
+                                onChange={(ev) => {
+                                  const factionId = ev.target.value;
+                                  setPlacedNpcs((prev) =>
+                                    prev.map((p, j) => (j === i ? { ...p, factionId } : p))
+                                  );
+                                  setDirty(true);
+                                  setSaved(false);
+                                }}
+                              >
+                                <option value="">— NONE (FLAT PRICES) —</option>
+                                {factionOptions.map((f) => (
+                                  <option key={f.id} value={f.id}>
+                                    {f.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                        {(n.shop ?? []).map((w, wi) => (
+                          <div
+                            key={wi}
+                            style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}
+                          >
+                            <select
+                              className={styles.formInp}
+                              style={{ width: 'auto', cursor: 'pointer' }}
+                              aria-label={`NPC ${i + 1} ware ${wi + 1} item`}
+                              value={w.itemId}
+                              onChange={(ev) => {
+                                const itemId = ev.target.value;
+                                setPlacedNpcs((prev) =>
+                                  prev.map((p, j) =>
+                                    j === i
+                                      ? {
+                                          ...p,
+                                          shop: p.shop!.map((x, k) =>
+                                            k === wi ? { ...x, itemId } : x
+                                          ),
+                                        }
+                                      : p
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            >
+                              {w.itemId && !itemOptions.some((o) => o.id === w.itemId) && (
+                                <option value={w.itemId}>{w.itemId} (unlisted)</option>
+                              )}
+                              {itemOptions.map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.name}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              className={styles.formInp}
+                              style={{ width: 90 }}
+                              type="number"
+                              min={0}
+                              aria-label={`NPC ${i + 1} ware ${wi + 1} price`}
+                              value={w.price}
+                              onChange={(ev) => {
+                                const price = Number(ev.target.value);
+                                setPlacedNpcs((prev) =>
+                                  prev.map((p, j) =>
+                                    j === i
+                                      ? {
+                                          ...p,
+                                          shop: p.shop!.map((x, k) =>
+                                            k === wi ? { ...x, price } : x
+                                          ),
+                                        }
+                                      : p
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            />
+                            <span style={{ fontSize: '0.7rem', color: 'var(--t-dim)' }}>cr</span>
+                            <button
+                              className={styles.ghostBtn}
+                              style={{ padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
+                              aria-label={`Remove NPC ${i + 1} ware ${wi + 1}`}
+                              onClick={() => {
+                                setPlacedNpcs((prev) =>
+                                  prev.map((p, j) =>
+                                    j === i ? { ...p, shop: p.shop!.filter((_, k) => k !== wi) } : p
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                       {dialogueOpen === i && (
                         <div style={{ marginTop: 6 }}>
                           <DialogueEditor
