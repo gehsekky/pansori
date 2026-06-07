@@ -146,8 +146,8 @@ import { factionShopPrice } from './campaignEngine.js';
 import { fillEnemyTokens } from './narrative/enemyName.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
-import { responsesAtPath } from './conversation.js';
 import { returnFromEncounter } from './mapEngine.js';
+import { visibleResponses } from './dialogueGating.js';
 import { wornSaveBonus } from './wornEffects.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
@@ -4291,17 +4291,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (conv && !state.combat_active && conv.roomId === state.current_room) {
     const cnpc = npcById(seed, conv.npcId);
     if (cnpc && !npcIsKilled(state, conv.npcId)) {
-      const convoChoices: GameChoice[] = responsesAtPath(cnpc, conv.path).map((r, i) => {
-        const action = { type: 'talk_response' as const, responseIdx: i };
-        // This early-return bypasses the end-of-function seenKey pass, so stamp
-        // it here — lets the FE dim dialogue options the player already picked.
-        return {
-          label: `<To ${cnpc.name}> ${r.label}`,
-          action,
-          kind: 'conversation' as const,
-          seenKey: seenKeyForAction(action, state),
-        };
-      });
+      // Conditioned / one-shot options are filtered out here (hidden, never
+      // grayed); `idx` is the ORIGINAL index in the unfiltered tree, so the
+      // conversation path + talk_response stay stable as visibility shifts.
+      const convoChoices: GameChoice[] = visibleResponses(cnpc, conv.path, state, context).map(
+        ({ response: r, idx }) => {
+          const action = { type: 'talk_response' as const, responseIdx: idx };
+          // This early-return bypasses the end-of-function seenKey pass, so stamp
+          // it here — lets the FE dim dialogue options the player already picked.
+          return {
+            label: `<To ${cnpc.name}> ${r.label}`,
+            action,
+            kind: 'conversation' as const,
+            seenKey: seenKeyForAction(action, state),
+          };
+        }
+      );
       if (conv.path.length > 0) {
         convoChoices.push({
           label: '↩ Back',

@@ -9,6 +9,7 @@ import {
   npcsInRoom,
 } from '../gameEngine.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
+import { onceKey, visibleResponses } from '../dialogueGating.js';
 import type { ActionHandler } from './types.js';
 import type { ActiveGrid } from '../mapEngine.js';
 import type { GridPos } from '../../types.js';
@@ -138,6 +139,27 @@ export const handleTalkResponse: ActionHandler<{
   if (!response) {
     ctx.narrative = 'Invalid response.';
     return;
+  }
+  // Server-side gate re-check: a stale client (or a consequence that just
+  // flipped a fact mid-conversation) can submit an option that is no longer
+  // visible — refuse it the same way as an out-of-range index. The check
+  // mirrors visibleResponses (condition + once), indexed on the unfiltered
+  // tree so responseIdx means the same node both places.
+  if (!visibleResponses(npc, path, ctx.st, ctx.context).some((v) => v.idx === action.responseIdx)) {
+    ctx.narrative = 'Invalid response.';
+    return;
+  }
+  // One-shot options are spent the moment they're picked — recorded for the
+  // whole playthrough (like objects_searched), BEFORE consequences run so a
+  // consequence can't re-surface the node it just consumed.
+  if (response.once) {
+    ctx.st = {
+      ...ctx.st,
+      dialogue_chosen: [
+        ...(ctx.st.dialogue_chosen ?? []),
+        onceKey(npc.id, path, action.responseIdx),
+      ],
+    };
   }
   let narrative = response.reply ? `${npc.name}: "${response.reply}"` : `${npc.name} nods.`;
   if (response.consequences?.length) {

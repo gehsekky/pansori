@@ -134,3 +134,83 @@ describe('conversation mode', () => {
     expect(choices.some((c) => c.kind === 'conversation')).toBe(false);
   });
 });
+
+describe('gated dialogue (condition + once)', () => {
+  // A smuggler whose root node mixes an open option, a flag-gated option and
+  // a one-shot — the flag-gated one is UNLOCKED BY the one-shot's consequence,
+  // exercising mid-conversation visibility shifts on stable indices.
+  const gatedNpc: PlacedNpc = {
+    roomId: ROOM,
+    id: 'smuggler',
+    name: 'The Smuggler',
+    attitude: 'friendly',
+    hp: 4,
+    ac: 10,
+    damage: '1d4',
+    toHit: 0,
+    xp: 0,
+    greeting: 'Looking for something?',
+    responses: [
+      { label: 'Just browsing', reply: 'Suit yourself.' },
+      {
+        label: 'About that job…',
+        reply: 'Keep your voice down. The ledger. Bring it.',
+        condition: { fact: 'flags', path: '$.knows_password', operator: 'equal', value: true },
+      },
+      {
+        label: 'A little bird told me a password',
+        reply: 'Hah. So you know Hob after all.',
+        once: true,
+        consequences: [{ type: 'set_flag', key: 'knows_password', value: true }],
+      },
+    ],
+  };
+  const gatedSeed = { ...seed, npcs: { smuggler: gatedNpc } } as unknown as Seed;
+  const gatedStart = () =>
+    makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['smuggler'] });
+  const gatedAct = (
+    state: ReturnType<typeof makeState>,
+    action: Parameters<typeof takeAction>[0]['action']
+  ) => takeAction({ action, history: [], state, seed: gatedSeed, context: ctx });
+  const labels = (state: ReturnType<typeof makeState>) =>
+    generateChoices(state, gatedSeed, ctx).map((c) => c.label);
+
+  it('a locked option is hidden — and refused server-side if submitted anyway', async () => {
+    const r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
+    expect(labels(r.newState)).not.toContain('<To The Smuggler> About that job…');
+    // A stale client submits the hidden index directly: rejected, no reply,
+    // no descent.
+    const forced = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 1 });
+    expect(forced.narrative).toContain('Invalid response.');
+    expect(forced.newState.active_conversation?.prompt).toBe('Looking for something?');
+  });
+
+  it('a consequence mid-conversation unlocks a sibling at its original index', async () => {
+    let r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
+    // Spend the one-shot (index 2): flag set, option gone, gated sibling appears.
+    r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });
+    expect(r.newState.flags?.knows_password).toBe(true);
+    const after = labels(r.newState);
+    expect(after).toContain('<To The Smuggler> About that job…');
+    expect(after).not.toContain('<To The Smuggler> A little bird told me a password');
+    // The unlocked option answers at its ORIGINAL index (1) — stable identity.
+    r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 1 });
+    expect(r.newState.active_conversation?.prompt).toBe(
+      'Keep your voice down. The ledger. Bring it.'
+    );
+  });
+
+  it('once persists for the playthrough: re-opening the talk keeps it spent', async () => {
+    let r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
+    r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });
+    r = await gatedAct(r.newState, { type: 'end_conversation' });
+    expect(r.newState.dialogue_chosen).toEqual(['smuggler:2']);
+    // Fresh conversation, same playthrough — the one-shot stays gone and a
+    // direct re-submit of its index is refused.
+    r = await gatedAct(r.newState, { type: 'talk', npcId: 'smuggler' });
+    expect(labels(r.newState)).not.toContain('<To The Smuggler> A little bird told me a password');
+    const again = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });
+    expect(again.narrative).toContain('Invalid response.');
+    expect(again.newState.flags?.knows_password).toBe(true); // not double-fired (still just set)
+  });
+});

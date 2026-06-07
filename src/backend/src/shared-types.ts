@@ -1056,6 +1056,16 @@ export interface NpcDialogueResponse {
   label: string;
   reply?: string; // NPC's follow-up text after player picks this
   consequences?: GameConsequence[]; // applied when this response is chosen
+  // Visibility gate — a json-rules-engine condition (the same shape as
+  // QuestStep.condition) evaluated against CampaignFacts. A response whose
+  // condition does not hold is HIDDEN — never grayed out, never hinted at —
+  // so gated paths stay a surprise for players who earn them. Evaluation
+  // fails closed: a malformed condition hides the option.
+  condition?: object;
+  // One-shot — once chosen, the option disappears for the REST OF THE
+  // PLAYTHROUGH (recorded in GameState.dialogue_chosen, which persists with
+  // the session like objects_searched).
+  once?: boolean;
   // Nested follow-up options. A response WITH children is a branch: picking it
   // descends a level (its `reply` becomes the new prompt, `responses` the new
   // options) and a "Back" choice appears. A response WITHOUT children is a leaf:

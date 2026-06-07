@@ -88,6 +88,7 @@ import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
+import { derivedProgressFacts } from '../services/dialogueGating.js';
 import { generateSeed } from '../services/procgen.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
@@ -1409,6 +1410,17 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
         campaign_flags: result.newState.campaign_flags ?? {},
         quest_progress: result.newState.quest_progress ?? [],
         faction_rep: result.newState.faction_rep ?? {},
+        // Derived progress facts (quest ids by status, steps as
+        // 'questId:stepId', faction tiers) — lets quest steps key on OTHER
+        // quests / faction standing with the same vocabulary dialogue gates use.
+        ...derivedProgressFacts(
+          result.newState.quest_progress ?? [],
+          result.newState.faction_rep ?? {},
+          ctx
+        ),
+        party_items: result.newState.characters.flatMap((c) =>
+          (c.inventory ?? []).map((i) => i.id)
+        ),
         world_minute: result.newState.world_minute ?? 0,
         // Derived day, kept as a fact so quests can key on it directly.
         world_day: formatGameClock(result.newState.world_minute ?? 0).day,

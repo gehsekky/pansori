@@ -1631,6 +1631,11 @@ export interface GameState {
   // Object interaction — keys are "roomId:objectId"
   objects_searched: string[];
 
+  // One-shot dialogue options already chosen — keys are
+  // "npcId:<path indices joined by '.'>" (see dialogueGating.onceKey).
+  // Persists for the whole playthrough, like objects_searched.
+  dialogue_chosen?: string[];
+
   // Script engine flags
   flags: Record<string, boolean | string | number>;
 
@@ -1932,6 +1937,23 @@ export interface CampaignFacts {
   campaign_flags: Record<string, boolean | string | number>;
   quest_progress: QuestProgress[];
   faction_rep: Record<string, number>;
+  // Derived progress facts — flattened from quest_progress / faction_rep so
+  // conditions (quest steps AND dialogue gates) can key on them without
+  // fighting the QuestProgress[] array shape:
+  //   quests_active / quests_completed — quest ids by status
+  //   steps_done — 'questId:stepId' for every completed step
+  //   faction_tier — factionId → named tier (factionAttitude over thresholds),
+  //     so authors write "millers is friendly" instead of raw rep numbers.
+  // Optional in the type (legacy fixtures predate them) but ALWAYS populated
+  // by the real builders (the action route + dialogueFacts) via
+  // derivedProgressFacts.
+  quests_active?: string[];
+  quests_completed?: string[];
+  steps_done?: string[];
+  faction_tier?: Record<string, string>;
+  // Party inventory item ids (every member's pack pooled) — dialogue gates key
+  // on it for "show him the ledger"-style options. Same always-populated deal.
+  party_items?: string[];
   // In-game clock facts. `world_minute` is canonical; `world_day` is derived
   // (floor(world_minute/1440)+1) and kept so quests can key on the day directly.
   world_minute: number;
