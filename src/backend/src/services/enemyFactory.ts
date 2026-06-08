@@ -71,5 +71,8 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
       ? (template.legendary_pool ?? 3)
       : undefined,
     lair_actions: template.lair_actions,
+    // Death drops carried from the template (a placement may override these).
+    drops: template.drops,
+    goldDrop: template.goldDrop,
   };
 }

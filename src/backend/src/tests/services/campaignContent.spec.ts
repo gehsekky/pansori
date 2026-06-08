@@ -1751,7 +1751,7 @@ describe('section CRUD + live refresh', () => {
       ]).success
     ).toBe(true);
     expect(sch.safeParse([rule('d'), rule('d')]).success).toBe(false); // dup name
-    expect(sch.safeParse([rule('e', { consequences: [] })]).success).toBe(false); // empty
+    expect(sch.safeParse([rule('e', { consequences: [] })]).success).toBe(true); // flag-only rule
     // A non-DB consequence arm is rejected.
     expect(
       sch.safeParse([

@@ -1117,6 +1117,9 @@ const RoomNpcSchema = z
   .object({
     id: SLUG,
     name: z.string().min(1).max(80),
+    // Treat `name` as a proper noun in prose (no definite article) — for
+    // single-word personal names a heuristic can't catch (e.g. "Dusk").
+    proper_noun: z.boolean().optional(),
     attitude: z.enum(['friendly', 'indifferent', 'hostile']),
     greeting: z.string().min(1).max(2000),
     // NPC narrative hooks — the FIRST variant overrides the plain one once:
@@ -1183,6 +1186,14 @@ const RoomsSchema = z
               .object({
                 name: z.string().min(1).max(80),
                 count: z.number().int().min(1).max(8).optional(),
+                // Explicit id for a single (count 1) placement so quests/rules
+                // can target this specific creature; ignored when count > 1.
+                id: z.string().min(1).max(80).optional(),
+                // Per-placement death-drop overrides (applied over the
+                // template at materialize time) — a boss/elite in this room
+                // drops specific coin/loot the base template doesn't.
+                goldDrop: z.number().int().min(0).max(100000).optional(),
+                drops: z.array(z.string().min(1).max(80)).max(10).optional(),
               })
               .strict()
           )
@@ -1493,7 +1504,9 @@ const RuleSchema = z
     priority: z.number().int().min(1).max(100).optional(),
     once: z.boolean().optional(),
     conditions: RuleConditionSchema,
-    consequences: z.array(DialogueConsequenceSchema).min(1).max(8),
+    // May be empty: a `once` rule whose only effect is setting its
+    // `rule_fired_<name>` flag (which a quest step then reads).
+    consequences: z.array(DialogueConsequenceSchema).max(8),
   })
   .strict();
 const RulesSchema = z

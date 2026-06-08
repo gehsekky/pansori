@@ -660,6 +660,15 @@ export interface CampaignRoomExit {
 export interface CampaignRoomEnemy {
   name: string;
   count?: number; // default 1
+  // An explicit enemy id for a single (count 1) placement — lets quest/rule
+  // conditions target a specific creature (e.g. `enemies_killed contains
+  // 'spire_ritual_apex#boss'`). Without it the materializer assigns the
+  // positional `<roomId>#<index>` id. Ignored when count > 1.
+  id?: string;
+  // Per-placement death-drop overrides applied over the template at
+  // materialize time (a room's elite drops specific coin/loot).
+  goldDrop?: number;
+  drops?: string[];
 }
 
 // A loot placement: which item (by id — the composed loot-table identity)
@@ -725,6 +734,9 @@ export interface CampaignRoomTrap {
 export interface CampaignRoomNpc {
   id: string; // campaign-unique — keys the campaign.npcs map
   name: string;
+  // Treat `name` as a proper noun in prose (no definite article) — set for
+  // single-word personal names a heuristic can't catch (e.g. "Dusk").
+  proper_noun?: boolean;
   attitude: 'friendly' | 'indifferent' | 'hostile';
   greeting: string;
   firstGreeting?: string;
@@ -1322,6 +1334,7 @@ function materializeRoomNpcs(
         roomId: room.id,
         id: n.id,
         name: n.name,
+        ...(n.proper_noun ? { proper_noun: n.proper_noun } : {}),
         attitude: n.attitude,
         greeting: n.greeting,
         ...(n.firstGreeting ? { firstGreeting: n.firstGreeting } : {}),
@@ -1394,8 +1407,16 @@ function materializeRoomEnemies(
         );
         continue;
       }
-      for (let i = 0; i < (p.count ?? 1); i++) {
-        list.push(materializeEnemy(tpl, `${room.id}#${list.length}`, tpl.hp));
+      const count = p.count ?? 1;
+      for (let i = 0; i < count; i++) {
+        // A single placement may pin an explicit id (for quest/rule targeting);
+        // otherwise fall back to the positional id.
+        const id = count === 1 && p.id ? p.id : `${room.id}#${list.length}`;
+        const e = materializeEnemy(tpl, id, tpl.hp);
+        // Per-placement death-drop overrides win over the template's.
+        if (p.goldDrop !== undefined) e.goldDrop = p.goldDrop;
+        if (p.drops !== undefined) e.drops = p.drops;
+        list.push(e);
       }
     }
     if (list.length > 0) placed[room.id] = list;
