@@ -1473,6 +1473,46 @@ const QuestsSchema = z
     });
   });
 
+// Engine rules (Context.rules, read by gameEngine.maybeRunRules): a
+// condition (the RuleFacts vocabulary — superset of quest facts) firing the
+// safe consequence subset. The only campaign-script data not previously
+// DB-editable; the engine already consumes context.rules, so this is a 1:1
+// move. `once` auto-sets a `rule_fired_<name>` flag so it never re-fires.
+const RULE_FACTS = [
+  'prev_room_id',
+  'combat_active',
+  'active_hp',
+  'active_max_hp',
+  'active_conditions',
+  ...QUEST_FACTS,
+] as const;
+const RuleConditionSchema = conditionSchema(RULE_FACTS);
+const RuleSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    priority: z.number().int().min(1).max(100).optional(),
+    once: z.boolean().optional(),
+    conditions: RuleConditionSchema,
+    consequences: z.array(DialogueConsequenceSchema).min(1).max(8),
+  })
+  .strict();
+const RulesSchema = z
+  .array(RuleSchema)
+  .max(100)
+  .superRefine((rules, ctx) => {
+    const names = new Set<string>();
+    rules.forEach((r, i) => {
+      if (names.has(r.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate rule name "${r.name}"`,
+          path: [i, 'name'],
+        });
+      }
+      names.add(r.name);
+    });
+  });
+
 const FACTION_TIERS = ['hostile', 'unfriendly', 'neutral', 'friendly', 'exalted'] as const;
 const FactionSchema = z
   .object({
@@ -1626,6 +1666,8 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // folded into campaign.quests / campaign.factions wholesale at overlay).
   quests: QuestsSchema,
   factions: FactionsSchema,
+  // Engine rules (Context.rules) — condition → consequence scripting.
+  rules: RulesSchema,
   terrainArt: TerrainArtSchema,
   regions: RegionsSchema,
   towns: TownsSchema,

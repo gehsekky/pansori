@@ -117,6 +117,9 @@ export const EDITABLE_SECTIONS = [
   'rooms',
   'quests',
   'factions',
+  // Engine rules (Context.rules) — a plain top-level field, folded by the
+  // generic overlay merge (gameEngine reads context.rules directly).
+  'rules',
   'terrainArt',
   'customItems',
   'customMonsters',

@@ -1708,6 +1708,58 @@ describe('section CRUD + live refresh', () => {
     expect(sch.safeParse({ size: 4, composition: ['Necromancer'] }).success).toBe(false); // not SRD
   });
 
+  it('rules overlay the context top level (engine reads context.rules)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({ id: 'malgovia' });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const rules = [
+      {
+        name: 'ledger_found',
+        once: true,
+        priority: 5,
+        conditions: {
+          all: [{ fact: 'loot_taken', operator: 'contains', value: 'guild_ledger' }],
+        },
+        consequences: [
+          { type: 'advance_quest', questId: 'q1', stepId: 's1' },
+          { type: 'add_narrative', text: 'The Guild stamp.' },
+        ],
+      },
+    ];
+    expect(await putCampaignSection(db.pool, 'malgovia', 'rules', rules)).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.rules).toEqual(rules);
+
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'rules')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.rules).toBeUndefined();
+  });
+
+  it('rules schema: condition facts + consequence subset, duplicate names rejected', () => {
+    const sch = CAMPAIGN_SECTION_SCHEMAS.rules;
+    const rule = (name: string, over: Record<string, unknown> = {}) => ({
+      name,
+      conditions: { all: [{ fact: 'loot_taken', operator: 'contains', value: 'x' }] },
+      consequences: [{ type: 'add_narrative', text: 'hi' }],
+      ...over,
+    });
+    expect(sch.safeParse([rule('a'), rule('b')]).success).toBe(true);
+    // npc_id is a valid rule fact (the step_talk_elise pattern).
+    expect(
+      sch.safeParse([
+        rule('c', { conditions: { all: [{ fact: 'npc_id', operator: 'equal', value: 'elise' }] } }),
+      ]).success
+    ).toBe(true);
+    expect(sch.safeParse([rule('d'), rule('d')]).success).toBe(false); // dup name
+    expect(sch.safeParse([rule('e', { consequences: [] })]).success).toBe(false); // empty
+    // A non-DB consequence arm is rejected.
+    expect(
+      sch.safeParse([
+        rule('f', { consequences: [{ type: 'spawn_enemy', roomId: 'r', enemyId: 'g' }] }),
+      ]).success
+    ).toBe(false);
+  });
+
   it('theme overlays the context top-level (the FE merges it over the base)', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const code = codeCtx({ id: 'malgovia' });
