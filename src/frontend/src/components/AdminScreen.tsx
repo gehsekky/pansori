@@ -7,6 +7,7 @@ import {
   api,
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
+import Breadcrumb from './Breadcrumb.tsx';
 import CampaignContentEditor from './CampaignContentEditor.tsx';
 import FactionsPanel from './FactionsPanel.tsx';
 import MapArtPanel from './MapArtPanel.tsx';
@@ -21,6 +22,7 @@ const ERROR_TEXT: Record<string, string> = {
   user_not_found: 'No account with that email — they need to sign in once first.',
   not_a_member: 'That user is not a member of this campaign.',
   last_owner: 'A campaign cannot lose its last owner — promote someone else first.',
+  cannot_change_own_role: 'You cannot change your own role — ask another owner or an admin.',
 };
 
 function errorText(err: unknown): string {
@@ -42,7 +44,7 @@ function errorText(err: unknown): string {
 function AdminScreen({
   user,
   onBack,
-  mode = 'admin',
+  mode = 'creator',
   initialCampaignId,
   onSelectCampaign,
   onEditMap,
@@ -58,7 +60,12 @@ function AdminScreen({
   // nothing is selected) so the parent can keep the address bar current.
   onSelectCampaign?: (id: string | null) => void;
   // Open the visual map painter for a region/town/room of the campaign.
-  onEditMap?: (campaignId: string, kind: 'region' | 'town' | 'room', mapId: string) => void;
+  onEditMap?: (
+    campaignId: string,
+    kind: 'region' | 'town' | 'room',
+    mapId: string,
+    campaignName?: string
+  ) => void;
 }) {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [campaignsErr, setCampaignsErr] = useState<string | null>(null);
@@ -250,33 +257,75 @@ function AdminScreen({
     }
   }
 
+  // The site-admin surface is intentionally blank for now — it used to mirror
+  // the creator screen, which was just duplication. Real admin tools will land
+  // here later; campaign management lives on the CREATOR screen.
+  if (mode === 'admin') {
+    return (
+      <div className={styles.pageFlex}>
+        <div className={styles.sessionsInner}>
+          <div className={styles.sessionsHeader}>
+            <div>
+              <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+                PANSORI ADMIN
+              </h1>
+              <p className={styles.sub}>
+                {user.display_name.toUpperCase()}
+                {user.is_admin && <span style={{ color: 'var(--t-mid)' }}> · SITE ADMIN</span>}
+              </p>
+            </div>
+            <div className={styles.sessionsActions}>
+              <button className={styles.ghostBtn} onClick={onBack}>
+                BACK
+              </button>
+            </div>
+          </div>
+          <div
+            className={styles.card}
+            style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--t-dim)' }}
+          >
+            <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', marginBottom: 8 }}>
+              NO ADMIN TOOLS YET
+            </p>
+            <p style={{ fontSize: '0.75rem' }}>
+              Site-admin functions will live here once we define them. For now, manage campaigns
+              from the CREATOR screen.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.pageFlex}>
       <div className={styles.sessionsInner}>
         <div className={styles.sessionsHeader}>
           <div>
-            <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
-              {mode === 'admin' ? 'PANSORI ADMIN' : 'CAMPAIGN CREATOR'}
-            </h1>
+            <Breadcrumb
+              testId="creator-breadcrumb"
+              crumbs={[
+                { label: 'CREATOR', onClick: selected ? () => setSelectedId(null) : undefined },
+                ...(selected ? [{ label: selected.name }] : []),
+              ]}
+            />
             <p className={styles.sub}>
               {user.display_name.toUpperCase()}
               {user.is_admin && <span style={{ color: 'var(--t-mid)' }}> · SITE ADMIN</span>}
             </p>
           </div>
           <div className={styles.sessionsActions}>
-            {mode === 'creator' && (
-              <button
-                data-testid="new-campaign-btn"
-                className={styles.submit}
-                style={{ marginTop: 0, width: 'auto', padding: '0.5rem 1.25rem' }}
-                onClick={() => {
-                  setCreating((v) => !v);
-                  setCreateErr(null);
-                }}
-              >
-                + NEW CAMPAIGN
-              </button>
-            )}
+            <button
+              data-testid="new-campaign-btn"
+              className={styles.submit}
+              style={{ marginTop: 0, width: 'auto', padding: '0.5rem 1.25rem' }}
+              onClick={() => {
+                setCreating((v) => !v);
+                setCreateErr(null);
+              }}
+            >
+              + NEW CAMPAIGN
+            </button>
             <button className={styles.ghostBtn} onClick={onBack}>
               BACK
             </button>
@@ -330,91 +379,111 @@ function AdminScreen({
           </form>
         )}
 
-        {/* ── Campaign list ─────────────────────────────────────────────── */}
-        {mode === 'creator' && !campaignsErr && visibleCampaigns.length === 0 && (
+        {/* ── Campaign list (bordered SELECT CAMPAIGN box) ──────────────── */}
+        {!campaignsErr && (
           <div
-            className={styles.card}
-            style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--t-dim)' }}
+            style={{
+              border: '1px solid var(--t-border)',
+              borderRadius: 4,
+              padding: '0.75rem 0.85rem',
+              marginBottom: '1rem',
+            }}
           >
-            <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', marginBottom: 8 }}>
-              NO CAMPAIGNS YET
+            <p
+              style={{
+                fontSize: '0.72rem',
+                letterSpacing: '0.14em',
+                color: 'var(--t-mid)',
+                marginBottom: '0.65rem',
+              }}
+            >
+              SELECT CAMPAIGN
             </p>
-            <p style={{ fontSize: '0.75rem' }}>
-              You don&apos;t own or edit any campaigns. Hit + NEW CAMPAIGN to start one — it&apos;s
-              private until you invite players, and playable immediately on the base template.
-            </p>
+            {visibleCampaigns.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--t-dim)' }}>
+                <p style={{ fontSize: '0.8rem', letterSpacing: '0.12em', marginBottom: 8 }}>
+                  NO CAMPAIGNS YET
+                </p>
+                <p style={{ fontSize: '0.75rem' }}>
+                  You don&apos;t own or edit any campaigns. Hit + NEW CAMPAIGN to start one —
+                  it&apos;s private until you invite players, and playable immediately on the base
+                  template.
+                </p>
+              </div>
+            ) : (
+              <div className={styles.sessionList}>
+                {visibleCampaigns.map((c) => {
+                  const manageable = adminRole(c.my_role);
+                  const isSelected = c.id === selectedId;
+                  return (
+                    <button
+                      key={c.id}
+                      className={styles.card}
+                      onClick={() => manageable && setSelectedId(c.id)}
+                      disabled={!manageable}
+                      aria-pressed={isSelected}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        marginBottom: 0,
+                        width: '100%',
+                        textAlign: 'left',
+                        cursor: manageable ? 'pointer' : 'default',
+                        opacity: manageable ? 1 : 0.5,
+                        borderColor: isSelected ? 'var(--t-primary)' : undefined,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          style={{
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem',
+                            letterSpacing: '0.06em',
+                            color: 'var(--t-primary)',
+                          }}
+                        >
+                          {c.name}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--t-dim)',
+                            letterSpacing: '0.08em',
+                            marginTop: 2,
+                          }}
+                        >
+                          {c.id}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p
+                          style={{
+                            fontSize: '0.75rem',
+                            letterSpacing: '0.1em',
+                            color: c.my_role ? 'var(--t-mid)' : 'var(--t-dim)',
+                          }}
+                        >
+                          {c.my_role ? c.my_role.toUpperCase() : 'NO ACCESS'}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '0.7rem',
+                            letterSpacing: '0.1em',
+                            color: c.visibility === 'global' ? 'var(--t-hp-high)' : 'var(--t-dim)',
+                            marginTop: 2,
+                          }}
+                        >
+                          {c.visibility.toUpperCase()}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
-        <div className={styles.sessionList}>
-          {visibleCampaigns.map((c) => {
-            const manageable = adminRole(c.my_role);
-            const isSelected = c.id === selectedId;
-            return (
-              <button
-                key={c.id}
-                className={styles.card}
-                onClick={() => manageable && setSelectedId(c.id)}
-                disabled={!manageable}
-                aria-pressed={isSelected}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  marginBottom: 0,
-                  width: '100%',
-                  textAlign: 'left',
-                  cursor: manageable ? 'pointer' : 'default',
-                  opacity: manageable ? 1 : 0.5,
-                  borderColor: isSelected ? 'var(--t-primary)' : undefined,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
-                    style={{
-                      fontWeight: 'bold',
-                      fontSize: '0.85rem',
-                      letterSpacing: '0.06em',
-                      color: 'var(--t-primary)',
-                    }}
-                  >
-                    {c.name}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--t-dim)',
-                      letterSpacing: '0.08em',
-                      marginTop: 2,
-                    }}
-                  >
-                    {c.id}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <p
-                    style={{
-                      fontSize: '0.75rem',
-                      letterSpacing: '0.1em',
-                      color: c.my_role ? 'var(--t-mid)' : 'var(--t-dim)',
-                    }}
-                  >
-                    {c.my_role ? c.my_role.toUpperCase() : 'NO ACCESS'}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: '0.7rem',
-                      letterSpacing: '0.1em',
-                      color: c.visibility === 'global' ? 'var(--t-hp-high)' : 'var(--t-dim)',
-                      marginTop: 2,
-                    }}
-                  >
-                    {c.visibility.toUpperCase()}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
 
         {/* ── Members panel ─────────────────────────────────────────────── */}
         {selected && (
@@ -528,18 +597,35 @@ function AdminScreen({
                 </div>
                 {canManage ? (
                   <>
-                    <select
-                      className={styles.formInp}
-                      style={{ width: 'auto', cursor: 'pointer' }}
-                      value={m.role}
-                      disabled={busy}
-                      aria-label={`Role for ${m.display_name}`}
-                      onChange={(e) => handleRoleChange(m.user_id, e.target.value as CampaignRole)}
-                    >
-                      <option value="owner">OWNER</option>
-                      <option value="editor">EDITOR</option>
-                      <option value="player">PLAYER</option>
-                    </select>
+                    {/* You can't change your OWN role (it could orphan a campaign
+                        — only another owner or a site admin can). Site admins are
+                        the recovery path, so they keep the control on their row. */}
+                    {m.user_id !== user.id || user.is_admin ? (
+                      <select
+                        className={styles.formInp}
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        value={m.role}
+                        disabled={busy}
+                        aria-label={`Role for ${m.display_name}`}
+                        onChange={(e) =>
+                          handleRoleChange(m.user_id, e.target.value as CampaignRole)
+                        }
+                      >
+                        <option value="owner">OWNER</option>
+                        <option value="editor">EDITOR</option>
+                        <option value="player">PLAYER</option>
+                      </select>
+                    ) : (
+                      <p
+                        style={{
+                          fontSize: '0.75rem',
+                          letterSpacing: '0.1em',
+                          color: 'var(--t-mid)',
+                        }}
+                      >
+                        {m.role.toUpperCase()}
+                      </p>
+                    )}
                     <button
                       className={styles.ghostBtn}
                       style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
@@ -628,7 +714,11 @@ function AdminScreen({
           <MapsPanel
             campaignId={selected.id}
             kind="region"
-            onOpenMap={onEditMap ? (mapId) => onEditMap(selected.id, 'region', mapId) : undefined}
+            onOpenMap={
+              onEditMap
+                ? (mapId) => onEditMap(selected.id, 'region', mapId, selected.name)
+                : undefined
+            }
           />
         )}
 

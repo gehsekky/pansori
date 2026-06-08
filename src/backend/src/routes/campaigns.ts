@@ -164,6 +164,15 @@ campaignsRouter.put(
   async (req: Request, res: Response) => {
     const parsed = parseBody(req, res, SetCampaignMemberRoleSchema);
     if (!parsed) return;
+    // You can't change your OWN role — an owner self-demoting could orphan the
+    // campaign (the last_owner guard below is the hard backstop, but this also
+    // blocks an owner with co-owners from quietly stepping down via this UI).
+    // Site admins are the recovery path, so they're exempt.
+    const requester = (req as AuthedRequest).user;
+    if (param(req, 'userId') === requester.id && !requester.is_admin) {
+      res.status(403).json({ error: 'cannot_change_own_role' });
+      return;
+    }
     try {
       const result = await setMemberRole(
         pool,

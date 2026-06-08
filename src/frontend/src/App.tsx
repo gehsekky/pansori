@@ -151,6 +151,10 @@ export default function App() {
   // Deep-linked creator selection (/creator/<campaign id>) — consumed by
   // AdminScreen as its initial selection when the creator view opens.
   const [creatorCampaignId, setCreatorCampaignId] = useState<string | null>(null);
+  // The selected campaign's display name (for the painter breadcrumb). Known
+  // when the painter is opened from the creator screen; null on a cold deep
+  // link, where the breadcrumb falls back to the campaign id.
+  const [creatorCampaignName, setCreatorCampaignName] = useState<string | null>(null);
   // Deep-linked map painter (/creator/<campaign id>/(region|room)/<map id>;
   // towns nest: /creator/<cid>/region/<region id>/town/<town id>).
   const [creatorRegionId, setCreatorRegionId] = useState<string | null>(null);
@@ -499,12 +503,13 @@ export default function App() {
             // history entries — the creator view itself is the destination.
             window.history.replaceState(null, '', id ? `/creator/${id}` : '/creator')
           }
-          onEditMap={(campaignId, kind, mapId) => {
+          onEditMap={(campaignId, kind, mapId, campaignName) => {
             // Only regions launch from the creator screen — towns and rooms
             // are reached (and URL-nested) through their parent painter page.
             // The flat /creator/<cid>/room/<id> deep link stays parseable for
             // old bookmarks.
             setCreatorCampaignId(campaignId);
+            setCreatorCampaignName(campaignName ?? null);
             setCreatorMapKind(kind);
             setCreatorRegionId(mapId);
             setPainterStack([]);
@@ -549,11 +554,42 @@ export default function App() {
             }
             return `/creator/${creatorCampaignId}/${kind}/${mapId}`;
           };
+          // Breadcrumb crumbs BEFORE the current map: CREATOR (→ creator home),
+          // the campaign (→ its creator page), then each ancestor map in the
+          // painter stack (→ jump straight to that level, truncating below it).
+          const breadcrumbBase = [
+            {
+              label: 'CREATOR',
+              onClick: () => {
+                window.history.pushState(null, '', '/creator');
+                setCreatorCampaignId(null);
+                setView('creator');
+              },
+            },
+            {
+              label: creatorCampaignName ?? creatorCampaignId,
+              onClick: () => {
+                window.history.pushState(null, '', `/creator/${creatorCampaignId}`);
+                setView('creator');
+              },
+            },
+            ...painterStack.map((e, i) => ({
+              label: e.mapId,
+              onClick: () => {
+                const rest = painterStack.slice(0, i);
+                setPainterStack(rest);
+                setCreatorMapKind(e.kind);
+                setCreatorRegionId(e.mapId);
+                window.history.pushState(null, '', painterUrl(e.kind, e.mapId, rest));
+              },
+            })),
+          ];
           return (
             <RegionEditorScreen
               campaignId={creatorCampaignId}
               regionId={creatorRegionId}
               kind={creatorMapKind}
+              breadcrumbBase={breadcrumbBase}
               onBack={() => {
                 // Pop one breadcrumb level (room → its town → its region);
                 // an empty stack backs out to the creator screen.

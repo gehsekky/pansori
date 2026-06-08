@@ -1,3 +1,4 @@
+import Breadcrumb, { type Crumb } from './Breadcrumb.tsx';
 import DialogueEditor, { type DialogueNode } from './DialogueEditor.tsx';
 import { MARKER_TILES, TERRAIN, TERRAIN_TILES, type TerrainType } from '../shared-types.ts';
 
@@ -272,6 +273,7 @@ function RegionEditorScreen({
   kind = 'region',
   onBack,
   onOpenMap,
+  breadcrumbBase,
 }: {
   campaignId: string;
   regionId: string;
@@ -284,6 +286,11 @@ function RegionEditorScreen({
   // panel (towns are reached through region sites), and its cards/creates
   // open the town painter through this.
   onOpenMap?: (kind: 'region' | 'town' | 'room', mapId: string) => void;
+  // The clickable breadcrumb crumbs BEFORE this map (CREATOR › campaign ›
+  // any ancestor maps), supplied by the parent which owns the navigation.
+  // This screen appends the current map as the terminal crumb. When absent
+  // the plain title is shown.
+  breadcrumbBase?: Crumb[];
 }) {
   const section = kind === 'region' ? 'regions' : kind === 'town' ? 'towns' : 'rooms';
   // The full regions list (the save unit) + the edited region's pieces.
@@ -900,11 +907,16 @@ function RegionEditorScreen({
       <div className={styles.sessionsInner}>
         <div className={styles.sessionsHeader}>
           <div>
-            <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
-              {kind.toUpperCase()} MAP — {(region?.name ?? regionId).toUpperCase()}
-            </h1>
+            {breadcrumbBase ? (
+              <Breadcrumb crumbs={[...breadcrumbBase, { label: region?.name ?? regionId }]} />
+            ) : (
+              <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+                {kind.toUpperCase()} MAP — {(region?.name ?? regionId).toUpperCase()}
+              </h1>
+            )}
             <p className={styles.sub}>
-              {width}×{height} · 1 SQUARE = {String(region?.feetPerSquare ?? defaultScale)} FT
+              {kind.toUpperCase()} MAP · {width}×{height} · 1 SQUARE ={' '}
+              {String(region?.feetPerSquare ?? defaultScale)} FT
               {dirty && <span style={{ color: 'var(--t-hp-mid)' }}> · UNSAVED</span>}
             </p>
           </div>

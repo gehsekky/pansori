@@ -72,6 +72,51 @@
   text-shadow: 0 0 8px var(--t-primary);
 }
 
+/* Clickable breadcrumb title (creator surface): CREATOR › campaign › region */
+.breadcrumb {
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-weight: bold;
+}
+.breadcrumbItem {
+  display: inline-flex;
+  align-items: baseline;
+}
+.breadcrumbSep {
+  color: var(--t-dim);
+  padding: 0 0.45em;
+  font-weight: normal;
+}
+.breadcrumbLink {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: uppercase;
+  color: var(--t-primary);
+  cursor: pointer;
+}
+.breadcrumbLink:hover,
+.breadcrumbLink:focus-visible {
+  text-decoration: underline;
+}
+.breadcrumbLabel,
+.breadcrumbCurrent {
+  text-transform: uppercase;
+}
+.breadcrumbCurrent {
+  color: var(--t-mid);
+}
+.breadcrumbLabel {
+  color: var(--t-primary);
+}
+
 .sub {
   font-size: 0.8rem;
   color: var(--t-dim);
@@ -1592,8 +1637,8 @@
 
 /* ── About modal ─────────────────────────────────────────────────────────── */
 .aboutBody {
-  font-size: 0.9rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.65;
   max-height: 70vh;
   overflow-y: auto;
   /* The modal box (--t-card) is dark; set a legible foreground so paragraph
@@ -1611,8 +1656,8 @@
   margin: 0 0 0.5rem;
 }
 .aboutHeading {
-  margin: 0 0 0.35rem;
-  font-size: 0.95rem;
+  margin: 1.25rem 0 0.4rem;
+  font-size: 1.15rem;
   color: var(--t-primary);
   letter-spacing: 0.04em;
 }
@@ -1628,9 +1673,11 @@
   text-decoration: underline;
 }
 .aboutFoot {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--t-dim);
-  margin-top: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--t-separator);
 }
 
 .artAscii {
@@ -1659,6 +1706,12 @@
   background: var(--t-card);
   border: 1px solid var(--t-border);
   padding: 1.25rem 1.5rem;
+  /* Never outgrow the viewport — a large map (or any tall modal) scrolls
+     inside the box instead of spilling off-screen. The header below sticks
+     so the close button stays reachable while scrolling. */
+  max-width: 80vw;
+  max-height: 80vh;
+  overflow: auto;
 }
 
 .mapHeader {
@@ -1666,6 +1719,15 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
+  /* Pin to the top of the scrolling box so the title + close button stay in
+     view for an oversized map. The negative inset + padding cover the box's
+     own padding gap so scrolled content doesn't peek above the header. */
+  position: sticky;
+  top: -1.25rem;
+  margin-top: -1.25rem;
+  padding-top: 1.25rem;
+  background: var(--t-card);
+  z-index: 2;
 }
 
 .mapTitle {

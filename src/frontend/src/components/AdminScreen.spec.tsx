@@ -77,14 +77,17 @@ beforeEach(() => {
 });
 
 describe('AdminScreen', () => {
-  it('lists campaigns with role badges and disables no-access ones', async () => {
+  it('lists owner/editor campaigns with role badges (creator surface)', async () => {
     mockCampaigns('owner');
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
-    const malgoviaCard = (await screen.findByText('Malgovia')).closest('button')!;
+    // The campaign name also appears in the breadcrumb once selected, so pick
+    // the occurrence inside a card button.
+    const malgoviaCard = (await screen.findAllByText('Malgovia'))
+      .map((el) => el.closest('button'))
+      .find(Boolean)!;
     expect(within(malgoviaCard).getByText('OWNER')).toBeTruthy();
-    expect(screen.getByText('NO ACCESS')).toBeTruthy();
-    const sandboxCard = screen.getByText('Dev Sandbox').closest('button')!;
-    expect(sandboxCard.disabled).toBe(true);
+    // No-access campaigns are filtered off the creator surface.
+    expect(screen.queryByText('Dev Sandbox')).toBeNull();
   });
 
   it('auto-selects the first manageable campaign and shows its members', async () => {
@@ -125,8 +128,10 @@ describe('AdminScreen', () => {
     mockCampaigns('owner');
     mocked.setCampaignMemberRole.mockRejectedValue({ error: 'last_owner' });
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
-    const roleSelect = await screen.findByLabelText('Role for Alice');
-    fireEvent.change(roleSelect, { target: { value: 'editor' } });
+    // Change another member's role (Alice can't change her own — own row is
+    // read-only); the mocked rejection drives the message either way.
+    const roleSelect = await screen.findByLabelText('Role for Bob');
+    fireEvent.change(roleSelect, { target: { value: 'player' } });
     expect(
       await screen.findByText(/cannot lose its last owner/i, undefined, { timeout: 2000 })
     ).toBeTruthy();
@@ -151,13 +156,13 @@ describe('AdminScreen', () => {
     expect(await screen.findByText('Could not load campaigns.')).toBeTruthy();
   });
 
-  it('treats player membership as no-admin: card disabled, PLAYER badge', async () => {
+  it('hides player-only campaigns from the creator surface', async () => {
     mockCampaigns('player');
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
-    const card = (await screen.findByText('Malgovia')).closest('button')!;
-    expect(card.disabled).toBe(true);
-    expect(within(card).getByText('PLAYER')).toBeTruthy();
-    // Nothing auto-selected → no members panel.
+    // Player (and no-access) campaigns aren't workable here → empty state, no
+    // members panel.
+    expect(await screen.findByText('NO CAMPAIGNS YET')).toBeTruthy();
+    expect(screen.queryByText('Malgovia')).toBeNull();
     expect(screen.queryByText(/^MEMBERS — /)).toBeNull();
   });
 
@@ -169,8 +174,8 @@ describe('AdminScreen', () => {
     ]);
     mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
-    expect(await screen.findByText('CAMPAIGN CREATOR')).toBeTruthy();
-    expect(await screen.findByText('Malgovia')).toBeTruthy();
+    expect(await screen.findByText('CREATOR')).toBeTruthy();
+    expect((await screen.findAllByText('Malgovia')).length).toBeGreaterThan(0);
     // No-access and player-only campaigns don't belong on the creator surface.
     expect(screen.queryByText('Dev Sandbox')).toBeNull();
     expect(screen.queryByText('Secret Realm')).toBeNull();
@@ -257,7 +262,9 @@ describe('AdminScreen', () => {
     mocked.setCampaignVisibility.mockResolvedValue({ ok: true, visibility: 'global' });
     const { unmount } = render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
     // Non-admin owner: badge yes, toggle no.
-    const card = (await screen.findByText('Malgovia')).closest('button')!;
+    const card = (await screen.findAllByText('Malgovia'))
+      .map((el) => el.closest('button'))
+      .find(Boolean)!;
     expect(within(card).getByText('PRIVATE')).toBeTruthy();
     await screen.findByText('MEMBERS — MALGOVIA');
     expect(screen.queryByText('MAKE GLOBAL')).toBeNull();
@@ -289,7 +296,8 @@ describe('AdminScreen', () => {
     );
     // Local state updates without a refetch — header + campaign card.
     expect(await screen.findByText('MEMBERS — VALE OF MISTS')).toBeTruthy();
-    expect(screen.getByText('Vale of Mists')).toBeTruthy();
+    // Appears in both the breadcrumb and the campaign card.
+    expect(screen.getAllByText('Vale of Mists').length).toBeGreaterThan(0);
   });
 
   it('editors do not get the rename button', async () => {
@@ -318,6 +326,32 @@ describe('AdminScreen', () => {
     const onEditMap = vi.fn();
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} onEditMap={onEditMap} />);
     fireEvent.click(await screen.findByTestId('region-card-vale'));
-    expect(onEditMap).toHaveBeenCalledWith('malgovia', 'region', 'vale');
+    // The campaign name rides along for the painter breadcrumb.
+    expect(onEditMap).toHaveBeenCalledWith('malgovia', 'region', 'vale', 'Malgovia');
+  });
+
+  it('site-admin mode is blank — no campaign management surface', async () => {
+    mockCampaigns('owner');
+    render(<AdminScreen user={{ ...OWNER_USER, is_admin: true }} onBack={vi.fn()} mode="admin" />);
+    expect(await screen.findByText('NO ADMIN TOOLS YET')).toBeTruthy();
+    expect(screen.queryByText('Malgovia')).toBeNull();
+    expect(screen.queryByText(/^MEMBERS — /)).toBeNull();
+  });
+
+  it('an owner cannot change their OWN role, but can change others', async () => {
+    mockCampaigns('owner');
+    render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
+    await screen.findByText('MEMBERS — MALGOVIA');
+    // Alice (the owner) views her own row → read-only, no role select.
+    expect(screen.queryByLabelText('Role for Alice')).toBeNull();
+    // Bob (another member) stays editable.
+    expect(screen.getByLabelText('Role for Bob')).toBeTruthy();
+  });
+
+  it('a site admin CAN change their own role (the recovery path)', async () => {
+    mockCampaigns('owner');
+    render(<AdminScreen user={{ ...OWNER_USER, is_admin: true }} onBack={vi.fn()} />);
+    await screen.findByText('MEMBERS — MALGOVIA');
+    expect(screen.getByLabelText('Role for Alice')).toBeTruthy();
   });
 });

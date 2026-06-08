@@ -16,7 +16,7 @@ function Ext({ href, children }: { href: string; children: React.ReactNode }) {
 // screens; the canonical legal text lives in LEGAL.md.
 function AboutModal({ onClose }: { onClose: () => void }) {
   return (
-    <Dialog title="About Pansori" onClose={onClose} width="640px" testId="about-modal">
+    <Dialog title="About Pansori" onClose={onClose} width="720px" testId="about-modal">
       <div className={styles.aboutBody}>
         <section>
           <p>
