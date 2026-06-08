@@ -1299,55 +1299,63 @@ function RegionEditorScreen({
                         )}
                         {kind === 'region' && (
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className={styles.formLbl} htmlFor="site-icon">
-                              ICON
-                            </label>
-                            {/* Center the select against the taller preview so the
-                                pair reads as one control. */}
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <select
-                                id="site-icon"
-                                className={styles.formInp}
-                                style={{ cursor: 'pointer', flex: 1 }}
-                                value={selectedSite.icon ?? ''}
-                                onChange={(e) =>
-                                  // '' (DEFAULT) stores undefined — the schema
-                                  // rejects empty icon strings.
-                                  updateSite(selectedSite.id, { icon: e.target.value || undefined })
-                                }
-                              >
-                                <option value="">
-                                  {selectedSite.kind === 'town'
-                                    ? '— DEFAULT (TOWN MARKER) —'
-                                    : '— DEFAULT (DUNGEON GLYPH) —'}
-                                </option>
-                                {/* A legacy game-icons glyph (or any value not in the
+                            {/* Bottom-align the label+select column with the
+                                preview: the 2.5D tiles carry a transparent
+                                overhang up top, so the geometric center reads
+                                visually low — the painted ground sits at the
+                                bottom edge, and that's what the select should
+                                line up with. */}
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                              <div style={{ flex: 1 }}>
+                                <label className={styles.formLbl} htmlFor="site-icon">
+                                  ICON
+                                </label>
+                                <select
+                                  id="site-icon"
+                                  className={styles.formInp}
+                                  style={{ cursor: 'pointer', flex: 1 }}
+                                  value={selectedSite.icon ?? ''}
+                                  onChange={(e) =>
+                                    // '' (DEFAULT) stores undefined — the schema
+                                    // rejects empty icon strings.
+                                    updateSite(selectedSite.id, {
+                                      icon: e.target.value || undefined,
+                                    })
+                                  }
+                                >
+                                  <option value="">
+                                    {selectedSite.kind === 'town'
+                                      ? '— DEFAULT (TOWN MARKER) —'
+                                      : '— DEFAULT (DUNGEON GLYPH) —'}
+                                  </option>
+                                  {/* A legacy game-icons glyph (or any value not in the
                                     catalogs) stays editable — listed, not dropped. */}
-                                {selectedSite.icon &&
-                                  !siteIconOptions.some((o) => o.value === selectedSite.icon) && (
-                                    <option value={selectedSite.icon}>
-                                      {selectedSite.icon} (custom)
-                                    </option>
-                                  )}
-                                <optgroup label="LOCATIONS">
-                                  {siteIconOptions
-                                    .filter((o) => o.group === 'marker')
-                                    .map((o) => (
-                                      <option key={o.value} value={o.value}>
-                                        {o.label}
+                                  {selectedSite.icon &&
+                                    !siteIconOptions.some((o) => o.value === selectedSite.icon) && (
+                                      <option value={selectedSite.icon}>
+                                        {selectedSite.icon} (custom)
                                       </option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="TERRAIN">
-                                  {siteIconOptions
-                                    .filter((o) => o.group === 'terrain')
-                                    .map((o) => (
-                                      <option key={o.value} value={o.value}>
-                                        {o.label}
-                                      </option>
-                                    ))}
-                                </optgroup>
-                              </select>
+                                    )}
+                                  <optgroup label="LOCATIONS">
+                                    {siteIconOptions
+                                      .filter((o) => o.group === 'marker')
+                                      .map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                          {o.label}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                  <optgroup label="TERRAIN">
+                                    {siteIconOptions
+                                      .filter((o) => o.group === 'terrain')
+                                      .map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                          {o.label}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                </select>
+                              </div>
                               {/* Live preview — always rendered (fixed footprint,
                                   so the row doesn't reflow when the pick changes):
                                   a painted tile shows its variant-1 art; DEFAULT
