@@ -24,6 +24,33 @@ export const context: Context = {
   gridWidth: 8,
   gridHeight: 8,
 
+  // ─── Picker presentation (DB sections once seeded; rides into the seed) ───────
+  tagline: 'A development dungeon for testing mechanics. Every rule exercised.',
+  previewArt: `
+  +---SANDBOX---+
+  | [ Fighter ] |
+  | [ Rogue   ] |
+  | [ Wizard  ] |
+  | [ Cleric  ] |
+  | [ Ranger  ] |
+  +---5e rules--+`,
+  theme: {
+    pageBg: '#0a0a0a',
+    cardBg: '#111',
+    font: 'monospace',
+    primary: '#c8a96e',
+    mid: '#9a9a9a',
+    dim: '#7e7e7e',
+    dimDark: '#222',
+    border: '#333',
+    separator: '#222',
+    itemColor: '#aaa',
+    hpHigh: '#4caf50',
+    hpMid: '#ff9800',
+    hpLow: '#f44336',
+    title: 'SANDBOX',
+  },
+
   // ─── Classes ──────────────────────────────────────────────────────────────────
   classPrimaryStats: { ...SRD_CLASS_PRIMARY_STATS },
 
@@ -175,6 +202,9 @@ export const context: Context = {
     world_name: 'The Testing Grounds',
     intro:
       'A clinical stone dungeon built to stress-test every rule of combat. Step inside and begin.',
+    // A solo testbed — surfaces the auto-fill control (it renders only when a
+    // recommended size is set) and rides into the DB as the recommendedParty section.
+    recommendedPartySize: 1,
     rooms: [
       {
         id: 'entry_hall',

@@ -42,6 +42,33 @@ const context: Context = {
   id: 'malgovia',
   displayNoun: 'vale',
 
+  // ─── Picker presentation (DB sections once seeded; rides into the seed) ───────
+  tagline:
+    'A shadowed frontier of pine and frost: Millhaven and its restless crypt, the Iceshard Spire above the Frozen Pass, and the Silent Grove beyond Pinegate.',
+  previewArt: `
+   ╔═ MALGOVIA ═════╗
+   ║ Millhaven · Crypt║
+   ║ ❄ The Frozen Pass║
+   ║ ◆ Iceshard Spire ║
+   ║ Pinegate · Grove ║
+   ╚══════════════════╝`,
+  theme: {
+    pageBg: '#0a0908',
+    cardBg: '#16110d',
+    font: 'monospace',
+    primary: '#d4b483',
+    mid: '#a89478',
+    dim: '#8a7758',
+    dimDark: '#2a221a',
+    border: '#3a2f22',
+    separator: '#241c14',
+    itemColor: '#b8a07a',
+    hpHigh: '#7cb342',
+    hpMid: '#e6a23c',
+    hpLow: '#c93838',
+    title: 'MALGOVIA',
+  },
+
   // ─── Classes ─────────────────────────────────────────────────────────────────
 
   classPrimaryStats: { ...SRD_CLASS_PRIMARY_STATS },

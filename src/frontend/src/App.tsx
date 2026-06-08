@@ -37,15 +37,17 @@ import { activeGrid } from './lib/activeGrid.ts';
 import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
 import { availableLootIn } from './lib/placedLoot.ts';
-import { context as malgoviaContext } from './contexts/malgovia.tsx';
+import { context as baseContext } from './contexts/base.tsx';
 import { mapPanelVisible } from './lib/mapPanelVisible.ts';
-import { context as sandboxContext } from './contexts/sandbox.tsx';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
 
+// The FE ships ONE code context — the base donor. Every campaign (sandbox,
+// malgovia, creator-built) resolves as DB rows: CharScreen synthesizes its card
+// over this donor from the /game/contexts summary, and the in-game theme rides
+// in via the seed. The donor is hidden, so it never appears in the picker.
 const CONTEXTS: Record<string, FrontendContext> = {
-  sandbox: sandboxContext,
-  malgovia: malgoviaContext,
+  __base__: baseContext,
 };
 // Choice kinds that get their own dedicated UI (D-pad / icon bar) and
 // therefore drop out of the numbered text-button column and its 1-9
@@ -123,10 +125,10 @@ function filterByTarget(c: GameChoice, selectedEnemyId: string | null): boolean 
   return action.targetEnemyId === selectedEnemyId;
 }
 function getCtx(seed: Seed | null): FrontendContext {
-  return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? sandboxContext;
+  return (seed?.context_id ? CONTEXTS[seed.context_id] : null) ?? baseContext;
 }
 
-applyTheme(sandboxContext.theme);
+applyTheme(baseContext.theme);
 
 type View =
   | 'login'

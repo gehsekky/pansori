@@ -6,6 +6,7 @@ import type {
   Session,
   SessionSummary,
   StructuredAction,
+  Theme,
 } from '../types.js';
 
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -175,9 +176,11 @@ export interface BackendContextSummary {
   id: string;
   displayName: string;
   // Picker presentation for DB campaigns (absent for code campaigns — the
-  // FE context carries theirs).
+  // FE context carries theirs). `theme` is partial: it layers over the base
+  // donor's neutral default in the synthesized card.
   tagline?: string;
   previewArt?: string;
+  theme?: Partial<Theme>;
   classes: string[];
   // Per-class "choose N from options" skill proficiencies + the curated
   // default selection, for the creation-screen skill picker.

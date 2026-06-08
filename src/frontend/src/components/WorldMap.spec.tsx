@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import WorldMap from './WorldMap';
-import { context as sandboxCtx } from '../contexts/sandbox.js';
+import { context as baseCtx } from '../contexts/base.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -11,7 +11,7 @@ afterEach(() => vi.restoreAllMocks());
 // Following the pattern established in src/backend/src/services/gameEngine.spec.ts
 
 const mockSeed: Seed = {
-  context_id: sandboxCtx.id,
+  context_id: baseCtx.id,
   world_name: 'The Testing Grounds',
   ship_name: 'The Testing Grounds',
   intro: 'Unit test intro.',

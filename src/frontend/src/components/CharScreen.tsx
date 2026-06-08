@@ -389,6 +389,9 @@ function CharScreen({
           displayName: b.displayName,
           tagline: b.tagline ?? 'A creator-built campaign.',
           previewArt: b.previewArt ?? '',
+          // The campaign's OWN theme (DB 'theme' section) layered over the base
+          // donor's neutral default — so the picker card looks like the campaign.
+          theme: { ...donorCtx.theme, ...(b.theme ?? {}) },
           hidden: false,
           // The campaign's OWN class roster (from the summary) — not the
           // donor's, which could be a subset (e.g. sandbox's 5) and would
@@ -469,6 +472,26 @@ function CharScreen({
       cancelled = true;
     };
   }, []);
+
+  // Settle the selection once the BE campaign list resolves. `contextId`
+  // initializes to the base donor ('__base__') because campaigns load async —
+  // this picks a real one: honor a ?campaign=<id> override (the escape hatch
+  // for a campaign the picker omits, as long as the server returned it), else
+  // keep a still-valid selection, else the last-used or first listed campaign.
+  useEffect(() => {
+    if (!beLoaded) return;
+    const ids = new Set(pickerContexts.map((c) => c.id));
+    const override = new URLSearchParams(window.location.search).get('campaign');
+    if (override && override in beContexts) {
+      setContextId(override);
+      return;
+    }
+    if (ids.has(contextId)) return;
+    const last = localStorage.getItem('last_context_id');
+    const next = (last && ids.has(last) && last) || pickerContexts[0]?.id;
+    if (next) setContextId(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beLoaded]);
 
   // The world picker's list: code contexts minus hidden ones, intersected
   // with what the server says this user may see (global campaigns + their
