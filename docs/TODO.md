@@ -1,11 +1,25 @@
 # TODO
 
-> **Status snapshot — verified 2026-06-03.** The top section is the
+> **Status snapshot — verified 2026-06-07.** The top section is the
 > authoritative implementation status, re-grounded in a fresh code survey
 > (not the prior changelog). The backlog below it lists only **remaining**
 > work — completed (`[x]`) items have been pruned; `git log` is the record
 > of what already landed. `[~]` marks a shipped framework with documented
 > deferrals.
+>
+> **Session 2026-06-07 (headline):** the **SRD 5.2.1 bestiary is
+> complete** — 88 → **328** catalog templates across five batches
+> (animals → humanoid NPC blocks → dungeon classics → all ten dragon
+> families → planar/top-end through the CR 30 Tarrasque). New engine
+> mechanic: **Regeneration** (damage-floor block flag + turn-start heal).
+> Three permanent spec guards: SRD-exact names, a full cr/hp/ac/xp audit
+> against the SRD txt (it caught 9 legacy entries still on 2014 stats —
+> corrected), and a completeness pin at 328. Legendary actions wired for
+> real (20 adult/ancient dragons Pounce + 6 top-end bosses). Policy: the
+> bestiary follows the SRD exactly; campaign renames are clones (the 2014
+> Orc moved inline into sandbox; the catalog sync now prunes removed ids).
+> Also this session: the MAP ART editor (terrain tints, town-marker tiles,
+> floor skins, level tabs).
 
 ## End-goal target
 
@@ -19,8 +33,8 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-06-07)
 
-Grounded in a code survey + the full suite: **backend 2755 tests across
-322 files + frontend 327 across 41 files, all green** (lint + typecheck +
+Grounded in a code survey + the full suite: **backend 3065 tests across
+325 files + frontend 339 across 42 files, all green** (lint + typecheck +
 prettier clean).
 
 ### Done — world map / navigation
@@ -140,15 +154,16 @@ prettier clean).
 | Category                  | In pansori                                       | SRD universe                     |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
 | Spells                    | **340** in the catalog (~232 mechanical, ~108 narrative-only) | full SRD coverage |
-| Shared SRD monster pool   | **50** (`SRD_MONSTERS`) + per-campaign templates | hundreds                         |
+| Shared SRD monster pool   | **328** (`SRD_MONSTERS`) — complete: every attack-capable stat block, CR 0 → 30 | 330 blocks (Seahorse + Shrieker Fungus have no attacks) |
 | Species                   | 9                                                | 9 standalone + Drow lineage      |
 | Classes                   | 12                                               | 12                               |
 | Subclasses                | 12 iconic (1 / class)                            | 1 iconic / class in SRD          |
 | Origin feats / epic boons | 6 / 7                                            | 4 (+Magic Initiate variants) / 7 |
 
-**Bottom line:** the rules-engine frameworks and the entire class/subclass
-progression are done. What remains is overwhelmingly **content breadth**
-on existing patterns and a handful of **bounded subsystems**.
+**Bottom line:** the rules-engine frameworks, the entire class/subclass
+progression, the spell catalog and the bestiary are done. What remains is
+**magic-item breadth**, the per-monster specials that need new infra, and
+a handful of **bounded subsystems**.
 
 ---
 
@@ -170,27 +185,39 @@ on existing patterns and a handful of **bounded subsystems**.
       shape, move earth, passwall…), and pure-flavor utility (mending,
       prestidigitation, tiny hut…) — several of those are
       narrative-by-design and should stay that way.
-- [ ] **Monsters** — stat-block content breadth. The ambient catalog is at
-      **88** (synced to the DB, served to every campaign; customs shadow by
-      name), on the supported fields (multiattack, onHitEffect incl.
-      grapple-on-hit, resist/vuln/immune, bonusDamage, packTactics,
-      bloodiedFrenzy, lifeDrain, aura, parry, breath weapon, etc.).
-      Remaining: more breadth + the per-monster specials that need new infra
-      (below). Legendary + lair scaffolding is shipped but unwired to a
-      current boss.
+- [x] **Monsters** — COMPLETE (2026-06-07): the ambient catalog holds
+      **328** templates, every attack-capable SRD 5.2.1 stat block (CR 0
+      Rat → CR 30 Tarrasque; only the attack-less Seahorse + Shrieker
+      Fungus are skipped). Three permanent spec guards: SRD-exact names,
+      a full cr/hp/ac/xp audit parsed from `docs/srd-5.2.1.txt`, and a
+      completeness pin. New in support: **Regeneration** (Troll / Vampire
+      / Hydra / Oni — damage-floor block flag + turn-start heal), and
+      legendary `extra_attack` actions live on 20 adult/ancient dragons
+      (Pounce) + 6 top-end bosses (Lash / Arcane Prowl / Onslaught /
+      Charging Horn / Storm Bolt). Bestiary policy: names follow the SRD
+      exactly; campaign renames are clones (CLAUDE.md "Bestiary naming").
+      Remaining: per-monster specials that need new infra (below), each
+      marked inline with a `// Simplification:` note.
 - [ ] **Magic items** — content; the body-slot + attunement + curse + worn-effect
       infra is shipped (so new wondrous items are largely data + an effect kind).
 
 ### Monster-ability infrastructure (remaining specials need new engine support)
 
-> The shared bestiary's stat lines are in, and the common hooks shipped (central
-> enemy-damage floor, Undead Fortitude, Life Drain / max-HP reduction, monster
-> auras, enemy reactions / Parry, conditional extra actions / Rampage, Sunlight
-> Sensitivity, grapple-on-hit, Pack Tactics, Bloodied Frenzy, bonus on-hit
-> damage). Still narrated / deferred per-monster: Flyby, Lion Roar, charge +
-> auto-Prone riders, Rotting Curse, Create Specter, and each giant's ranged /
-> recharge / bonus-action specials (Deflect Missile, War Cry, Cloud Giant
-> Spellcasting).
+> The FULL bestiary's stat lines are in, and the common hooks shipped (central
+> enemy-damage floor, Undead Fortitude, Life Drain / max-HP reduction,
+> **Regeneration** with typed off-switches, monster auras incl. damage auras,
+> enemy reactions / Parry, conditional extra actions / Rampage, Sunlight
+> Sensitivity, grapple-on-hit with escape DCs, Pack Tactics, Bloodied Frenzy,
+> bonus on-hit damage, recharge breath weapons, legendary `extra_attack`).
+> Still deferred per-monster — every one marked inline with a
+> `// Simplification:` comment (grep for the worklist). The big clusters:
+> movement-conditional **charge riders** ("moved 20+ ft" → extra dice/Prone),
+> **Swallow / Engulf**, **petrifying-gaze ladders** (Restrained → Petrified),
+> monster **utility spellcasting** (the Priest convention defers it),
+> spell-based **legendary options + Legendary Resistance + lairs**,
+> shape-shifters / lycanthropy infection, ooze **splits + death bursts**,
+> ability-score drain (Shadow), no-damage utility breaths (metallics, Dust
+> Mephit), and target-state traits (Blood Frenzy, Bloodied-tier damage).
 
 ### Documented engine deferrals (depend on missing content / infra)
 
@@ -302,12 +329,20 @@ on existing patterns and a handful of **bounded subsystems**.
 > NPCs; NPC narrative hooks greeting/firstGreeting/goodbye/firstGoodbye;
 > structured dialogue-tree editor + QUESTS/FACTIONS panels sharing one
 > condition/effect row vocabulary). Rooms locked to the SRD 5-ft scale.
+>
+> **Shipped — the world-sim wave (2026-06-06/07):** region-to-region
+> travel via region GATE sites (full enter/exit hook matrix); SRD Travel
+> Pace (hour-per-click cap + fast/normal/slow pace with passive-Perception
+> trap stakes); town teleportation (Teleport / Word of Recall → visited
+> towns); the **vendor economy** (per-entry stock qty, vendor wallets,
+> daily restock, the SELL side at half price + general loot buyback off
+> SRD catalog values); worldName/tagline/previewArt/encounterTable ported
+> to DB sections; and the **MAP ART editor** — terrainArt tile picks +
+> structured tints, town-marker tiles, floor skins, REGIONAL / TOWN &
+> LOCAL tabs, theme presets.
 
 - [ ] **Narratives section editor** — the last JSON-only section with a
       natural structured surface (keyed string-lists).
-- [ ] **Region-to-region travel** — region `onExit`/`onFirstExit` hooks are
-      authored + stored but dormant until a region-edge transition exists.
-      The next world-model piece; the-sky-has-fallen needs it at region #2.
 - [ ] **Venue-level narration hooks** — venues carry only the per-landing
       site `onEnter`; no first/exit variants (towns/rooms/regions have all
       four).
@@ -320,16 +355,16 @@ on existing patterns and a handful of **bounded subsystems**.
 
 ## Content & playtest
 
-- [ ] **Wire boss legendary + lair actions to an actual boss** — scaffolding +
-      tests exist; unwired pending a fitting boss. More effect kinds (terrain
-      shift, debuff aura, summon, multi-attack legendary) as content demands.
+- [~] **Boss legendary + lair actions** — legendary `extra_attack` is now
+      LIVE on 26 catalog bosses (the adult/ancient dragons + Aboleth, Kraken,
+      both sphinxes, Tarrasque, Unicorn). Remaining: lair actions are still
+      unwired to any boss, and more legendary effect KINDS (teleport, gaze,
+      debuff aura, spell-cast) as content demands.
 - [ ] **Another campaign module (opportunistic)** — coastal pirate town,
       desert ruin, planar city, etc. Authored on the 3-level grid map as its own
       `campaignData/<name>/` folder (auto-discovered), or merged into Malgovia.
       A new player-facing campaign drops the `hidden` flag so the world picker
       resurfaces. Not on the critical path.
-- [ ] **Sell side of the vendor pane** — add a `sell` action + a "Selling"
-      section to the existing `VendorPanel` (the buy half shipped).
 
 ---
 
