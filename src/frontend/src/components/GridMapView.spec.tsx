@@ -137,7 +137,7 @@ describe('GridMapView', () => {
     const { container, getByText } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
     // Town cell: the painted village tile (not the old glyph) + always-visible name.
     expect(cell(container, 3, 0).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/town.png'
+      '/art/markers/village_'
     );
     expect(cell(container, 3, 0).querySelector('.game-icon-village')).toBeNull();
     expect(getByText('Millhaven')).toBeTruthy();
@@ -293,7 +293,7 @@ describe('GridMapView', () => {
       />
     );
     const img = cell(container, 3, 0).querySelector('img')!;
-    expect(img.getAttribute('src')).toContain('/art/markers/castle.png');
+    expect(img.getAttribute('src')).toContain('/art/markers/castle_');
     expect(img.style.filter).toBe('');
     // A tinted marker choice compiles its filter.
     rerender(
@@ -304,12 +304,12 @@ describe('GridMapView', () => {
       />
     );
     const tinted = cell(container, 3, 0).querySelector('img')!;
-    expect(tinted.getAttribute('src')).toContain('/art/markers/monastery.png');
+    expect(tinted.getAttribute('src')).toContain('/art/markers/monastery_');
     expect(tinted.style.filter).toBe('hue-rotate(-40deg)');
     // No marker slot → the default painted village tile (back-compat).
     rerender(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} terrainArt={{}} />);
     expect(cell(container, 3, 0).querySelector('img')!.getAttribute('src')).toContain(
-      '/art/tiles/town.png'
+      '/art/markers/village_'
     );
   });
 
@@ -405,7 +405,7 @@ describe('GridMapView', () => {
       <GridMapView grid={overlap} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
     const c = cell(container, 1, 0);
-    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/town.png'); // town wins
+    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/markers/village_'); // town wins
     expect(c.querySelector('.game-icon-wave-crest')).toBeNull(); // not the water glyph
     expect(c.getAttribute('role')).toBe('button'); // reachable
   });

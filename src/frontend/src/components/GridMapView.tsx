@@ -127,10 +127,9 @@ const tileVariant = (x: number, y: number, count: number) => ((x * 7 + y * 13) %
 const tileSrcFor = (spec: TerrainTileSpec, x: number, y: number): string =>
   `/art/tiles/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`;
 
-// A town site on the regional map renders as this hand-painted village tile
-// (David Baumgart's dirtVillage) instead of the generic village glyph —
-// unless the campaign skin picks a marker tile (terrainArt.markers.town).
-const TOWN_SITE_TILE = '/art/tiles/town.png';
+// Marker (location) tiles share the variant scheme: /art/markers/<base>_<n>.png.
+const markerSrcFor = (spec: MarkerTileSpec, x: number, y: number): string =>
+  `/art/markers/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`;
 
 // A tile's effective CSS filter: the catalog's recolor first, then the
 // author tint layered over it (order matters — tint adjusts the themed look).
@@ -293,14 +292,15 @@ function GridMapView({
     return { src: tileSrcFor(spec, x, y), filter: joinFilters(spec.filter, tint) };
   };
   // The town-site marker through the campaign skin: `markers.town` picks a
-  // MARKER_TILES entry (+ optional tint); absent = the painted village tile.
-  const townMarkerTile = (): { src: string; filter?: string } => {
+  // MARKER_TILES entry (+ optional tint); absent = the painted village
+  // family. The cell position picks the variant, so two towns on the same
+  // region draw different village paintings.
+  const townMarkerTile = (x: number, y: number): { src: string; filter?: string } => {
     const choice = terrainArt?.markers?.town;
     const id = typeof choice === 'string' ? choice : choice?.tile;
-    const spec: MarkerTileSpec | undefined = id ? MARKER_TILES[id] : undefined;
-    if (!spec) return { src: TOWN_SITE_TILE };
+    const spec: MarkerTileSpec = (id ? MARKER_TILES[id] : undefined) ?? MARKER_TILES.village;
     const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
-    return { src: `/art/markers/${spec.base}.png`, filter: joinFilters(spec.filter, tint) };
+    return { src: markerSrcFor(spec, x, y), filter: joinFilters(spec.filter, tint) };
   };
   // A floor family through the campaign skin: `floors.<authored type>` may
   // remap to another family and/or tint it. Returns the texture family to
@@ -417,22 +417,30 @@ function GridMapView({
       // unpainted "plains" cell only tiles on the regional map (so interior
       // rooms don't sprout grass where they're just bare floor). Fogged cells
       // never show a tile.
-      // A site's 'tile:<id>' icon resolves through the catalog (variant 1 —
-      // a landmark shouldn't shimmer between variants across re-renders).
-      const sitePaintedSpec = siteTileName
+      // A site's 'tile:<id>' icon resolves through the terrain catalog, then
+      // the marker (location) catalog — so authored sites can be painted
+      // mines / barrows / ruins. Pinned to variant 1: a landmark shouldn't
+      // differ between visits.
+      const sitePaintedTerrain = siteTileName
         ? (TERRAIN_TILES as Partial<Record<string, TerrainTileSpec>>)[siteTileName]
         : undefined;
+      const sitePaintedMarker =
+        siteTileName && !sitePaintedTerrain
+          ? (MARKER_TILES as Partial<Record<string, MarkerTileSpec>>)[siteTileName]
+          : undefined;
       const cellTile = fogged
         ? {}
         : isTownSite
-          ? townMarkerTile()
-          : sitePaintedSpec
-            ? { src: `/art/tiles/${sitePaintedSpec.base}_1.png` }
-            : terrainType
-              ? tileFor(terrainType, x, y)
-              : isRegional && plainsDefault
-                ? tileFor('plains', x, y)
-                : {};
+          ? townMarkerTile(x, y)
+          : sitePaintedTerrain
+            ? { src: `/art/tiles/${sitePaintedTerrain.base}_1.png` }
+            : sitePaintedMarker
+              ? { src: `/art/markers/${sitePaintedMarker.base}_1.png` }
+              : terrainType
+                ? tileFor(terrainType, x, y)
+                : isRegional && plainsDefault
+                  ? tileFor('plains', x, y)
+                  : {};
       const tileSrc = cellTile.src;
       // Seamless ground texture for a floored cell (local rooms + town maps). A
       // painted "ground" terrain (cobblestone / garden) picks the matching

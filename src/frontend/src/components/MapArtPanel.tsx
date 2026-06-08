@@ -276,9 +276,9 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     const tintFilter = compileTint(cleanTint(value.tint));
     const filter = [spec.filter, tintFilter].filter(Boolean).join(' ') || undefined;
     const isDefault = value.tile === defaultTile && !tintFilter;
-    // Variant-bearing tile families live at <base>_<n>.png — preview the
-    // first painting; single-file art (markers) keeps the bare base name.
-    const previewSrc = `${dir}/${spec.base}${spec.variants !== undefined || dir === '/art/tiles' ? '_1' : ''}.png`;
+    // Tile + marker families live at <base>_<n>.png — preview the first
+    // painting. Floor catalog bases already embed their variant suffix.
+    const previewSrc = `${dir}/${spec.base}${dir === '/art/floors' ? '' : '_1'}.png`;
     return (
       <div
         key={name}

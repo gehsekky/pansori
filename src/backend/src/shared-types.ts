@@ -377,25 +377,57 @@ export const TERRAIN_TILES = {
 
 export type TerrainTileId = keyof typeof TERRAIN_TILES;
 
-// Marker tiles — the painted POI art drawn on a regional site cell in
-// place of the cell's terrain tile (so far: town sites). Same 256×384
-// bottom-anchored 2.5D format as the terrain tiles; each composites a
-// settlement/building onto the plains ground so it replaces the cell
-// tile cleanly. Files live at /art/markers/<base>.png.
+// Marker tiles — the painted LOCATION art drawn on a regional site cell
+// in place of the cell's terrain tile: town sites (via terrainArt's
+// `markers.town`) and any site whose icon is 'tile:<marker id>'. David
+// Baumgart's "Tile Medieval Fantasy Locations" set: same 256×384
+// bottom-anchored 2.5D format, each painted on its own ground so it
+// replaces the cell tile cleanly. Files at /art/markers/<base>_<n>.png;
+// like terrain tiles, multi-variant families pick per cell.
 export interface MarkerTileSpec {
-  base: 'village' | 'castle' | 'monastery' | 'tower' | 'house' | 'barracks';
+  base: string;
   label: string;
+  // Painted variations on disk (<base>_1.png … <base>_N.png). Default 1.
+  variants?: number;
   // CSS filter recoloring the base PNG; omitted = the art as painted.
   filter?: string;
 }
 
 export const MARKER_TILES = {
-  village: { base: 'village', label: 'village' }, // the default town marker
-  castle: { base: 'castle', label: 'castle' },
-  monastery: { base: 'monastery', label: 'monastery' },
-  tower: { base: 'tower', label: 'tower' },
-  house: { base: 'house', label: 'lone house' },
+  // Settlements (village is the default town marker).
+  village: { base: 'village', label: 'village', variants: 4 },
+  hamlet: { base: 'hamlet', label: 'hamlet', variants: 4 },
+  'village-dirt': { base: 'village_dirt', label: 'dirt-road village', variants: 4 },
+  'village-ruins': { base: 'village_ruins', label: 'ruined village', variants: 4 },
+  'walled-city': { base: 'walled_city', label: 'walled city' },
+  // Fortifications.
+  castle: { base: 'castle', label: 'castle', variants: 3 },
+  'castle-fortified': { base: 'castle_fortified', label: 'fortified castle' },
+  'castle-ruins': { base: 'castle_ruins', label: 'castle ruins', variants: 3 },
+  stronghold: { base: 'stronghold', label: 'wooden stronghold', variants: 4 },
   barracks: { base: 'barracks', label: 'barracks' },
+  'dwarf-fortress': { base: 'dwarf_fortress', label: 'dwarven fortress' },
+  // Holy + arcane.
+  monastery: { base: 'monastery', label: 'monastery' },
+  temple: { base: 'temple', label: 'temple' },
+  'temple-ruins': { base: 'temple_ruins', label: 'temple ruins' },
+  henge: { base: 'henge', label: 'standing stones' },
+  tower: { base: 'tower', label: 'wizard tower' },
+  'dark-tower': { base: 'dark_tower', label: 'dark tower', variants: 2 },
+  // Commerce + rural life.
+  inn: { base: 'inn', label: 'roadside inn' },
+  marketplace: { base: 'marketplace', label: 'marketplace' },
+  smithy: { base: 'smithy', label: 'smithy' },
+  windmill: { base: 'windmill', label: 'windmill' },
+  farm: { base: 'farm', label: 'farmstead', variants: 4 },
+  house: { base: 'house', label: 'forester cabin', variants: 2 },
+  'elven-lodge': { base: 'elven_lodge', label: 'elven lodge' },
+  // Adventure sites.
+  mine: { base: 'mine', label: 'mine', variants: 4 },
+  cave: { base: 'cave', label: 'cave mouth', variants: 2 },
+  barrow: { base: 'barrow', label: 'barrow downs' },
+  'bandit-camp': { base: 'bandit_camp', label: 'bandit camp' },
+  graveyard: { base: 'graveyard', label: 'sunken graveyard' },
 } as const satisfies Record<string, MarkerTileSpec>;
 
 export type MarkerTileId = keyof typeof MARKER_TILES;
