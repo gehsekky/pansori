@@ -34,5 +34,6 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     regions: c.regions,
     towns: c.towns,
     terrain_art: context.terrainArt,
+    theme: context.theme,
   };
 }

@@ -10,6 +10,7 @@ export * from './shared-types.js';
 import type {
   AbilityKey,
   Background,
+  CampaignTheme,
   CombatEntity,
   CombatEvent,
   ConditionName,
@@ -487,6 +488,8 @@ export interface Seed {
   // Campaign terrain-art overrides (Context.terrainArt), snapshotted at seed
   // time like the maps above — the FE skins its tiles from this.
   terrain_art?: TerrainArtMap;
+  // Campaign visual theme (partial; FE merges over the base theme).
+  theme?: CampaignTheme;
 }
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -1882,6 +1885,9 @@ export interface Context {
   // TERRAIN_TILES catalog. Unmapped types render their default tile. Editable
   // section ('terrainArt'); copied into the seed so the FE map can skin itself.
   terrainArt?: TerrainArtMap;
+  // Campaign-scoped visual theme (PARTIAL — the FE merges it over the base
+  // theme). Editable section ('theme'); rides into the seed like terrainArt.
+  theme?: CampaignTheme;
   gridWidth?: number; // default combat grid width  (squares)
   gridHeight?: number; // default combat grid height (squares)
   campaign?: CampaignData;
@@ -1979,6 +1985,11 @@ export interface Context {
 export interface CampaignFacts {
   action: string;
   room_id: string;
+  // The NPC mid-conversation ('' otherwise) — lets a "talk to THIS npc"
+  // quest step complete directly, without the set_flag indirection.
+  // Optional so condition-less fixtures stay terse; both fact builders
+  // (the action route + dialogueFacts) always supply it.
+  npc_id?: string;
   // The town the party is currently in (GameState.current_town_id), '' when not
   // in one. Quest steps key on it for "reach <town>" objectives (e.g. the
   // opening arrival quest completing on entering Pinegate).

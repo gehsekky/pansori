@@ -1008,6 +1008,116 @@ describe('editable sections registry', () => {
     );
   });
 
+  it('dialogue consequences: the Malgovia-parity arms validate with bounds', () => {
+    const quests = CAMPAIGN_SECTION_SCHEMAS.quests;
+    const quest = (rewards: unknown[]) => [
+      {
+        id: 'q1',
+        title: 'T',
+        desc: 'D',
+        steps: [
+          {
+            id: 's1',
+            desc: 'd',
+            condition: { all: [{ fact: 'flags', operator: 'contains', value: 'x' }] },
+          },
+        ],
+        rewards,
+      },
+    ];
+    expect(
+      quests.safeParse(
+        quest([
+          { type: 'advance_quest', questId: 'q2', stepId: 's9' },
+          { type: 'add_narrative', text: 'The idol grows cold in your hand.' },
+          { type: 'modify_hp', amount: 8 },
+          { type: 'modify_hp', amount: -10 },
+          { type: 'consume_item', itemId: 'guild_ledger' },
+        ])
+      ).success
+    ).toBe(true);
+    // Bounds: zero / oversized hp swings, missing step id.
+    expect(quests.safeParse(quest([{ type: 'modify_hp', amount: 0 }])).success).toBe(false);
+    expect(quests.safeParse(quest([{ type: 'modify_hp', amount: 999 }])).success).toBe(false);
+    expect(quests.safeParse(quest([{ type: 'advance_quest', questId: 'q2' }])).success).toBe(false);
+    // Still rejected: the arms that stayed code-side.
+    expect(
+      quests.safeParse(quest([{ type: 'spawn_enemy', roomId: 'r', enemyId: 'rat' }])).success
+    ).toBe(false);
+  });
+
+  it('quest conditions may key on npc_id (talk-to-this-npc steps)', () => {
+    const quests = CAMPAIGN_SECTION_SCHEMAS.quests;
+    const withFact = (fact: string) => [
+      {
+        id: 'q1',
+        title: 'T',
+        desc: 'D',
+        steps: [
+          {
+            id: 's1',
+            desc: 'd',
+            condition: {
+              all: [
+                { fact: 'action', operator: 'equal', value: 'talk_response' },
+                { fact, operator: 'equal', value: 'npc_elise_elder' },
+              ],
+            },
+          },
+        ],
+        rewards: [],
+      },
+    ];
+    expect(quests.safeParse(withFact('npc_id')).success).toBe(true);
+    expect(quests.safeParse(withFact('npc_name')).success).toBe(false); // not a fact
+  });
+
+  it('theme schema: partial CSS knobs, capped, unknown keys rejected', () => {
+    const theme = CAMPAIGN_SECTION_SCHEMAS.theme;
+    expect(theme.safeParse({}).success).toBe(true);
+    expect(
+      theme.safeParse({ pageBg: '#1a1208', primary: 'goldenrod', title: 'EMBERFALL' }).success
+    ).toBe(true);
+    expect(theme.safeParse({ titleFont: 'serif' }).success).toBe(false);
+    expect(theme.safeParse({ title: '' }).success).toBe(false);
+  });
+
+  it('backgrounds schema: full shape, unique ids', () => {
+    const backgrounds = CAMPAIGN_SECTION_SCHEMAS.backgrounds;
+    const soldier = {
+      id: 'soldier',
+      name: 'Soldier',
+      desc: 'You served.',
+      skillProficiencies: ['Athletics', 'Intimidation'],
+      feature: 'Military Rank',
+      featureDesc: 'Watchmen recognise your authority.',
+      originFeat: 'savage_attacker',
+      abilityScoreIncreases: ['str', 'dex', 'con'],
+      startingEquipment: ['shortsword'],
+    };
+    expect(backgrounds.safeParse([soldier]).success).toBe(true);
+    expect(backgrounds.safeParse([soldier, { ...soldier, name: 'Other' }]).success).toBe(false); // dup id
+    expect(backgrounds.safeParse([{ ...soldier, skillProficiencies: [] }]).success).toBe(false);
+  });
+
+  it('class config schemas: per-class id lists + equipment packages', () => {
+    expect(
+      CAMPAIGN_SECTION_SCHEMAS.classSpells.safeParse({ Wizard: ['fire_bolt', 'shield'] }).success
+    ).toBe(true);
+    expect(
+      CAMPAIGN_SECTION_SCHEMAS.classStartingLoot.safeParse({ Fighter: ['longsword', 'shield'] })
+        .success
+    ).toBe(true);
+    expect(
+      CAMPAIGN_SECTION_SCHEMAS.classStartingEquipment.safeParse({
+        Fighter: [{ id: 'A', label: 'Sword & board', items: ['longsword', 'shield'], gold: 10 }],
+      }).success
+    ).toBe(true);
+    expect(CAMPAIGN_SECTION_SCHEMAS.classStartingEquipment.safeParse({ Fighter: [] }).success).toBe(
+      false
+    );
+  });
+
   it('gameStart schema is a plain narration string', () => {
     const gameStart = CAMPAIGN_SECTION_SCHEMAS.gameStart;
     expect(gameStart.safeParse('The road south is long and the coin pouch light.').success).toBe(
@@ -1561,6 +1671,21 @@ describe('section CRUD + live refresh', () => {
     expect(await deleteCampaignSection(db.pool, 'malgovia', 'terrainArt')).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
     expect(contexts.malgovia.terrainArt).toBeUndefined();
+  });
+
+  it('theme overlays the context top-level (the FE merges it over the base)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({ id: 'malgovia' });
+    const contexts: Record<string, Context> = { malgovia: code };
+    const theme = { pageBg: '#101418', title: 'EMBERFALL' };
+
+    expect(await putCampaignSection(db.pool, 'malgovia', 'theme', theme)).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.theme).toEqual(theme);
+
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'theme')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.theme).toBeUndefined();
   });
 
   it('gameStart overlays the base template intro for DB-born campaigns', async () => {

@@ -513,3 +513,74 @@ describe('parley (hostile NPCs with dialogue)', () => {
     );
   });
 });
+
+describe('promoted consequence arms (Malgovia parity) — the DB dialogue path', () => {
+  // An NPC wired with the four arms promoted into the DB-safe subset:
+  // complete-a-step, heal, narrate, and take a quest item.
+  const healer: PlacedNpc = {
+    roomId: ROOM,
+    id: 'healer',
+    name: 'Sister Maren',
+    attitude: 'friendly',
+    hp: 4,
+    ac: 10,
+    damage: '1d4',
+    toHit: 0,
+    xp: 0,
+    greeting: 'You look hurt.',
+    responses: [
+      {
+        label: 'I found the ledger',
+        reply: 'So this is what Aldric wanted.',
+        consequences: [
+          { type: 'advance_quest', questId: 'quest_ledger', stepId: 'step_deliver' },
+          { type: 'consume_item', itemId: 'guild_ledger' },
+          { type: 'add_narrative', text: 'She tucks the ledger into her robes.' },
+        ],
+      },
+      {
+        label: 'Please, mend these wounds',
+        reply: 'Hold still.',
+        consequences: [{ type: 'modify_hp', amount: 8 }],
+      },
+    ],
+  };
+
+  const healerSeed = {
+    ...seed,
+    npcs: { healer },
+  } as unknown as Seed;
+
+  const actH = (
+    state: ReturnType<typeof makeState>,
+    action: Parameters<typeof takeAction>[0]['action']
+  ) => takeAction({ action, history: [], state, seed: healerSeed, context: ctx });
+
+  it('advance_quest + consume_item + add_narrative fire from one reply', async () => {
+    const st = makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['healer'] });
+    st.characters[0].inventory.push({
+      id: 'guild_ledger',
+      name: 'Guild Ledger',
+      type: 'misc',
+      instance_id: 'led-1',
+    } as never);
+    let r = await actH(st, { type: 'talk', npcId: 'healer' });
+    r = await actH(r.newState, { type: 'talk_response', responseIdx: 0 });
+    // The step lands (quest auto-started active since it wasn't accepted).
+    expect(r.newState.quest_progress).toEqual([
+      { questId: 'quest_ledger', status: 'active', completedSteps: ['step_deliver'] },
+    ]);
+    // The ledger left the pack.
+    expect(r.newState.characters[0].inventory.some((i) => i.id === 'guild_ledger')).toBe(false);
+    // The flavor narrative rides the reply.
+    expect(r.narrative).toContain('She tucks the ledger into her robes.');
+  });
+
+  it('modify_hp heals the active character, capped at max', async () => {
+    const st = makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['healer'] });
+    st.characters[0].hp = st.characters[0].max_hp - 3; // only 3 missing — the +8 caps
+    let r = await actH(st, { type: 'talk', npcId: 'healer' });
+    r = await actH(r.newState, { type: 'talk_response', responseIdx: 1 });
+    expect(r.newState.characters[0].hp).toBe(r.newState.characters[0].max_hp);
+  });
+});

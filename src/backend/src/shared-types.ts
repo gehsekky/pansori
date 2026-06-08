@@ -233,6 +233,29 @@ export const TERRAIN: Record<TerrainType, TerrainSpec> = {
   town_wall: { passable: false, travelMult: 1, encounterMult: 0, label: 'town wall' },
 };
 
+// ─── Campaign THEME (the DB-editable visual identity) ─────────────────
+//
+// A PARTIAL set of the FE theme knobs (CSS custom properties + the donor
+// title): the frontend merges it over the base theme, so a campaign sets
+// only what it cares about. Rides Context.theme → seed.theme, the same
+// route terrainArt takes.
+export interface CampaignTheme {
+  pageBg?: string;
+  cardBg?: string;
+  font?: string;
+  primary?: string;
+  mid?: string;
+  dim?: string;
+  dimDark?: string;
+  border?: string;
+  separator?: string;
+  itemColor?: string;
+  hpHigh?: string;
+  hpMid?: string;
+  hpLow?: string;
+  title?: string;
+}
+
 // ─── Terrain ART (campaign-scoped skin over the global tile set) ──────
 //
 // The base art is David Baumgart's "Tile Basic Terrain Set" (the full

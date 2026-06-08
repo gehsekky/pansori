@@ -1418,6 +1418,9 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       const facts: CampaignFacts = {
         action: action.type,
         room_id: result.newState.current_room,
+        // The NPC mid-conversation — '' outside one. Lets "talk to <npc>"
+        // steps key on npc_id directly.
+        npc_id: result.newState.active_conversation?.npcId ?? '',
         current_town_id: result.newState.current_town_id ?? '',
         // Retired with the Location model — quest conditions key on room_id now.
         location_id: '',

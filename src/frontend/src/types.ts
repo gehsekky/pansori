@@ -9,6 +9,7 @@ import type {
   AbilityKey,
   Background,
   CampaignState,
+  CampaignTheme,
   ChoiceDirection,
   ChoiceKind,
   CombatEntity,
@@ -506,6 +507,9 @@ export interface Seed {
   // Campaign terrain-art overrides (type → TERRAIN_TILES id), snapshotted at
   // seed time — GridMapView skins its tiles from this.
   terrain_art?: TerrainArtMap;
+  // Campaign visual theme (PARTIAL — merged over the donor context's base
+  // theme when the seed loads).
+  theme?: CampaignTheme;
 }
 
 export interface Session {

@@ -219,8 +219,13 @@ export default function App() {
   );
 
   useEffect(() => {
-    applyTheme(ctx.theme);
-  }, [ctx]);
+    // The campaign's partial theme (seed.theme — the DB 'theme' section)
+    // lays over the donor context's base theme, defined keys only.
+    const overrides = Object.fromEntries(
+      Object.entries(seed?.theme ?? {}).filter(([, v]) => v !== undefined && v !== '')
+    );
+    applyTheme({ ...ctx.theme, ...overrides });
+  }, [ctx, seed]);
 
   // Keep the enemy selector pointed at a valid target. When the roster
   // changes (combat starts/ends, an enemy dies, the party moves rooms),

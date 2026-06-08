@@ -931,10 +931,12 @@ function conditionSchema(facts: readonly [string, ...string[]]): z.ZodType<Condi
 const DialogueConditionSchema = conditionSchema(DIALOGUE_FACTS);
 
 // The consequence subset DB dialogue may fire — the world-state setters
-// (flags for cross-NPC threads, attitude shifts for parley outcomes) and
-// the simple grants. The heavier GameConsequence arms (spawn_enemy,
-// unlock_room, advance_quest, travel_to…) stay code-side until the systems
-// they script are DB-authored too.
+// (flags for cross-NPC threads, attitude shifts for parley outcomes), the
+// simple grants, and the Malgovia-parity arms (advance_quest /
+// add_narrative / modify_hp / consume_item — everything its hand-authored
+// dialogue uses). The remaining GameConsequence arms (spawn_enemy,
+// unlock_room, set_escape, travel_to, set_faction_rep) stay code-side
+// until the systems they script are DB-authored too.
 const DialogueConsequenceSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -956,6 +958,27 @@ const DialogueConsequenceSchema = z.discriminatedUnion('type', [
   // Quest ids live in the quests SECTION (separate write), so they can't be
   // cross-validated here — an unknown id warns and no-ops at apply time.
   z.object({ type: z.literal('start_quest'), questId: SLUG }).strict(),
+  // Complete a specific quest step directly ("thanks for telling me" —
+  // dialogue that IS the objective). Same warn-and-no-op rule for unknown
+  // quest/step ids as start_quest.
+  z.object({ type: z.literal('advance_quest'), questId: SLUG, stepId: SLUG }).strict(),
+  // Flavor narrative at the trigger moment (the GameRule staple).
+  z.object({ type: z.literal('add_narrative'), text: z.string().min(1).max(2000) }).strict(),
+  // A healer patching (or a trap-like sting hurting) the active character.
+  // Bounded so DB dialogue can't insta-kill or fully trivialize combat.
+  z
+    .object({
+      type: z.literal('modify_hp'),
+      amount: z
+        .number()
+        .int()
+        .min(-100)
+        .max(100)
+        .refine((n) => n !== 0, 'amount must be nonzero'),
+    })
+    .strict(),
+  // Take a quest item back ("hand over the ledger").
+  z.object({ type: z.literal('consume_item'), itemId: z.string().min(1).max(80) }).strict(),
 ]);
 type DialogueConsequenceShape = z.infer<typeof DialogueConsequenceSchema>;
 
@@ -1381,7 +1404,9 @@ const TerrainArtSchema = z
 
 // Quest steps reuse the condition vocabulary dialogue gates use, plus the
 // `action` fact (meaningful during quest evaluation — it runs per action).
-const QUEST_FACTS = ['action', ...DIALOGUE_FACTS] as const;
+// `npc_id` is quest-side only: the NPC mid-conversation ('' otherwise),
+// so a "talk to THIS npc" step can complete without the flag indirection.
+const QUEST_FACTS = ['action', 'npc_id', ...DIALOGUE_FACTS] as const;
 const QuestConditionSchema = conditionSchema(QUEST_FACTS);
 
 const QuestStepSchema = z
@@ -1481,6 +1506,86 @@ const FactionsSchema = z
     });
   });
 
+// ─── Theme + creation-config sections ────────────────────────────────────────
+
+// The visual theme (FE CSS custom properties + the donor title). All
+// fields optional: the FE merges a partial theme over the base theme, so
+// authors set only what they care about. Values are CSS color/font
+// strings — capped, not parsed (a broken color renders as a broken
+// color, nothing worse).
+const CSS_VALUE = z.string().min(1).max(200);
+const ThemeSchema = z
+  .object({
+    pageBg: CSS_VALUE.optional(),
+    cardBg: CSS_VALUE.optional(),
+    font: CSS_VALUE.optional(),
+    primary: CSS_VALUE.optional(),
+    mid: CSS_VALUE.optional(),
+    dim: CSS_VALUE.optional(),
+    dimDark: CSS_VALUE.optional(),
+    border: CSS_VALUE.optional(),
+    separator: CSS_VALUE.optional(),
+    itemColor: CSS_VALUE.optional(),
+    hpHigh: CSS_VALUE.optional(),
+    hpMid: CSS_VALUE.optional(),
+    hpLow: CSS_VALUE.optional(),
+    title: z.string().min(1).max(60).optional(),
+  })
+  .strict();
+
+const ABILITY = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
+const BackgroundSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(80),
+    desc: z.string().min(1).max(2000),
+    skillProficiencies: z.array(z.string().min(1).max(40)).min(1).max(4),
+    toolProficiency: z.string().min(1).max(60).nullable().optional(),
+    feature: z.string().min(1).max(120),
+    featureDesc: z.string().min(1).max(2000),
+    originFeat: z.string().min(1).max(60).optional(),
+    abilityScoreIncreases: z.array(ABILITY).min(1).max(3).optional(),
+    startingEquipment: z.array(z.string().min(1).max(80)).max(10).optional(),
+    language: z.string().min(1).max(60).optional(),
+  })
+  .strict();
+const BackgroundsSchema = z
+  .array(BackgroundSchema)
+  .min(1)
+  .max(20)
+  .superRefine((bgs, ctx) => {
+    const seen = new Set<string>();
+    for (const b of bgs) {
+      if (seen.has(b.id))
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate background id "${b.id}"` });
+      seen.add(b.id);
+    }
+  });
+
+// Per-class id lists. Class keys are free strings (unknown classes are
+// inert — the creation flow only reads the classes it offers); spell /
+// item ids resolve against the catalogs at play time, where unknown ids
+// simply never surface.
+const CLASS_KEY = z.string().min(1).max(40);
+const ClassSpellsSchema = z.record(CLASS_KEY, z.array(z.string().min(1).max(60)).max(60));
+const ClassStartingLootSchema = z.record(CLASS_KEY, z.array(z.string().min(1).max(80)).max(12));
+const ClassStartingEquipmentSchema = z.record(
+  CLASS_KEY,
+  z
+    .array(
+      z
+        .object({
+          id: z.string().min(1).max(8),
+          label: z.string().min(1).max(200),
+          items: z.array(z.string().min(1).max(80)).max(12),
+          gold: z.number().int().min(0).max(1000),
+        })
+        .strict()
+    )
+    .min(1)
+    .max(4)
+);
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Narration hook: the first narrative entry of a new game (overlays the
   // code/template campaign.intro).
@@ -1504,6 +1609,13 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // the catalogs themselves (these compose into live engine fields).
   customItems: LootTableSchema,
   customMonsters: EnemyTemplatesSchema,
+  // Visual theme + creation config — top-level Context fields, folded by
+  // the plain overlay merge (the section name IS the Context field name).
+  theme: ThemeSchema,
+  backgrounds: BackgroundsSchema,
+  classSpells: ClassSpellsSchema,
+  classStartingLoot: ClassStartingLootSchema,
+  classStartingEquipment: ClassStartingEquipmentSchema,
 };
 
 // PUT body for a section write: { value: <section payload> }.

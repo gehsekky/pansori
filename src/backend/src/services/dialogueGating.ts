@@ -128,6 +128,7 @@ export function dialogueFacts(st: GameState, context: Context): CampaignFacts {
   return {
     action: '',
     room_id: st.current_room,
+    npc_id: st.active_conversation?.npcId ?? '',
     current_town_id: st.current_town_id ?? '',
     location_id: '',
     enemies_killed: st.enemies_killed,

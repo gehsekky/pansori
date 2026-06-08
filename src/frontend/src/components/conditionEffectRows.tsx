@@ -209,7 +209,11 @@ const EFFECT_TYPES = [
   { value: 'give_item', label: 'GIVE ITEM' },
   { value: 'give_xp', label: 'GIVE XP' },
   { value: 'start_quest', label: 'START QUEST' },
+  { value: 'advance_quest', label: 'COMPLETE STEP' },
   { value: 'set_npc_attitude', label: 'SET ATTITUDE' },
+  { value: 'add_narrative', label: 'NARRATE' },
+  { value: 'modify_hp', label: 'MODIFY HP' },
+  { value: 'consume_item', label: 'TAKE ITEM' },
 ];
 
 function defaultEffect(type: string, pickers: RowPickers): DialogueConsequence {
@@ -223,6 +227,14 @@ function defaultEffect(type: string, pickers: RowPickers): DialogueConsequence {
       return { type, itemId: pickers.items[0]?.id ?? '' };
     case 'start_quest':
       return { type, questId: pickers.quests[0]?.id ?? '' };
+    case 'advance_quest':
+      return { type, questId: pickers.quests[0]?.id ?? '', stepId: '' };
+    case 'add_narrative':
+      return { type, text: '' };
+    case 'modify_hp':
+      return { type, amount: 5 };
+    case 'consume_item':
+      return { type, itemId: pickers.items[0]?.id ?? '' };
     default:
       return { type, npcId: pickers.npcIds[0] ?? '', attitude: 'indifferent' };
   }
@@ -279,12 +291,52 @@ function EffectRow(props: {
           onChange={(itemId) => onChange({ ...e, itemId })}
         />
       )}
-      {e.type === 'start_quest' && (
+      {(e.type === 'start_quest' || e.type === 'advance_quest') && (
         <TinySelect
           ariaLabel={`${where} quest`}
           value={String(e.questId ?? '')}
           options={pickers.quests.map((q) => ({ value: q.id, label: q.title }))}
           onChange={(questId) => onChange({ ...e, questId })}
+        />
+      )}
+      {e.type === 'advance_quest' && (
+        <input
+          className={styles.formInp}
+          style={{ ...inp, width: 130 }}
+          aria-label={`${where} step id`}
+          placeholder="step_id"
+          value={String(e.stepId ?? '')}
+          onChange={(ev) => onChange({ ...e, stepId: ev.target.value })}
+        />
+      )}
+      {e.type === 'add_narrative' && (
+        <input
+          className={styles.formInp}
+          style={{ ...inp, width: 260 }}
+          aria-label={`${where} narrative text`}
+          placeholder="flavor narrative shown when this fires"
+          value={String(e.text ?? '')}
+          onChange={(ev) => onChange({ ...e, text: ev.target.value })}
+        />
+      )}
+      {e.type === 'modify_hp' && (
+        <input
+          className={styles.formInp}
+          style={{ ...inp, width: 70 }}
+          type="number"
+          min={-100}
+          max={100}
+          aria-label={`${where} hp amount`}
+          value={Number(e.amount ?? 0)}
+          onChange={(ev) => onChange({ ...e, amount: Number(ev.target.value) })}
+        />
+      )}
+      {e.type === 'consume_item' && (
+        <TinySelect
+          ariaLabel={`${where} consumed item`}
+          value={String(e.itemId ?? '')}
+          options={pickers.items.map((i) => ({ value: i.id, label: i.name }))}
+          onChange={(itemId) => onChange({ ...e, itemId })}
         />
       )}
       {e.type === 'set_npc_attitude' && (

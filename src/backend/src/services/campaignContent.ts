@@ -120,6 +120,13 @@ export const EDITABLE_SECTIONS = [
   'terrainArt',
   'customItems',
   'customMonsters',
+  // Visual theme + creation config — plain top-level Context fields, so the
+  // generic overlay merge folds them with no special handling.
+  'theme',
+  'backgrounds',
+  'classSpells',
+  'classStartingLoot',
+  'classStartingEquipment',
 ] as const;
 export type EditableSection = (typeof EDITABLE_SECTIONS)[number];
 

@@ -358,32 +358,34 @@ a handful of **bounded subsystems**.
 > combatStart / shortRest / longRest overrides — it lacks only a
 > structured editor. All of it live via `refreshCampaignOverlay`.
 
+> **Promotion pass (2026-06-07, shipped):** the `theme` section (partial
+> CSS knobs merged over the donor theme via seed.theme); the creation
+> sections `backgrounds` / `classSpells` / `classStartingLoot` /
+> `classStartingEquipment` (plain top-level overlay folds); the
+> Malgovia-parity consequence arms `advance_quest` / `add_narrative` /
+> `modify_hp` (bounded ±100) / `consume_item`, with effect-row UI; and
+> the `npc_id` quest fact ("talk to THIS npc" steps without the flag
+> indirection). With these, Malgovia's hand-authored dialogue + quests
+> are fully DB-expressible — only its 8 GameRules still need code (each
+> reduces to a step condition + completion narrative).
+
 What code campaigns can still do that DB campaigns cannot, by impact:
 
-- [ ] **FE theme** — `App.tsx getCtx`: `CONTEXTS[context_id] ?? sandboxContext`;
-      only malgovia/sandbox have FE contexts, so every DB campaign renders
-      with the sandbox theme (colors, fonts, donor title). The most
-      player-visible gap; cheapest high-impact win: a `theme` JSONB section
-      validated against the `Theme` shape, applied via the existing
-      `applyTheme`, sandbox as fallback.
-- [ ] **Class & creation configuration** — everything from `classSkills`
-      through `classStartingEquipment`, plus `backgrounds`, `classSpells`,
-      `spellcastingAbility`, `featTable`, `spellTable`: DB campaigns inherit
-      the base template unchangeably; code campaigns can theme any of it
-      (custom backgrounds, trimmed spell lists…). Big surface — port
-      piecemeal as authoring demands, starting with `backgrounds` +
-      `classStartingEquipment`.
 - [ ] **`rules` engine hook** (`GameRule[]`) — json-rules-engine conditions
       firing arbitrary consequences with priority + once semantics. Pure
       code-side scripting today; no DB section. Would need the same
-      condition-vocabulary treatment dialogue gates got.
-- [ ] **The full consequence union** — DB dialogue/quest rewards are limited
-      to the safe six (set_flag, set_npc_attitude, give_gold, give_xp,
-      give_item, start_quest). Code can also fire add_narrative, modify_hp,
-      unlock_room, spawn_enemy, set_escape, advance_quest, set_faction_rep,
-      travel_to. Safest next promotions: **set_faction_rep + advance_quest**;
-      spawn_enemy/unlock_room would let DB dialogue spring ambushes and open
-      doors.
+      condition-vocabulary treatment dialogue gates got. (Most uses reduce
+      to quest-step conditions now that advance_quest + add_narrative are
+      DB arms.)
+- [ ] **Remaining consequence arms** — spawn_enemy, unlock_room, set_escape,
+      travel_to, set_faction_rep stay code-side. set_faction_rep is the
+      safest next promotion; spawn_enemy/unlock_room would let DB dialogue
+      spring ambushes and open doors.
+- [ ] **Engine-y creation config** — `classSkills` / hit dice / armor +
+      weapon + save proficiencies / `classFeatures` / `featTable` /
+      `spellTable` / `spellcastingAbility` stay base-template-only (these
+      are SRD constants more than campaign flavor; port only if a real
+      campaign needs to).
 - [ ] **Campaign-meta knobs with no section** — `recommendedPartySize`,
       `recommendedComposition` (creation auto-fill), `defaultStartingLoot`,
       `displayNoun`, default `gridWidth`/`gridHeight`.
