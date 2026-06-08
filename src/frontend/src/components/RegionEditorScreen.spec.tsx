@@ -896,6 +896,18 @@ describe('RegionEditorScreen', () => {
       fireEvent.change(screen.getByLabelText('INTERACT TEXT'), {
         target: { value: 'It sloshes.' },
       });
+      // Optional narrative overrides — fill all three for object 1.
+      fireEvent.change(screen.getByLabelText('DESCRIPTION', { selector: '#obj-desc-0' }), {
+        target: { value: 'A fat oak barrel, hooped in iron.' },
+      });
+      fireEvent.change(
+        screen.getByLabelText('FOUND TEXT (search hit)', { selector: '#obj-foundText-0' }),
+        { target: { value: 'A false bottom hides a coin purse.' } }
+      );
+      fireEvent.change(
+        screen.getByLabelText('EMPTY TEXT (search miss)', { selector: '#obj-emptyText-0' }),
+        { target: { value: 'Just stale mead.' } }
+      );
       fireEvent.change(screen.getByLabelText('SEARCH DC'), { target: { value: '14' } });
       // The loot select carries customs + catalog; picking adds a chip.
       const lootSel = screen.getByLabelText('Add loot to object 1') as HTMLSelectElement;
@@ -931,10 +943,15 @@ describe('RegionEditorScreen', () => {
           id: 'obj-1',
           name: 'Mead Barrel',
           interactText: 'It sloshes.',
+          desc: 'A fat oak barrel, hooped in iron.',
+          foundText: 'A false bottom hides a coin purse.',
+          emptyText: 'Just stale mead.',
           searchDC: 14,
           lootIds: ['dagger'],
           pos: { x: 1, y: 0 },
         },
+        // Object 2 carries only a name — blank narrative fields are pruned, not
+        // sent as empty strings (the schema rejects min(1) empties).
         { id: 'obj-2', name: 'Cracked Shrine' },
       ]);
     });
@@ -960,6 +977,14 @@ describe('RegionEditorScreen', () => {
         target: { value: 'bludgeoning' },
       });
       fireEvent.change(screen.getByLabelText('CONDITION'), { target: { value: 'prone' } });
+      // Fill two of the four narrative overrides; leave DISARM SUCCESS/FAIL blank
+      // to prove blanks are pruned (not saved as empty strings).
+      fireEvent.change(screen.getByLabelText('DETECT TEXT'), {
+        target: { value: 'A floorboard sits a hair proud.' },
+      });
+      fireEvent.change(screen.getByLabelText('TRIGGER TEXT ({name}, {dmg})'), {
+        target: { value: 'The step gives — {name} drops for {dmg}.' },
+      });
       fireEvent.click(screen.getByText('SAVE'));
       await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
       const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
@@ -972,6 +997,8 @@ describe('RegionEditorScreen', () => {
         damage: '1d4',
         damageType: 'bludgeoning',
         condition: 'prone',
+        detectNarrative: 'A floorboard sits a hair proud.',
+        triggerNarrative: 'The step gives — {name} drops for {dmg}.',
       });
       // REMOVE TRAP clears the draft; the next save drops the key.
       fireEvent.click(screen.getByTestId('toggle-trap-btn')); // REMOVE TRAP

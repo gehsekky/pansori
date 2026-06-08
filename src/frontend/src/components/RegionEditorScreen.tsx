@@ -150,26 +150,33 @@ interface EditorRegion {
   [key: string]: unknown;
 }
 
-// A searchable/interactable object as the painter edits it. desc/found/
-// empty texts are preserved on save but edited via the ROOMS JSON.
+// A searchable/interactable object as the painter edits it — including the
+// flavor strings (desc + interact/search-result text).
 interface EditorObject {
   id: string;
   name: string;
+  desc?: string;
   interactText?: string;
+  foundText?: string;
+  emptyText?: string;
   searchDC?: number;
   lootIds?: string[];
   pos?: { x: number; y: number };
   [key: string]: unknown;
 }
 
-// The room's (at most one) trap. The painter edits the mechanics; the
-// narrative overrides live in the ROOMS JSON and are preserved on save.
+// The room's (at most one) trap. The painter edits the mechanics AND the
+// narrative overrides ({name} = the triggering character, {dmg} = rolled damage).
 interface EditorTrap {
   name: string;
   dc: number;
   damage: string;
   damageType: string;
   condition?: string;
+  detectNarrative?: string;
+  triggerNarrative?: string;
+  disarmSuccess?: string;
+  disarmFail?: string;
   [key: string]: unknown;
 }
 
@@ -894,7 +901,11 @@ function RegionEditorScreen({
         if (placedObjects.length > 0) {
           next.objects = placedObjects.map((o) => {
             const c: EditorObject = { ...o, name: o.name.trim() };
-            if (!c.interactText) delete c.interactText;
+            // Empty flavor strings are omitted (the schema requires min-1 / the
+            // engine defaults them); never persist a '' that would fail validation.
+            for (const k of ['desc', 'interactText', 'foundText', 'emptyText'] as const) {
+              if (!(c[k] as string | undefined)?.trim()) delete c[k];
+            }
             if (c.searchDC === undefined) delete c.searchDC;
             if (!c.lootIds || c.lootIds.length === 0) delete c.lootIds;
             if (!c.pos) delete c.pos;
@@ -906,6 +917,14 @@ function RegionEditorScreen({
         if (trapDraft) {
           const t: EditorTrap = { ...trapDraft, name: trapDraft.name.trim() };
           if (!t.condition) delete t.condition;
+          for (const k of [
+            'detectNarrative',
+            'triggerNarrative',
+            'disarmSuccess',
+            'disarmFail',
+          ] as const) {
+            if (!(t[k] as string | undefined)?.trim()) delete t[k];
+          }
           next.trap = t;
         } else {
           delete next.trap;
@@ -3073,6 +3092,36 @@ function RegionEditorScreen({
                           ))}
                         </select>
                       </div>
+                      {/* Flavor text (all optional — blank uses the engine default). */}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                        {(
+                          [
+                            ['desc', 'DESCRIPTION'],
+                            ['foundText', 'FOUND TEXT (search hit)'],
+                            ['emptyText', 'EMPTY TEXT (search miss)'],
+                          ] as const
+                        ).map(([field, label]) => (
+                          <div key={field} style={{ flex: '1 1 180px' }}>
+                            <label className={styles.formLbl} htmlFor={`obj-${field}-${i}`}>
+                              {label}
+                            </label>
+                            <input
+                              id={`obj-${field}-${i}`}
+                              className={styles.formInp}
+                              placeholder="default"
+                              value={(o[field] as string | undefined) ?? ''}
+                              onChange={(ev) => {
+                                const v = ev.target.value;
+                                setPlacedObjects((prev) =>
+                                  prev.map((p, j) => (j === i ? { ...p, [field]: v } : p))
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))
                 )}
@@ -3080,8 +3129,8 @@ function RegionEditorScreen({
             )}
 
             {/* ── Trap (rooms only, at most one). The painter edits the
-                mechanics; narrative overrides ({name}/{dmg} substitution)
-                live in the ROOMS JSON and default sensibly. */}
+                mechanics + the narrative overrides ({name}/{dmg} substitution);
+                blank fields default sensibly at overlay time. */}
             {kind === 'room' && (
               <div className={styles.card} style={{ marginTop: '1rem' }}>
                 <div
@@ -3113,8 +3162,7 @@ function RegionEditorScreen({
                 {!trapDraft ? (
                   <p style={{ color: 'var(--t-dim)', fontSize: '0.8rem' }}>
                     No trap. One per room: Perception (vs DC) to spot it, Dexterity to disarm,
-                    damage + an optional condition on trigger. Narrative overrides edit via the
-                    ROOMS JSON.
+                    damage + an optional condition on trigger, with optional narrative overrides.
                   </p>
                 ) : (
                   <div
@@ -3252,6 +3300,33 @@ function RegionEditorScreen({
                         ))}
                       </select>
                     </div>
+                    {/* Narrative overrides — blank uses the engine default. */}
+                    {(
+                      [
+                        ['detectNarrative', 'DETECT TEXT'],
+                        ['triggerNarrative', 'TRIGGER TEXT ({name}, {dmg})'],
+                        ['disarmSuccess', 'DISARM SUCCESS'],
+                        ['disarmFail', 'DISARM FAIL'],
+                      ] as const
+                    ).map(([field, label]) => (
+                      <div key={field} style={{ flex: '1 1 240px' }}>
+                        <label className={styles.formLbl} htmlFor={`trap-${field}`}>
+                          {label}
+                        </label>
+                        <input
+                          id={`trap-${field}`}
+                          className={styles.formInp}
+                          placeholder="default"
+                          value={(trapDraft[field] as string | undefined) ?? ''}
+                          onChange={(ev) => {
+                            const v = ev.target.value;
+                            setTrapDraft((t) => (t ? { ...t, [field]: v } : t));
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
