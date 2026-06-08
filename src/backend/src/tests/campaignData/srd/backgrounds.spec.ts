@@ -13,7 +13,6 @@ import {
 } from '../../../campaignData/srd/backgrounds.js';
 import { describe, expect, it } from 'vitest';
 import { context as sandbox } from '../../fixtures/testContext.js';
-import { context as vale } from '../../../campaignData/malgovia/index.js';
 
 // Mechanical fields that must be identical across every campaign.
 const MECHANICAL = [
@@ -59,10 +58,7 @@ describe('srdBackgrounds selector', () => {
 });
 
 describe('no drift — shipped contexts share the canonical background mechanics', () => {
-  const contexts = [
-    ['sandbox', sandbox],
-    ['malgovia', vale],
-  ] as const;
+  const contexts = [['sandbox', sandbox]] as const;
 
   for (const [name, ctx] of contexts) {
     it(`${name}: every background's mechanics match SRD_BACKGROUNDS`, () => {

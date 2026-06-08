@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Enemy } from '../../types.js';
 import { makeChar } from '../../test-fixtures.js';
 import { processDeathSave } from '../../services/gameEngine.js';
-import { context as valeCtx } from '../../campaignData/malgovia/index.js';
+import { context as valeCtx } from '../fixtures/testContext.js';
 
 const enemy = { id: 'orc-1', name: 'Orc' } as unknown as Enemy;
 

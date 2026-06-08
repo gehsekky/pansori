@@ -31,8 +31,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
 import type { Context } from '../../types.js';
 import type { Pool } from 'pg';
-import { context as malgovia } from '../../campaignData/malgovia/index.js';
 import { regionTierAt } from '../../services/mapEngine.js';
+import { context as shippedCtx } from '../fixtures/testContext.js';
 
 function codeCtx(partial: Partial<Context> & { id: string }): Context {
   return partial as Context;
@@ -448,25 +448,25 @@ describe('editable sections registry', () => {
     expect(isEditableSection('enemyTemplates')).toBe(false);
   });
 
-  it('narratives schema accepts the real malgovia narratives', () => {
+  it('narratives schema accepts a shipped campaign narratives block', () => {
     // Regression guard: if the Context narratives shape grows a field the
     // schema doesn't know, a GET→PUT round trip in the editor would 400.
-    const result = CAMPAIGN_SECTION_SCHEMAS.narratives.safeParse(malgovia.narratives);
+    const result = CAMPAIGN_SECTION_SCHEMAS.narratives.safeParse(shippedCtx.narratives);
     expect(result.success, JSON.stringify(result.error?.issues?.slice(0, 3))).toBe(true);
   });
 
-  it('lootTable schema accepts every SRD catalog item and the real malgovia loot table', () => {
+  it('lootTable schema accepts every SRD catalog item and a shipped loot table', () => {
     // The whole catalog must round-trip — this is what the editor serves.
     const catalog = CAMPAIGN_SECTION_SCHEMAS.customItems.safeParse(Object.values(SRD_ITEMS));
     expect(catalog.success, JSON.stringify(catalog.error?.issues?.slice(0, 3))).toBe(true);
-    const loot = CAMPAIGN_SECTION_SCHEMAS.customItems.safeParse(malgovia.lootTable);
+    const loot = CAMPAIGN_SECTION_SCHEMAS.customItems.safeParse(shippedCtx.lootTable);
     expect(loot.success, JSON.stringify(loot.error?.issues?.slice(0, 3))).toBe(true);
   });
 
-  it('enemyTemplates schema accepts the whole SRD bestiary and the real malgovia templates', () => {
+  it('enemyTemplates schema accepts the whole SRD bestiary and a shipped template set', () => {
     const bestiary = CAMPAIGN_SECTION_SCHEMAS.customMonsters.safeParse(Object.values(SRD_MONSTERS));
     expect(bestiary.success, JSON.stringify(bestiary.error?.issues?.slice(0, 3))).toBe(true);
-    const campaign = CAMPAIGN_SECTION_SCHEMAS.customMonsters.safeParse(malgovia.enemyTemplates);
+    const campaign = CAMPAIGN_SECTION_SCHEMAS.customMonsters.safeParse(shippedCtx.enemyTemplates);
     expect(campaign.success, JSON.stringify(campaign.error?.issues?.slice(0, 3))).toBe(true);
   });
 

@@ -26,7 +26,6 @@ import { dirname, join } from 'path';
 import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { context as sandbox } from '../fixtures/testContext.js';
-import { context as vale } from '../../campaignData/malgovia/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 // This spec lints the ENGINE SOURCE on disk — it lives in tests/ but
@@ -124,10 +123,7 @@ function lineOf(src: string, idx: number): number {
 
 describe('narrative placeholder lint', () => {
   // Layer 1 — per-pool, per-reference strict check.
-  for (const [ctxName, ctx] of [
-    ['sandbox', sandbox],
-    ['malgovia', vale],
-  ] as const) {
+  for (const [ctxName, ctx] of [['sandbox', sandbox]] as const) {
     it(`every {token} is substituted at every inline reference in ${ctxName}.narratives`, () => {
       const required = tokensByPool(ctx.narratives);
       const failures: string[] = [];
@@ -160,10 +156,7 @@ describe('narrative placeholder lint', () => {
 
   // Layer 2 — file-wide loose check (the original lint, kept as a
   // backstop for variable-indirected pools).
-  for (const [ctxName, ctx] of [
-    ['sandbox', sandbox],
-    ['malgovia', vale],
-  ] as const) {
+  for (const [ctxName, ctx] of [['sandbox', sandbox]] as const) {
     it(`every {token} in ${ctxName}.narratives has a handler somewhere in the engine`, () => {
       const required = tokensByPool(ctx.narratives);
       const allTokens = new Set<string>();

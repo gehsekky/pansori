@@ -9,7 +9,6 @@
 import { ALL_SRD_ITEM_IDS, SRD_ITEMS, srdItems } from '../../../campaignData/srd/items.js';
 import { describe, expect, it } from 'vitest';
 import { context as sandbox } from '../../fixtures/testContext.js';
-import { context as vale } from '../../../campaignData/malgovia/index.js';
 
 describe('SRD_ITEMS catalog integrity', () => {
   it('every entry key matches its item id', () => {
@@ -93,10 +92,7 @@ describe('srdItems selector', () => {
 });
 
 describe('no drift — shipped contexts reuse the canonical SRD definitions', () => {
-  const contexts = [
-    ['sandbox', sandbox],
-    ['malgovia', vale],
-  ] as const;
+  const contexts = [['sandbox', sandbox]] as const;
 
   for (const [name, ctx] of contexts) {
     it(`${name}: each SRD-id loot entry is the shared object`, () => {

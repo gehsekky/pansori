@@ -5,7 +5,7 @@ import type { GameState, PlacedNpc, Seed } from '../../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateChoices, takeAction } from '../../../services/gameEngine.js';
 import { makeState } from '../../../test-fixtures.js';
-import { context as vale } from '../../../campaignData/malgovia/index.js';
+import { context as vale } from '../../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

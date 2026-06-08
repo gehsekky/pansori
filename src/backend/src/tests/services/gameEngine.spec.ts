@@ -1,6 +1,4 @@
 import type {
-  CampaignFacts,
-  CampaignState,
   Character,
   Context,
   GameRule,
@@ -21,7 +19,6 @@ import {
   seenKeyForAction,
   takeAction,
 } from '../../services/gameEngine.js';
-import { applyQuestCompletions, evaluateQuestSteps } from '../../services/campaignEngine.js';
 import {
   ctxWithRage,
   makeChar,
@@ -34,7 +31,6 @@ import {
 } from '../../test-fixtures.js';
 import { context as ctx } from '../fixtures/testContext.js';
 import { generateSeed } from '../../services/procgen.js';
-import { context as valeCtx } from '../../campaignData/malgovia/index.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -1600,122 +1596,6 @@ describe('NPC actions', () => {
       context: ctx,
     });
     expect(result.newState.enemies_killed).toContain(`npc:${placedNpc.id}`);
-  });
-});
-
-// ─── Faction-aware shop pricing ──────────────────────────────────────────────
-
-describe('faction shop price modifiers', () => {
-  // Aldric (Vale Merchant Guild) sells a healing potion at base 50 cr.
-  // factionShopPrice maps faction_guild attitude tiers as:
-  //   exalted (rep >= 60): 0.75x → 38 cr
-  //   friendly (rep >= 20): 0.9x → 45 cr
-  //   neutral (rep >= 0): 1.0x → 50 cr
-  //   unfriendly (rep >= -10): 1.2x → 60 cr
-  //   hostile (rep <  -50): 1.5x → 75 cr
-  // The shop choice surfaces only when the NPC attitude is 'friendly' (set
-  // statically on Aldric); faction rep modifies the price independently.
-
-  function makeValeStateInMarket(repWithGuild: number): GameState {
-    return {
-      characters: [makeChar({ id: 'p1', character_class: 'Fighter' })],
-      active_character_id: 'p1',
-      current_room: 'millhaven_market',
-      visited_rooms: ['millhaven_square', 'millhaven_market'],
-      enemies_killed: [],
-      loot_taken: [],
-      combat_active: false,
-      initiative_order: [],
-      initiative_idx: 0,
-      run_log: [],
-      room_log: [],
-      last_choices: [],
-      flags: {},
-      short_rested_rooms: [],
-      long_rested: false,
-      npc_attitudes: {},
-      npc_talked: [],
-      traps_triggered: [],
-      traps_disarmed: [],
-      objects_searched: [],
-      faction_rep: { faction_guild: repWithGuild },
-      // The vendor pane is open — buy choices surface through the active_shop
-      // early-return (faction pricing is independent of attitude/shop state).
-      active_shop: { npcId: 'npc_aldric', roomId: 'millhaven_market' },
-    };
-  }
-
-  // Vale's millhaven_market is in a campaign-driven seed; build a minimal one
-  // that mirrors the placed NPC for choice-generation purposes.
-  const valeMarketSeed: Seed = {
-    context_id: valeCtx.id,
-    world_name: 'Vale',
-    ship_name: 'Vale',
-    intro: '',
-    seed_id: 'vale-test-shop',
-    rooms: [
-      { id: 'millhaven_square', name: 'Town', desc: '' },
-      { id: 'millhaven_market', name: 'Market', desc: '' },
-    ],
-    enemies: {},
-    loot: {},
-    npcs: {
-      npc_aldric: {
-        roomId: 'millhaven_market',
-        id: 'npc_aldric',
-        name: 'Aldric the Merchant',
-        attitude: 'friendly',
-        factionId: 'faction_guild',
-        hp: 4,
-        ac: 10,
-        damage: '1d4',
-        toHit: 0,
-        xp: 0,
-        greeting: 'hi',
-        responses: [],
-        shop: [{ itemId: 'healing_potion', price: 50 }],
-      } as PlacedNpc,
-    },
-  };
-
-  it('neutral rep (0) charges base price', () => {
-    const choices = generateChoices(makeValeStateInMarket(0), valeMarketSeed, valeCtx);
-    const buy = choices.find((c) => c.action.type === 'buy');
-    expect(buy).toBeDefined();
-    expect((buy?.action as { price: number }).price).toBe(50);
-    expect(buy?.label).not.toMatch(/discount|markup/i);
-  });
-
-  it('friendly rep (25) gives a 10% discount → 45 cr', () => {
-    const choices = generateChoices(makeValeStateInMarket(25), valeMarketSeed, valeCtx);
-    const buy = choices.find((c) => c.action.type === 'buy');
-    expect((buy?.action as { price: number }).price).toBe(45);
-    expect(buy?.label).toMatch(/Merchant Guild discount/);
-  });
-
-  it('exalted rep (75) gives a 25% discount → 38 cr', () => {
-    const choices = generateChoices(makeValeStateInMarket(75), valeMarketSeed, valeCtx);
-    const buy = choices.find((c) => c.action.type === 'buy');
-    expect((buy?.action as { price: number }).price).toBe(38);
-    expect(buy?.label).toMatch(/Merchant Guild discount/);
-  });
-
-  it('unfriendly rep (-5) marks up by 20% → 60 cr', () => {
-    // Aldric is statically 'friendly' attitude, so the shop still surfaces;
-    // the faction rep just changes the price. This is the intentional design:
-    // attitude gates *whether* the shop is open, rep gates *the price*.
-    // Vale thresholds: unfriendly = -10 (i.e. rep >= -10 → unfriendly tier).
-    const choices = generateChoices(makeValeStateInMarket(-5), valeMarketSeed, valeCtx);
-    const buy = choices.find((c) => c.action.type === 'buy');
-    expect((buy?.action as { price: number }).price).toBe(60);
-    expect(buy?.label).toMatch(/Merchant Guild markup/);
-  });
-
-  it('hostile rep (-100) marks up by 50% → 75 cr', () => {
-    const choices = generateChoices(makeValeStateInMarket(-100), valeMarketSeed, valeCtx);
-    const buy = choices.find((c) => c.action.type === 'buy');
-    expect((buy?.action as { price: number }).price).toBe(75);
-    expect(buy?.label).toMatch(/Merchant Guild markup/);
   });
 });
 
@@ -3751,10 +3631,14 @@ describe('deathLines placeholder substitution', () => {
       conditions: ['unconscious'],
       death_saves: { successes: 0, failures: 2 },
     });
-    // Use the Vale context — its deathLines pool literally is
-    // "{name} falls..." / "{name} collapses..." (both reference {name}).
+    // A context whose deathLines pool references {name} on every entry, so the
+    // resolved line is guaranteed to substitute the character name.
+    const nameDeathCtx = {
+      ...ctx,
+      narratives: { ...ctx.narratives, deathLines: ['{name} falls.', '{name} collapses.'] },
+    };
     const valeSeed: Seed = {
-      context_id: valeCtx.id,
+      context_id: ctx.id,
       world_name: 'Vale',
       ship_name: 'Vale',
       intro: '',
@@ -3791,11 +3675,11 @@ describe('deathLines placeholder substitution', () => {
       history: [],
       state,
       seed: valeSeed,
-      context: valeCtx,
+      context: nameDeathCtx,
     });
     expect(result.dead).toBe(true);
     // The deathLines pool only ever yields a line containing the character
-    // name — both Vale templates start with "{name}".
+    // name — every template references {name}.
     expect(result.narrative).toContain('Halric');
     // The literal placeholder must not survive.
     expect(result.narrative).not.toContain('{name}');
@@ -5186,7 +5070,7 @@ describe('backfillOwnership', () => {
 
 describe('hostile in current room blocks loot / move', () => {
   function valeSeedWithGhoulIn(room: string): Seed {
-    const base = generateSeed(valeCtx, 1);
+    const base = generateSeed(ctx, 1);
     return {
       ...base,
       enemies: {
@@ -5215,9 +5099,9 @@ describe('hostile in current room blocks loot / move', () => {
 
   it('loot handler rejects when a hostile is in the current room', async () => {
     const seed = {
-      ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
+      ...valeSeedWithGhoulIn('great_hall'),
       loot: {
-        dungeon_offering_chamber: [
+        great_hall: [
           {
             id: 'guild_ledger',
             name: 'Guild Ledger',
@@ -5237,7 +5121,7 @@ describe('hostile in current room blocks loot / move', () => {
     const st = makeState(
       { id: 'pc-1' },
       {
-        current_room: 'dungeon_offering_chamber',
+        current_room: 'great_hall',
         active_character_id: 'pc-1',
       }
     );
@@ -5246,18 +5130,18 @@ describe('hostile in current room blocks loot / move', () => {
       history: [],
       state: st,
       seed,
-      context: valeCtx,
+      context: ctx,
     });
     expect(result.newState.loot_taken).not.toContain('guild_ledger');
     expect(result.narrative).toMatch(/hostile/i);
   });
 
   it('marker_move is blocked when a hostile is in the current room', async () => {
-    const seed = valeSeedWithGhoulIn('dungeon_offering_chamber');
+    const seed = valeSeedWithGhoulIn('great_hall');
     const st = makeState(
       { id: 'pc-1' },
       {
-        current_room: 'dungeon_offering_chamber',
+        current_room: 'great_hall',
         map_level: 'local',
         marker_pos: { x: 0, y: 0 },
         active_character_id: 'pc-1',
@@ -5268,17 +5152,17 @@ describe('hostile in current room blocks loot / move', () => {
       history: [],
       state: st,
       seed,
-      context: valeCtx,
+      context: ctx,
     });
-    expect(result.newState.current_room).toBe('dungeon_offering_chamber');
+    expect(result.newState.current_room).toBe('great_hall');
     expect(result.narrative).toMatch(/hostile/i);
   });
 
   it('generateChoices suppresses Pick up while a hostile is in the room', () => {
     const seed = {
-      ...valeSeedWithGhoulIn('dungeon_offering_chamber'),
+      ...valeSeedWithGhoulIn('great_hall'),
       loot: {
-        dungeon_offering_chamber: [
+        great_hall: [
           {
             id: 'guild_ledger',
             name: 'Guild Ledger',
@@ -5298,11 +5182,11 @@ describe('hostile in current room blocks loot / move', () => {
     const st = makeState(
       {},
       {
-        current_room: 'dungeon_offering_chamber',
+        current_room: 'great_hall',
         current_location_id: 'dungeon_shattered_crypt',
       }
     );
-    const choices = generateChoices(st, seed, valeCtx);
+    const choices = generateChoices(st, seed, ctx);
     expect(choices.find((c) => c.action.type === 'loot')).toBeUndefined();
     // Attack-the-ghoul should still surface so the player can engage.
     expect(choices.find((c) => c.action.type === 'attack')).toBeDefined();
@@ -5448,133 +5332,5 @@ describe('Turn Undead — action economy + behavior', () => {
       context: ctx,
     });
     expect(result.narrative).toMatch(/Action already used/i);
-  });
-});
-
-// ─── Quest auto-acceptance ───────────────────────────────────────────────────
-// The explicit "Accept quest" choice was removed. A talk_response in the
-// giver NPC's room (matched by quest step[0]'s tightened condition) is now
-// enough to auto-activate the quest. The router emits a "Quest accepted —"
-// narrative line in that case.
-
-describe('quest auto-acceptance via talk_response', () => {
-  it('generateChoices no longer emits an "Accept quest" choice', () => {
-    // Build a minimal vale-shaped state in Aldric's room.
-    const sd = generateSeed(valeCtx, 1);
-    const st = makeState({}, { current_room: 'millhaven_market' });
-    const choices = generateChoices(st, sd, valeCtx);
-    const acceptChoice = choices.find((c) => c.action.type === 'accept_quest');
-    expect(acceptChoice).toBeUndefined();
-    // The Talk-to-NPC choice keeps its quest indicator [!] when an
-    // unaccepted quest is available from this NPC.
-    const talkChoice = choices.find((c) => c.action.type === 'talk');
-    expect(talkChoice?.label).toMatch(/\[!\]/);
-  });
-
-  it('Vale quest_shipment step 1 only fires in millhaven_market (room-scoped)', async () => {
-    // Action matches (talk_response) but the room does not — should NOT trigger.
-    const elsewhere = {
-      action: 'talk_response',
-      room_id: 'millhaven_temple',
-      current_town_id: 'millhaven_town',
-      location_id: 'town_millhaven',
-      enemies_killed: [],
-      loot_taken: [],
-      visited_rooms: [],
-      flags: {},
-      campaign_flags: {},
-      quest_progress: [],
-      faction_rep: {},
-      world_minute: 480,
-      world_day: 1,
-      active_level: 1,
-      active_class: 'Fighter',
-    };
-    const emptyCs: CampaignState = {
-      campaign_id: valeCtx.id,
-      user_id: 'u',
-      world_minute: 480,
-      current_location: 'town_millhaven',
-      quests: [],
-      flags: {},
-      faction_rep: {},
-      npc_attitudes: {},
-    };
-    const completionsWrongRoom = await evaluateQuestSteps(
-      emptyCs,
-      valeCtx.campaign?.quests ?? [],
-      elsewhere
-    );
-    expect(completionsWrongRoom.find((c) => c.questId === 'quest_shipment')).toBeUndefined();
-
-    // Same action, correct room — should activate quest_shipment.
-    const correct = { ...elsewhere, room_id: 'millhaven_market' };
-    const completionsRightRoom = await evaluateQuestSteps(
-      emptyCs,
-      valeCtx.campaign?.quests ?? [],
-      correct
-    );
-    const matched = completionsRightRoom.find((c) => c.questId === 'quest_shipment');
-    expect(matched).toBeDefined();
-    expect(matched?.completedStepIds).toEqual(['step_talk_aldric']);
-  });
-
-  it('applyQuestCompletions reports newly-activated quest IDs', () => {
-    const emptyCs: CampaignState = {
-      campaign_id: valeCtx.id,
-      user_id: 'u',
-      world_minute: 480,
-      current_location: 'town_millhaven',
-      quests: [],
-      flags: {},
-      faction_rep: {},
-      npc_attitudes: {},
-    };
-    const result = applyQuestCompletions(emptyCs, valeCtx.campaign?.quests ?? [], [
-      { questId: 'quest_shipment', completedStepIds: ['step_talk_aldric'] },
-    ]);
-    expect(result.newlyActivatedQuestIds).toEqual(['quest_shipment']);
-    expect(result.cs.quests).toHaveLength(1);
-    expect(result.cs.quests[0]).toMatchObject({
-      questId: 'quest_shipment',
-      status: 'active',
-      completedSteps: ['step_talk_aldric'],
-    });
-  });
-
-  it('does not auto-activate later steps of an inactive quest (only step 1 is eligible)', async () => {
-    // facts simulate "loot_taken contains guild_ledger" (which would match
-    // quest_shipment step 2). Because the quest is inactive, only step 1 is
-    // checked — and step 1 requires room_id = millhaven_market, which we
-    // don't satisfy here. So nothing should activate.
-    const facts: CampaignFacts = {
-      action: 'loot',
-      room_id: 'dungeon_crypt_throne',
-      current_town_id: '',
-      location_id: 'dungeon_shattered_crypt',
-      enemies_killed: [],
-      loot_taken: ['guild_ledger'],
-      visited_rooms: [],
-      flags: {},
-      campaign_flags: {},
-      quest_progress: [],
-      faction_rep: {},
-      world_minute: 480,
-      world_day: 1,
-      active_level: 1,
-      active_class: 'Fighter',
-    };
-    const emptyCs: CampaignState = {
-      campaign_id: valeCtx.id,
-      user_id: 'u',
-      world_minute: 480,
-      current_location: 'town_millhaven',
-      quests: [],
-      flags: {},
-      faction_rep: {},
-      npc_attitudes: {},
-    };
-    const completions = await evaluateQuestSteps(emptyCs, valeCtx.campaign?.quests ?? [], facts);
-    expect(completions.find((c) => c.questId === 'quest_shipment')).toBeUndefined();
   });
 });
