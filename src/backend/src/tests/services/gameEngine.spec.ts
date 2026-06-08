@@ -352,11 +352,26 @@ describe('generateChoices', () => {
     expect(choices[0].label).toBe('Roll death saving throw');
   });
 
-  it('returns only healing choice when HP = 0 and stable', () => {
+  it('HP = 0 and stable with NO healing item: offers a wait/pass, not a dead-end use', () => {
     const choices = generateChoices(makeState({ hp: 0, stable: true }), seed, ctx);
     expect(choices).toHaveLength(1);
+    expect(choices[0].action.type).toBe('pass');
+    expect(choices[0].label).toMatch(/wait for aid/i);
+  });
+
+  it('HP = 0 and stable WITH a healing item: offers using that specific item', () => {
+    const choices = generateChoices(
+      makeState({
+        hp: 0,
+        stable: true,
+        inventory: [{ instance_id: 'p1', id: 'healing_potion', name: 'Healing Potion' }],
+      }),
+      seed,
+      ctx
+    );
+    expect(choices).toHaveLength(1);
     expect(choices[0].action.type).toBe('use');
-    expect(choices[0].label).toBe('Use healing item');
+    expect(choices[0].label).toMatch(/Healing Potion/);
   });
 
   it('includes attack option when an enemy is alive', () => {

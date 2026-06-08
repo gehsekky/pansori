@@ -59,8 +59,25 @@ export function runCombatStart(
   const pc = ctx.actor;
 
   const enemiesForInit = ctx.livingEnemiesInRoom;
-  const order = buildInitiativeOrder(ctx.st.characters, enemiesForInit);
-  ctx.st = { ...ctx.st, combat_active: true };
+  // ── Surprise check (SRD 5.2.1) ──────────────────────────────
+  // If the party averages a higher Stealth than the highest passive Perception
+  // among the enemies, the enemies are Surprised. Per SRD 5.2.1 that means
+  // Disadvantage on their Initiative roll (NOT a skipped turn) — so it must be
+  // determined BEFORE initiative is rolled and fed into buildInitiativeOrder.
+  const livingParty = ctx.st.characters.filter((c) => !c.dead);
+  const partyAvgStealth = Math.round(
+    livingParty.reduce((sum, c) => {
+      const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
+      return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
+    }, 0) / Math.max(1, livingParty.length)
+  );
+  const enemyPassivePerc = Math.max(...enemiesForInit.map((e) => 10 + abilityMod(e.wis ?? 10)));
+  const surprisedIds = new Set<string>(
+    partyAvgStealth > enemyPassivePerc ? enemiesForInit.map((e) => e.id) : []
+  );
+
+  const order = buildInitiativeOrder(ctx.st.characters, enemiesForInit, surprisedIds);
+  ctx.st = { ...ctx.st, combat_active: true, surprised: [...surprisedIds] };
 
   const updatedCharsForInit = ctx.st.characters.map((c) => {
     // SRD Bard Superior Inspiration (L18): rolling Initiative tops Bardic
@@ -125,22 +142,6 @@ export function runCombatStart(
     };
   }
 
-  // ── Surprise check (SRD) ────────────────────────────────────
-  // If the party averages a higher Stealth than the highest passive
-  // Perception among the enemies, all enemies are surprised for round 1.
-  const partyAvgStealth = Math.round(
-    ctx.st.characters
-      .filter((c) => !c.dead)
-      .reduce((sum, c) => {
-        const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
-        return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
-      }, 0) / Math.max(1, ctx.st.characters.filter((c) => !c.dead).length)
-  );
-  const enemyPassivePerc = Math.max(...enemiesForInit.map((e) => 10 + abilityMod(e.wis ?? 10)));
-  if (partyAvgStealth > enemyPassivePerc) {
-    ctx.st = { ...ctx.st, surprised: enemiesForInit.map((e) => e.id) };
-  }
-
   // RE-1 Phase 4 — materialize persistent ally summons (Animate Dead
   // skeletons, etc.) into entities + initiative now that PC entities and
   // the initiative order exist. initiative_idx is recomputed below from
@@ -157,8 +158,8 @@ export function runCombatStart(
     .join(' → ');
   const surpriseLabel =
     enemiesForInit.length === 1
-      ? fillEnemyTokens('{The_enemy} is SURPRISED!', enemiesForInit[0])
-      : `${enemiesForInit.map((e) => e.name).join(', ')} are SURPRISED!`;
+      ? fillEnemyTokens('{The_enemy} is SURPRISED (Disadvantage on Initiative)!', enemiesForInit[0])
+      : `${enemiesForInit.map((e) => e.name).join(', ')} are SURPRISED (Disadvantage on Initiative)!`;
   const surpriseNote = ctx.st.surprised?.length ? ` ${surpriseLabel}` : '';
   const combatPrefix = ctx.context.narratives.combatStart
     ? fillEnemyTokens(pick(ctx.context.narratives.combatStart), target) + ' '

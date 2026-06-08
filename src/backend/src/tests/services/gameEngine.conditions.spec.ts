@@ -483,7 +483,10 @@ describe('conditions — new types', () => {
         {
           id: goblinBId,
           isEnemy: true,
-          pos: { x: 6, y: 5 }, // adjacent to goblin A
+          // Adjacent to goblin A AND within the fighter's reach — SRD Cleave
+          // requires the second creature to be within 5 ft of the first *and*
+          // within your reach.
+          pos: { x: 5, y: 4 },
           hp: 50,
           maxHp: 50,
           conditions: [],

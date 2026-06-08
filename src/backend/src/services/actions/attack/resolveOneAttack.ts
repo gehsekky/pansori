@@ -1139,44 +1139,63 @@ export function resolveOneAttack(
       };
       ctx.narrative += ` ${fmt.note(`[Slow: ${target.name}'s speed -10 ft]`)}`;
     } else if (mastery === 'cleave') {
-      // SRD Cleave (greataxe, halberd) — second enemy within 5 ft
-      // takes the weapon's damage die (no ability mod).
+      // SRD Cleave (greataxe, halberd) — make a SEPARATE melee attack roll
+      // against a second creature within 5 ft of the first AND within your
+      // reach; on a HIT it takes the weapon's damage die (no ability mod, unless
+      // negative). (Crit doubling on the cleave swing is not modeled.)
       const targetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
-      if (targetEnt && weaponItem.damage) {
+      const attackerEnt = ctx.st.entities?.find((e) => e.id === pc.char.id && !e.isEnemy);
+      const reachCells = weaponItem.reach ? 2 : 1;
+      if (targetEnt && attackerEnt && weaponItem.damage) {
         const cleaveTarget = (ctx.st.entities ?? []).find(
           (e) =>
             e.isEnemy &&
             e.hp > 0 &&
             e.id !== targetId &&
-            Math.max(Math.abs(e.pos.x - targetEnt.pos.x), Math.abs(e.pos.y - targetEnt.pos.y)) <= 1
+            // within 5 ft of the first target …
+            Math.max(Math.abs(e.pos.x - targetEnt.pos.x), Math.abs(e.pos.y - targetEnt.pos.y)) <=
+              1 &&
+            // … and within the attacker's reach.
+            Math.max(
+              Math.abs(e.pos.x - attackerEnt.pos.x),
+              Math.abs(e.pos.y - attackerEnt.pos.y)
+            ) <= reachCells
         );
         if (cleaveTarget) {
-          const rawCleaveDmg = rollDice(weaponItem.damage);
-          // Apply enemy resistance / vulnerability to the cleave
-          // damage type — previously this raw weapon-die damage was
-          // written straight to entity HP, ignoring any resistance
-          // the second target had to the weapon's damage type.
           const cleaveEnemy = getEnemyById(ctx.seed, cleaveTarget.id);
-          const { damage: cleaveDmg, note: cleaveDmgNote } = applyDamageMultiplier(
-            rawCleaveDmg,
-            weaponItem.damageType,
-            cleaveEnemy ?? {}
-          );
-          const cleaveNewHp = Math.max(0, cleaveTarget.hp - cleaveDmg);
-          ctx.st = {
-            ...ctx.st,
-            entities: (ctx.st.entities ?? []).map((e) =>
-              e.id === cleaveTarget.id ? { ...e, hp: cleaveNewHp } : e
-            ),
-          };
+          // The separate Cleave attack roll vs the second creature's AC, using
+          // the same to-hit modifiers as the main swing.
+          const cleaveAc = cleaveEnemy?.ac ?? 10;
+          const cleaveD20 = rollDice('1d20');
+          const cleaveTotal = cleaveD20 + atk.atkMod + atk.prof + totalAttackBonus;
           const cleaveName = cleaveEnemy?.name ?? cleaveTarget.id;
-          ctx.narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveDmgNote}${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
-          if (cleaveNewHp <= 0) {
-            const cleaveXp = getEnemyById(ctx.seed, cleaveTarget.id)?.xp ?? 0;
-            const cleaveSplit = splitEncounterXp(ctx.st, pc.char.id, cleaveXp);
-            ctx.st = cleaveSplit.st;
-            updatePcActor(ctx, { xp: (pc.char.xp || 0) + cleaveSplit.share });
-            ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
+          const cleaveHit = cleaveD20 === 20 || (cleaveD20 !== 1 && cleaveTotal >= cleaveAc);
+          if (!cleaveHit) {
+            ctx.narrative += ` ${fmt.note(`[Cleave misses ${cleaveName}! (d20 ${cleaveD20}+${atk.atkMod + atk.prof + totalAttackBonus} = ${cleaveTotal} vs AC ${cleaveAc})]`)}`;
+          } else {
+            // SRD: the weapon's damage, no ability modifier (unless negative).
+            const rawCleaveDmg = Math.max(1, rollDice(weaponItem.damage) + Math.min(0, atk.atkMod));
+            // Apply enemy resistance / vulnerability to the cleave damage type.
+            const { damage: cleaveDmg, note: cleaveDmgNote } = applyDamageMultiplier(
+              rawCleaveDmg,
+              weaponItem.damageType,
+              cleaveEnemy ?? {}
+            );
+            const cleaveNewHp = Math.max(0, cleaveTarget.hp - cleaveDmg);
+            ctx.st = {
+              ...ctx.st,
+              entities: (ctx.st.entities ?? []).map((e) =>
+                e.id === cleaveTarget.id ? { ...e, hp: cleaveNewHp } : e
+              ),
+            };
+            ctx.narrative += ` ${fmt.note(`[Cleave: ${cleaveName} also takes ${cleaveDmg} damage!${cleaveDmgNote}${cleaveNewHp <= 0 ? ' (killed)' : ''}]`)}`;
+            if (cleaveNewHp <= 0) {
+              const cleaveXp = getEnemyById(ctx.seed, cleaveTarget.id)?.xp ?? 0;
+              const cleaveSplit = splitEncounterXp(ctx.st, pc.char.id, cleaveXp);
+              ctx.st = cleaveSplit.st;
+              updatePcActor(ctx, { xp: (pc.char.xp || 0) + cleaveSplit.share });
+              ctx.narrative += applyPartyLevelUps(ctx.st, pc.char, ctx.context);
+            }
           }
         }
       }

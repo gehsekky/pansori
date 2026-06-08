@@ -3215,7 +3215,22 @@ export function isRoomCleared(state: GameState, seed: Seed, roomId: string): boo
 
 export type InitEntry = { id: string; roll: number; is_enemy: boolean };
 
-export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): InitEntry[] {
+export function buildInitiativeOrder(
+  chars: Character[],
+  enemies: Enemy[],
+  // SRD 5.2.1 — a Surprised combatant has Disadvantage on its Initiative roll
+  // (the 2024 rule; surprise no longer skips a turn). Pass the ids of the
+  // combatants caught unaware.
+  surprisedIds: ReadonlySet<string> = new Set()
+): InitEntry[] {
+  // A single d20 with optional Advantage/Disadvantage (which cancel). SRD Alert
+  // feat grants immunity to Surprise, so an Alert combatant never rolls at
+  // Disadvantage from it.
+  const rollInit = (adv: boolean, disadv: boolean): number => {
+    if (adv && !disadv) return Math.max(rollDice('1d20'), rollDice('1d20'));
+    if (disadv && !adv) return Math.min(rollDice('1d20'), rollDice('1d20'));
+    return rollDice('1d20');
+  };
   // Track DEX per entry for the tiebreaker. The InitEntry payload
   // doesn't expose DEX (clients don't need it), so we keep it in a
   // local map and use it only inside the sort comparator.
@@ -3226,11 +3241,14 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
     ...chars
       .filter((c) => !c.dead)
       .map((c) => {
-        // SRD Alert feat — adds proficiency bonus to Initiative.
-        const alertBonus = (c.feats ?? []).includes('alert') ? profBonus(c.level) : 0;
+        // SRD Alert feat — adds proficiency bonus to Initiative AND grants
+        // immunity to the Surprised condition (so no Disadvantage from it).
+        const isAlert = (c.feats ?? []).includes('alert');
+        const alertBonus = isAlert ? profBonus(c.level) : 0;
         // SRD Barbarian Feral Instinct (L7) — Advantage on Initiative rolls.
         const feralAdv = getClassLevel(c, 'barbarian') >= 7;
-        const d20 = feralAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
+        const surprised = !isAlert && surprisedIds.has(c.id);
+        const d20 = rollInit(feralAdv, surprised);
         return {
           id: c.id,
           roll: d20 + abilityMod(c.dex) + alertBonus,
@@ -3239,7 +3257,7 @@ export function buildInitiativeOrder(chars: Character[], enemies: Enemy[]): Init
       }),
     ...enemies.map((enemy) => ({
       id: enemy.id,
-      roll: rollDice('1d20') + abilityMod(enemy.dex ?? 10),
+      roll: rollInit(false, surprisedIds.has(enemy.id)) + abilityMod(enemy.dex ?? 10),
       is_enemy: true,
     })),
   ];
@@ -4517,12 +4535,15 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (char.hp <= 0 && !char.stable)
     return [{ label: 'Roll death saving throw', action: { type: 'death_save' } }];
   if (char.hp <= 0 && char.stable)
-    return [{ label: 'Use healing item', action: { type: 'use', itemId: healItem?.id ?? '' } }];
+    // Stable but unconscious: a self-quaff is only possible with a healing item
+    // actually in the pack. Without one there's nothing to do but wait for an
+    // ally's aid (don't offer a dead-end "Use healing item" that can't resolve).
+    return healItem
+      ? [{ label: `Use ${healItem.name}`, action: { type: 'use', itemId: healItem.id } }]
+      : [{ label: 'Unconscious — wait for aid (pass)', action: { type: 'pass' } }];
 
-  // Surprised on round 1: entity cannot act (SRD)
-  if (state.combat_active && (state.surprised ?? []).includes(char.id)) {
-    return [{ label: 'SURPRISED — cannot act this round (pass)', action: { type: 'pass' } }];
-  }
+  // SRD 5.2.1 — Surprise imposes Disadvantage on the Initiative roll (handled in
+  // buildInitiativeOrder), not a lost turn; a surprised PC acts normally here.
 
   // Stunned / paralyzed / incapacitated / petrified: cannot take actions, bonus actions, reactions, or move
   const isIncapacitated = char.conditions.some((c) =>
@@ -9214,20 +9235,9 @@ export async function runEnemyTurns(args: {
       continue;
     }
     if (rm && !st.enemies_killed.includes(eEntry.id)) {
-      // Surprised creatures skip their first turn entirely (SRD
-      // — Pansori's chosen surprise model; PC-side handling mirrors
-      // this at the `Surprised — cannot act this round` choice). The
-      // `surprised` array is cleared on round-wrap so the skip only
-      // applies in round 1.
-      if ((st.surprised ?? []).includes(eEntry.id)) {
-        narrative += `\n\n[${rm.name} is surprised and loses their turn!]`;
-        resumeMi = 0;
-        const prevAdvIdxSurprise = advIdx;
-        advIdx = (advIdx + 1) % orderLen;
-        if (advIdx === 0 && prevAdvIdxSurprise !== 0) roundWrapped = true;
-        if (advIdx === args.initialCurrentIdx) break;
-        continue;
-      }
+      // SRD 5.2.1 — Surprise now imposes Disadvantage on the Initiative roll
+      // (applied in buildInitiativeOrder), NOT a skipped turn. So a surprised
+      // creature takes its turn normally here; no skip.
       // SRD Banishment — banished creatures are in a harmless
       // demiplane and skip their turn entirely. The condition is
       // cleared by the caster's concentration drop in

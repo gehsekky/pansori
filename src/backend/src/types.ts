@@ -1700,7 +1700,10 @@ export interface GameState {
   spell_walls?: SpellWall[]; // transient wall/terrain-spell obstacles (Wall of Fire/Force)
   spell_zones?: SpellZone[]; // transient persistent damage zones (Cloud of Daggers, …)
   help_target_id?: string; // char id receiving Help action advantage
-  surprised?: string[]; // entity ids surprised at combat start (skip first turn)
+  // Entity ids Surprised at combat start. SRD 5.2.1: Surprise imposes
+  // Disadvantage on the Initiative roll (applied in buildInitiativeOrder); this
+  // list is retained only to surface the "SURPRISED" combat-start note.
+  surprised?: string[];
   metamagic_active?: string[]; // active Metamagic modifier ids for the next cast (Sorcery Incarnate allows 2)
   cutting_words_penalty?: number; // Lore Bard Cutting Words penalty to apply
   round?: number; // current combat round (1-indexed)
