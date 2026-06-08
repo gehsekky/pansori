@@ -1,7 +1,7 @@
 import type { Context, GameState, GridPos } from '../../types.js';
 import { ENCOUNTER_ROOM_ID, resolveMarkerMove, stageEncounter } from '../mapEngine.js';
 import { buildArrivalNarrative, hasSaveProficiency } from '../gameEngine.js';
-import { materializeEnemy, scaleEnemyHp } from '../enemyFactory.js';
+import { materializeEnemy, scaledEnemyCount } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
 import { rollConditionSave } from '../rulesEngine.js';
 import { runCombatStart } from './attack/combatStart.js';
@@ -147,25 +147,35 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
     const template = ctx.context.enemyTemplates.find((t) => t.name === res.encounter);
     if (template) {
       const partySize = Math.max(1, ctx.st.characters.filter((c) => !c.dead).length);
-      const hp = scaleEnemyHp(template.hp, partySize);
+      // Count-scale the ambush to party size (SRD way) relative to the campaign's
+      // recommended size; bestiary HP is left intact. A rolled ambusher is a mook,
+      // so it scales freely (min 1) — no boss-singleton guard here.
+      const recommendedSize = ctx.context.campaign?.recommendedPartySize ?? 1;
+      const count = Math.max(1, scaledEnemyCount(1, partySize, recommendedSize));
       // Unique id per encounter so a repeat of the same creature isn't treated
       // as already-killed (enemies_killed tracks ids).
-      const enemy = materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${Date.now()}`, hp);
-      ctx.seed.enemies = { ...(ctx.seed.enemies ?? {}), [ENCOUNTER_ROOM_ID]: [enemy] };
+      const stamp = Date.now();
+      const enemies = Array.from({ length: count }, (_, k) =>
+        materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${stamp}-${k}`, template.hp)
+      );
+      ctx.seed.enemies = { ...(ctx.seed.enemies ?? {}), [ENCOUNTER_ROOM_ID]: enemies };
       ctx.st = stageEncounter(ctx.st);
       // Drop straight into the fight instead of arriving out of combat with an
       // Attack button. stageEncounter moved the party into the encounter room,
       // so refresh the ctx's room-enemy list (it was the pre-move room) and
       // start combat now — runCombatStart deploys tokens + rolls initiative and
       // puts the active PC on the clock so the player acts immediately.
-      const ambushLine = ` ⚔️ Ambush! A ${res.encounter} falls upon the party.`;
+      const ambushLine =
+        count > 1
+          ? ` ⚔️ Ambush! ${count} ${res.encounter}s fall upon the party.`
+          : ` ⚔️ Ambush! A ${res.encounter} falls upon the party.`;
       // runCombatStart reads `livingEnemiesInRoom` (read-only on the dispatched
       // ctx, and stale for the pre-move room). Hand it the just-materialized
-      // encounter enemy via a shallow ctx copy; the actor is shared by
+      // encounter enemies via a shallow ctx copy; the actor is shared by
       // reference (so PC updates land), and we copy the new st/narrative back.
       const preCombatNarrative = ctx.narrative ?? '';
-      const combatCtx = { ...ctx, livingEnemiesInRoom: [enemy] };
-      runCombatStart(combatCtx, enemy);
+      const combatCtx = { ...ctx, livingEnemiesInRoom: enemies };
+      runCombatStart(combatCtx, enemies[0]);
       ctx.st = combatCtx.st;
       ctx.narrative = preCombatNarrative + ambushLine + ' ' + combatCtx.narrative;
     } else {

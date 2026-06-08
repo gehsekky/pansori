@@ -31,6 +31,7 @@ import {
 } from '../../test-fixtures.js';
 import { context as ctx } from '../fixtures/testContext.js';
 import { generateSeed } from '../../services/procgen.js';
+import { scaledEnemyCount } from '../../services/enemyFactory.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -1317,44 +1318,45 @@ describe('Ability Score Improvements', () => {
 
 // ─── Enemy HP scaling ─────────────────────────────────────────────────────────
 
-describe('enemy HP scaling by party size', () => {
-  it('1-player seed has unscaled enemy HP (1× base)', () => {
+describe('enemy COUNT scaling by party size', () => {
+  it('1-player seed has valid enemy HP', () => {
     const s = generateSeed(ctx, 1);
     for (const enemiesInRoom of Object.values(s.enemies)) {
       for (const enemy of enemiesInRoom) {
-        // All enemies should have HP ≥ 1
         expect(enemy.hp).toBeGreaterThanOrEqual(1);
       }
     }
   });
 
-  it('2-player seed has ~1.5× the enemy HP of a 1-player seed for the same template', () => {
-    // Fix random so both seeds pick the same enemy template
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  it('a larger party scales by COUNT, never by inflating a stat block', () => {
     const s1 = generateSeed(ctx, 1);
-    const s2 = generateSeed(ctx, 2);
-    const hps1 = Object.values(s1.enemies)
-      .flat()
-      .map((e) => e.hp);
-    const hps2 = Object.values(s2.enemies)
-      .flat()
-      .map((e) => e.hp);
-    if (hps1.length > 0 && hps2.length > 0) {
-      // Average HP in 2-player seed should be higher than 1-player seed
-      const avg1 = hps1.reduce((a, b) => a + b, 0) / hps1.length;
-      const avg2 = hps2.reduce((a, b) => a + b, 0) / hps2.length;
-      expect(avg2).toBeGreaterThan(avg1);
+    const s2 = generateSeed(ctx, 4);
+    const count1 = Object.values(s1.enemies).flat().length;
+    const count2 = Object.values(s2.enemies).flat().length;
+    // More (or equal, if a room holds only singleton placements) — never fewer.
+    expect(count2).toBeGreaterThanOrEqual(count1);
+    // The HP values present never grow: every HP in the bigger seed already
+    // exists in the base seed (clones reuse the bestiary HP; nothing inflated).
+    const baseHps = new Set(
+      Object.values(s1.enemies)
+        .flat()
+        .map((e) => e.hp)
+    );
+    for (const e of Object.values(s2.enemies).flat()) {
+      expect(baseHps.has(e.hp)).toBe(true);
     }
   });
 
-  it('scaleEnemyHp formula: partySize 1→1×, 2→1.5×, 3→2×, 4→2.5×', () => {
-    // Test via generateRoguelikeSeed with a context whose enemy templates have known HP
-    // We verify the formula by checking the ratio holds for a fixed base HP of 10
-    // Formula: Math.round(10 * (0.5 + n * 0.5))
-    expect(Math.round(10 * (0.5 + 1 * 0.5))).toBe(10);
-    expect(Math.round(10 * (0.5 + 2 * 0.5))).toBe(15);
-    expect(Math.round(10 * (0.5 + 3 * 0.5))).toBe(20);
-    expect(Math.round(10 * (0.5 + 4 * 0.5))).toBe(25);
+  it('scaledEnemyCount: floored count scaling relative to the recommended party size', () => {
+    // Party AT the recommended size → authored count (1×).
+    expect(scaledEnemyCount(2, 4, 4)).toBe(2);
+    // Larger party → more, floored so we never exceed the XP pool.
+    expect(scaledEnemyCount(2, 8, 4)).toBe(4); // 2 × (8/4)
+    expect(scaledEnemyCount(2, 6, 4)).toBe(3); // floor(2 × 1.5)
+    expect(scaledEnemyCount(3, 4, 3)).toBe(4); // floor(3 × 4/3) = floor(4) = 4
+    // Smaller party → fewer (floor can reach 0; the room-scaler clamps to ≥1).
+    expect(scaledEnemyCount(2, 1, 4)).toBe(0); // floor(2 × 0.25)
+    expect(scaledEnemyCount(2, 2, 4)).toBe(1); // floor(2 × 0.5)
   });
 });
 

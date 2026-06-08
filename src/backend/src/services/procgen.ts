@@ -1,25 +1,30 @@
 import type { Context, Enemy, Seed } from '../types.js';
 import { randomUUID } from 'crypto';
-import { scaleEnemyHp } from './enemyFactory.js';
+import { scaleRoomEnemiesByCount } from './enemyFactory.js';
 
 /**
  * Build the run seed for a campaign context. (The roguelike procedural
  * generator was retired — the engine now runs only authored grid campaigns, so
- * the seed is the campaign's authored rooms/enemies/loot with enemy HP scaled
- * to party size + the 3-level map definitions copied through for the frontend.)
+ * the seed is the campaign's authored rooms/enemies/loot with the enemy COUNT
+ * scaled to party size — the SRD way — relative to the campaign's
+ * recommendedPartySize + the 3-level map definitions copied through for the FE.)
  */
 export function generateSeed(context: Context, partySize = 1): Seed {
   const c = context.campaign;
   if (!c) {
     throw new Error(`generateSeed: context '${context.id}' has no campaign data`);
   }
-  // Scale campaign enemy HP by party size.
+  // Scale campaign enemy COUNT by party size (relative to the recommended size).
+  // Stat blocks are left bestiary-exact — difficulty rides on numbers, per RAW.
+  const recommendedSize = c.recommendedPartySize ?? 1;
   const scaledEnemies: Record<string, Enemy[]> = {};
   for (const [roomId, enemiesInRoom] of Object.entries(c.enemies ?? {})) {
-    scaledEnemies[roomId] = enemiesInRoom.map((enemy) => {
-      const scaled = scaleEnemyHp(enemy.hp, partySize);
-      return { ...enemy, hp: scaled, maxHp: scaled };
-    });
+    scaledEnemies[roomId] = scaleRoomEnemiesByCount(
+      roomId,
+      enemiesInRoom,
+      partySize,
+      recommendedSize
+    );
   }
   return {
     context_id: context.id,

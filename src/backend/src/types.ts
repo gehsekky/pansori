@@ -1877,11 +1877,13 @@ export interface CampaignData {
   towns?: Town[];
   quests?: Quest[];
   factions?: Faction[];
-  // Authoring hint: the campaign is balanced for this many PCs. Enemy HP
-  // already scales linearly with party size via `scaleEnemyHp`, but the
-  // *quantity* of enemies per room is authored statically — so a party of 1
-  // facing the throne fight (Crypt Lord + 2 minions, balanced for 3 PCs) will
-  // have a hard time. Surfaced on the character creation screen.
+  // Authoring hint: the campaign is balanced for this many PCs — and it's the
+  // baseline for encounter scaling. A room's authored enemy COUNT is the right
+  // fight at this size; `scaleRoomEnemiesByCount` grows/shrinks the count for
+  // other party sizes (partySize / recommendedSize, floored), leaving stat
+  // blocks bestiary-exact (the SRD way). Count-1 placements (bosses, quest
+  // targets) are never cloned, so an under-sized party still faces the boss —
+  // just with fewer minions. Surfaced on the character creation screen.
   recommendedPartySize?: number;
   // Class ids for the campaign's ideal party composition. Length should match
   // `recommendedPartySize`. The character creation screen offers an auto-fill

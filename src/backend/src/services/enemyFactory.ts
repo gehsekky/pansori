@@ -1,10 +1,66 @@
 import type { Enemy, EnemyTemplate } from '../types.js';
 
-// HP scaling — 1× solo, 1.5× 2-player, 2× 3-player, 2.5× 4-player. Shared by
-// procgen (room population) and the map engine (wilderness encounter drops) so
-// both stat-block instantiations stay identical.
-export function scaleEnemyHp(baseHp: number, partySize: number): number {
-  return Math.max(1, Math.round(baseHp * (0.5 + partySize * 0.5)));
+// Party-size encounter scaling — the SRD 5.2.1 way: adjust the NUMBER of
+// creatures, never a creature's stat block (so every enemy stays bestiary-exact).
+// The authored encounter is balanced for the campaign's `recommendedPartySize`,
+// which IS the XP budget at that size (RAW: budget = per-character XP ×
+// party size). For a different party the budget scales linearly, so the target
+// count is `baseCount × partySize / recommendedSize`, FLOORED so the encounter's
+// XP never exceeds the party's pool (we get as close as possible from below).
+export function scaledEnemyCount(
+  baseCount: number,
+  partySize: number,
+  recommendedSize = 1
+): number {
+  const multiplier = partySize / Math.max(1, recommendedSize);
+  return Math.max(0, Math.floor(baseCount * multiplier));
+}
+
+// Apply count scaling to one room's already-materialized enemy list. Enemies are
+// grouped by name (a name = one placement of one template); each group is grown
+// or trimmed to its floored target. Two safeguards:
+//   • A singleton group (count-1 placement — bosses, quest/rule targets) is never
+//     cloned or dropped; its id (which a quest/rule may reference) is preserved.
+//   • A multi-instance group keeps at least 1 (we never delete an authored
+//     encounter outright, even for an under-sized party).
+// Clones get fresh positional ids above any existing `#<n>` so nothing collides.
+export function scaleRoomEnemiesByCount(
+  roomId: string,
+  enemies: Enemy[],
+  partySize: number,
+  recommendedSize: number
+): Enemy[] {
+  const groups = new Map<string, Enemy[]>();
+  for (const e of enemies) {
+    const g = groups.get(e.name);
+    if (g) g.push(e);
+    else groups.set(e.name, [e]);
+  }
+  // Next free positional index in this room, so clone ids never collide.
+  let nextIdx = 0;
+  for (const e of enemies) {
+    const m = /#(\d+)$/.exec(e.id);
+    if (m) nextIdx = Math.max(nextIdx, Number(m[1]) + 1);
+  }
+  const out: Enemy[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      out.push(group[0]); // unique / boss / quest target — never cloned or dropped
+      continue;
+    }
+    const target = Math.max(1, scaledEnemyCount(group.length, partySize, recommendedSize));
+    if (target <= group.length) {
+      out.push(...group.slice(0, target));
+    } else {
+      out.push(...group);
+      const proto = group[0];
+      const fullHp = proto.maxHp ?? proto.hp;
+      for (let k = group.length; k < target; k++) {
+        out.push({ ...proto, id: `${roomId}#${nextIdx++}`, hp: fullHp, maxHp: fullHp });
+      }
+    }
+  }
+  return out;
 }
 
 /**
