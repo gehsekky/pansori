@@ -280,11 +280,15 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     // painting. Floor catalog bases already embed their variant suffix.
     const previewSrc = `${dir}/${spec.base}${dir === '/art/floors' ? '' : '_1'}.png`;
     return (
+      // Bottom-aligned: the 2.5D tile previews carry a transparent overhang
+      // up top, so the painted ground sits at the bottom edge — controls
+      // line up with THAT, not the geometric center (same fix as the sites
+      // editor's ICON preview).
       <div
         key={name}
         style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           gap: 12,
           flexWrap: 'wrap',
           padding: '0.4rem 0',
