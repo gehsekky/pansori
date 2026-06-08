@@ -17,7 +17,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
 import type { GameState } from '../../types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

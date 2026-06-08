@@ -13,7 +13,7 @@ import {
   resolveCastingAbility,
 } from '../../services/multiclass.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { skillCheck } from '../../services/rulesEngine.js';
 import { takeAction } from '../../services/gameEngine.js';
 

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyFeatTake, getFeat, resetFeatLongRestResources } from '../../../services/feats.js';
 import { baseSandboxSeed, makeChar, makeState } from '../../../test-fixtures.js';
 import { generateChoices, takeAction } from '../../../services/gameEngine.js';
-import { context as ctx } from '../../../campaignData/sandbox.js';
+import { context as ctx } from '../../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

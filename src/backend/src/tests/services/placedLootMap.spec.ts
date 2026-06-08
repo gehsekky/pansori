@@ -7,7 +7,7 @@ import type { GameState, PlacedLoot, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { availableLootIn, isLootTaken, placedLootIn } from '../../services/placedLoot.js';
 import { buildArrivalNarrative, generateChoices, takeAction } from '../../services/gameEngine.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { makeState } from '../../test-fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());

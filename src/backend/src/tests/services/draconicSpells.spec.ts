@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyLevelUpForClass, mergeDraconicSpells } from '../../services/gameEngine.js';
 import type { ActionContext } from '../../services/actions/types.js';
 import type { Character } from '../../types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { handleSelectSubclass } from '../../services/actions/meta.js';
 import { makeChar } from '../../test-fixtures.js';
 import { pcActor } from '../../services/actions/actor.js';

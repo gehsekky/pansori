@@ -9,7 +9,7 @@ import { enemyActor, pcActor } from '../../services/actions/actor.js';
 import { hasEscapeTheHorde, hasMultiattackDefense } from '../../services/multiclass.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { ActionContext } from '../../services/actions/types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { generateChoices } from '../../services/gameEngine.js';
 import { handleChooseHunterOption } from '../../services/actions/meta.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';

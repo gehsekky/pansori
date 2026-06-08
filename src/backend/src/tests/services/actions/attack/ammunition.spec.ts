@@ -2,7 +2,7 @@ import type { Character, Enemy, GameState, Seed } from '../../../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../../../test-fixtures.js';
 import { SRD_ITEMS } from '../../../../campaignData/srd/items.js';
-import { context as baseCtx } from '../../../../campaignData/sandbox.js';
+import { context as baseCtx } from '../../../fixtures/testContext.js';
 import { takeAction } from '../../../../services/gameEngine.js';
 
 // SRD ammunition. A ranged attack with a bow/crossbow/sling/blowgun/firearm

@@ -7,7 +7,7 @@ import { elementalAffinityBonus, elementalAffinityType } from '../../services/mu
 import { enemyActor, pcActor } from '../../services/actions/actor.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { ActionContext } from '../../services/actions/types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { handleChooseElementalAffinity } from '../../services/actions/meta.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';
 import { takeAction } from '../../services/gameEngine.js';

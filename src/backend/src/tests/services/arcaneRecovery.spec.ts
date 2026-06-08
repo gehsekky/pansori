@@ -12,7 +12,7 @@ import {
 } from '../../services/slotRecovery.js';
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
 import { makeState, baseSandboxSeed as seed } from '../../test-fixtures.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

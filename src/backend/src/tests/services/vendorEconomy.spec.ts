@@ -10,7 +10,7 @@ import type { PlacedNpc, Seed } from '../../types.js';
 import { describe, expect, it } from 'vitest';
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 
 const ROOM = 'market';
 

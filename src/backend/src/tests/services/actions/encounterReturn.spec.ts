@@ -7,7 +7,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GameState } from '../../../types.js';
-import { context as ctx } from '../../../campaignData/sandbox.js';
+import { context as ctx } from '../../fixtures/testContext.js';
 import { generateSeed } from '../../../services/procgen.js';
 import { makeChar } from '../../../test-fixtures.js';
 import { takeAction } from '../../../services/gameEngine.js';

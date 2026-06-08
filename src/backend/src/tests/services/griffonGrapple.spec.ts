@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enemyActor, pcActor } from '../../services/actions/actor.js';
 import type { ActionContext } from '../../services/actions/types.js';
 import { SRD_MONSTERS } from '../../campaignData/srd/monsters.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';
 import { handleTryEscapeGrapple } from '../../services/actions/combatTactical.js';
 import { makeChar } from '../../test-fixtures.js';

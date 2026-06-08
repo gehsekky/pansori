@@ -8,7 +8,7 @@ import { applyLevelUpForClass, generateChoices } from '../../services/gameEngine
 import { describe, expect, it } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { Seed } from '../../types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 
 const seed: Seed = {
   context_id: ctx.id,

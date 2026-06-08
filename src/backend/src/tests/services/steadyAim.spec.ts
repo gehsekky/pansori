@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeEnemy, makeState } from '../../test-fixtures.js';
 import type { ActionContext } from '../../services/actions/types.js';
 import type { Seed } from '../../types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { handleRogueFeature } from '../../services/actions/classFeature/rogue.js';
 import { pcActor } from '../../services/actions/actor.js';
 import { takeAction } from '../../services/gameEngine.js';

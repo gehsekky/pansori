@@ -13,7 +13,7 @@ import { enemyActor } from '../../services/actions/actor.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';
 import { hasElusive } from '../../services/multiclass.js';
 import { makeChar } from '../../test-fixtures.js';
-import { context as sandboxCtx } from '../../campaignData/sandbox.js';
+import { context as sandboxCtx } from '../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

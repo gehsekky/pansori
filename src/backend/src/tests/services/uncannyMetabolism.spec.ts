@@ -12,7 +12,7 @@ import {
   seedWithEnemy,
 } from '../../test-fixtures.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { takeAction } from '../../services/gameEngine.js';
 import { uncannyMetabolismRefresh } from '../../services/multiclass.js';
 

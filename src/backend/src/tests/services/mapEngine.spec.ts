@@ -518,7 +518,7 @@ describe('SRD travel pace (set_pace + perception effects)', () => {
   it('set_pace stores the stance and narrates it', async () => {
     const { takeAction } = await import('../../services/gameEngine.js');
     const { makeState } = await import('../../test-fixtures.js');
-    const { context: sandbox } = await import('../../campaignData/sandbox.js');
+    const { context: sandbox } = await import('../fixtures/testContext.js');
     const st = {
       ...makeState({ id: 'pc-1' }, {}),
       map_level: 'regional' as const,

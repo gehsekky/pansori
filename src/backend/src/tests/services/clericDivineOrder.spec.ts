@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyCreationDivineOrder, handleChooseDivineOrder } from '../../services/actions/meta.js';
 import type { Character } from '../../types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { makeChar } from '../../test-fixtures.js';
 import { pcActor } from '../../services/actions/actor.js';
 

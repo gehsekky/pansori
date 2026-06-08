@@ -12,7 +12,7 @@ import {
 import { enemyActor, pcActor } from '../../services/actions/actor.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { ActionContext } from '../../services/actions/types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { handleChooseFiendishResilience } from '../../services/actions/meta.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';
 import { takeAction } from '../../services/gameEngine.js';

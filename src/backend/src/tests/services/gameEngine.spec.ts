@@ -32,7 +32,7 @@ import {
   spellSeed,
   withAdjacentEntities,
 } from '../../test-fixtures.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { generateSeed } from '../../services/procgen.js';
 import { context as valeCtx } from '../../campaignData/malgovia/index.js';
 

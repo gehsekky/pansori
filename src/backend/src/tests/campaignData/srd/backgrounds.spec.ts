@@ -12,7 +12,7 @@ import {
   srdBackgrounds,
 } from '../../../campaignData/srd/backgrounds.js';
 import { describe, expect, it } from 'vitest';
-import { context as sandbox } from '../../../campaignData/sandbox.js';
+import { context as sandbox } from '../../fixtures/testContext.js';
 import { context as vale } from '../../../campaignData/malgovia/index.js';
 
 // Mechanical fields that must be identical across every campaign.

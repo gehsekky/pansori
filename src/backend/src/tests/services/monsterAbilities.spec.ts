@@ -10,7 +10,7 @@ import type { CombatEntity, Enemy } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, mockRandom } from '../../test-fixtures.js';
 import type { ActionContext } from '../../services/actions/types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { enemyActor } from '../../services/actions/actor.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';
 

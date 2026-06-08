@@ -1,12 +1,13 @@
-// Sandbox — 3-level map wiring smoke. Validates the migration off the roguelike
+// Base test campaign — 3-level map wiring smoke. Validates the campaign map
 // model: the party starts on the regional grid, enters the dungeon site, and
-// steps from the entry hall into the guard post via a room-exit cell. (Sandbox
-// is imported by ~150 other specs purely as a Context for class/spell/narrative
-// data; this is the only spec that exercises its new campaign navigation.)
+// steps from the entry hall into the guard post via a room-exit cell. Runs
+// against the shared test fixture context (tests/fixtures/testContext.ts —
+// formerly campaignData/sandbox.ts, which ~220 specs import for class/spell/
+// narrative data); this is the only spec that exercises campaign navigation.
 
 import type { Character, GameState, Seed, StructuredAction } from '../../types.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { generateSeed } from '../../services/procgen.js';
 import { initMapState } from '../../services/mapEngine.js';
 import { makeChar } from '../../test-fixtures.js';

@@ -9,7 +9,7 @@ import { makeChar, makeState } from '../../../test-fixtures.js';
 import type { ActionContext } from '../../../services/actions/types.js';
 import { SRD_SPELLS } from '../../../campaignData/srd/spells.js';
 import { breakConcentration } from '../../../services/gameEngine.js';
-import { context as ctx } from '../../../campaignData/sandbox.js';
+import { context as ctx } from '../../fixtures/testContext.js';
 import { enemyActor } from '../../../services/actions/actor.js';
 import { handleEnemyAttack } from '../../../services/actions/enemyAttack.js';
 import { takeAction } from '../../../services/gameEngine.js';

@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyMonsterAuras, takeAction } from '../../services/gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import { SRD_MONSTERS } from '../../campaignData/srd/monsters.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

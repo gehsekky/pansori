@@ -11,7 +11,7 @@ import type { ActionContext } from '../../services/actions/types.js';
 import { handleEnemyAttack } from '../../services/actions/enemyAttack.js';
 import { handleMonkFeature } from '../../services/actions/classFeature/monk.js';
 import { makeChar } from '../../test-fixtures.js';
-import { context as sandboxCtx } from '../../campaignData/sandbox.js';
+import { context as sandboxCtx } from '../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

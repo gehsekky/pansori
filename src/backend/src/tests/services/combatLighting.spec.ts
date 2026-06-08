@@ -20,7 +20,7 @@ import {
 import { makeChar, makeState } from '../../test-fixtures.js';
 import { SRD_ITEMS } from '../../campaignData/srd/items.js';
 import { SRD_MONSTERS } from '../../campaignData/srd/monsters.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

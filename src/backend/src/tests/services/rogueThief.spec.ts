@@ -8,7 +8,7 @@ import { applyLevelUpForClass, takeAction } from '../../services/gameEngine.js';
 import { hasSecondStoryWork, maxAttunement } from '../../services/multiclass.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import type { ActionContext } from '../../services/actions/types.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { handleAttune } from '../../services/actions/inventory.js';
 import { handleRogueFeature } from '../../services/actions/classFeature/rogue.js';
 import { pcActor } from '../../services/actions/actor.js';

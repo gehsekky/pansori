@@ -11,7 +11,7 @@ import { ctxWithRage, makeChar, makeState, spellSeed } from '../../../test-fixtu
 import { generateChoices, seedSummonedAllies, takeAction } from '../../../services/gameEngine.js';
 import type { GameState } from '../../../types.js';
 import { checkMountFallOff } from '../../../services/actions/mount.js';
-import { context as ctx } from '../../../campaignData/sandbox.js';
+import { context as ctx } from '../../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

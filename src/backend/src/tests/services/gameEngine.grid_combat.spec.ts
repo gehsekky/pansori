@@ -12,7 +12,7 @@ import {
 } from '../../test-fixtures.js';
 import type { Character, Enemy, GameState, GridPos, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { takeAction } from '../../services/gameEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

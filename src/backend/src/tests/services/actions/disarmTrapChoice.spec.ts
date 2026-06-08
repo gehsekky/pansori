@@ -15,7 +15,7 @@
 import type { GameState, Seed } from '../../../types.js';
 import { describe, expect, it } from 'vitest';
 import { makeChar, makeState } from '../../../test-fixtures.js';
-import { context as ctx } from '../../../campaignData/sandbox.js';
+import { context as ctx } from '../../fixtures/testContext.js';
 import { generateChoices } from '../../../services/gameEngine.js';
 
 const trapRoom = 'trap_room';

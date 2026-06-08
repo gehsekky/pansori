@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateChoices, takeAction } from '../../../services/gameEngine.js';
 import { makeChar, makeState } from '../../../test-fixtures.js';
 import { SRD_ITEMS } from '../../../campaignData/srd/items.js';
-import { context as baseCtx } from '../../../campaignData/sandbox.js';
+import { context as baseCtx } from '../../fixtures/testContext.js';
 
 // SRD thrown splash weapons (throw_item): a DEX ranged attack vs the target's
 // AC; on a hit, splash damage of the item's type. Holy Water only harms

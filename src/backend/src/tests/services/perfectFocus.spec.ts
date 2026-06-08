@@ -6,7 +6,7 @@
 
 import { CORRIDOR_ID, makeChar, makeState, seedWithEnemy } from '../../test-fixtures.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { perfectFocusRefresh } from '../../services/multiclass.js';
 import { takeAction } from '../../services/gameEngine.js';
 

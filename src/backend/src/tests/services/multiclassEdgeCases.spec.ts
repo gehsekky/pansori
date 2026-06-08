@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyLevelUpForClass } from '../../services/gameEngine.js';
 import { applyMulticlassProfGrants } from '../../services/multiclass.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { makeChar } from '../../test-fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());

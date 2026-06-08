@@ -8,7 +8,7 @@
 import { applyFeatTake, canTakeFeat } from '../../services/feats.js';
 import { describe, expect, it } from 'vitest';
 import { SRD_FEATS } from '../../campaignData/srd/feats.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { makeChar } from '../../test-fixtures.js';
 
 const BOON_IDS = [

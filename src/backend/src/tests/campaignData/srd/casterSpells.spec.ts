@@ -10,7 +10,7 @@ import {
 } from '../../../campaignData/srd/classes.js';
 import { describe, expect, it } from 'vitest';
 import { casterSpellOptions } from '../../../services/multiclass.js';
-import { context as sandbox } from '../../../campaignData/sandbox.js';
+import { context as sandbox } from '../../fixtures/testContext.js';
 
 const opts = (cls: string) => casterSpellOptions(cls, sandbox.spellTable ?? {});
 

@@ -12,7 +12,7 @@ import { CORRIDOR_ID, makeChar, makeState, seedWithEnemy } from '../../test-fixt
 import type { CombatEntity, GameState, GridPos, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canAttemptHide, generateChoices, takeAction } from '../../services/gameEngine.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 
 afterEach(() => vi.restoreAllMocks());
 

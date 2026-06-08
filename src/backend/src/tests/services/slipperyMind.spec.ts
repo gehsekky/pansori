@@ -6,7 +6,7 @@
 // Slippery Mind — making this a clean probe of the feature in isolation.
 
 import { describe, expect, it } from 'vitest';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { hasSaveProficiency } from '../../services/gameEngine.js';
 import { hasSlipperyMind } from '../../services/multiclass.js';
 import { makeChar } from '../../test-fixtures.js';

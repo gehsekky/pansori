@@ -10,7 +10,7 @@ import { breakConcentration, endCombatState, takeAction } from '../../../service
 import { makeChar, makeState } from '../../../test-fixtures.js';
 import { ENEMY_DISADV_CONDITIONS } from '../../../services/conditions/registry.js';
 import { SRD_SPELLS } from '../../../campaignData/srd/spells.js';
-import { context as ctx } from '../../../campaignData/sandbox.js';
+import { context as ctx } from '../../fixtures/testContext.js';
 import { rollConditionSave } from '../../../services/rulesEngine.js';
 
 afterEach(() => vi.restoreAllMocks());

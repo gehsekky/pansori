@@ -11,7 +11,7 @@
 import type { Enemy, GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../test-fixtures.js';
-import { context as ctx } from '../../campaignData/sandbox.js';
+import { context as ctx } from '../fixtures/testContext.js';
 import { enemyHpAfterDamage } from '../../services/enemyDamage.js';
 import { takeAction } from '../../services/gameEngine.js';
 

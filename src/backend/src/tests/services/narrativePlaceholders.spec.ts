@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
 import { dirname, join } from 'path';
 import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { context as sandbox } from '../../campaignData/sandbox.js';
+import { context as sandbox } from '../fixtures/testContext.js';
 import { context as vale } from '../../campaignData/malgovia/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
