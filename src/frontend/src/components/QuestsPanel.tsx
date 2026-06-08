@@ -253,7 +253,15 @@ function QuestsPanel({ campaignId }: { campaignId: string }) {
       {(quests ?? []).map((q, i) => (
         <div
           key={q.id}
-          style={{ padding: '0.4rem 0', borderBottom: '1px solid var(--t-separator)' }}
+          // Bordered block per quest (matching the factions + NPC editors)
+          // — each quest spans many rows (title, desc, giver, steps,
+          // rewards), so an outline keeps neighbours distinct.
+          style={{
+            padding: '0.5rem 0.6rem',
+            marginBottom: '0.6rem',
+            border: '1px solid var(--t-border)',
+            borderRadius: 4,
+          }}
         >
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: '2 1 180px' }}>
