@@ -1302,7 +1302,9 @@ function RegionEditorScreen({
                             <label className={styles.formLbl} htmlFor="site-icon">
                               ICON
                             </label>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            {/* Center the select against the taller preview so the
+                                pair reads as one control. */}
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                               <select
                                 id="site-icon"
                                 className={styles.formInp}
