@@ -12,6 +12,7 @@ import CampaignContentEditor from './CampaignContentEditor.tsx';
 import FactionsPanel from './FactionsPanel.tsx';
 import MapArtPanel from './MapArtPanel.tsx';
 import MapsPanel from './MapsPanel.tsx';
+import NarrativesPanel from './NarrativesPanel.tsx';
 import QuestsPanel from './QuestsPanel.tsx';
 import RecommendedPartyPanel from './RecommendedPartyPanel.tsx';
 import styles from '../styles.module.css';
@@ -727,6 +728,11 @@ function AdminScreen({
         {selected && <RecommendedPartyPanel campaignId={selected.id} />}
         {selected && <QuestsPanel campaignId={selected.id} />}
         {selected && <FactionsPanel campaignId={selected.id} />}
+
+        {/* ── Narrative: structured editor for the ambient `narratives` flavor
+            pools (combat lines, arrivals, loot, rest). The raw JSON tab above
+            edits the same section; this is the friendly surface. ── */}
+        {selected && <NarrativesPanel campaignId={selected.id} />}
       </div>
     </div>
   );
