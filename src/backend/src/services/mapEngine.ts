@@ -7,6 +7,7 @@
 
 import {
   type CampaignData,
+  type EncounterZone,
   type FloorType,
   type GameState,
   type GridPos,
@@ -40,6 +41,11 @@ function mergeObstacles(
 /** Terrain type at a cell — defaults to `plains` for any unlisted square. */
 function terrainTypeAt(terrain: TerrainCell[] | undefined, pos: GridPos): TerrainType {
   return terrain?.find((c) => posEqual(c.pos, pos))?.type ?? 'plains';
+}
+
+/** The painted encounter zone covering a square, if any (zones never overlap). */
+function encounterZoneAt(region: Region | undefined, pos: GridPos): EncounterZone | undefined {
+  return region?.encounterZones?.find((z) => z.cells.some((c) => posEqual(c, pos)));
 }
 
 const DEFAULT_LOCAL_GRID = 10;
@@ -426,15 +432,21 @@ export function resolveMarkerMove(
     const milesPerSquare = grid.feetPerSquare / FEET_PER_MILE;
     const pace: TravelPace = st.travel_pace ?? 'normal';
     const mph = PACE_MILES_PER_HOUR[pace];
-    const chance = region?.encounterChance ?? 0;
-    const table = region?.encounterTable ?? [];
+    // Region-level chance/table are the FALLBACK for squares not in a painted
+    // encounter zone; a zone overrides either per square (see encounterZoneAt).
+    const regionChance = region?.encounterChance ?? 0;
+    const regionTable = region?.encounterTable ?? [];
+    const hasRegionPool = regionChance > 0 && regionTable.length > 0;
+    const hasZonePool = (region?.encounterZones ?? []).some(
+      (z) => (z.encounterChance ?? regionChance) > 0 && (z.encounterTable ?? regionTable).length > 0
+    );
     // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
     // production) suppresses random wilderness encounters so a scripted journey
     // reliably arrives at its destination instead of being pre-empted by an
     // ambush. Unit tests (vitest, no such env) still roll encounters.
     const encountersDisabled =
       process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true';
-    const rollEncounters = !encountersDisabled && chance > 0 && table.length > 0;
+    const rollEncounters = !encountersDisabled && (hasRegionPool || hasZonePool);
     const fatigueNotes: string[] = [];
     const crossed: GridPos[] = [from];
     let stopCell: GridPos = to;
@@ -469,9 +481,17 @@ export function resolveMarkerMove(
         elapsedMin += cellMin;
         crossed.push(cell);
       }
-      // This square's random encounter — fires the party into combat right here.
-      if (rollEncounters && Math.random() < chance * spec.encounterMult) {
-        encounter = table[Math.floor(Math.random() * table.length)];
+      // This square's random encounter — uses the painted zone's pool if the
+      // square is in one, else the region-level fallback. Fires combat right here.
+      const zone = encounterZoneAt(region, cell);
+      const cellChance = zone?.encounterChance ?? regionChance;
+      const cellTable = zone?.encounterTable ?? regionTable;
+      if (
+        rollEncounters &&
+        cellTable.length > 0 &&
+        Math.random() < cellChance * spec.encounterMult
+      ) {
+        encounter = cellTable[Math.floor(Math.random() * cellTable.length)];
         stopCell = cell;
         reachedDest = false;
         break;

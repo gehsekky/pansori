@@ -2126,9 +2126,17 @@ export interface Region extends LevelNarrationHooks {
   startPos: GridPos; // where the party marker begins
   sites: MapSite[];
   // Random travel encounters: per square crossed, an `encounterChance` roll can
-  // drop the party into a local encounter map drawn from `encounterTable`.
+  // drop the party into a local encounter map drawn from `encounterTable`. This
+  // region-level table/chance is the FALLBACK for squares not in an encounter zone.
   encounterTable?: string[];
   encounterChance?: number; // 0–1 per square moved
+  // Painted intra-region encounter zones (non-overlapping). A square inside a
+  // zone rolls from that zone's table/chance instead of the region-level ones;
+  // squares outside every zone fall back to `encounterTable`/`encounterChance`.
+  // Each square belongs to at most one zone (the dense grid carries a single
+  // `ez` tag per cell — see CampaignRegionCell). `cells` is materialized from
+  // those tags by dbRegionsToEngine.
+  encounterZones?: EncounterZone[];
   // SRD Tiers of Play (loosely) — the encounter-difficulty band of each overland
   // square, so future PROCEDURAL wilderness encounters can scale creatures to the
   // party level expected in that area. tier 1 ≈ levels 1–4, 2 ≈ 5–7, 3 ≈ 8–10
@@ -2145,6 +2153,18 @@ export interface TierZone {
   tier: number;
   from: GridPos;
   to: GridPos;
+}
+
+// A painted intra-region encounter zone — an arbitrary set of squares (`cells`)
+// that share their own wilderness encounter pool. `encounterTable`/
+// `encounterChance` fall back to the region-level values when unset. Zones never
+// overlap (one `ez` tag per grid cell). See `Region.encounterZones`.
+export interface EncounterZone {
+  id: string;
+  name?: string;
+  encounterChance?: number; // 0–1; falls back to the region's chance
+  encounterTable?: string[]; // creature names; falls back to the region's table
+  cells: GridPos[]; // squares painted into this zone (materialized from grid `ez`)
 }
 
 // A transition cell on a TOWN grid.

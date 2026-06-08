@@ -26,6 +26,7 @@
 
 import type {
   Context,
+  EncounterZone,
   Enemy,
   EnemyTemplate,
   Faction,
@@ -178,11 +179,23 @@ export interface CampaignRegionSite {
 
 // One square of the dense terrain grid: `t` is the terrain type (behavior
 // derives from the shared TERRAIN registry); `tier` / `enc` are rare
-// per-cell overrides of the region-level defaults.
+// per-cell overrides of the region-level defaults; `ez` (optional) tags the
+// square into an encounter zone (a single id per cell ⇒ zones never overlap).
 export interface CampaignRegionCell {
   t: string;
   tier?: number;
   enc?: number;
+  ez?: string;
+}
+
+// An intra-region encounter zone as authored/stored (metadata only — the cell
+// geometry lives on the grid via each cell's `ez` tag). Resolved into the engine
+// `EncounterZone` (with materialized `cells`) by dbRegionsToEngine.
+export interface CampaignEncounterZone {
+  id: string;
+  name: string;
+  encounterChance?: number;
+  encounterTable?: string[];
 }
 
 export interface CampaignRegion {
@@ -204,8 +217,11 @@ export interface CampaignRegion {
   startPos: { x: number; y: number };
   encounterChance?: number;
   // Wilderness-encounter creature names (composed bestiary). Unknown names
-  // warn-and-skip at overlay; absent/empty = no random encounters here.
+  // warn-and-skip at overlay; absent/empty = no random encounters here. This is
+  // the FALLBACK pool for squares not painted into an encounter zone.
   encounterTable?: string[];
+  // Painted intra-region encounter zones (metadata; geometry on the grid `ez`).
+  encounterZones?: CampaignEncounterZone[];
   baseTier?: number;
   // Transition cells — stored in campaign_region_sites, authored inside
   // the region's JSON. Present only when the region has sites.
@@ -227,6 +243,7 @@ interface RegionRow {
   start_y: number;
   encounter_chance: number | null;
   encounter_table: string[];
+  encounter_zones: CampaignEncounterZone[];
   base_tier: number | null;
 }
 
@@ -245,13 +262,14 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     startPos: { x: r.start_x, y: r.start_y },
     ...(r.encounter_chance !== null ? { encounterChance: r.encounter_chance } : {}),
     ...(r.encounter_table.length > 0 ? { encounterTable: r.encounter_table } : {}),
+    ...((r.encounter_zones ?? []).length > 0 ? { encounterZones: r.encounter_zones } : {}),
     ...(r.base_tier !== null ? { baseTier: r.base_tier } : {}),
   };
 }
 
 const REGION_COLUMNS = `id, name, is_starting_region, description, on_enter, feet_per_square,
        grid, start_x, start_y, encounter_chance, base_tier, on_first_enter, on_exit,
-       on_first_exit, encounter_table`;
+       on_first_exit, encounter_table, encounter_zones`;
 
 interface SiteRow {
   region_id: string;
@@ -344,9 +362,9 @@ export async function putCampaignRegions(
         `INSERT INTO campaign_regions
            (campaign_id, id, sort_order, name, is_starting_region, description,
             on_enter, feet_per_square, grid, start_x, start_y, encounter_chance, base_tier,
-            on_first_enter, on_exit, on_first_exit, encounter_table)
+            on_first_enter, on_exit, on_first_exit, encounter_table, encounter_zones)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16,
-                 $17::jsonb)`,
+                 $17::jsonb, $18::jsonb)`,
         [
           campaignId,
           r.id,
@@ -365,6 +383,7 @@ export async function putCampaignRegions(
           r.onExit ?? null,
           r.onFirstExit ?? null,
           JSON.stringify(r.encounterTable ?? []),
+          JSON.stringify(r.encounterZones ?? []),
         ]
       );
       const sites = r.sites ?? [];
@@ -1008,14 +1027,34 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
   return ordered.map((r) => {
     const terrain: TerrainCell[] = [];
     const tierZones: TierZone[] = [];
+    // Collect the painted cells of each encounter zone from the grid's `ez` tags.
+    const zoneCells = new Map<string, GridPos[]>();
     r.grid.forEach((row, y) =>
       row.forEach((cell, x) => {
         if (cell.t !== 'plains') terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
         if (cell.tier !== undefined) {
           tierZones.push({ tier: cell.tier, from: { x, y }, to: { x, y } });
         }
+        if (cell.ez) {
+          const list = zoneCells.get(cell.ez);
+          if (list) list.push({ x, y });
+          else zoneCells.set(cell.ez, [{ x, y }]);
+        }
       })
     );
+    // Materialize each registered zone with its painted cells; drop zones that
+    // ended up with no cells (deleted/empty paint) so the roll never picks them.
+    const encounterZones: EncounterZone[] = (r.encounterZones ?? [])
+      .map((z) => ({
+        id: z.id,
+        ...(z.name !== undefined ? { name: z.name } : {}),
+        ...(z.encounterChance !== undefined ? { encounterChance: z.encounterChance } : {}),
+        ...(z.encounterTable && z.encounterTable.length > 0
+          ? { encounterTable: z.encounterTable }
+          : {}),
+        cells: zoneCells.get(z.id) ?? [],
+      }))
+      .filter((z) => z.cells.length > 0);
     return {
       id: r.id,
       name: r.name,
@@ -1034,6 +1073,7 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
       ...(r.encounterTable && r.encounterTable.length > 0
         ? { encounterTable: r.encounterTable }
         : {}),
+      ...(encounterZones.length > 0 ? { encounterZones } : {}),
       ...(r.baseTier !== undefined ? { baseTier: r.baseTier } : {}),
       ...(tierZones.length > 0 ? { tierZones } : {}),
     };
@@ -1297,16 +1337,35 @@ function filterEncounterTables(
   regions: CampaignRegion[],
   templates: EnemyTemplate[]
 ): CampaignRegion[] {
-  return regions.map((r) => {
-    if (!r.encounterTable || r.encounterTable.length === 0) return r;
-    const kept = r.encounterTable.filter((name) => {
-      if (templates.some((t) => t.name === name)) return true;
+  const isKnown = (name: string) => templates.some((t) => t.name === name);
+  const filterNames = (names: string[], where: string): string[] =>
+    names.filter((name) => {
+      if (isKnown(name)) return true;
       console.warn(
-        `[campaignContent] ${campaignId}/${r.id}: no enemy template named "${name}" — encounter entry dropped`
+        `[campaignContent] ${campaignId}/${where}: no enemy template named "${name}" — encounter entry dropped`
       );
       return false;
     });
-    return kept.length === r.encounterTable.length ? r : { ...r, encounterTable: kept };
+  return regions.map((r) => {
+    let next = r;
+    // Region-level fallback table.
+    if (r.encounterTable && r.encounterTable.length > 0) {
+      const kept = filterNames(r.encounterTable, r.id);
+      if (kept.length !== r.encounterTable.length) next = { ...next, encounterTable: kept };
+    }
+    // Each painted zone's own table.
+    if (r.encounterZones && r.encounterZones.length > 0) {
+      let zonesChanged = false;
+      const zones = r.encounterZones.map((z) => {
+        if (!z.encounterTable || z.encounterTable.length === 0) return z;
+        const kept = filterNames(z.encounterTable, `${r.id}/zone:${z.id}`);
+        if (kept.length === z.encounterTable.length) return z;
+        zonesChanged = true;
+        return { ...z, encounterTable: kept };
+      });
+      if (zonesChanged) next = { ...next, encounterZones: zones };
+    }
+    return next;
   });
 }
 

@@ -62,7 +62,16 @@ interface Cell {
   t?: string;
   tier?: number;
   enc?: number;
+  ez?: string; // regions only — encounter-zone id (one per cell ⇒ no overlap)
   m?: string; // rooms only — one mechanical flag per cell
+}
+
+// A painted intra-region encounter zone (metadata; geometry is the cells' `ez`).
+interface EditorEncounterZone {
+  id: string;
+  name: string;
+  encounterChance?: number;
+  encounterTable: string[];
 }
 
 const MECH_FLAGS = ['obstacle', 'difficult', 'climb', 'swim', 'cover'] as const;
@@ -121,7 +130,8 @@ interface EditorRegion {
   onExit?: string;
   onFirstExit?: string;
   encounterChance?: number; // regions only
-  encounterTable?: string[]; // regions only — wilderness creature names
+  encounterTable?: string[]; // regions only — wilderness creature names (fallback pool)
+  encounterZones?: EditorEncounterZone[]; // regions only — painted sub-area pools
   baseTier?: number; // regions only
   floor?: string; // towns + rooms
   lighting?: string; // rooms only
@@ -251,9 +261,31 @@ const LOCAL_TERRAINS = ['cobblestone', 'garden', 'town_wall'].filter((t) =>
 ) as TerrainType[];
 const REGIONAL_TERRAINS = TERRAIN_TYPES.filter((t) => !LOCAL_TERRAINS.includes(t));
 
-type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech' | 'size';
+type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech' | 'size' | 'zone';
 
 const CELL_PX = 30;
+
+// Distinct overlay colors for painted encounter zones, assigned by index. The
+// border/tint sits over the terrain fill so a zone's extent reads at a glance.
+const ZONE_COLORS = [
+  '#e2574c',
+  '#4caf50',
+  '#2196f3',
+  '#ff9800',
+  '#9c27b0',
+  '#00bcd4',
+  '#ffeb3b',
+  '#8bc34a',
+];
+const zoneColor = (zones: { id: string }[], id: string | undefined): string | undefined =>
+  id
+    ? ZONE_COLORS[
+        Math.max(
+          0,
+          zones.findIndex((z) => z.id === id)
+        ) % ZONE_COLORS.length
+      ]
+    : undefined;
 
 function describeError(err: unknown): string {
   const e = err as { error?: string; issues?: Array<{ path: string; message: string }> };
@@ -319,8 +351,13 @@ function RegionEditorScreen({
   // names that feed the picker (ambient catalog + campaign customs).
   const [placedEnemies, setPlacedEnemies] = useState<Array<{ name: string; count: number }>>([]);
   const [monsterNames, setMonsterNames] = useState<string[]>([]);
-  // Region wilderness encounter table (creature names), edited as chips.
+  // Region wilderness encounter table (creature names), edited as chips. This is
+  // the FALLBACK pool for squares not painted into an encounter zone.
   const [encounterTable, setEncounterTable] = useState<string[]>([]);
+  // Region painted encounter zones + the currently-selected zone for the paint
+  // tool (its id, or null = the eraser, which clears a cell's zone).
+  const [zones, setZones] = useState<EditorEncounterZone[]>([]);
+  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   // Rooms only: loot placements ({item id, optional grid pos}) + the item
   // options that feed the picker (id + display name).
   const [placedLoot, setPlacedLoot] = useState<
@@ -359,6 +396,7 @@ function RegionEditorScreen({
   const [error, setError] = useState<string | null>(null);
 
   const region = regions?.find((r) => r.id === regionId) ?? null;
+  const activeZone = zones.find((z) => z.id === activeZoneId) ?? null;
 
   useEffect(() => {
     // The painter can navigate map→map without unmounting (region page →
@@ -391,6 +429,10 @@ function RegionEditorScreen({
         setMakeStarter(false);
         setCanRest(!!r.canRest);
         setEncounterTable([...(r.encounterTable ?? [])]);
+        setZones(
+          (r.encounterZones ?? []).map((z) => ({ ...z, encounterTable: [...z.encounterTable] }))
+        );
+        setActiveZoneId(r.encounterZones?.[0]?.id ?? null);
         setSites(
           kind === 'room'
             ? exitsToSites(r.exits)
@@ -554,6 +596,13 @@ function RegionEditorScreen({
           if ((cell.m ?? '') === mechBrush) return prev;
           if (mechBrush === '') delete cell.m;
           else cell.m = mechBrush;
+        } else if (tool === 'zone') {
+          // Paint the active zone onto the cell — a repaint reassigns it (one
+          // `ez` per cell ⇒ zones never overlap). A null active zone erases.
+          const target = activeZoneId ?? undefined;
+          if ((cell.ez ?? undefined) === target) return prev;
+          if (target === undefined) delete cell.ez;
+          else cell.ez = target;
         } else {
           // tier tool: 0 clears the override.
           if (tierBrush === 0) delete cell.tier;
@@ -565,7 +614,18 @@ function RegionEditorScreen({
       });
       setDirty(true);
     },
-    [tool, terrainBrush, tierBrush, mechBrush, sites, selectedSiteId, moveArmed, kind, placeArm]
+    [
+      tool,
+      terrainBrush,
+      tierBrush,
+      mechBrush,
+      activeZoneId,
+      sites,
+      selectedSiteId,
+      moveArmed,
+      kind,
+      placeArm,
+    ]
   );
 
   // Patch the selected site; clearing a kind's target also clears the
@@ -773,6 +833,17 @@ function RegionEditorScreen({
       else next.baseTier = Number(details.baseTier);
       if (encounterTable.length > 0) next.encounterTable = encounterTable;
       else delete next.encounterTable;
+      // Encounter zones (metadata; the cells' `ez` tags carry the geometry).
+      if (zones.length > 0) {
+        next.encounterZones = zones.map((z) => ({
+          id: z.id,
+          name: z.name,
+          ...(z.encounterChance !== undefined ? { encounterChance: z.encounterChance } : {}),
+          ...(z.encounterTable.length > 0 ? { encounterTable: z.encounterTable } : {}),
+        })) as EditorEncounterZone[];
+      } else {
+        delete next.encounterZones;
+      }
       if (makeStarter) next.isStartingRegion = true;
     } else {
       if (details.floor === '') delete next.floor;
@@ -959,6 +1030,7 @@ function RegionEditorScreen({
                       [
                         ['terrain', 'TERRAIN'],
                         ...(kind === 'region' ? [['tier', 'TIER'] as [Tool, string]] : []),
+                        ...(kind === 'region' ? [['zone', 'ENC. ZONES'] as [Tool, string]] : []),
                         ...(kind === 'room' ? [['mech', 'MECHANICS'] as [Tool, string]] : []),
                         ['start', kind === 'room' ? 'ENTRY POS' : 'START POS'],
                         ['site', `${markerNoun}S`],
@@ -1072,6 +1144,247 @@ function RegionEditorScreen({
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {tool === 'zone' && (
+                  <div>
+                    <p className={styles.formLbl}>
+                      ENCOUNTER ZONES (PAINT NON-OVERLAPPING AREAS; EACH ROLLS ITS OWN CREATURES)
+                    </p>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 6,
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        marginBottom: 8,
+                      }}
+                    >
+                      {zones.map((z) => (
+                        <button
+                          key={z.id}
+                          className={styles.ghostBtn}
+                          aria-pressed={activeZoneId === z.id}
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            fontSize: '0.7rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            borderColor: activeZoneId === z.id ? 'var(--t-primary)' : undefined,
+                          }}
+                          onClick={() => setActiveZoneId(z.id)}
+                        >
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              width: 12,
+                              height: 12,
+                              display: 'inline-block',
+                              background: zoneColor(zones, z.id),
+                              border: '1px solid rgba(0,0,0,0.4)',
+                            }}
+                          />
+                          {z.name}
+                        </button>
+                      ))}
+                      <button
+                        className={styles.ghostBtn}
+                        aria-pressed={activeZoneId === null}
+                        title="Erase a cell's zone"
+                        style={{
+                          padding: '0.25rem 0.6rem',
+                          fontSize: '0.7rem',
+                          borderColor: activeZoneId === null ? 'var(--t-primary)' : undefined,
+                        }}
+                        onClick={() => setActiveZoneId(null)}
+                      >
+                        ERASER
+                      </button>
+                      <button
+                        className={styles.ghostBtn}
+                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+                        onClick={() => {
+                          const used = new Set(zones.map((z) => z.id));
+                          let n = zones.length + 1;
+                          let id = `zone-${n}`;
+                          while (used.has(id)) id = `zone-${++n}`;
+                          setZones((prev) => [
+                            ...prev,
+                            { id, name: `Zone ${n}`, encounterTable: [] },
+                          ]);
+                          setActiveZoneId(id);
+                          setDirty(true);
+                          setSaved(false);
+                        }}
+                      >
+                        + NEW ZONE
+                      </button>
+                    </div>
+                    {activeZone && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 12,
+                            flexWrap: 'wrap',
+                            alignItems: 'flex-end',
+                          }}
+                        >
+                          <div>
+                            <label className={styles.formLbl} htmlFor="zone-name">
+                              ZONE NAME
+                            </label>
+                            <input
+                              id="zone-name"
+                              className={styles.formInp}
+                              value={activeZone.name}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setZones((prev) =>
+                                  prev.map((z) => (z.id === activeZone.id ? { ...z, name: v } : z))
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            />
+                          </div>
+                          <div style={{ flex: '0 0 150px' }}>
+                            <label className={styles.formLbl} htmlFor="zone-chance">
+                              CHANCE (0–1, blank = region)
+                            </label>
+                            <input
+                              id="zone-chance"
+                              className={styles.formInp}
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              placeholder="region default"
+                              value={activeZone.encounterChance ?? ''}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setZones((prev) =>
+                                  prev.map((z) =>
+                                    z.id === activeZone.id
+                                      ? {
+                                          ...z,
+                                          encounterChance: raw === '' ? undefined : Number(raw),
+                                        }
+                                      : z
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            />
+                          </div>
+                          <button
+                            className={styles.ghostBtn}
+                            style={{
+                              padding: '0.25rem 0.6rem',
+                              fontSize: '0.7rem',
+                              color: 'var(--t-hp-low)',
+                            }}
+                            title="Delete this zone and clear its painted cells"
+                            onClick={() => {
+                              const id = activeZone.id;
+                              setGrid((prev) =>
+                                prev.map((row) =>
+                                  row.map((c) => {
+                                    if (c.ez !== id) return c;
+                                    const nextCell = { ...c };
+                                    delete nextCell.ez;
+                                    return nextCell;
+                                  })
+                                )
+                              );
+                              setZones((prev) => prev.filter((z) => z.id !== id));
+                              setActiveZoneId((cur) => (cur === id ? null : cur));
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          >
+                            DELETE ZONE
+                          </button>
+                        </div>
+                        <div>
+                          <p className={styles.formLbl}>
+                            ENCOUNTER TABLE (blank = use the region table)
+                          </p>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 6,
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            {activeZone.encounterTable.map((name) => (
+                              <button
+                                key={name}
+                                className={styles.ghostBtn}
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                                title="Remove from this zone's table"
+                                onClick={() => {
+                                  setZones((prev) =>
+                                    prev.map((z) =>
+                                      z.id === activeZone.id
+                                        ? {
+                                            ...z,
+                                            encounterTable: z.encounterTable.filter(
+                                              (nm) => nm !== name
+                                            ),
+                                          }
+                                        : z
+                                    )
+                                  );
+                                  setDirty(true);
+                                  setSaved(false);
+                                }}
+                              >
+                                {name} ✕
+                              </button>
+                            ))}
+                            <select
+                              className={styles.formInp}
+                              style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
+                              aria-label="Add zone creature"
+                              value=""
+                              onChange={(ev) => {
+                                const name = ev.target.value;
+                                if (!name) return;
+                                setZones((prev) =>
+                                  prev.map((z) =>
+                                    z.id === activeZone.id
+                                      ? z.encounterTable.includes(name)
+                                        ? z
+                                        : { ...z, encounterTable: [...z.encounterTable, name] }
+                                      : z
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            >
+                              <option value="">+ ADD CREATURE…</option>
+                              {monsterNames.map((n) => (
+                                <option key={n} value={n}>
+                                  {n}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {!activeZone && zones.length === 0 && (
+                      <p className={styles.formLbl} style={{ color: 'var(--t-dim)' }}>
+                        No zones yet — add one, then paint cells. Unpainted cells use the region’s
+                        ENCOUNTER TABLE.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1528,7 +1841,8 @@ function RegionEditorScreen({
                         tabIndex={0}
                         aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}${cellNpc ? ` (npc: ${cellNpc.name})` : ''}${cellObject ? ` (object: ${cellObject.name})` : ''}`}
                         data-testid={`cell-${x}-${y}`}
-                        title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${site ? ` — ${site.name}` : ''}`}
+                        data-zone={cell.ez ?? undefined}
+                        title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.ez ? ` {zone: ${zones.find((z) => z.id === cell.ez)?.name ?? cell.ez}}` : ''}${site ? ` — ${site.name}` : ''}`}
                         style={{
                           width: CELL_PX,
                           height: CELL_PX,
@@ -1544,6 +1858,10 @@ function RegionEditorScreen({
                           justifyContent: 'center',
                           fontSize: 14,
                           outline: 'none',
+                          // Encounter-zone overlay: an inset border tinted to the zone.
+                          boxShadow: cell.ez
+                            ? `inset 0 0 0 3px ${zoneColor(zones, cell.ez)}`
+                            : undefined,
                         }}
                         onMouseDown={(e) => {
                           e.preventDefault();

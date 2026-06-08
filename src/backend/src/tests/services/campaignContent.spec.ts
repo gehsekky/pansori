@@ -239,6 +239,7 @@ function makeContentDb(initial: {
         on_exit: p[13],
         on_first_exit: p[14],
         encounter_table: p[15] !== undefined ? JSON.parse(p[15] as string) : [],
+        encounter_zones: p[16] !== undefined ? JSON.parse(p[16] as string) : [],
       }));
       return { rows, rowCount: rows.length };
     }

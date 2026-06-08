@@ -277,6 +277,10 @@ const TerrainCellSchema = z
     t: z.enum(Object.keys(TERRAIN) as [string, ...string[]]),
     tier: z.number().int().min(1).max(4).optional(),
     enc: z.number().min(0).max(1).optional(),
+    // Encounter-zone tag: the id of the encounter zone this square belongs to
+    // (one per cell ⇒ zones never overlap). Validated against the region's
+    // `encounterZones` ids in the region superRefine below.
+    ez: z.string().min(1).max(40).optional(),
   })
   .strict();
 
@@ -341,8 +345,25 @@ const RegionsSchema = z
         // Random-encounter roll per square crossed (0–1).
         encounterChance: z.number().min(0).max(1).optional(),
         // The creatures those rolls materialize — composed-bestiary names
-        // (unknown names warn-and-skip at overlay time).
+        // (unknown names warn-and-skip at overlay time). This is the FALLBACK
+        // pool for squares not painted into an encounter zone.
         encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
+        // Painted intra-region encounter zones (metadata only — the geometry is
+        // the grid cells' `ez` tags). A zone's table/chance override the
+        // region-level ones for its squares.
+        encounterZones: z
+          .array(
+            z
+              .object({
+                id: SLUG,
+                name: z.string().min(1).max(80),
+                encounterChance: z.number().min(0).max(1).optional(),
+                encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
+              })
+              .strict()
+          )
+          .max(32)
+          .optional(),
         // SRD tiers of play (1 ≈ L1–4, 2 ≈ L5–7, 3 ≈ L8–10).
         baseTier: z.number().int().min(1).max(4).optional(),
         // Transition cells. Omitted = a region with no sites (yet).
@@ -408,6 +429,30 @@ const RegionsSchema = z
             });
           }
         });
+        // Encounter zones: unique ids, and every cell `ez` tag must reference a
+        // declared zone (so a painted square can't point at a deleted zone).
+        const zoneIds = new Set<string>();
+        (r.encounterZones ?? []).forEach((zone, i) => {
+          if (zoneIds.has(zone.id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `duplicate encounter zone id "${zone.id}"`,
+              path: ['encounterZones', i, 'id'],
+            });
+          }
+          zoneIds.add(zone.id);
+        });
+        r.grid.forEach((row, y) =>
+          row.forEach((cell, x) => {
+            if (cell.ez && !zoneIds.has(cell.ez)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `cell (${x},${y}) references unknown encounter zone "${cell.ez}"`,
+                path: ['grid', y, x, 'ez'],
+              });
+            }
+          })
+        );
       })
   )
   .min(1)

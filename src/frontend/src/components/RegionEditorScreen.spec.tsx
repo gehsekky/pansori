@@ -129,6 +129,33 @@ describe('RegionEditorScreen', () => {
     expect(screen.getByTestId('cell-1-1').getAttribute('aria-label')).not.toContain('tier');
   });
 
+  it('zone tool paints cells, reassigns on overlap, and saves encounterZones', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    // Create the first zone (auto-selected) and paint (0,0).
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    expect(screen.getByTestId('cell-0-0').getAttribute('data-zone')).toBe('zone-1');
+    // Give the zone a creature from the pool.
+    fireEvent.change(screen.getByLabelText('Add zone creature'), { target: { value: 'Wolf' } });
+    // Create a SECOND zone and repaint the SAME cell — non-overlap reassigns it.
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    expect(screen.getByTestId('cell-0-0').getAttribute('data-zone')).toBe('zone-2');
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const [, , value] = mocked.putCampaignSection.mock.calls[0];
+    const saved = (value as Array<Record<string, unknown>>)[0];
+    const zones = saved.encounterZones as Array<{ id: string; encounterTable?: string[] }>;
+    expect(zones.map((z) => z.id)).toEqual(['zone-1', 'zone-2']);
+    expect(zones[0].encounterTable).toEqual(['Wolf']);
+    // The painted cell carries the (reassigned) zone id; no cell holds two zones.
+    const grid = saved.grid as Array<Array<{ ez?: string }>>;
+    expect(grid[0][0].ez).toBe('zone-2');
+  });
+
   it('start tool relocates the marker', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
