@@ -20,6 +20,26 @@
 > Orc moved inline into sandbox; the catalog sync now prunes removed ids).
 > Also this session: the MAP ART editor (terrain tints, town-marker tiles,
 > floor skins, level tabs).
+>
+> **Session 2026-06-07 (continued):** (1) **art** — imported the full
+> purchased David Baumgart packs: Tile Basic Terrain Set (14 biomes × 4
+> painted variants, per-cell variant picker; 8 new biomes incl. desert /
+> woodlands / void) + Tile Medieval Fantasy Locations (29 marker
+> families replacing the Tiny Swords composites — castles, ruins, mines,
+> barrows…), with `tile:<id>` site icons resolving through both
+> catalogs. (2) **DB-campaign parity promotion pass** — `theme` section
+> (partial CSS merged over the donor theme), `backgrounds` /
+> `classSpells` / `classStartingLoot` / `classStartingEquipment`
+> sections, the Malgovia-parity dialogue arms (advance_quest /
+> add_narrative / modify_hp / consume_item), and the `npc_id` quest
+> fact; Malgovia's dialogue + quests are now fully DB-expressible (only
+> its 8 GameRules remain code-bound). (3) **tests relocated** to
+> `src/backend/src/tests/` (mirrored tree, 325 spec files, prod image
+> ships zero compiled specs via tsconfig.build.json). (4) **creator UX**
+> — region-page ROOMS panel (dungeon authoring without a town detour);
+> sites editor icon DROPDOWN with painted previews + town sites honoring
+> per-site icons; bottom-aligned tile previews (overhang-aware) across
+> the sites editor + MAP ART panel; halved map-grid bleed padding.
 
 ## End-goal target
 
@@ -33,9 +53,10 @@ PHB/DMG-exclusive content (subclasses, feats, species, spells). See
 
 ## Implementation status (code-verified 2026-06-07)
 
-Grounded in a code survey + the full suite: **backend 3065 tests across
-325 files + frontend 339 across 42 files, all green** (lint + typecheck +
-prettier clean).
+Grounded in a code survey + the full suite: **backend 3073 tests across
+325 files + frontend 344 across 42 files, all green** (lint + typecheck +
+prettier clean). Backend specs live under `src/backend/src/tests/`
+(mirroring the source tree).
 
 ### Done — world map / navigation
 
