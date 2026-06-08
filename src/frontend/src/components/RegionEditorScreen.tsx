@@ -1,5 +1,35 @@
 import DialogueEditor, { type DialogueNode } from './DialogueEditor.tsx';
-import { TERRAIN, type TerrainType } from '../shared-types.ts';
+import { MARKER_TILES, TERRAIN, TERRAIN_TILES, type TerrainType } from '../shared-types.ts';
+
+// ─── Site icon options (the SITES tool's ICON dropdown) ──────────────────────
+//
+// A site's icon is either '' (the default dungeon-gate glyph), a
+// 'tile:<id>' painted tile — markers (location paintings) first, terrain
+// tiles second — or a legacy game-icons glyph kept as a "(custom)" entry.
+const siteIconOptions: Array<{ value: string; label: string; group: 'marker' | 'terrain' }> = [
+  ...Object.entries(MARKER_TILES).map(([id, spec]) => ({
+    value: `tile:${id}`,
+    label: spec.label.toUpperCase(),
+    group: 'marker' as const,
+  })),
+  ...Object.entries(TERRAIN_TILES).map(([id, spec]) => ({
+    value: `tile:${id}`,
+    label: spec.label.toUpperCase(),
+    group: 'terrain' as const,
+  })),
+];
+
+// The painted preview for a 'tile:<id>' icon (variant 1, matching what the
+// overworld renderer pins landmarks to). Glyph / custom icons → null.
+function siteIconPreview(icon: string | undefined): string | null {
+  if (!icon?.startsWith('tile:')) return null;
+  const id = icon.slice('tile:'.length);
+  const marker = (MARKER_TILES as Partial<Record<string, { base: string }>>)[id];
+  if (marker) return `/art/markers/${marker.base}_1.png`;
+  const terrain = (TERRAIN_TILES as Partial<Record<string, { base: string }>>)[id];
+  if (terrain) return `/art/tiles/${terrain.base}_1.png`;
+  return null;
+}
 import { useCallback, useEffect, useState } from 'react';
 import MapsPanel from './MapsPanel.tsx';
 import { api } from '../lib/api.ts';
@@ -1267,31 +1297,76 @@ function RegionEditorScreen({
                           </div>
                         )}
                         {kind === 'region' && (
-                          <div style={{ flex: '1 1 110px' }}>
+                          <div style={{ flex: '1 1 180px' }}>
                             <label className={styles.formLbl} htmlFor="site-icon">
                               ICON
                             </label>
-                            <input
-                              id="site-icon"
-                              className={styles.formInp}
-                              placeholder="default"
-                              value={selectedSite.icon ?? ''}
-                              onChange={(e) =>
-                                updateSite(selectedSite.id, { icon: e.target.value })
-                              }
-                            />
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <select
+                                id="site-icon"
+                                className={styles.formInp}
+                                style={{ cursor: 'pointer', flex: 1 }}
+                                value={selectedSite.icon ?? ''}
+                                onChange={(e) =>
+                                  updateSite(selectedSite.id, { icon: e.target.value })
+                                }
+                              >
+                                <option value="">— DEFAULT (DUNGEON GLYPH) —</option>
+                                {/* A legacy game-icons glyph (or any value not in the
+                                    catalogs) stays editable — listed, not dropped. */}
+                                {selectedSite.icon &&
+                                  !siteIconOptions.some((o) => o.value === selectedSite.icon) && (
+                                    <option value={selectedSite.icon}>
+                                      {selectedSite.icon} (custom)
+                                    </option>
+                                  )}
+                                <optgroup label="LOCATIONS">
+                                  {siteIconOptions
+                                    .filter((o) => o.group === 'marker')
+                                    .map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="TERRAIN">
+                                  {siteIconOptions
+                                    .filter((o) => o.group === 'terrain')
+                                    .map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                </optgroup>
+                              </select>
+                              {/* Live preview of the painted site tile (variant 1 —
+                                  what the overworld will draw). Glyph/custom icons
+                                  have no painting to preview. */}
+                              {siteIconPreview(selectedSite.icon) && (
+                                <img
+                                  src={siteIconPreview(selectedSite.icon)!}
+                                  alt="site tile preview"
+                                  width={40}
+                                  height={60}
+                                  style={{ display: 'block', border: '1px solid var(--t-line)' }}
+                                />
+                              )}
+                            </div>
                           </div>
                         )}
                         {kind === 'region' && (
                           // Sites only — venues/exits carry no narration hook
-                          // (the schema would reject one).
-                          <div style={{ flex: '2 1 200px' }}>
+                          // (the schema would reject one). Full-width, sized
+                          // like the map-level NARRATION HOOKS fields.
+                          <div style={{ flexBasis: '100%' }}>
                             <label className={styles.formLbl} htmlFor="site-on-enter">
                               ON ENTER NARRATION
                             </label>
-                            <input
+                            <textarea
                               id="site-on-enter"
                               className={styles.formInp}
+                              rows={3}
+                              style={{ resize: 'vertical' }}
                               placeholder="none"
                               value={selectedSite.onEnter ?? ''}
                               onChange={(e) =>

@@ -1163,3 +1163,70 @@ describe('region page — the hosted ROOMS panel (dungeon interiors)', () => {
     expect([...entry.options].map((o) => o.value)).toContain('pit');
   });
 });
+
+describe('region SITES card — icon dropdown + tile preview', () => {
+  it('offers painted tiles, previews the pick, and preserves legacy glyph icons', async () => {
+    render(
+      <RegionEditorScreen
+        campaignId="camp"
+        regionId="proving-grounds"
+        kind="region"
+        onBack={vi.fn()}
+      />
+    );
+    await screen.findByDisplayValue('The Proving Grounds');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-2-1')); // select The Pit
+    const icon = (await screen.findByLabelText('ICON')) as HTMLSelectElement;
+    // Default = the dungeon glyph; no painted preview shown.
+    expect(icon.value).toBe('');
+    expect(screen.queryByAltText('site tile preview')).toBeNull();
+    // The dropdown carries marker locations AND terrain tiles as tile: ids.
+    const values = [...icon.options].map((o) => o.value);
+    expect(values).toContain('tile:barrow');
+    expect(values).toContain('tile:mine');
+    expect(values).toContain('tile:forest');
+    // Picking one shows the painted variant-1 preview.
+    fireEvent.change(icon, { target: { value: 'tile:barrow' } });
+    expect((screen.getByAltText('site tile preview') as HTMLImageElement).getAttribute('src')).toBe(
+      '/art/markers/barrow_1.png'
+    );
+    // The on-enter narration is now a full-width textarea below the row.
+    expect((screen.getByLabelText('ON ENTER NARRATION') as HTMLTextAreaElement).tagName).toBe(
+      'TEXTAREA'
+    );
+  });
+
+  it('a legacy game-icons glyph value survives as a (custom) option', async () => {
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'regions'
+        ? {
+            section,
+            source: 'db',
+            value: [
+              {
+                ...REGION,
+                sites: [{ ...REGION.sites[0], icon: 'tombstone' }],
+              },
+              OTHER,
+            ],
+          }
+        : { section, source: 'db', value: [] }
+    );
+    render(
+      <RegionEditorScreen
+        campaignId="camp"
+        regionId="proving-grounds"
+        kind="region"
+        onBack={vi.fn()}
+      />
+    );
+    await screen.findByDisplayValue('The Proving Grounds');
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-2-1'));
+    const icon = (await screen.findByLabelText('ICON')) as HTMLSelectElement;
+    expect(icon.value).toBe('tombstone'); // kept, not clobbered
+    expect([...icon.options].some((o) => o.text.includes('(custom)'))).toBe(true);
+    expect(screen.queryByAltText('site tile preview')).toBeNull(); // glyphs have no painting
+  });
+});
