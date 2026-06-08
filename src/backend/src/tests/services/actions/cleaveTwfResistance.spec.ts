@@ -14,7 +14,7 @@
 // weapon's damageType + the secondary target's enemy data.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { makeChar, makeState, mockRandom } from '../../../test-fixtures.js';
+import { makeChar, makeState } from '../../../test-fixtures.js';
 import type { Seed } from '../../../types.js';
 import { context as ctx } from '../../fixtures/testContext.js';
 import { takeAction } from '../../../services/gameEngine.js';
@@ -60,9 +60,9 @@ const cleaveSeed: Seed = {
 
 describe('Cleave damage — enemy resistance applied', () => {
   it('Cleave halves slashing damage against a slashing-resistant second target', async () => {
-    // Force d20=20 + max damage. Greataxe damage 1d12 with the Cleave
-    // mastery; max roll = 12, halved by resistance = 6.
-    mockRandom(0.99);
+    // Force d20=20 + max damage on EVERY roll (the main swing AND the Cleave
+    // attack roll) — a constant mock, so the cleave reliably hits and isn't flaky.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const pc = makeChar({
       id: 'pc-1',
       character_class: 'Fighter',
@@ -157,7 +157,7 @@ const twfSeed: Seed = {
 
 describe('Two-Weapon off-hand damage — enemy resistance applied', () => {
   it('off-hand dagger (piercing) halves damage against piercing-resistant target', async () => {
-    mockRandom(0.99); // hit + max damage
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // hit + max damage on every roll
     const pc = makeChar({
       id: 'pc-1',
       character_class: 'Fighter',
