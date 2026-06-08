@@ -1,0 +1,13 @@
+{
+  // The BUILD project: emits dist/index.js for the production image.
+  // Spec files are excluded — tests live under tests/ (and the few not
+  // yet migrated under src/ shouldn't ship compiled into the image).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/**/*.spec.ts"]
+}
