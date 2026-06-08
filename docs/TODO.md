@@ -341,6 +341,60 @@ a handful of **bounded subsystems**.
 > structured tints, town-marker tiles, floor skins, REGIONAL / TOWN &
 > LOCAL tabs, theme presets.
 
+### Code-vs-DB capability gap (audited 2026-06-07)
+
+> **Where DB campaigns already have full parity:** the 13 editable
+> sections cover nearly the whole authoring surface, and the schemas are
+> NOT cut-down versions. World model (regions with encounterChance /
+> encounterTable / tiers + per-cell overrides / region-gate sites, towns,
+> rooms with enemies / loot / NPCs / objects / traps / lighting / floor /
+> rest / exits / the full narration-hook matrix). **Custom monsters carry
+> the entire EnemyTemplate surface** — phases, legendary actions + pool,
+> lair actions, regeneration, breath weapons, auras, drops — a DB boss can
+> be as mechanically rich as the Crypt Lord. Custom items get wornEffects /
+> curses / attunement / masteries / values. Dialogue gets checks / once /
+> vendors / parley; `RoomNpcSchema` even carries `icon` (only the picker
+> UI is missing). `narratives` is schema-complete incl. the
+> combatStart / shortRest / longRest overrides — it lacks only a
+> structured editor. All of it live via `refreshCampaignOverlay`.
+
+What code campaigns can still do that DB campaigns cannot, by impact:
+
+- [ ] **FE theme** — `App.tsx getCtx`: `CONTEXTS[context_id] ?? sandboxContext`;
+      only malgovia/sandbox have FE contexts, so every DB campaign renders
+      with the sandbox theme (colors, fonts, donor title). The most
+      player-visible gap; cheapest high-impact win: a `theme` JSONB section
+      validated against the `Theme` shape, applied via the existing
+      `applyTheme`, sandbox as fallback.
+- [ ] **Class & creation configuration** — everything from `classSkills`
+      through `classStartingEquipment`, plus `backgrounds`, `classSpells`,
+      `spellcastingAbility`, `featTable`, `spellTable`: DB campaigns inherit
+      the base template unchangeably; code campaigns can theme any of it
+      (custom backgrounds, trimmed spell lists…). Big surface — port
+      piecemeal as authoring demands, starting with `backgrounds` +
+      `classStartingEquipment`.
+- [ ] **`rules` engine hook** (`GameRule[]`) — json-rules-engine conditions
+      firing arbitrary consequences with priority + once semantics. Pure
+      code-side scripting today; no DB section. Would need the same
+      condition-vocabulary treatment dialogue gates got.
+- [ ] **The full consequence union** — DB dialogue/quest rewards are limited
+      to the safe six (set_flag, set_npc_attitude, give_gold, give_xp,
+      give_item, start_quest). Code can also fire add_narrative, modify_hp,
+      unlock_room, spawn_enemy, set_escape, advance_quest, set_faction_rep,
+      travel_to. Safest next promotions: **set_faction_rep + advance_quest**;
+      spawn_enemy/unlock_room would let DB dialogue spring ambushes and open
+      doors.
+- [ ] **Campaign-meta knobs with no section** — `recommendedPartySize`,
+      `recommendedComposition` (creation auto-fill), `defaultStartingLoot`,
+      `displayNoun`, default `gridWidth`/`gridHeight`.
+- [ ] **Room tactical extras** — `coverPositions` (half/three-quarter cover)
+      isn't paintable in the DB room schema. (The legacy obstacle/climb/swim
+      lists are superseded by typed terrain painting; cover genuinely isn't.)
+- [ ] **Procgen** — sandbox's roguelike dungeon generator is code; DB
+      campaigns are fully authored content only. Likely permanent.
+
+### Creator backlog (smaller)
+
 - [ ] **Narratives section editor** — the last JSON-only section with a
       natural structured surface (keyed string-lists).
 - [ ] **Venue-level narration hooks** — venues carry only the per-landing
@@ -348,7 +402,8 @@ a handful of **bounded subsystems**.
       four).
 - [ ] **Dialogue follow-ups (as authoring demands)** — `say` field (menu
       label vs spoken line), `goto`/node-ids for hub-and-spoke trees,
-      mid-combat surrender, NPC ICON sprite picker (`/art/sprites` stems).
+      mid-combat surrender, NPC ICON sprite picker (`/art/sprites` stems;
+      the schema already stores `icon`).
 - [ ] **Region-page ROOMS panel (if needed)** — rooms are created via a
       town's hosted panel today; dungeon interiors for region local sites
       have no home-page panel (the top-level one was removed).
