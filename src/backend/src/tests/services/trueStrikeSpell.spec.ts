@@ -2,7 +2,7 @@
 // spellcasting ability for the attack + damage rolls, plus a scaling Radiant
 // rider (L5 1d6, L11 2d6, L17 3d6). Mechanized in castSpell/index.ts — it
 // reuses the to-hit pipeline + resolvePlayerAttack with the ability swapped to
-// the casting stat. A low-STR / high-INT Wizard proves the swap (the dagger
+// the casting stat. A low-STR / high-INT Wizard proves the swap (the mace
 // damage carries the INT modifier, not STR).
 
 import type { Character, Enemy, GameState, Seed } from '../../types.js';
@@ -43,8 +43,8 @@ function casterCombat(over: Partial<Character> = {}): GameState {
     spell_slots_used: {},
     spells_known: ['true_strike'],
     prepared_spells: ['true_strike'],
-    inventory: [{ instance_id: 'w1', id: 'dagger', name: 'Dagger' }],
-    equipment: { weapon: 'w1' },
+    inventory: [{ instance_id: 'w1', id: 'mace', name: 'Mace' }],
+    equipment: { main_hand: 'w1' },
     ...over,
   });
   return {
@@ -85,8 +85,8 @@ const enemyHp = (r: { newState: GameState }) =>
 
 describe('True Strike — weapon attack via the spellcasting ability + Radiant rider', () => {
   it('hits with the casting modifier and adds the L5 Radiant rider', async () => {
-    // random 0.5 → d20 = 11 (hit vs AC 12 with +3 INT +3 prof = 17); dagger 1d4 = 3;
-    // radiant 1d6 = 4. Total = 3 + 3 (INT) + 4 = 10. (If STR -1 were used: only 6.)
+    // random 0.5 → d20 = 11 (hit vs AC 12 with +3 INT +3 prof = 17); mace 1d6 = 4;
+    // radiant 1d6 = 4. Total = 4 + 3 (INT) + 4 = 11. (If STR -1 were used: only 7.)
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const r = await takeAction({
       action: { type: 'cast_spell', spellId: 'true_strike', slotLevel: 0, targetEnemyId: ENEMY },
@@ -95,7 +95,7 @@ describe('True Strike — weapon attack via the spellcasting ability + Radiant r
       seed,
       context: ctx,
     });
-    expect(60 - enemyHp(r)).toBe(10);
+    expect(60 - enemyHp(r)).toBe(11);
   });
 
   it('below level 5 there is no Radiant rider', async () => {
@@ -107,7 +107,7 @@ describe('True Strike — weapon attack via the spellcasting ability + Radiant r
       seed,
       context: ctx,
     });
-    // dagger 3 + INT 3, prof at L4 is still +2 → to-hit 11+3+2=16 ≥ 12 hit; no rider.
-    expect(60 - enemyHp(r)).toBe(6);
+    // mace 4 + INT 3, prof at L4 is still +2 → to-hit 11+3+2=16 ≥ 12 hit; no rider.
+    expect(60 - enemyHp(r)).toBe(7);
   });
 });

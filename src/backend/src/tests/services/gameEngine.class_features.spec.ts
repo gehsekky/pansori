@@ -1402,7 +1402,10 @@ describe('class features', () => {
 
   // ── Counterspell (reactive spell, SRD) ────────────────────────────────
 
-  it('Accepting Counterspell consumes a 3rd-level slot, auto-counters lvl-1 enemy spell', async () => {
+  it('Accepting Counterspell burns a ≥L3 slot; enemy fails its CON save → spell countered', async () => {
+    // SRD 5.2.1: the enemy makes a CON save vs the counterspeller's spell save
+    // DC. Wizard L5 int 16 → DC 8 + prof 3 + int +3 = 14. random 0.5 → d20 = 11;
+    // goblin con 10 (+0) → save 11 < 14 → fails → the spell is unraveled.
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const wizId = 'wiz-cs';
     const goblinId = `${CORRIDOR_ID}#0`;
@@ -1457,7 +1460,7 @@ describe('class features', () => {
         targetCharId: wizId,
         intendedTargetPcId: wizId,
         enemySpellId: 'fire_bolt',
-        enemySpellLevel: 0, // cantrip — auto-counter
+        enemySpellLevel: 0,
         enemySpellName: 'Fire Bolt',
         resumeFromInitiativeIdx: 0,
         resumeFromMultiattackIdx: 0,
@@ -1582,8 +1585,10 @@ describe('class features', () => {
     expect(result.newState.pending_reaction).toBeUndefined();
   });
 
-  it('Counterspell at lvl-3 slot vs lvl-5 enemy spell requires ability check', async () => {
-    // Force int-based check to barely succeed: d20=20 (random=0.999) +int mod +prof
+  it('Counterspell fails when the enemy succeeds its CON save → spell bursts through', async () => {
+    // SRD 5.2.1: a SUCCESSFUL enemy CON save lets the spell resolve. Wizard L5
+    // int 18 → DC 8 + prof 3 + int +4 = 15. random 0.999 → d20 = 20; goblin con
+    // 10 (+0) → save 20 ≥ 15 → succeeds → Fire Bolt resolves and deals damage.
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     const wizId = 'wiz-cs-check';
     const goblinId = `${CORRIDOR_ID}#0`;
@@ -1638,8 +1643,8 @@ describe('class features', () => {
         targetCharId: wizId,
         intendedTargetPcId: wizId,
         enemySpellId: 'fire_bolt',
-        enemySpellLevel: 5, // forces ability check
-        enemySpellName: 'Fire Bolt (5th)',
+        enemySpellLevel: 0,
+        enemySpellName: 'Fire Bolt',
         resumeFromInitiativeIdx: 0,
         resumeFromMultiattackIdx: 0,
         narrativeSoFar: "[Goblin's turn]",
@@ -1665,10 +1670,13 @@ describe('class features', () => {
       seed: seedWithEnemy,
       context: ctx,
     });
-    // Either INT check or AUTO-counter — but spell level 5 > slot level 3
-    // means ability check fires. With d20=20 + INT mod (+4) + prof (+3) = 27 vs DC 15, success.
-    expect(result.narrative).toMatch(/INT check|ability check/i);
-    expect(result.narrative).toMatch(/success/);
+    // The enemy's save succeeds → Counterspell fails, the spell resolves.
+    expect(result.narrative).toMatch(/COUNTERSPELL/);
+    expect(result.narrative).toMatch(/bursts through|resolves/);
+    const newWiz = result.newState.characters[0];
+    expect(newWiz.spell_slots_used?.[3]).toBe(1); // slot still spent on the attempt
+    expect(newWiz.turn_actions.reaction_used).toBe(true);
+    expect(newWiz.hp).toBeLessThan(30); // Fire Bolt landed
   });
 
   // ── Sneak Attack (Rogue in sandbox) ─────────────────────────────────────────

@@ -1,5 +1,5 @@
 import type { Character, GameState } from '../../types.js';
-import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../rulesEngine.js';
+import { FRESH_TURN, abilityMod, profBonus, rollDice, spellSaveDC } from '../rulesEngine.js';
 import {
   applyEnemySpellDamage,
   applyPartyLevelUps,
@@ -78,9 +78,9 @@ export const handleUseReaction: ActionHandler<{ type: 'use_reaction' }> = (ctx) 
  *  - shield: +5 AC defensive cast. Burns lowest available slot.
  *  - hellish_rebuke: 2d10 fire counter-attack (DEX save halves).
  *    Tieflings have a 1/long-rest racial slot first.
- *  - counterspell: interrupt the enemy spell (auto if slot ≥ enemy
- *    spell level, ability check otherwise). Decline → enemy spell
- *    resolves on the intended target via applyEnemySpellDamage.
+ *  - counterspell: interrupt the enemy spell — the enemy makes a CON save vs
+ *    the counterspeller's spell save DC (fail → dissipated). Decline → enemy
+ *    spell resolves on the intended target via applyEnemySpellDamage.
  */
 export const handleResolveReaction: ActionHandler<{
   type: 'resolve_reaction';
@@ -333,9 +333,9 @@ export const handleResolveReaction: ActionHandler<{
       ctx.st = { ...ctx.st, pending_reaction: undefined };
     }
   } else if (rx.kind === 'counterspell') {
-    // SRD. Accept = burn a ≥ L3 slot to interrupt. Slot ≥ enemy
-    // spell level auto-counters; otherwise an ability check vs
-    // DC 10 + spell level. Decline = enemy spell resolves.
+    // SRD 5.2.1. Accept = burn a ≥ L3 slot; the enemy then makes a CON save vs
+    // the counterspeller's spell save DC — a FAILED save dissipates the spell,
+    // a success lets it resolve. Decline = the enemy spell resolves.
     if (action.accept) {
       const slotsMax = pc.char.spell_slots_max ?? {};
       const slotsUsed = pc.char.spell_slots_used ?? {};
@@ -352,19 +352,18 @@ export const handleResolveReaction: ActionHandler<{
           spell_slots_used: { ...slotsUsed, [slotLvl]: (slotsUsed[slotLvl] ?? 0) + 1 },
           turn_actions: { ...pc.char.turn_actions, reaction_used: true },
         });
-        const autoCounter = slotLvl >= rx.enemySpellLevel;
-        let success = autoCounter;
-        let checkDetail = '';
-        if (!autoCounter) {
-          const castingAbility = (ctx.context.spellcastingAbility?.[pc.char.character_class] ??
-            ctx.context.classPrimaryStats[pc.char.character_class] ??
-            'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
-          const score = pc.char[castingAbility] ?? 10;
-          const dc = 10 + rx.enemySpellLevel;
-          const checkRoll = rollDice('1d20') + abilityMod(score) + profBonus(pc.char.level);
-          success = checkRoll >= dc;
-          checkDetail = ` ${castingAbility.toUpperCase()} check ${checkRoll} vs DC ${dc} — ${success ? 'success' : 'failed'}.`;
-        }
+        // SRD 5.2.1 — the enemy makes a Constitution saving throw against the
+        // counterspeller's spell save DC. On a FAILED save the spell dissipates
+        // with no effect; on a success it resolves. (The 2014 slot-level
+        // auto-counter / counterspeller ability check was removed.)
+        const castingAbility = (ctx.context.spellcastingAbility?.[pc.char.character_class] ??
+          ctx.context.classPrimaryStats[pc.char.character_class] ??
+          'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+        const dc = spellSaveDC(pc.char.level, pc.char[castingAbility] ?? 10);
+        const enemyStat = getEnemyById(ctx.seed, rx.attackerEnemyId);
+        const conSave = rollDice('1d20') + abilityMod(enemyStat?.con ?? 10);
+        const success = conSave < dc; // a failed enemy save = the spell is countered
+        const checkDetail = ` (CON save ${conSave} vs DC ${dc} — ${success ? 'failed, countered' : 'succeeded'}).`;
         if (success) {
           ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
         } else {
