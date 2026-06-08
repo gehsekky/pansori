@@ -1204,6 +1204,13 @@ export interface Character {
   // breaks first. (Simplification: RAW keys the bonus to a chosen skill;
   // pansori grants it to the next ability check of any kind.)
   guidance_die?: boolean;
+  // SRD Resistance (cantrip) — while active, damage of the chosen `type` is
+  // reduced by 1d4, once per turn (pansori models "per turn" as per ROUND via
+  // `used_round`, mirroring Superior Hunter's Defense). Set by the buff cast
+  // path (concentration, target picks the type); the reduction is applied in
+  // `applyDamage` for any source that passes its damage type; cleared when
+  // concentration breaks.
+  resistance_reduction?: { type: string; used_round?: number };
   // SRD one-shot smite (Searing / Shining / Ensnaring Strike) — armed on cast,
   // consumed by the NEXT melee-weapon hit: adds `dice` damage (optional) and an
   // on-hit effect (Faerie-Fire-style advantage, or a saved condition that ends

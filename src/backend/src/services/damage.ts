@@ -63,6 +63,14 @@ export interface ApplyDamageOptions {
    * stays set after the spell technically ends.
    */
   context?: import('../types.js').Context;
+  /**
+   * Damage type of this hit (acid, fire, slashing, …). Lets `applyDamage`
+   * apply the SRD Resistance cantrip's −1d4 reduction when it matches the
+   * target's chosen type. Damage sources that don't carry a type just omit it
+   * (Resistance then doesn't trigger). NOT the halving resistances — those
+   * still live inline in the enemy-attack path (see the note above).
+   */
+  damageType?: string;
 }
 
 export interface ApplyDamageResult {
@@ -84,6 +92,8 @@ export interface ApplyDamageResult {
   concentrationSaveReroll?: import('./gameEngine.js').PendingSaveRerollInfo;
   /** True if HP dropped to 0 from this damage (caller handles death-save transition). */
   knockedOut: boolean;
+  /** Narrative fragment from the SRD Resistance cantrip's −1d4 — `''` if it didn't apply. */
+  resistanceNote: string;
 }
 
 export function applyDamage(
@@ -102,11 +112,33 @@ export function applyDamage(
       concentrationNote: '',
       concentrationBroken: false,
       knockedOut: false,
+      resistanceNote: '',
     };
   }
 
+  // SRD Resistance (cantrip) — if the target chose this damage type and hasn't
+  // benefited this round (RAW: per turn), reduce the total by 1d4 before temp
+  // HP / HP. Stamped onto `resistance_reduction.used_round` so it fires once
+  // per round; the stamp travels on the returned char.
+  let resistanceReduction = char.resistance_reduction;
+  let resistanceNote = '';
+  let workingAmount = rawAmount;
+  const round = st.round ?? 1;
+  if (
+    resistanceReduction &&
+    opts.damageType &&
+    resistanceReduction.type === opts.damageType &&
+    resistanceReduction.used_round !== round
+  ) {
+    const cut = rollDice('1d4');
+    const before = workingAmount;
+    workingAmount = Math.max(0, workingAmount - cut);
+    resistanceReduction = { ...resistanceReduction, used_round: round };
+    resistanceNote = ` (Resistance: ${before}→${workingAmount} ${opts.damageType})`;
+  }
+
   // Temp HP absorption first.
-  let remaining = rawAmount;
+  let remaining = workingAmount;
   let tempHpAbsorbed = 0;
   let newTempHp = char.temp_hp ?? 0;
   if (!opts.skipTempHp && newTempHp > 0) {
@@ -134,6 +166,7 @@ export function applyDamage(
     hp: clampedHp,
     ...(tempHpAbsorbed > 0 ? { temp_hp: newTempHp } : {}),
     ...(deathWardSaves ? { death_ward_active: false } : {}),
+    ...(resistanceNote ? { resistance_reduction: resistanceReduction } : {}),
   };
   let newSt = st;
 
@@ -194,6 +227,7 @@ export function applyDamage(
     concentrationBroken,
     concentrationSaveReroll,
     knockedOut,
+    resistanceNote,
   };
 }
 

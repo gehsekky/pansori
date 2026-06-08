@@ -535,10 +535,13 @@ export function breakConcentration(
   // on the caster; an ally-targeted die persists until used — a minor
   // simplification, harmless since it's a one-shot bonus.)
   const wasGuidance = char.concentrating_on.spellId === 'guidance';
+  // SRD Resistance — dropping concentration ends the −1d4 damage reduction.
+  const wasResistance = char.concentrating_on.spellId === 'resistance';
   let newChar: Character = {
     ...char,
     concentrating_on: null,
     ...(wasGuidance ? { guidance_die: false } : {}),
+    ...(wasResistance ? { resistance_reduction: undefined } : {}),
     ...(wasHuntersMark ? { hunters_mark_target_id: undefined } : {}),
     ...(wasHex ? { hex_target_id: undefined } : {}),
     ...(wasMagicWeapon ? { weapon_enhancement: undefined } : {}),
@@ -1956,6 +1959,9 @@ function computeEnemyAttack(
     }
     const dmgResult = applyDamage(charAfterWard, st, postShdDmg + bonusDmg, {
       deferConcentrationIndomitable: true,
+      // SRD Resistance cantrip — −1d4 if the PC chose this attack's damage type
+      // (applied inside applyDamage, once per round).
+      damageType: enemy.damageType,
     });
     let updatedChar = dmgResult.char;
     if (shdReactionUsed) {
@@ -2024,6 +2030,7 @@ function computeEnemyAttack(
       wardNote +
       tempHpNote;
     narrative += shdNote;
+    narrative += dmgResult.resistanceNote;
     narrative += lifeDrainNote;
     narrative += dmgResult.concentrationNote;
     narrative += darknessNote;
@@ -6172,7 +6179,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
                           .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
                           .map((s) => ({ id: s.id, label: s.name, sub: `Lvl ${s.level}` })),
                       }
-                    : undefined;
+                    : spellId === 'resistance'
+                      ? {
+                          param: 'resistType',
+                          title: 'Resistance — choose a damage type to reduce',
+                          options: [
+                            { id: 'acid', label: 'Acid' },
+                            { id: 'bludgeoning', label: 'Bludgeoning' },
+                            { id: 'cold', label: 'Cold' },
+                            { id: 'fire', label: 'Fire' },
+                            { id: 'lightning', label: 'Lightning' },
+                            { id: 'necrotic', label: 'Necrotic' },
+                            { id: 'piercing', label: 'Piercing' },
+                            { id: 'poison', label: 'Poison' },
+                            { id: 'radiant', label: 'Radiant' },
+                            { id: 'slashing', label: 'Slashing' },
+                            { id: 'thunder', label: 'Thunder' },
+                          ],
+                        }
+                      : undefined;
 
       if (spell.level === 0) {
         // Cantrip: no slot needed

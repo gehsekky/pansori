@@ -437,6 +437,23 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Resistance (cantrip) — arm the chosen-type −1d4 damage reduction on the
+  // target (the picker supplies `resistType`; default fire). `applyDamage`
+  // applies it once per round; breakConcentration clears it.
+  if (spell.id === 'resistance') {
+    const reduction = { type: action.resistType ?? 'fire' };
+    if (isCasterTarget) {
+      char.resistance_reduction = reduction;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, resistance_reduction: reduction } : c
+        ),
+      };
+    }
+  }
+
   // SRD Death Ward — set the one-shot flag on the target. The
   // interception logic lives in `applyDamage` where HP would hit
   // 0; the flag clears there on consumption.

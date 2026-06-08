@@ -511,11 +511,14 @@ export const SRD_SPELLS: Record<string, Spell> = {
     rangeFt: 30,
     spellList: ['divine'],
   },
-  // SRD: Resistance — concentration cantrip. Touch a willing
-  // creature and pick a damage type; until the spell ends the
-  // creature reduces damage of that type by 1d4 (once per turn).
-  // Pansori MVP is narrative — the damage-reduction rider would
-  // need a per-type-resistance hook on the damage pipeline.
+  // SRD 5.2.1: Resistance — concentration cantrip. Touch a willing creature and
+  // pick a damage type; until the spell ends the creature reduces damage of
+  // that type by 1d4, once per turn. Mechanized as a self/ally buff: the cast
+  // picker chooses the type (`resistType`), the buff path stamps
+  // `resistance_reduction`, and `applyDamage` subtracts 1d4 from matching
+  // damage. Simplification: the once-per-turn cap is modeled per ROUND
+  // (mirroring Superior Hunter's Defense), and only damage sources that pass
+  // their type to applyDamage (notably enemy attacks) trigger the reduction.
   resistance: {
     id: 'resistance',
     name: 'Resistance',
@@ -523,8 +526,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     concentration: true,
     durationRounds: 10,
+    targetType: 'self_or_ally',
     narrative: '{name} touches an ally and shapes a ward against the chosen element.',
-    desc: 'Touch buff: -1d4 damage of chosen type per turn (concentration, 1 minute).',
+    desc: 'Touch buff: reduce damage of a chosen type by 1d4 once per turn (concentration, 1 minute).',
     rangeKind: 'touch',
     spellList: ['divine', 'primal'],
   },
