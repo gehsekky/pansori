@@ -1,12 +1,20 @@
 import type { ActionContext, ActionHandler } from '../types.js';
 import type { ConditionName, Enemy, Spell } from '../../../types.js';
+import {
+  abilityMod,
+  resolvePlayerAttack,
+  rollCritical,
+  rollDice,
+  transmutedDamageType,
+} from '../../rulesEngine.js';
+import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
+import { getItemData, pick } from '../../gameEngine.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
-import { rollDice, transmutedDamageType } from '../../rulesEngine.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
-import { pick } from '../../gameEngine.js';
+import { computeToHitContext } from '../attack/toHit.js';
 import { pickCastPrefix } from './utils.js';
 import { runAoeConditionSpell } from './aoeCondition.js';
 import { runAoeSpell } from './aoe.js';
@@ -323,6 +331,71 @@ export const handleCastSpell: ActionHandler<{
   }
   updatePcActor(ctx, { turn_actions: precastTurnActions });
   ctx.commitChar();
+
+  // ── SRD 5.2.1 True Strike (cantrip) ──────────────────────────────────────
+  // Make a weapon attack with the casting weapon, but use the spellcasting
+  // ability for the attack + damage rolls (pass the casting score as both STR
+  // and DEX so resolvePlayerAttack derives the spellcasting modifier), plus a
+  // scaling Radiant rider (L5 1d6, L11 2d6, L17 3d6). Reuses computeToHitContext
+  // so the swing honors the same advantage / cover / crit-threshold / proficiency
+  // a normal attack does. Simplifications: rider features (Sneak Attack, smites,
+  // weapon mastery) and the post-roll inspiration reaction window don't apply to
+  // the cantrip; reach isn't grid-gated (the cast already picked the target); the
+  // Radiant rider is added to the weapon-type total for resistance purposes.
+  if (spell.id === 'true_strike') {
+    const weaponInst = pc.char.inventory?.find((i) => i.instance_id === equippedWeaponId(pc.char));
+    const weaponItem = weaponInst ? getItemData(weaponInst, ctx.context) : null;
+    const weaponDamage =
+      weaponItem?.versatileDamage && !equippedShieldId(pc.char)
+        ? weaponItem.versatileDamage
+        : (weaponItem?.damage ?? '1d4');
+    const toHit = computeToHitContext(ctx, {
+      target: spellTarget,
+      targetId: spellTargetId,
+      weaponItem,
+    });
+    const effectiveAc = spellTarget.ac + toHit.coverAcBonus;
+    const atk = resolvePlayerAttack(
+      { str: castingScore, dex: castingScore, level: pc.char.level },
+      weaponDamage,
+      effectiveAc,
+      false,
+      toHit.disadvantage,
+      toHit.advantage,
+      toHit.weaponProficient,
+      weaponItem?.range === 'ranged',
+      toHit.critThresh,
+      toHit.totalAttackBonus,
+      pc.char.species === 'halfling'
+    );
+    const prefix = `${pc.char.name} casts True Strike${slotNote} and strikes with their ${weaponItem?.name ?? 'fists'} (spell attack, ${String(abilityMod(castingScore) >= 0 ? '+' : '')}${abilityMod(castingScore)})`;
+    if (!atk.hit) {
+      ctx.narrative =
+        (ctx.narrative ?? '') +
+        `${prefix} — ${atk.fumble ? 'fumble' : 'miss'} (${atk.total} vs AC ${effectiveAc}).`;
+      ctx.usedInitiative = true;
+      return;
+    }
+    // Scaling Radiant rider — extra dice double on a crit (RAW).
+    const riderDice =
+      pc.char.level >= 17 ? '3d6' : pc.char.level >= 11 ? '2d6' : pc.char.level >= 5 ? '1d6' : '';
+    const radiant = riderDice ? (atk.critical ? rollCritical(riderDice) : rollDice(riderDice)) : 0;
+    const total = atk.damage + radiant;
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      `${prefix} — ${atk.critical ? 'CRITICAL HIT! ' : 'hit! '}${total} damage${
+        radiant ? ` (incl. ${radiant} radiant)` : ''
+      }.`;
+    applySingleTargetDamage(
+      ctx,
+      spellTarget,
+      spellTargetId,
+      { ...spell, damageType: weaponItem?.damageType },
+      total
+    );
+    ctx.usedInitiative = true;
+    return;
+  }
 
   // SRD 5.2.1 — enforce spell range against the grid when entities exist.
   // 'self' spells need no target check (they originate from the caster).

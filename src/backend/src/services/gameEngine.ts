@@ -5126,7 +5126,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if ((char.class_resource_uses?.[`mystic_arcanum_${lvl}`] ?? 0) > 0) continue;
       const s = context.spellTable[spellId];
       if (!s) continue;
-      const isOffensive = !!(s.damage || s.condition);
+      const isOffensive = !!(s.damage || s.condition) || s.id === 'true_strike';
       if (isOffensive && !enemyAlive) continue;
       choices.push({
         label: `Mystic Arcanum — cast ${s.name} (Lvl ${lvl}, no slot)`,
@@ -6008,7 +6008,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (spell.outOfCombatOnly && state.combat_active) continue;
 
       // Restrict offensive/condition spells to when an enemy is alive; heal spells when injured
-      const isOffensive = !!(spell.damage || spell.condition);
+      const isOffensive = !!(spell.damage || spell.condition) || spell.id === 'true_strike';
       const isHeal = !!spell.heal;
       if (isOffensive && !enemyAlive) continue;
       if (isHeal) {
@@ -6440,7 +6440,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (!onClericList || spell.level === 0 || spell.level > 5) continue;
       if (spell.castTime === 'reaction' || spell.summon || spell.revive) continue;
       if (spell.outOfCombatOnly && state.combat_active) continue;
-      const isOffensive = !!(spell.damage || spell.condition);
+      const isOffensive = !!(spell.damage || spell.condition) || spell.id === 'true_strike';
       if (isOffensive && !enemyAlive) continue;
       if (spell.heal && state.characters.every((c) => c.dead || c.hp >= c.max_hp)) continue;
       choices.push({

@@ -6452,6 +6452,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     narrative: '{name} speaks the word that reshapes what is — reality bends to their will.',
     spellList: ['arcane'],
   },
+  // SRD 5.2.1: a weapon attack made with the spellcasting ability + a scaling
+  // Radiant rider. Mechanized in castSpell/index.ts (the `true_strike` branch
+  // reuses the to-hit pipeline + resolvePlayerAttack with the ability swap); no
+  // mechanical fields here — the dispatch keys on the id.
   true_strike: {
     id: 'true_strike',
     name: 'True Strike',

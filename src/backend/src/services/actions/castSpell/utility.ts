@@ -42,7 +42,8 @@ export function runUtilitySpell(
     spell.wall || // barrier-only walls (Force / Stone) resolve in the wall path
     spell.id === 'hunters_mark' ||
     spell.id === 'hex' ||
-    spell.id === 'power_word_stun'
+    spell.id === 'power_word_stun' ||
+    spell.id === 'true_strike' // resolves as a weapon attack in the offensive path
   ) {
     return false;
   }
