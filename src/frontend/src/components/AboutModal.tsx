@@ -86,11 +86,12 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             Frog.
           </p>
           <p>
-            Local-room floor textures from the{' '}
-            <Ext href="https://arexxuru.itch.io/pixel-floor-texture-pack-ground-tile">
-              Pixel Floor Texture Pack
+            Local-room floor textures (grass, cobblestone) from the{' '}
+            <Ext href="https://screamingbrainstudios.itch.io/tiny-texture-pack">
+              Tiny Texture Pack
             </Ext>{' '}
-            by arexxuru (AI-assisted), used as in-game map art under its non-commercial terms.
+            by Screaming Brain Studios (CC0); the dirt and sand tiles are original
+            procedurally-generated art.
           </p>
         </section>
 

@@ -13,8 +13,8 @@ const TOKEN_PX = Math.round(24 * CELL_SCALE);
 const TOKEN_ICON_REM = `${(1.05 * CELL_SCALE).toFixed(2)}rem`;
 const TOKEN_LETTER_REM = `${(0.7 * CELL_SCALE).toFixed(2)}rem`;
 const CORPSE_REM = `${(0.9 * CELL_SCALE).toFixed(2)}rem`;
-// Seamless ground texture under the battlefield — the same arexxuru floor tiles
-// the exploration map uses for local rooms, painted as the cell's bottom layer
+// Seamless ground texture under the battlefield — the same floor tiles the
+// exploration map uses for local rooms, painted as the cell's bottom layer
 // (combat tints / lighting / highlights composite over it). One of 3 variants
 // per cell, deterministic so it doesn't reshuffle on every render. A painted
 // "ground" terrain (cobblestone / garden) picks its own texture (TERRAIN_FLOOR);
