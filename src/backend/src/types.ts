@@ -1294,6 +1294,12 @@ export interface Character {
   // attacks (+1, or +2 at slot 4, +3 at slot 6). Adds to both the attack roll
   // (toHit) and weapon damage. Concentration-bound; cleared on breakConcentration.
   weapon_enhancement?: number;
+  // SRD Shillelagh (Druid cantrip) — while active, a held Club or Quarterstaff
+  // uses the stored spellcasting ability instead of STR for attack + damage and
+  // its damage die becomes a scaling d8/d10/d12/2d6. 1 minute, NOT concentration;
+  // cleared at combat end (≈ duration) and when the qualifying weapon is dropped.
+  // The attack pipeline (preattack + resolveOneAttack) reads this.
+  shillelagh?: { ability: AbilityKey };
   // SRD Ranger Hunter "feature option" picks (swappable on a rest):
   //   Hunter's Prey (L3): 'colossus_slayer' | 'horde_breaker' (defaults to
   //     colossus_slayer when unset, preserving the pre-picker behavior).

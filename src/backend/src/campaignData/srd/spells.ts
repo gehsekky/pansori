@@ -285,9 +285,13 @@ export const SRD_SPELLS: Record<string, Spell> = {
     name: 'Shillelagh',
     level: 0,
     castTime: 'bonus_action',
-    narrative: 'Your staff glows with natural energy.',
-    desc: 'Your staff deals 1d8 magical bludgeoning using WIS for attack/damage.',
+    narrative: 'Your club glows with natural energy.',
+    // SRD: imbue a held Club or Quarterstaff — for 1 minute its attacks use your
+    // spellcasting ability instead of STR and its die becomes d8 (d10 at L5, d12
+    // at L11, 2d6 at L17). Routed to the buff branch via targetType 'self'.
+    desc: 'Imbue a held club or quarterstaff: its attacks use your spellcasting ability and a larger damage die (1d8, scaling).',
     rangeKind: 'self',
+    targetType: 'self',
     spellList: ['primal'],
   },
   bardic_inspiration_spell: {

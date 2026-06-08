@@ -1,6 +1,6 @@
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
-import { SQUARE_SIZE, posEqual } from '../../gridEngine.js';
 import {
+  SHILLELAGH_WEAPON_IDS,
   abilityMod,
   applyDamageMultiplier,
   profBonus,
@@ -13,6 +13,7 @@ import {
   sneakAttackDice,
   unarmedDamage,
 } from '../../rulesEngine.js';
+import { SQUARE_SIZE, posEqual } from '../../gridEngine.js';
 import {
   applyPartyLevelUps,
   dominatedDamageReSave,
@@ -136,11 +137,25 @@ export function resolveOneAttack(
     (isVersatile || weaponItem.heavy === true);
   const rollWeaponDmg = gwfApplies ? rollDiceGwf : rollDice;
   const rollWeaponCrit = gwfApplies ? rollCriticalGwf : rollCritical;
+  // SRD Shillelagh — while active on a held Club/Quarterstaff, the attack +
+  // damage rolls use the caster's spellcasting ability instead of STR (and never
+  // Finesse/ranged). The scaling die was already swapped in by runPreattack; here
+  // we swap the ability by feeding the casting score as the STR slot.
+  const shillelaghApplies =
+    !!pc.char.shillelagh &&
+    !!weaponItem &&
+    (SHILLELAGH_WEAPON_IDS as readonly string[]).includes(weaponItem.id);
+  const castScore = shillelaghApplies
+    ? ((pc.char[pc.char.shillelagh!.ability] as number) ?? 10)
+    : 0;
+  const atkPlayer = shillelaghApplies
+    ? { str: castScore, dex: castScore, level: pc.char.level }
+    : { str: pc.char.str, dex: pc.char.dex, level: pc.char.level };
   const atk = resolvePlayerAttack(
-    { str: pc.char.str, dex: pc.char.dex, level: pc.char.level },
+    atkPlayer,
     weaponDamage,
     effectiveEnemyAc,
-    weaponItem?.finesse ?? false,
+    shillelaghApplies ? false : (weaponItem?.finesse ?? false),
     disadvantage,
     effectiveAdvantage,
     weaponProficient,

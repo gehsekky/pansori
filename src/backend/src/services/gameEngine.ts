@@ -3339,6 +3339,8 @@ export function endCombatState(st: GameState): GameState {
       blinking: undefined,
       // Sanctuary ward (1 min ≈ encounter) clears at combat end.
       sanctuary_dc: undefined,
+      // Shillelagh (1 min ≈ encounter) — the imbued weapon reverts at combat end.
+      shillelagh: undefined,
       // Dragon's Breath (1 min ≈ encounter) — the granted breath doesn't carry
       // to the next fight.
       granted_breath: undefined,

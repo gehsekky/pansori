@@ -1,8 +1,13 @@
-import { computeTotalAc, spellSaveDC, upcastDamage } from '../../rulesEngine.js';
+import type { AbilityKey, Spell } from '../../../types.js';
+import {
+  SHILLELAGH_WEAPON_IDS,
+  computeTotalAc,
+  spellSaveDC,
+  upcastDamage,
+} from '../../rulesEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
-import { equippedArmorId, equippedShieldId } from '../../equipment.js';
+import { equippedArmorId, equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import type { ActionContext } from '../types.js';
-import type { Spell } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { defenseAcBonus } from '../../fightingStyle.js';
 
@@ -485,6 +490,24 @@ export function runBuffSpell(
         ),
       };
     }
+  }
+
+  // SRD Shillelagh (cantrip) — imbue a held Club or Quarterstaff: for 1 minute
+  // its attacks use the caster's spellcasting ability instead of STR and its die
+  // becomes a scaling d8 (read by the attack pipeline). Self-only. Requires a
+  // qualifying weapon in hand — without one the cast fizzles (action spent).
+  if (spell.id === 'shillelagh') {
+    const heldInst = equippedWeaponId(char);
+    const heldItem = heldInst ? char.inventory?.find((i) => i.instance_id === heldInst) : undefined;
+    const heldId = heldItem?.id ?? '';
+    if (!(SHILLELAGH_WEAPON_IDS as readonly string[]).includes(heldId)) {
+      ctx.narrative = `${char.name} needs a club or quarterstaff in hand to cast Shillelagh.`;
+      return true;
+    }
+    const castAbility = (ctx.context.spellcastingAbility?.[char.character_class] ??
+      ctx.context.classPrimaryStats[char.character_class] ??
+      'wis') as AbilityKey;
+    char.shillelagh = { ability: castAbility };
   }
 
   if (spell.id === 'fly' || spell.id === 'levitate') {

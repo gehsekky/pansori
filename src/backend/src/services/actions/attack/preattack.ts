@@ -1,4 +1,5 @@
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
+import { SHILLELAGH_WEAPON_IDS, shillelaghDie } from '../../rulesEngine.js';
 import { chebyshev, hasLineOfSight, inRange } from '../../gridEngine.js';
 import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
@@ -144,6 +145,17 @@ export function runPreattack(
   const isVersatile = !!(weaponItem?.versatileDamage && !equippedShieldId(pc.char));
   if (isVersatile) {
     weaponDamage = weaponItem!.versatileDamage!;
+  }
+  // SRD Shillelagh — while the cantrip is active and a Club or Quarterstaff is
+  // held, the weapon's damage die becomes the scaling Shillelagh die (overriding
+  // its normal/versatile die). The ability swap (casting stat for STR) happens in
+  // resolveOneAttack; this only sets the die.
+  if (
+    pc.char.shillelagh &&
+    weaponItem &&
+    (SHILLELAGH_WEAPON_IDS as readonly string[]).includes(weaponItem.id)
+  ) {
+    weaponDamage = shillelaghDie(pc.char.level);
   }
   const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
 

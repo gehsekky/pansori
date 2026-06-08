@@ -890,6 +890,18 @@ export function sneakAttackDice(level: number): string {
   return `${Math.ceil(level / 2)}d6`;
 }
 
+// SRD Shillelagh (cantrip) — only a Club or Quarterstaff can be imbued.
+export const SHILLELAGH_WEAPON_IDS = ['club', 'quarterstaff'] as const;
+
+// SRD Shillelagh — the imbued weapon's damage die. Cantrip Upgrade scales it at
+// levels 5 (d10), 11 (d12), and 17 (2d6); base is d8.
+export function shillelaghDie(level: number): string {
+  if (level >= 17) return '2d6';
+  if (level >= 11) return '1d12';
+  if (level >= 5) return '1d10';
+  return '1d8';
+}
+
 // Extra Attack — additional attacks per Attack action.
 // Fighter: 2 at L5, 3 at L11, 4 at L20. Ranger/Paladin/Barbarian: 2 at L5 only.
 // Returns number of EXTRA attacks (0 = 1 total, 1 = 2 total, 2 = 3 total)
