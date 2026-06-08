@@ -282,14 +282,23 @@ export interface TerrainTileSpec {
     | 'snow'
     | 'water'
     | 'water_calm'
+    | 'water_ice'
     | 'mountain'
+    | 'mountain_snow'
     | 'desert'
     | 'dirt'
     | 'woodlands'
     | 'highlands'
     | 'scrubland'
     | 'base'
-    | 'void';
+    | 'void'
+    // Cold Lands biomes (David Baumgart, the full purchased set).
+    | 'plains_cold'
+    | 'plains_snow'
+    | 'forest_pine'
+    | 'forest_snow'
+    | 'hills_cold'
+    | 'hills_snow';
   label: string;
   // Hand-painted variations on disk (<base>_1.png … <base>_N.png). The
   // renderer picks one per cell deterministically. Default 1.
@@ -305,7 +314,7 @@ export const TERRAIN_TILES = {
   forest: { base: 'forest', label: 'forest', variants: 4 },
   hills: { base: 'hills', label: 'hills', variants: 4 },
   swamp: { base: 'swamp', label: 'swamp', variants: 4 },
-  snow: { base: 'snow', label: 'snow' }, // Cold Lands sample — 1 variant
+  snow: { base: 'snow', label: 'snowfield', variants: 4 },
   water: { base: 'water', label: 'water', variants: 4 },
   mountain: { base: 'mountain', label: 'mountains', variants: 4 },
   // The rest of the full Basic Terrain Set — extra biomes for skinning
@@ -318,7 +327,15 @@ export const TERRAIN_TILES = {
   dirt: { base: 'dirt', label: 'bare dirt', variants: 4 },
   'base-tile': { base: 'base', label: 'bare ground', variants: 4 },
   void: { base: 'void', label: 'the void', variants: 4 },
-  'road-cold': { base: 'road_cold', label: 'wintry road' }, // Cold Lands sample
+  // ── Cold Lands (full set) — real painted cold biomes ──
+  'plains-cold': { base: 'plains_cold', label: 'cold plains', variants: 4 },
+  'plains-snow': { base: 'plains_snow', label: 'snowy plains', variants: 4 },
+  'forest-pine': { base: 'forest_pine', label: 'pine forest', variants: 4 },
+  'forest-snow': { base: 'forest_snow', label: 'snowy pines', variants: 4 },
+  'hills-cold': { base: 'hills_cold', label: 'cold hills', variants: 4 },
+  'hills-snow': { base: 'hills_snow', label: 'snowy hills', variants: 4 },
+  'mountain-snow': { base: 'mountain_snow', label: 'snow peaks', variants: 4 },
+  'road-cold': { base: 'road_cold', label: 'wintry road', variants: 4 },
   // Ashlands — scorched, grey, post-cataclysm.
   'plains-ash': {
     base: 'plains',
@@ -364,38 +381,20 @@ export const TERRAIN_TILES = {
   },
   'snow-ashfall': { base: 'snow', label: 'ashfall', filter: 'grayscale(0.9) brightness(0.75)' },
   // Frostbound — washed-out, icy.
-  'plains-tundra': {
-    base: 'plains',
-    variants: 4,
-    label: 'tundra',
-    filter: 'saturate(0.5) brightness(1.15) hue-rotate(-12deg)',
-  },
+  // Frostbound recolors now draw the real Cold Lands paintings (the
+  // road-snowbound precedent) — the id stays, the art upgrades.
+  'plains-tundra': { base: 'plains_snow', label: 'tundra', variants: 4 },
   // Frostbound's road is the real Cold Lands painting now, not a filter.
   'road-snowbound': { base: 'road_cold', label: 'snowbound road' },
-  'forest-frost': {
-    base: 'forest',
-    variants: 4,
-    label: 'frosted forest',
-    filter: 'saturate(0.45) brightness(1.2) hue-rotate(-18deg)',
-  },
-  'hills-frost': {
-    base: 'hills',
-    variants: 4,
-    label: 'frosted hills',
-    filter: 'saturate(0.4) brightness(1.25)',
-  },
+  'forest-frost': { base: 'forest_snow', label: 'frosted forest', variants: 4 },
+  'hills-frost': { base: 'hills_snow', label: 'frosted hills', variants: 4 },
   'swamp-frozen': {
     base: 'swamp',
     variants: 4,
     label: 'frozen fen',
     filter: 'saturate(0.45) brightness(1.15) hue-rotate(-25deg)',
   },
-  'water-ice': {
-    base: 'water',
-    variants: 4,
-    label: 'pack ice',
-    filter: 'saturate(0.45) brightness(1.4)',
-  },
+  'water-ice': { base: 'water_ice', label: 'pack ice', variants: 4 },
 } as const satisfies Record<string, TerrainTileSpec>;
 
 export type TerrainTileId = keyof typeof TERRAIN_TILES;
@@ -451,6 +450,12 @@ export const MARKER_TILES = {
   barrow: { base: 'barrow', label: 'barrow downs' },
   'bandit-camp': { base: 'bandit_camp', label: 'bandit camp' },
   graveyard: { base: 'graveyard', label: 'sunken graveyard' },
+  // Cold Lands locations (David Baumgart, the full purchased set).
+  'ice-palace': { base: 'ice_palace', label: 'ice palace' },
+  'frozen-ruins': { base: 'frozen_ruins', label: 'frozen ruins', variants: 2 },
+  'logging-camp': { base: 'logging_camp', label: 'logging camp', variants: 2 },
+  'ice-cave': { base: 'ice_cave', label: 'ice cave', variants: 3 },
+  'frozen-giant': { base: 'frozen_giant', label: 'frozen giant' },
 } as const satisfies Record<string, MarkerTileSpec>;
 
 export type MarkerTileId = keyof typeof MARKER_TILES;
