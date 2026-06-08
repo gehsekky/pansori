@@ -367,15 +367,8 @@ export const context: Context = {
   },
 
   narratives: {
-    roomArrival: {
-      entry_hall: ['You stand at the entrance. The dungeon awaits.'],
-      guard_post: ['A goblin sentry spots you immediately.'],
-      bone_crypt: ['The dead stir as you enter.'],
-      great_hall: ['Something large moves in the shadows.'],
-      storage_room: ['Quiet. You can rest here.'],
-      cultist_chamber: ['Candlelight flickers across a robed figure.'],
-      exit_gate: ['The gate. So close.'],
-    },
+    // Per-room arrival flavor lives on each room's pooled `onEnter` now;
+    // `genericArrival` is the campaign-wide fallback.
     genericArrival: [
       'You move into the room, senses alert.',
       'The room opens before you.',

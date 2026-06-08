@@ -130,16 +130,24 @@ export function initMapState(campaign: CampaignData | undefined, st: GameState):
   });
 }
 
+// Resolve a narration hook value to a single line: a string is itself, an array
+// is a random pick (rooms use the pooled `onEnter` form), undefined/empty → ''.
+export function pickHookText(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v.length ? v[Math.floor(Math.random() * v.length)] : undefined;
+  return v || undefined;
+}
+
 // Pick a level's narration hook for an enter/exit. The FIRST variant
 // overrides the plain one on the first occurrence; the plain one fires
-// every other time. Returns '' (no leading space) when nothing applies.
+// every other time. A pooled `onEnter` (rooms) random-picks. Returns ''
+// (no leading space) when nothing applies.
 function levelHook(
   level: LevelNarrationHooks | undefined,
   kind: 'enter' | 'exit',
   first: boolean
 ): string {
   if (!level) return '';
-  const text =
+  const raw =
     kind === 'enter'
       ? first
         ? (level.onFirstEnter ?? level.onEnter)
@@ -147,6 +155,7 @@ function levelHook(
       : first
         ? (level.onFirstExit ?? level.onExit)
         : level.onExit;
+  const text = pickHookText(raw);
   return text ? ` ${text}` : '';
 }
 
@@ -170,7 +179,7 @@ export function regionEnterNarration(
   regionId: string | undefined
 ): string {
   const region = regionById(campaign, regionId);
-  const text = region?.onFirstEnter ?? region?.onEnter ?? region?.desc;
+  const text = region?.onFirstEnter ?? pickHookText(region?.onEnter) ?? region?.desc;
   return text ? `\n\n${text}` : '';
 }
 
@@ -345,6 +354,11 @@ export interface MarkerMoveResult {
   encounter?: string;
   /** Accumulated forced-march notes for the cells crossed this leg. */
   fatigueNote?: string;
+  /** When the transition entered a local ROOM, whether it was the party's FIRST
+   *  visit. The caller passes this to `buildArrivalNarrative` so the room's
+   *  `onFirstEnter` beat fires once and the `onEnter` pool rotates thereafter.
+   *  (The room enter hook is emitted by buildArrivalNarrative, not here.) */
+  enteredRoomFirst?: boolean;
   rejected?: string;
 }
 
@@ -502,13 +516,24 @@ export function resolveMarkerMove(
   // (a mid-route encounter / collapse leaves it short, so no descend happens).
   const transition = reachedDest ? transitionAt(grid, next.marker_pos ?? to) : undefined;
   let transitioned = false;
+  let enteredRoomFirst: boolean | undefined;
   if (transition) {
     const res = resolveTransition(campaign, rooms, next, transition);
     next = res.st;
     narrative = res.narrative;
     transitioned = true;
+    enteredRoomFirst = res.enteredRoomFirst;
   }
-  return { st: next, narrative, squaresMoved, transitioned, elapsedHours, encounter, fatigueNote };
+  return {
+    st: next,
+    narrative,
+    squaresMoved,
+    transitioned,
+    elapsedHours,
+    encounter,
+    fatigueNote,
+    enteredRoomFirst,
+  };
 }
 
 /**
@@ -561,7 +586,7 @@ export function resolveTransition(
   rooms: Room[],
   st: GameState,
   t: MapTransition
-): { st: GameState; narrative: string } {
+): { st: GameState; narrative: string; enteredRoomFirst?: boolean } {
   // The site-enter narration hook: authored flavor follows the
   // announcement line every time the party lands on the site's square.
   const hook = t.onEnter ? ` ${t.onEnter}` : '';
@@ -577,7 +602,9 @@ export function resolveTransition(
     // First entry uses the regionEnterNarration chain (onFirstEnter ??
     // onEnter ?? desc) so authored regions narrate for free; re-entry
     // plays the plain onEnter.
-    const enterText = visit.first ? (next.onFirstEnter ?? next.onEnter ?? next.desc) : next.onEnter;
+    const enterText = visit.first
+      ? (next.onFirstEnter ?? pickHookText(next.onEnter) ?? next.desc)
+      : pickHookText(next.onEnter);
     return {
       st: {
         ...st,
@@ -633,7 +660,10 @@ export function resolveTransition(
         // Bookmark the cell to return to on ascent (town venue cell or region site cell).
         ...(fromTown ? { town_marker_pos: st.marker_pos } : { region_marker_pos: st.marker_pos }),
       },
-      narrative: ` You enter ${room.name}.${hook}${levelHook(room, 'enter', visit.first)}`,
+      // The room's own enter line (pooled `onEnter` / `onFirstEnter`) is emitted
+      // by buildArrivalNarrative downstream — see `enteredRoomFirst`.
+      narrative: ` You enter ${room.name}.${hook}`,
+      enteredRoomFirst: visit.first,
     };
   }
   // ── Move to another local room via an exit cell ──────────────────────
@@ -655,7 +685,9 @@ export function resolveTransition(
         visited_rooms: visit.list,
         exited_rooms: exit.list,
       },
-      narrative: `${levelHook(prev, 'exit', exit.first)} You pass into ${room.name}.${levelHook(room, 'enter', visit.first)}`,
+      // Room enter line emitted by buildArrivalNarrative downstream (enteredRoomFirst).
+      narrative: `${levelHook(prev, 'exit', exit.first)} You pass into ${room.name}.`,
+      enteredRoomFirst: visit.first,
     };
   }
   // ── Ascend: leave a local site / a town back up a level ──────────────

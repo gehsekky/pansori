@@ -136,6 +136,7 @@ import {
   equippedWeaponId,
 } from './equipment.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
+import { pickHookText, returnFromEncounter } from './mapEngine.js';
 import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
@@ -146,7 +147,6 @@ import { factionShopPrice } from './campaignEngine.js';
 import { fillEnemyTokens } from './narrative/enemyName.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
-import { returnFromEncounter } from './mapEngine.js';
 import { visibleResponses } from './dialogueGating.js';
 import { wornSaveBonus } from './wornEffects.js';
 
@@ -3847,10 +3847,21 @@ export function buildArrivalNarrative(
   targetId: string,
   state: GameState,
   seed: Seed,
-  context: Context
+  context: Context,
+  // First visit? Picks the room's `onFirstEnter` beat; repeats rotate the
+  // `onEnter` pool. Callers re-describing the current room (examine / default /
+  // death-save) leave this false; markerMove/sneak pass the transition's value.
+  first = false
 ): string {
-  const templates = context.narratives.roomArrival[targetId] || context.narratives.genericArrival;
-  let text = pick(templates).replace(/{world}/g, getWorldName(seed));
+  // A room's arrival line is now authored on the room itself (pooled `onEnter`,
+  // with `onFirstEnter` as the once-only beat); `genericArrival` is the
+  // campaign-wide fallback for rooms with no enter hook.
+  const room = seed.rooms.find((r) => r.id === targetId);
+  const line =
+    (first ? pickHookText(room?.onFirstEnter) : undefined) ??
+    pickHookText(room?.onEnter) ??
+    pick(context.narratives.genericArrival);
+  let text = line.replace(/{world}/g, getWorldName(seed));
 
   const livingHere = getLivingRoomEnemies(state, seed, targetId);
   if (livingHere.length > 0) {

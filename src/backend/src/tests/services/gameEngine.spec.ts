@@ -337,6 +337,53 @@ describe('buildArrivalNarrative', () => {
     const text = buildArrivalNarrative(CORRIDOR_ID, state, seedWithLoot, ctx);
     expect(text).not.toContain('Med-Kit');
   });
+
+  // The room's arrival line is authored on the room now (pooled `onEnter`,
+  // with `onFirstEnter` as the once-only beat); `genericArrival` is the fallback.
+  const hookedSeed: Seed = {
+    ...seed,
+    rooms: [
+      {
+        id: 'shrine',
+        name: 'Shrine',
+        desc: 'A shrine.',
+        onEnter: ['The censer still smokes.', 'Wax pools on cold stone.'],
+        onFirstEnter: 'The shrine reveals itself for the first time.',
+      },
+    ],
+  };
+
+  it('repeat visit picks from the room onEnter pool', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // deterministic pool pick → index 0
+    const text = buildArrivalNarrative(
+      'shrine',
+      makeState({}, { current_room: 'shrine' }),
+      hookedSeed,
+      ctx
+    );
+    expect(text).toContain('The censer still smokes.');
+    expect(text).not.toContain('reveals itself for the first time');
+  });
+
+  it('first visit uses onFirstEnter, not the onEnter pool', () => {
+    const text = buildArrivalNarrative(
+      'shrine',
+      makeState({}, { current_room: 'shrine' }),
+      hookedSeed,
+      ctx,
+      true // first visit
+    );
+    expect(text).toContain('The shrine reveals itself for the first time.');
+    expect(text).not.toContain('censer');
+  });
+
+  it('falls back to genericArrival when the room has no onEnter', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    // entry_hall (in `seed`) has no onEnter and no enemies/loot/trap cues, so
+    // the text is exactly the picked genericArrival line.
+    const text = buildArrivalNarrative('entry_hall', makeState(), seed, ctx);
+    expect(ctx.narratives.genericArrival).toContain(text.trim());
+  });
 });
 
 // ─── generateChoices ─────────────────────────────────────────────────────────

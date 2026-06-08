@@ -326,7 +326,10 @@ describe('narration hooks', () => {
     expect(r.narrative).toContain('The gate thuds shut.');
   });
 
-  it('room level hooks fire on enter/exit; town scope survives a venue visit', () => {
+  it('room EXIT hooks fire on leaving; enter is deferred to buildArrivalNarrative', () => {
+    // The room ENTER hook (pooled onEnter / onFirstEnter) is emitted by
+    // buildArrivalNarrative downstream (see gameEngine.spec); the transition
+    // carries only the announcement + EXIT hooks, and flags the first visit.
     const hooked: CampaignData = { ...campaign };
     const hookedRooms = rooms.map((rm) =>
       rm.id === 'tavern'
@@ -342,7 +345,10 @@ describe('narration hooks', () => {
     const st = start();
     let r = resolveMarkerMove(hooked, hookedRooms, st, { x: 2, y: 0 }); // → town
     r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 3, y: 3 }); // → tavern (first)
-    expect(r.narrative).toContain('You enter The Salt Hog. The Salt Hog, in the flesh.');
+    // Announcement only; the enter hook is NOT in the transition now.
+    expect(r.narrative).toContain('You enter The Salt Hog.');
+    expect(r.narrative).not.toContain('The Salt Hog, in the flesh.');
+    expect(r.enteredRoomFirst).toBe(true);
     // Ascend back to the town: room FIRST exit fires; the town is NOT
     // re-entered (it never left scope).
     r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 5, y: 5 });
@@ -350,14 +356,15 @@ describe('narration hooks', () => {
     expect(r.narrative).toContain('You return to Millhaven.');
     expect(r.narrative).not.toContain('mill wheel');
     expect(r.st.exited_rooms).toEqual(['tavern']);
-    // Second visit → plain variants both ways.
+    // Second visit → plain exit variant; first-visit flag now false.
     r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 3, y: 3 });
-    expect(r.narrative).toContain('You enter The Salt Hog. Sawdust and spilled ale.');
+    expect(r.narrative).toContain('You enter The Salt Hog.');
+    expect(r.enteredRoomFirst).toBe(false);
     r = resolveMarkerMove(hooked, hookedRooms, r.st, { x: 5, y: 5 });
     expect(r.narrative).toContain('The din fades behind you.');
   });
 
-  it('room→room passage fires the old room exit and the new room enter', () => {
+  it('room→room passage fires the old room exit; enter is deferred + flagged first', () => {
     const hookedRooms = rooms.map((rm) =>
       rm.id === 'crypt_entrance'
         ? { ...rm, onExit: 'The doorway breathes cold at your back.' }
@@ -367,8 +374,10 @@ describe('narration hooks', () => {
     );
     let r = resolveMarkerMove(campaign, hookedRooms, start(), { x: 3, y: 0 }); // → crypt
     r = resolveMarkerMove(campaign, hookedRooms, r.st, { x: 9, y: 9 }); // → hall
-    expect(r.narrative).toContain('The doorway breathes cold at your back.');
-    expect(r.narrative).toContain('You pass into Crypt Hall. Bones. Bones everywhere.');
+    expect(r.narrative).toContain('The doorway breathes cold at your back.'); // exit hook stays
+    expect(r.narrative).toContain('You pass into Crypt Hall.');
+    expect(r.narrative).not.toContain('Bones. Bones everywhere.'); // enter hook deferred
+    expect(r.enteredRoomFirst).toBe(true);
     expect(r.st.exited_rooms).toEqual(['crypt_entrance']);
   });
 

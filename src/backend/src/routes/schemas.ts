@@ -218,7 +218,8 @@ const TieredNarrativeSchema = z.union([StringArray, StringArrayMap]);
 
 const NarrativesSchema = z
   .object({
-    roomArrival: StringArrayMap,
+    // Per-room arrival flavor moved onto each room's pooled `onEnter`;
+    // `genericArrival` stays the campaign-wide fallback.
     genericArrival: StringArray,
     weaponVerbs: StringArrayMap,
     classStyle: StringArrayMap,
@@ -299,6 +300,12 @@ const LEVEL_HOOK_FIELDS = {
   onExit: HOOK,
   onFirstExit: HOOK,
 };
+// Rooms allow a POOL for `onEnter` (random pick per visit — absorbed the old
+// campaign-level `narratives.roomArrival`). Region/town keep the single-string
+// HOOK. A 1-element pool is fine; blank lines are pruned client-side.
+const ROOM_ENTER_HOOK = z
+  .union([z.string().min(1).max(2000), z.array(z.string().min(1).max(2000)).min(1).max(50)])
+  .optional();
 
 // the region-level superRefine below (they need the region's grid size).
 const RegionSiteSchema = z
@@ -1205,8 +1212,10 @@ const RoomsSchema = z
         name: z.string().min(1).max(80),
         desc: z.string().min(1).max(4000),
         // Level narration hooks (enter on every descend/passage in; exit
-        // on leaving to another room or ascending).
+        // on leaving to another room or ascending). `onEnter` is a pool on
+        // rooms — override the single-string HOOK from LEVEL_HOOK_FIELDS.
         ...LEVEL_HOOK_FIELDS,
+        onEnter: ROOM_ENTER_HOOK,
         // SRD tactical scale: 5 ft per square (the default when omitted).
         grid: RoomGridSchema,
         entryPos: GridPosSchema,

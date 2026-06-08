@@ -76,14 +76,9 @@ const HIT_TIERS = ['high', 'mid', 'low'] as const;
 
 // Keyed maps: each key (room id / weapon / class / monster / status) owns a
 // list of lines. The key column header + add-row placeholder differ per pool.
+// (ROOM ARRIVAL moved onto each room's pooled `onEnter` — authored in the room
+// editor now, not here.)
 const KEYED_POOLS: (Pool & { keyLabel: string; keyHint: string })[] = [
-  {
-    key: 'roomArrival',
-    label: 'ROOM ARRIVAL',
-    keyLabel: 'ROOM ID',
-    keyHint: 'room id',
-    tokens: 'shown on first entering that room',
-  },
   {
     key: 'weaponVerbs',
     label: 'WEAPON VERBS',

@@ -1426,6 +1426,19 @@ describe('rooms table store', () => {
     expect('feetPerSquare' in back[1]).toBe(false); // rooms are LOCKED to 5 ft — no scale key
   });
 
+  it('room onEnter pools round-trip through the TEXT column; a single string stays a string', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    // Pool form (array) — stored JSON-encoded in the on_enter TEXT column,
+    // parsed back to an array (it absorbed the old roomArrival pool).
+    const pooled: CampaignRoom = { ...ROOM_B, onEnter: ['Line one.', 'Line two.'] };
+    // Single-string form — stored verbatim, read back as a string (legacy shape).
+    const single: CampaignRoom = { ...ROOM_A, onEnter: 'Just the one line.' };
+    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [pooled, single])).toBe(true);
+    const back = await getCampaignRooms(db.pool, 'malgovia');
+    expect(back.find((r) => r.id === 'cellar')!.onEnter).toEqual(['Line one.', 'Line two.']);
+    expect(back.find((r) => r.id === 'taproom')!.onEnter).toBe('Just the one line.');
+  });
+
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);

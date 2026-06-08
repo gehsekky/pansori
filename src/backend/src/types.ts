@@ -1952,7 +1952,9 @@ export interface Context {
   lootTable: LootItem[];
   rules?: GameRule[];
   narratives: {
-    roomArrival: Record<string, string[]>;
+    // Per-room arrival flavor moved onto each room's `onEnter` pool (a room's
+    // arrival narrative is authored on the room now). `genericArrival` stays the
+    // campaign-wide fallback for rooms with no `onEnter`.
     genericArrival: string[];
     weaponVerbs: Record<string, string[]>;
     classStyle: Record<string, string[]>;
@@ -2100,7 +2102,10 @@ export interface MapSite {
 // does not exit the region. The FIRST variant overrides the plain one on
 // the first occurrence; the plain one fires every other time.
 export interface LevelNarrationHooks {
-  onEnter?: string;
+  // A pool on rooms (random pick per visit — absorbs the old campaign-level
+  // `narratives.roomArrival`); regions/towns use the single-string form. The
+  // engine picks via `pickHookText` (mapEngine), which accepts either shape.
+  onEnter?: string | string[];
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;

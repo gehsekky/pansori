@@ -131,7 +131,14 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
       ? ctx.st.current_room
       : undefined;
   const arrival = enteredRoom
-    ? `${res.narrative ?? ''} ` + buildArrivalNarrative(enteredRoom, ctx.st, ctx.seed, ctx.context)
+    ? `${res.narrative ?? ''} ` +
+      buildArrivalNarrative(
+        enteredRoom,
+        ctx.st,
+        ctx.seed,
+        ctx.context,
+        res.enteredRoomFirst ?? false
+      )
     : res.narrative || ' The party moves across the map.';
   ctx.narrative = (ctx.narrative ?? '') + arrival;
   // Regional travel-time flavor (whole-hour granularity reads cleanly).

@@ -143,6 +143,9 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       ? ctx.seed.rooms.find((r) => r.id === fleeExit.toRoomId)
       : undefined;
     if (target) {
+      // First visit? Check BEFORE marking the room visited below, so the
+      // destination's `onFirstEnter` beat fires once.
+      const firstVisit = !ctx.st.visited_rooms.includes(target.id);
       if (ctx.st.combat_active) {
         ctx.st = endCombatState(ctx.st);
         updatePcActor(ctx, { conditions: [] });
@@ -151,9 +154,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
         ...ctx.st,
         current_room: target.id,
         marker_pos: fleeExit?.entrancePos ?? target.entryPos ?? ctx.st.marker_pos,
-        visited_rooms: ctx.st.visited_rooms.includes(target.id)
-          ? ctx.st.visited_rooms
-          : [...ctx.st.visited_rooms, target.id],
+        visited_rooms: firstVisit ? [...ctx.st.visited_rooms, target.id] : ctx.st.visited_rooms,
       };
       narrative +=
         ' ' +
@@ -164,7 +165,8 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
             characters: ctx.st.characters.map((c, i) => (i === safeIdx ? char : c)),
           },
           ctx.seed,
-          ctx.context
+          ctx.context,
+          firstVisit
         );
     }
   } else {

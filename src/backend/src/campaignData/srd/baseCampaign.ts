@@ -95,6 +95,8 @@ export const baseCampaignContext: Context = {
         id: 'base_camp',
         name: 'Camp',
         desc: 'A small camp beside a worn road: a fire ring, a bedroll, and open country in every direction.',
+        // Arrival flavor (pooled — random pick per visit; was narratives.roomArrival).
+        onEnter: ['The camp is quiet. The fire ring is cold but serviceable.'],
         canRest: true,
         gridWidth: 8,
         gridHeight: 8,
@@ -105,6 +107,8 @@ export const baseCampaignContext: Context = {
         id: 'old_cave',
         name: 'Old Cave',
         desc: 'A low cave mouth in the hillside. Something has been living here.',
+        // Arrival flavor (pooled — was narratives.roomArrival).
+        onEnter: ['The cave smells of damp stone and something animal.'],
         gridWidth: 8,
         gridHeight: 8,
         entryPos: { x: 0, y: 4 },
@@ -146,11 +150,8 @@ export const baseCampaignContext: Context = {
   },
 
   // ─── Neutral narrative pools (overlaid by the campaign's DB narratives) ──────
+  // (Per-room arrival flavor lives on each room's pooled `onEnter` now.)
   narratives: {
-    roomArrival: {
-      base_camp: ['The camp is quiet. The fire ring is cold but serviceable.'],
-      old_cave: ['The cave smells of damp stone and something animal.'],
-    },
     genericArrival: [
       'You move on, senses alert.',
       'The way opens before you.',

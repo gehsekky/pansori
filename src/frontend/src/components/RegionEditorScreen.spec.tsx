@@ -560,6 +560,39 @@ describe('RegionEditorScreen', () => {
       expect(screen.getByTestId('cell-2-2').getAttribute('aria-label')).toContain('site: Door');
     });
 
+    it('room ON ENTER is a pool: loads joined, saves split into an array (blanks pruned)', async () => {
+      mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+        section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [{ ...TAPROOM, onEnter: ['First glimpse.', 'Second glimpse.'] }, CELLAR],
+            }
+          : { section, source: 'db', value: [] }
+      );
+      mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'rooms', source: 'db' });
+      render(
+        <RegionEditorScreen campaignId="sandbox" regionId="taproom" kind="room" onBack={vi.fn()} />
+      );
+      const ta = (await screen.findByLabelText(
+        'ON ENTER (ONE LINE = ONE ENTRY)'
+      )) as HTMLTextAreaElement;
+      // The pool loads one line per entry.
+      expect(ta.value).toBe('First glimpse.\nSecond glimpse.');
+      // Edit: a blank line + trailing spaces are pruned on save; result is an array.
+      fireEvent.change(ta, { target: { value: 'First glimpse.\n\nThird glimpse.  ' } });
+      fireEvent.click(screen.getByText('SAVE'));
+      await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+      const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
+        id: string;
+        onEnter?: unknown;
+      }>;
+      expect(saved.find((r) => r.id === 'taproom')!.onEnter).toEqual([
+        'First glimpse.',
+        'Third glimpse.',
+      ]);
+    });
+
     it('MECHANICS brush paints one flag per cell and clears it', async () => {
       renderRoom();
       await screen.findByTestId('cell-0-0');

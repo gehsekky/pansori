@@ -203,8 +203,9 @@ export interface CampaignRegion {
   desc?: string;
   // Level narration hooks (FIRST variant overrides plain on the first
   // occurrence; region first-enter falls back to desc; region exits are
-  // dormant until region travel exists).
-  onEnter?: string;
+  // dormant until region travel exists). `onEnter` is typed as the shared
+  // pool shape, but regions store/serve a single string (only rooms pool).
+  onEnter?: string | string[];
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;
@@ -440,8 +441,9 @@ export interface CampaignTown {
   name: string;
   desc?: string;
   // Level narration hooks (enter via a region site; exit via the gate —
-  // venue descends stay inside the town's scope).
-  onEnter?: string;
+  // venue descends stay inside the town's scope). `onEnter` typed as the
+  // shared pool shape, but towns store/serve a single string (only rooms pool).
+  onEnter?: string | string[];
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;
@@ -768,9 +770,11 @@ export interface CampaignRoom {
   id: string;
   name: string;
   desc: string;
-  // Level narration hooks (enter on every descend/passage into the room;
-  // exit on leaving it — to another room or ascending).
-  onEnter?: string;
+  // Level narration hooks. `onEnter` is a POOL on rooms (random pick per visit
+  // — it absorbed the old campaign-level `narratives.roomArrival`); it's stored
+  // in the on_enter TEXT column JSON-encoded when an array (see onEnter
+  // parse/encode helpers). `onFirstEnter` stays the single once-only beat.
+  onEnter?: string | string[];
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;
@@ -810,6 +814,26 @@ interface RoomRow {
   trap: CampaignRoomTrap | null;
 }
 
+// A room's `on_enter` is pool-capable: stored in the TEXT column JSON-encoded
+// when it's an array, plain when a single string. A leading '[' marks the JSON
+// form; legacy plain strings (and prose, which never starts with '[') read
+// verbatim. Rooms only — region/town `on_enter` stay plain strings.
+function parseRoomOnEnter(raw: string): string | string[] {
+  if (raw.startsWith('[')) {
+    try {
+      const v: unknown = JSON.parse(raw);
+      if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v as string[];
+    } catch {
+      /* not JSON — fall through to the literal string */
+    }
+  }
+  return raw;
+}
+function encodeRoomOnEnter(v: string | string[] | undefined): string | null {
+  if (v === undefined) return null;
+  return Array.isArray(v) ? JSON.stringify(v) : v;
+}
+
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, grid, entry_x, entry_y, exits,
@@ -824,7 +848,7 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     id: r.id,
     name: r.name,
     desc: r.description,
-    ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
+    ...(r.on_enter !== null ? { onEnter: parseRoomOnEnter(r.on_enter) } : {}),
     ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
     ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
     ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
@@ -882,7 +906,7 @@ export async function putCampaignRooms(
           JSON.stringify(r.enemies ?? []),
           JSON.stringify(r.loot ?? []),
           JSON.stringify(r.npcs ?? []),
-          r.onEnter ?? null,
+          encodeRoomOnEnter(r.onEnter),
           r.onFirstEnter ?? null,
           r.onExit ?? null,
           r.onFirstExit ?? null,

@@ -15,11 +15,11 @@ import { api } from '../lib/api.ts';
 const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 // A representative slice of the real `narratives` shape: a flat pool, a tiered
-// pool (combatHit), and a keyed map (roomArrival).
+// pool (combatHit), and a keyed map (enemyReactions).
 const SEED = {
   genericArrival: ['You press on.', 'The way opens.'],
   combatHit: { high: ['A clean strike!'], mid: ['It connects.'], low: ['A glancing blow.'] },
-  roomArrival: { old_cave: ['The cave reeks of damp.'] },
+  enemyReactions: { Goblin: ['snarls', 'shrieks'] },
 };
 
 describe('NarrativesPanel', () => {
@@ -47,12 +47,18 @@ describe('NarrativesPanel', () => {
       'It connects.'
     );
     // Keyed map — the seeded key + its lines.
-    expect((screen.getByLabelText('ROOM ARRIVAL key old_cave') as HTMLInputElement).value).toBe(
-      'old_cave'
+    expect((screen.getByLabelText('ENEMY REACTIONS key Goblin') as HTMLInputElement).value).toBe(
+      'Goblin'
     );
     expect(
-      (screen.getByLabelText('ROOM ARRIVAL lines old_cave') as HTMLTextAreaElement).value
-    ).toBe('The cave reeks of damp.');
+      (screen.getByLabelText('ENEMY REACTIONS lines Goblin') as HTMLTextAreaElement).value
+    ).toBe('snarls\nshrieks');
+  });
+
+  it('ROOM ARRIVAL is no longer an editable pool (moved onto room onEnter)', async () => {
+    render(<NarrativesPanel campaignId="sandbox" />);
+    await screen.findByLabelText('GENERIC ARRIVAL');
+    expect(screen.queryByText('ROOM ARRIVAL')).toBeNull();
   });
 
   it('edits a flat pool + tier, dropping blank lines on save', async () => {
@@ -67,7 +73,7 @@ describe('NarrativesPanel', () => {
     expect(saved.genericArrival).toEqual(['Onward.', 'Forward.']);
     // The emptied LOW tier is dropped; high + mid survive.
     expect(saved.combatHit).toEqual({ high: ['A clean strike!'], mid: ['It connects.'] });
-    expect(saved.roomArrival).toEqual({ old_cave: ['The cave reeks of damp.'] });
+    expect(saved.enemyReactions).toEqual({ Goblin: ['snarls', 'shrieks'] });
   });
 
   it('adds a keyed-map entry and folds it into the save', async () => {
@@ -89,16 +95,16 @@ describe('NarrativesPanel', () => {
   it('emits all required pools even when empty; optional rest pools are omitted', async () => {
     render(<NarrativesPanel campaignId="sandbox" />);
     await screen.findByLabelText('GENERIC ARRIVAL');
-    // Clear the only roomArrival key's lines → the entry drops, but the pool
+    // Clear the only enemyReactions key's lines → the entry drops, but the pool
     // itself is REQUIRED by the strict schema, so it serializes as `{}`.
-    fireEvent.change(screen.getByLabelText('ROOM ARRIVAL lines old_cave'), {
+    fireEvent.change(screen.getByLabelText('ENEMY REACTIONS lines Goblin'), {
       target: { value: '' },
     });
     fireEvent.click(screen.getByTestId('save-narratives-btn'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Record<string, unknown>;
     // Required map present but empty; required flat pool present but empty.
-    expect(saved.roomArrival).toEqual({});
+    expect(saved.enemyReactions).toEqual({});
     expect(saved.noLoot).toEqual([]);
     // Optional rest pools were never filled → omitted entirely.
     expect('shortRest' in saved).toBe(false);
@@ -107,7 +113,6 @@ describe('NarrativesPanel', () => {
     // The strict NarrativesSchema requires every non-optional pool — assert the
     // save carries the full set so a missing key can't slip past validation.
     const REQUIRED = [
-      'roomArrival',
       'genericArrival',
       'weaponVerbs',
       'classStyle',

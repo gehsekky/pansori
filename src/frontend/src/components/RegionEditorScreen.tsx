@@ -131,7 +131,9 @@ interface EditorRegion {
   isStartingRegion?: boolean; // regions only
   // Level narration hooks (all kinds): FIRST variant overrides plain on
   // the first scope entry/exit; region first-enter falls back to desc.
-  onEnter?: string;
+  // `onEnter` is a POOL on rooms (random pick per visit — absorbed the old
+  // campaign-level roomArrival); region/town use the single-string form.
+  onEnter?: string | string[];
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;
@@ -233,7 +235,9 @@ function detailsFrom(r: EditorRegion): Details {
     name: r.name ?? '',
     desc: r.desc ?? '',
     feetPerSquare: r.feetPerSquare !== undefined ? String(r.feetPerSquare) : '',
-    onEnter: r.onEnter ?? '',
+    // Rooms hold a pool (string[]); show it one line per entry. Region/town
+    // are a single string.
+    onEnter: Array.isArray(r.onEnter) ? r.onEnter.join('\n') : (r.onEnter ?? ''),
     onFirstEnter: r.onFirstEnter ?? '',
     onExit: r.onExit ?? '',
     onFirstExit: r.onFirstExit ?? '',
@@ -829,8 +833,21 @@ function RegionEditorScreen({
       }
       next.feetPerSquare = fps;
     }
-    // Level narration hooks — every kind.
-    for (const key of ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const) {
+    // Level narration hooks. `onEnter` is a POOL on rooms (one line per entry,
+    // random-picked per visit); region/town keep a single string. The other
+    // three hooks are always single strings.
+    if (kind === 'room') {
+      const pool = details.onEnter
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (pool.length) next.onEnter = pool;
+      else delete next.onEnter;
+    } else {
+      if (details.onEnter.trim()) next.onEnter = details.onEnter.trim();
+      else delete next.onEnter;
+    }
+    for (const key of ['onFirstEnter', 'onExit', 'onFirstExit'] as const) {
       if (details[key].trim()) next[key] = details[key].trim();
       else delete next[key];
     }
@@ -2161,7 +2178,9 @@ function RegionEditorScreen({
               </p>
               {(
                 [
-                  ['onEnter', 'ON ENTER'],
+                  // On rooms, ON ENTER is a pool: one line per entry, random-
+                  // picked each visit (it absorbed the old roomArrival pool).
+                  ['onEnter', kind === 'room' ? 'ON ENTER (ONE LINE = ONE ENTRY)' : 'ON ENTER'],
                   ['onFirstEnter', 'ON FIRST ENTER'],
                   ['onExit', 'ON EXIT'],
                   ['onFirstExit', 'ON FIRST EXIT'],
@@ -2174,7 +2193,7 @@ function RegionEditorScreen({
                   <textarea
                     id={`map-hook-${key}`}
                     className={styles.formInp}
-                    rows={3}
+                    rows={key === 'onEnter' && kind === 'room' ? 5 : 3}
                     style={{ resize: 'vertical' }}
                     placeholder="none"
                     value={details[key]}
