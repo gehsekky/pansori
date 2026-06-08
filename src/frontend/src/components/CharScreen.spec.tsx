@@ -215,6 +215,34 @@ describe('CharScreen — campaign selector includes DB-only campaigns', () => {
     const classSelect = container.querySelector('#char-0-class') as HTMLSelectElement;
     expect(classSelect.options.length).toBeGreaterThan(0);
   });
+
+  it("auto-fill uses the DB campaign's OWN recommended party, not the donor's", async () => {
+    // Regression: selectedCtxForInit resolved only against the code
+    // contexts, so a DB campaign fell back to the donor entirely —
+    // auto-fill built the DONOR's composition. The donor (clericCtx) has
+    // Fighter/Cleric; the DB campaign wants Wizard×2.
+    const dbSummary = {
+      ...wizardSummary,
+      id: 'frostspire',
+      displayName: 'Frostspire',
+      recommendedPartySize: 2,
+      recommendedComposition: ['Wizard', 'Wizard'],
+    } as BackendContextSummary;
+    vi.spyOn(api, 'listContexts').mockResolvedValue([
+      { ...wizardSummary, id: clericCtx.id } as BackendContextSummary,
+      dbSummary,
+    ]);
+    const onStart = vi.fn().mockResolvedValue(undefined);
+    const { findByTestId, getByTestId } = render(
+      <CharScreen onStart={onStart} loading={false} availableContexts={[clericCtx]} user={null} />
+    );
+    fireEvent.click(await findByTestId('world-picker-frostspire'));
+    fireEvent.click(getByTestId('auto-fill-party-btn'));
+    fireEvent.click(getByTestId('begin-adventure-btn'));
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
+    const chars = onStart.mock.calls[0][0] as Array<{ character_class: string }>;
+    expect(chars.map((c) => c.character_class)).toEqual(['Wizard', 'Wizard']);
+  });
 });
 
 describe('CharScreen — caster spell picker', () => {

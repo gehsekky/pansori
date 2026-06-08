@@ -366,8 +366,46 @@ function CharScreen({
     if (last && visibleContexts.some((c) => c.id === last)) return last;
     return visibleContexts[0]?.id ?? availableContexts[0]?.id ?? '';
   });
-  const selectedCtxForInit =
-    availableContexts.find((c) => c.id === contextId) ?? availableContexts[0];
+  // BE context summaries (incl. DB-only campaigns). Lazy-loaded on mount;
+  // the synthesized contexts below need them, so this is declared up here.
+  const [beContexts, setBeContexts] = useState<Record<string, BackendContextSummary>>({});
+  // The world picker's list: code contexts minus hidden, intersected with
+  // what the server says this user may see — PLUS server-listed campaigns
+  // with no code context (creator-built, DB-only). A DB campaign gets a
+  // synthesized FrontendContext: a code context donates the SRD class/
+  // background/theme machinery; id/name/party-hint come from the server.
+  const beLoaded = Object.keys(beContexts).length > 0;
+  const donorCtx =
+    availableContexts.length > 0
+      ? availableContexts.reduce((best, c) => (c.classes.length > best.classes.length ? c : best))
+      : availableContexts[0];
+  const beOnlyContexts: FrontendContext[] = !beLoaded
+    ? []
+    : Object.values(beContexts)
+        .filter((b) => !availableContexts.some((c) => c.id === b.id))
+        .map((b) => ({
+          ...donorCtx,
+          id: b.id,
+          displayName: b.displayName,
+          tagline: b.tagline ?? 'A creator-built campaign.',
+          previewArt: b.previewArt ?? '',
+          hidden: false,
+          // The campaign's OWN class roster (from the summary) — not the
+          // donor's, which could be a subset (e.g. sandbox's 5) and would
+          // make auto-fill fall back for any missing class.
+          classes: (b.classes ?? donorCtx.classes.map((c) => c.id)).map(
+            (id) => donorCtx.classes.find((c) => c.id === id) ?? { id, desc: '' }
+          ),
+          // The campaign's OWN party hint (the DB recommendedParty section) —
+          // not the donor context's, which would otherwise leak through.
+          recommendedPartySize: b.recommendedPartySize,
+          recommendedComposition: b.recommendedComposition,
+        }));
+  // Selection lookups resolve from code + synthesized contexts alike — so a
+  // DB campaign uses ITS OWN classes/backgrounds/recommended party, not the
+  // donor's.
+  const allContexts = [...availableContexts, ...beOnlyContexts];
+  const selectedCtxForInit = allContexts.find((c) => c.id === contextId) ?? availableContexts[0];
   // Try to restore the per-context saved party. If none exists, fall
   // back to a single-member default seeded with the legacy
   // `operative_name` localStorage value + the user's avatar (so the
@@ -409,7 +447,6 @@ function CharScreen({
   // catalog) drive the Magic Initiate spell picker. Lazy-loaded on mount;
   // empty until the request resolves. The picker trigger button stays
   // hidden until the data is ready so players can't open an empty dialog.
-  const [beContexts, setBeContexts] = useState<Record<string, BackendContextSummary>>({});
   // Which party-member index has the Magic Initiate spell picker open. null = closed.
   const [spellPickerIdx, setSpellPickerIdx] = useState<number | null>(null);
   // Which party-member index has the caster spell picker open. null = closed.
@@ -440,29 +477,9 @@ function CharScreen({
   // a code context donates the SRD class/background/theme machinery while
   // the id/name come from the server. Before the BE list resolves, show
   // the code list as-is — the code contexts are the global built-ins.
-  const beLoaded = Object.keys(beContexts).length > 0;
-  const donorCtx = availableContexts[0];
-  const beOnlyContexts: FrontendContext[] = !beLoaded
-    ? []
-    : Object.values(beContexts)
-        .filter((b) => !availableContexts.some((c) => c.id === b.id))
-        .map((b) => ({
-          ...donorCtx,
-          id: b.id,
-          displayName: b.displayName,
-          tagline: b.tagline ?? 'A creator-built campaign.',
-          previewArt: b.previewArt ?? '',
-          hidden: false,
-          // The campaign's OWN party hint (the DB recommendedParty section) —
-          // not the donor context's, which would otherwise leak through.
-          recommendedPartySize: b.recommendedPartySize,
-          recommendedComposition: b.recommendedComposition,
-        }));
   const pickerContexts = beLoaded
     ? [...visibleContexts.filter((c) => c.id in beContexts), ...beOnlyContexts]
     : visibleContexts;
-  // Selection lookups resolve from code + synthesized contexts alike.
-  const allContexts = [...availableContexts, ...beOnlyContexts];
 
   function swapStats(partyIdx: number, a: keyof StatBlock, b: keyof StatBlock) {
     if (a === b) return;
