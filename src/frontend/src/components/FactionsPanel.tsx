@@ -221,7 +221,7 @@ function FactionsPanel({ campaignId }: { campaignId: string }) {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: 6 }}>
             {TIERS.map((tier) => (
-              <div key={tier} style={{ width: 107 }}>
+              <div key={tier} style={{ width: 130 }}>
                 <label className={styles.formLbl} htmlFor={`faction-${i}-th-${tier}`}>
                   {tier.toUpperCase()} ≥
                 </label>
@@ -248,7 +248,7 @@ function FactionsPanel({ campaignId }: { campaignId: string }) {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: 6 }}>
             {TIERS.map((tier) => (
-              <div key={tier} style={{ width: 107 }}>
+              <div key={tier} style={{ width: 130 }}>
                 <label className={styles.formLbl} htmlFor={`faction-${i}-mod-${tier}`}>
                   {tier.toUpperCase()} ×
                 </label>
