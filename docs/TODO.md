@@ -406,9 +406,6 @@ What code campaigns can still do that DB campaigns cannot, by impact:
       label vs spoken line), `goto`/node-ids for hub-and-spoke trees,
       mid-combat surrender, NPC ICON sprite picker (`/art/sprites` stems;
       the schema already stores `icon`).
-- [ ] **Region-page ROOMS panel (if needed)** — rooms are created via a
-      town's hosted panel today; dungeon interiors for region local sites
-      have no home-page panel (the top-level one was removed).
 
 ## Content & playtest
 

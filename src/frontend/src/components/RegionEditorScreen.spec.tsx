@@ -1116,3 +1116,50 @@ describe('RegionEditorScreen', () => {
     expect(saved[0].floor).toBe('cobblestone');
   });
 });
+
+describe('region page — the hosted ROOMS panel (dungeon interiors)', () => {
+  it('renders the ROOMS panel and its rooms feed the local-site ENTRY ROOM picker', async () => {
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'regions'
+        ? { section, source: 'db', value: [REGION, OTHER] }
+        : section === 'towns'
+          ? { section, source: 'db', value: [{ id: 'oakvale', name: 'Oakvale' }] }
+          : section === 'rooms'
+            ? {
+                section,
+                source: 'db',
+                value: [
+                  {
+                    id: 'pit',
+                    name: 'The Pit',
+                    desc: 'd',
+                    grid: [[{ t: 'cobblestone' }]],
+                    entryPos: { x: 0, y: 0 },
+                  },
+                ],
+              }
+            : { section, source: 'db', value: [] }
+    );
+    const onOpenMap = vi.fn();
+    render(
+      <RegionEditorScreen
+        campaignId="camp"
+        regionId="proving-grounds"
+        kind="region"
+        onBack={vi.fn()}
+        onOpenMap={onOpenMap}
+      />
+    );
+    // The hosted ROOMS panel is on the page (next to TOWNS) with a creator.
+    expect(await screen.findByText('+ NEW ROOM')).toBeTruthy();
+    // Its room card opens the room painter directly — no town hop.
+    fireEvent.click(await screen.findByTestId('room-card-pit'));
+    expect(onOpenMap).toHaveBeenCalledWith('room', 'pit');
+    // And the rooms list feeds the local-site ENTRY ROOM picker: select
+    // the existing local site ("The Pit" at cell 2,1) via the SITES tool.
+    fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-2-1'));
+    const entry = (await screen.findByLabelText('ENTRY ROOM')) as HTMLSelectElement;
+    expect([...entry.options].map((o) => o.value)).toContain('pit');
+  });
+});

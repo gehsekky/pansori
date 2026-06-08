@@ -432,19 +432,9 @@ function RegionEditorScreen({
         })
         .catch(() => setFactionOptions([]));
     }
-    // Region pages need the room pool for the local-site ENTRY ROOM picker
-    // (town pages get it live from their hosted ROOMS panel instead).
-    if (kind === 'region') {
-      api
-        .getCampaignSection(campaignId, 'rooms')
-        .then((s) => {
-          const list = Array.isArray(s.value) ? (s.value as Array<{ id?: unknown }>) : [];
-          setRoomOptions(
-            list.map((r) => r.id).filter((id): id is string => typeof id === 'string')
-          );
-        })
-        .catch(() => setRoomOptions([]));
-    }
+    // (Region pages used to one-shot-fetch the room pool here for the
+    // local-site ENTRY ROOM picker; their hosted ROOMS panel feeds it live
+    // now, same as town pages.)
   }, [campaignId, regionId, section, kind]);
 
   // Drag-paint ends wherever the mouse is released.
@@ -2921,10 +2911,13 @@ function RegionEditorScreen({
             </div>
 
             {/* ── Child maps. Towns are authored on the region page (they're
-                reached through its town sites); rooms on the town page
-                (reached through its interior venues). Each hosted panel
-                also feeds the marker tool's target picker (onMaps), so a
-                map created here is pickable immediately. */}
+                reached through its town sites); rooms on BOTH the region
+                page (dungeon interiors — local sites point at rooms
+                directly, no town needed) and the town page (venue
+                interiors). The rooms pool is campaign-global either way.
+                Each hosted panel also feeds the marker tool's target
+                picker (onMaps), so a map created here is pickable
+                immediately. */}
             {kind === 'region' && (
               <MapsPanel
                 campaignId={campaignId}
@@ -2935,6 +2928,21 @@ function RegionEditorScreen({
                     ? (mapId) => {
                         if (dirty && !confirm('Discard unsaved map changes?')) return;
                         onOpenMap('town', mapId);
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {kind === 'region' && (
+              <MapsPanel
+                campaignId={campaignId}
+                kind="room"
+                onMaps={(maps) => setRoomOptions(maps.map((m) => m.id))}
+                onOpenMap={
+                  onOpenMap
+                    ? (mapId) => {
+                        if (dirty && !confirm('Discard unsaved map changes?')) return;
+                        onOpenMap('room', mapId);
                       }
                     : undefined
                 }
