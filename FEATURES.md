@@ -1,0 +1,152 @@
+# Pansori — built features
+
+What's implemented and working. Strict SRD 5.2.1 scope throughout (see
+[CLAUDE.md](CLAUDE.md) / [LEGAL.md](LEGAL.md)). Open work lives in
+[TODO.md](TODO.md). `git log` is the authoritative record of what landed.
+
+## SRD content coverage
+
+| Category | In pansori | SRD universe |
+|---|---|---|
+| Spells | **340** catalog entries (~232 mechanical, ~108 narrative-only) | full SRD coverage |
+| Monsters | **328** stat blocks (CR 0 Rat → CR 30 Tarrasque), SRD-exact names | 330 (Seahorse + Shrieker Fungus have no attacks) |
+| Classes | 12 | 12 |
+| Subclasses | 12 iconic (1/class) | 1 iconic/class |
+| Species | 9 (+ Drow as an Elf lineage) | 9 |
+| Origin feats / epic boons | 6 / 7 | 4 (+Magic Initiate variants) / 7 |
+| Fighting styles | 4 (Archery, Defense, Great Weapon, Two-Weapon) | — |
+
+- The **bestiary is complete** — every attack-capable SRD block, spec-guarded
+  (SRD-exact names, a full cr/hp/ac/xp audit against `docs/srd-5.2.1.txt`, a
+  completeness pin). Regeneration, legendary `extra_attack` (26 bosses), Undead
+  Fortitude, Life Drain, auras, recharge breath, Pack Tactics, Parry, etc. are wired.
+- **Narrative-only spells graduate** as their systems land: anti-magic
+  suppression, Time Stop, Shapechange / Animal Shapes, basic Wish, the teleport
+  family, Remove Curse.
+
+## Character build & creation
+
+- **All 12 classes + their iconic SRD subclass, through L20**, each spec-covered
+  (Berserker, College of Lore, Life Domain, Circle of the Land, Champion, Open
+  Hand, Oath of Devotion, Hunter, Thief, Draconic Sorcery, Fiend, Evoker).
+- **Multiclassing** (per-class levels, multiclass slot table, ability prereqs,
+  entry proficiency grants, per-class feature gating); **2024 exhaustion**
+  (−2/level d20, −5 ft/level, lethal at 6); ability-score generation
+  (roll/array/point-buy/manual) + background ASIs; full skill→ability map.
+- **Player-driven creation**: ability method + background split, class-skill
+  choice, starting-equipment package, weapon-mastery picker (+ level-up scaling),
+  fighting-style / Expertise pickers, Cleric **Divine Order**, a **caster spell
+  picker** (cantrips + L1; Magic Initiate vs caster pickers lock duplicate
+  cantrips, allow the L1 overlap, show locked spells). Magic Initiate's free L1
+  cast is a distinct, slot-independent combat choice.
+- **Body-slot equipment** — 13-slot `Character.equipment` map keyed to inventory
+  instances; items confer passive `wornEffects` while worn + attuned.
+
+## Equipment (full SRD 5.2.1 tables)
+
+- All 38 weapons (simple + martial, incl. firearms) with RAW damage / properties
+  / **weapon mastery**; all 13 armor entries. Tools + adventuring gear; Healer's
+  Kit (`stabilize`), Antitoxin.
+- Light sources (Torch / Hooded / Bullseye Lantern) as a worn `light` effect +
+  a quiver slot (seeds `light_radius_ft`); thrown splash weapons (Acid,
+  Alchemist's Fire, Holy Water — creature-type-gated); ammunition spent per
+  ranged round.
+
+## Combat engine
+
+- Grid tactical combat (5-ft squares): to-hit, advantage/disadvantage stacking,
+  crits, cover, flanking (optional), difficult terrain, BFS pathfinding,
+  opportunity attacks (reach), Chebyshev distance, line-of-sight blocking, and a
+  room-grained **lighting/vision model** (dark/dim/bright/sunlight, darkvision,
+  magical Darkness, light sources, Sunlight Sensitivity) with FE grid-fog + LoS reveal.
+- **Surprise** = Disadvantage on the Initiative roll (SRD 5.2.1; Alert immune).
+- All 8 SRD **weapon masteries** (Cleave makes its own attack roll; Graze, Topple,
+  Vex, Slow, …); resistance/vulnerability/immunity; massive-damage instant death.
+- **Reaction framework** — discriminated `pending_reaction` with pause/resume:
+  Shield, Counterspell (2024 enemy CON-save), Hellish Rebuke, Uncanny Dodge,
+  readied actions, OAs, Heroic-Inspiration reroll, Deflect Attacks, Indomitable,
+  Countercharm.
+- Conditions (source attribution, immunities, durations), concentration (saves +
+  break sweep), spell slots / components / AoE shapes / saves, rest / death-save /
+  revive ladder, temp HP, Death Ward, mounted combat.
+- **Dispatcher-integrated enemy turns** (enemy_move → enemy_cast | enemy_attack×N
+  through the same dispatch path as PCs); **summon-as-ally** infra (side tagging,
+  ally AI, lifecycle, familiar Help-only path); persistent damage zones, recurring
+  spell attacks, weapon riders (Divine Favor, smites), AoE-condition control,
+  forced displacement, wall spells.
+- Per-spell handlers cover the combat-relevant catalog. Recent mechanizations:
+  Guidance, Resistance, True Strike, Shield, Counterspell, Shillelagh.
+
+## Map, travel & encounters
+
+- Three-level grid map: **regional → town → local room**, one party marker;
+  descend/ascend/change-room on transition cells (region sites / town venues /
+  room exits). Region-to-region travel via **GATE sites** (full enter/exit hook
+  matrix); town **teleportation** (Teleport / Word of Recall → visited towns).
+- **In-game clock** — single `world_minute` integer; day/time-band derived at
+  display; travel adds minutes, short rest +60, long rest +480, SRD one-long-rest-
+  per-24h gate.
+- SRD **Travel Pace** (hour-per-click cap; fast/normal/slow) + **forced-march**
+  CON saves → exhaustion past 8 hrs/day; fog of war.
+- **Encounter zones** — paintable, non-overlapping region sub-areas, each a
+  self-contained pool: a difficulty **tier (1–4)**, a per-square chance, and a
+  creature table. One region can span multiple tiers; a square outside every zone
+  never rolls. The sole source of random wilderness encounters.
+- **Party-size scaling** the SRD way — by creature COUNT (not inflated stat
+  blocks), relative to `recommendedPartySize`, floored to the XP budget; bosses
+  (count-1 placements) never cloned.
+
+## NPCs, dialogue & economy
+
+- **Conversation mode** — a dedicated dialogue window; arbitrarily nested
+  responses; condition/once/check-gated nodes; a safe consequence subset
+  (advance_quest, add_narrative, modify_hp, consume_item, start_quest); parley
+  with authored-hostile NPCs; greeting/goodbye narrative hooks.
+- **Vendor economy** — buy + sell (half price), per-entry stock quantities,
+  vendor wallets, daily restock, general buyback off SRD catalog values.
+
+## Campaign platform (content lives in the DB)
+
+- Campaigns are DB rows resolving over the shared SRD base template
+  (`campaignData/srd/baseCampaign.ts`) — one loading path for the shipped
+  campaigns (sandbox, Malgovia) and any user-authored one. The old per-campaign
+  code contexts are deleted; the DB is canonical.
+- **Creator / editor**: visual region/town/room **painters** (terrain, tiers,
+  mechanics, SIZE, markers, encounter zones, narration-hook cards), placed
+  content in rooms (enemies/loot/NPCs/objects/traps), a structured dialogue-tree
+  editor + QUESTS/FACTIONS panels (shared condition/effect vocabulary), and the
+  **MAP ART editor** (terrain tints, town-marker tiles, floor skins, level tabs).
+- **Editable sections** (DB-first, live via `refreshCampaignOverlay`, per-section
+  schema-validated): gameStart, narratives, regions, towns, rooms, quests,
+  factions, terrainArt, customItems, customMonsters, theme, rules,
+  recommendedParty, backgrounds, classSpells, classStarting{Loot,Equipment}.
+  Custom monsters/items carry the full template surface (phases, legendary/lair
+  actions, wornEffects, curses, attunement, masteries).
+- **Membership & visibility** — `users.is_admin`; campaigns registry with
+  visibility (private-by-default; admin-only promote to global); `campaign_members`
+  with **owner ⊃ editor ⊃ player** + last-owner guard; role middleware +
+  `/api/campaigns` API; the picker intersects with the server-visible set.
+  Breadcrumb nav.
+
+## Art & assets (all commercial-licensed — the project is commercial-clean)
+
+- **Inventory item icons** — painted, bucket-derived (silhouette → bucket → art),
+  per-item override: Baumgart "Medieval Arms & Armor" + Vivid Motion kit
+  (potions, food, tools, gear…); `firearm` is the lone glyph fallback.
+- **Overland terrain tiles** — Baumgart Basic Terrain Set (14 biomes × 4 painted
+  variants) + Medieval Fantasy Locations markers (29 families); `tile:<id>` site
+  icons. **Local/town floor tiles** — CC0 (SBS "Tiny Texture Pack") +
+  original procedurally-generated dirt/sand. Party sprite: Tiny Swords.
+- Monochrome glyphs (rpg-awesome / game-icons / Phosphor) for UI + uncovered
+  buckets. No asset carries a non-commercial restriction.
+
+## Platform & ops
+
+- Type-share: `src/shared/types.ts` is the source of truth, synced to BE+FE
+  `shared-types.ts` (CI `sync-types:check`).
+- Local gate: lint + both tsc + `test:be` + `test:fe` + the Playwright e2e smoke;
+  `npm run check-migrations` on migration changes.
+- **Deployment** (shipped): ECR + EC2 + RDS, nginx, Let's Encrypt (certbot
+  auto-renew), GitHub Actions → SSM deploy, Google OAuth, Docker Compose prod;
+  Postgres sessions (httpOnly/secure/sameSite), helmet, pinned CORS, parameterized
+  queries, auth rate-limit, `npm audit` in CI.

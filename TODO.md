@@ -1,100 +1,212 @@
-# Strict-SRD cleanup — "PHB" audit
+# Pansori — TODO
 
-Audited all **477** mentions of `phb` across the codebase. Findings below.
+Open work only. For what's already built, see [FEATURES.md](FEATURES.md);
+`git log` is the record of what landed. `[~]` = a shipped framework with
+documented deferrals.
 
-## ✅ Not a problem — leave as-is
+## Content breadth
 
-- **No PHB-only _content_ is present.** Every "PHB-only" mention is a comment
-  _documenting_ that the content is correctly **excluded** (Lucky, Sharpshooter,
-  Sentinel, Polearm Master, Great Weapon Master, War Caster, Beast Master,
-  Assassin, Protection/Blind Fighting styles, Aasimar, etc.). These notes are
-  the record of the strict-SRD scope — **keep them.**
-- **Doc scope statements** intentionally discuss the PHB boundary:
-  `CLAUDE.md`, `LEGAL.md`, `README.md`, `docs/AUTHORING.md`, `docs/TODO.md`. **Keep.**
-- **No `PHB` in code/identifiers/strings** that logic depends on — only comments
-  + a few test `it(...)` descriptions.
-
-## ⚠️ To fix — citation convention (CLAUDE.md: "Never cite PHB pages — use SRD section names")
-
-~421 comments cite **`2024 PHB <Feature>`** or **`(PHB p.NNN)`** for content that
-**is in the SRD 5.2.1**. Relabel `2024 PHB` / `PHB p.N` → `SRD` in comments.
-Do **not** touch the "PHB-only" exclusion notes or the doc scope statements.
-
-### Checklist (by area, descending by count) — ✅ DONE
-
-Relabeled `2024 PHB` / `PHB 2024` / `2014 PHB` / `5e PHB` / `PHB p.N` / `PHB/SRD`
-/ bare `PHB` → `SRD` across **96 source files** (guarded sed, skipping the
-keep-list), then re-synced the generated `shared-types.ts`. Comment-only — no
-behavior change. Gate green (BE tsc/eslint, FE tsc/eslint, sync-types, prettier,
-BE 2520 + FE 221 tests).
-
-- [x] `services/gameEngine.ts`
-- [x] `services/rulesEngine.ts`
-- [x] `services/actions/**`
-- [x] `services/*.ts`
-- [x] `campaignData/srd/**`
-- [x] `types.ts` + `src/shared/types.ts` (→ synced `shared-types.ts`)
-- [x] `frontend/src/**`
-- [x] `**/*.spec.ts` test descriptions
-- [x] Manual fixes: 4 "Beast Form" citations wrongly skipped by the
-      `PHB Beast`(-Master) guard; the multi-page list in `classes.ts`
-      (orphan page numbers removed)
-- [x] Final sweep — the only remaining `phb` mentions are the intentional
-      keep-list (PHB-only exclusion notes + doc scope statements)
-
-### Follow-up (related, but NOT PHB — out of this task's scope)
-
-- [x] **`SRD p.NNN` page citations dropped** — relabeled to SRD section names
-      across the citations (rulesEngine, etc.); no `SRD p.` / `PHB p.` page
-      references remain in source.
-- [ ] Box-drawing comment headers that shrank (e.g. `// ─── X (SRD) ───`) have
-      slightly shorter trailing rules now — purely cosmetic.
-
----
-
-# SRD equipment + creation/combat (this session)
-
-## ✅ Done
-
-**Equipment catalog (`campaignData/srd/items.ts`) — now the full SRD 5.2.1 tables:**
-- [x] All 38 weapons (simple + martial, incl. firearms) with RAW damage /
-      properties / mastery; fixed Dart's missing Vex mastery.
-- [x] All 13 armor entries (padded → plate + shield) with base AC / DEX cap.
-- [x] Tools + adventuring gear (backpack, rope, tinderbox, …); Healer's Kit
-      wired to a `stabilize` use; Antitoxin (`con_advantage`).
-- [x] Light sources — Torch / Hooded Lantern / Bullseye Lantern as a `light`
-      worn effect + a **quiver** equip slot; combat seeding emits `light_radius_ft`.
-- [x] Thrown splash weapons (`throw_item`): Acid, Alchemist's Fire (save-ends
-      burn), Holy Water (gated on a new `Enemy.creatureType`).
-- [x] Ammunition (arrows/bolts/bullets/needles) + the quiver slot; ranged
-      attacks spend a matching round; ranged starters bundle arrows.
-
-**Rules / creation / combat:**
-- [x] Rogue weapon proficiency = Simple + Finesse/Light martial
-      (`martial_finesse_light`) — fixes the mastery picker + attack proficiency.
-- [x] Cleric **Divine Order** moved to character creation (required to start).
-- [x] **Caster spell picker** at creation (cantrips + L1 from the class list);
-      Magic Initiate vs caster pickers lock duplicate *cantrips* but allow the
-      beneficial L1 overlap; locked spells shown (not hidden).
-- [x] Magic Initiate free L1 cast surfaced as a distinct, slot-independent
-      combat choice (`✦ … free, Magic Initiate`); cantrips tagged by source.
-
-## ⏳ Deferred / open
-
-- [ ] **Mounts, vehicles, trade goods** — the rest of the SRD equipment chapter;
-      not modeled (no systems for them yet).
-- [ ] **Caltrops / ball bearings** — area-denial consumables; need a
-      movement-triggered ground-effect mechanic (the thrown splash weapons exist;
-      these don't).
-- [ ] **Spellcasting foci** (holy symbol / component pouch / arcane focus) are
-      still flavor — `effect: 'spellcasting_focus'` isn't read anywhere; casting
-      has no focus/component gate.
+- [ ] **Magic items** — content; the body-slot + attunement + curse + worn-effect
+      infra is shipped, so new wondrous items are largely data + an effect kind.
 - [ ] **Per-campaign spell curation** — `spellTable` loads the whole SRD catalog
       everywhere; no `srdSpells(…)` selector (cf. `srdItems`) for low-magic settings.
-- [ ] Continue the **auto-pick → player-driven** migration (Divine Order + caster
-      spells done) for any remaining auto-assigned creation choices.
+- [ ] **Mounts, vehicles, trade goods** — rest of the SRD equipment chapter; not modeled.
+- [ ] **Caltrops / ball bearings** — area-denial consumables; need a
+      movement-triggered ground-effect mechanic (thrown splash weapons exist; these don't).
+- [ ] **Spellcasting foci** (holy symbol / component pouch / arcane focus) are
+      still flavor — `effect: 'spellcasting_focus'` isn't read; no focus/component gate.
 
-### Verify after each batch
-- BE: `npx tsc --noEmit`, `npx eslint .`, `npx vitest run`
-- FE: same; root `npm run sync-types:check` + `npx prettier --check`
-  (the three `shared-types.ts` are generated — edit `src/shared/types.ts` then `npm run sync-types`)
+## Monster-ability infrastructure
+
+> The full bestiary's stat lines are in and the common hooks shipped; the
+> remaining per-monster specials need new engine support. Each is marked inline
+> with a `// Simplification:` comment (grep for the worklist).
+
+- [ ] Movement-conditional **charge riders** ("moved 20+ ft" → extra dice/Prone).
+- [ ] **Swallow / Engulf**; **petrifying-gaze ladders** (Restrained → Petrified).
+- [ ] Monster **utility spellcasting** (the Priest convention defers it);
+      spell-based **legendary options + Legendary Resistance + lair actions**.
+- [ ] Shape-shifters / lycanthropy infection; ooze **splits + death bursts**;
+      ability-score drain (Shadow); no-damage utility breaths; target-state traits
+      (Blood Frenzy, Bloodied-tier damage).
+
+## Documented engine deferrals (depend on missing content / infra)
+
+- [ ] **Greater Divine Intervention** (Cleric L20) — needs a Wish spell.
+- [ ] **Dragon Companion** (Draconic L18) — needs a Summon Dragon spell.
+- [ ] **Contact Patron** (Warlock L9) — needs a Contact Other Plane spell.
+- [ ] **Holy Ward half** (Devotion L20) — save sites don't carry the attacker's
+      creature type yet (the Radiant aura ships).
+- [~] **Truesight / Dimensional Travel / Night Spirit boons** — the +1 ability +
+      Truesight's see-through-magical-darkness half ship; remaining: see-Invisible /
+      shapechanger halves, Dimensional Travel positioning, Night Spirit. Narrated.
+- [ ] Minor markers: Devious Strikes' Daze restriction, Use Magic Device
+      scroll/charge sub-features, Thief Jumper, Lay on Hands poison-cure, Deflect
+      Energy (Monk L13).
+
+## Combat / exploration subsystems (bounded)
+
+- [ ] **Underwater combat** — non-piercing melee disadvantage, ranged rules, fire resist.
+- [ ] **High Jump / verticality** — Long Jump ships; High Jump is helper-only.
+      Verticality is the architectural gap (flat grid, no elevation/ledges).
+- [ ] **Somatic spell components** — RAW needs a free hand → a hand-state model;
+      no spell carries a `somatic` flag yet. Also unlocks focus-substitutes-for-material.
+- [ ] **Forced-march death at Exhaustion 6** — fatigue ships (`applyForcedMarch`)
+      but only raises `exhaustion_level`; the level-6 = death rule fires in a
+      separate flow. Wire the death check into the march path (and/or centralize
+      exhaustion-gain).
+- [ ] **Out-of-combat systems** — Downtime, Bastions, Crafting (potions / scrolls
+      / items), Vehicles. Lowest urgency.
+
+## Condition + spellcasting fidelity (multiclass edge cases)
+
+- [~] Per-class ASI spacing + multiclass-entry skill/tool grants done. Deferred
+      (larger model changes):
+  - [ ] **Warlock pact-slot pool separation** — slots are one merged pool;
+        `actions/rest.ts` short-rest overwrites `spell_slots_max` to the pact value
+        and resets all `spell_slots_used`, wiping a multiclass Warlock's other slots.
+        Needs a separate pact pool + casting + recovery + FE.
+  - [ ] **Second-class subclass features** — subclass auto-assign only fires for
+        the primary class at its L3; a second class reaching its subclass level gets
+        nothing. Needs a per-class subclass model.
+
+## Subsystem follow-ups
+
+- [ ] **Magic / Utilize action-category tags** — only needed for Action Surge's
+      "extra action except the Magic action" once a martial multiclasses into a
+      caster. Bundle with multiclass UX.
+- [ ] **Magic-item attunement — remaining** — short-rest attune gating, Remove
+      Curse ↔ `de_attune` interaction, cursed items in seed loot.
+- [ ] **Long Rest → pure SRD 24-hour rule** — drop the per-session `long_rested`
+      cap and let the 24h world-clock gate (`last_long_rest_minute`) govern alone
+      (one-line change in `actions/rest.ts` + a `gameEngine.ts` label).
+
+## Narrative pipeline — structured fragments
+
+- [ ] `twoWeaponAttack` fragment — off-hand outcomes emit no `CombatEvent`.
+- [ ] Cleave-hit fragment — secondary-target damage emits no event.
+- [ ] `resolveTarget(ctx, action)` helper to dedupe target resolution (~5 sites).
+- [ ] `cleric.ts` Divine Spark auto-hit → `spell_auto_hit` fragment.
+
+## Encounter zones (follow-ups)
+
+- [ ] **Weighted creature entries** (`{name, weight}`) — selection is uniform today.
+- [ ] **Mixed-group entries** — spawn a small group (e.g. "2 wolves + 1 bandit")
+      instead of N of a single creature.
+- [ ] **Per-terrain weighting within a zone** (optional) — terrain only modulates
+      encounter *frequency* now, not which creature.
+
+## Campaign platform — DB authoring-model gaps
+
+- [ ] **Remaining consequence arms** — spawn_enemy, unlock_room, set_escape,
+      travel_to, set_faction_rep stay code-side. set_faction_rep is the safest next
+      promotion; spawn_enemy/unlock_room would let DB dialogue spring ambushes / open doors.
+- [ ] **Engine-y creation config** — classSkills / hit dice / proficiencies /
+      classFeatures / featTable / spellTable / spellcastingAbility stay
+      base-template-only (SRD constants; port only if a real campaign needs it).
+- [ ] **Campaign-meta knobs with no section** — `defaultStartingLoot`,
+      `displayNoun`, default `gridWidth`/`gridHeight`.
+- [ ] **Room tactical extras** — `coverPositions` (half/three-quarter cover) isn't
+      paintable in the DB room schema.
+- [ ] **Procgen** — sandbox's roguelike dungeon generator is code; DB campaigns are
+      authored-only. Likely permanent.
+
+## Creator backlog (smaller)
+
+- [ ] **Narratives section editor** — the last JSON-only section with a natural
+      structured surface (keyed string-lists).
+- [ ] **Venue-level narration hooks** — venues carry only the per-landing site
+      `onEnter`; no first/exit variants.
+- [ ] **Dialogue follow-ups** — `say` field (menu label vs spoken line),
+      `goto`/node-ids for hub-and-spoke trees, mid-combat surrender, NPC ICON sprite
+      picker (`/art/sprites` stems; schema already stores `icon`).
+- [ ] Continue the **auto-pick → player-driven** creation migration (Divine Order
+      + caster spells done) for any remaining auto-assigned choices.
+
+## Content & playtest
+
+- [~] **Boss legendary + lair actions** — legendary `extra_attack` live on 26
+      bosses; remaining: lair actions unwired, more legendary effect KINDS
+      (teleport, gaze, debuff aura, spell-cast).
+- [ ] **Another campaign module (opportunistic)** — coastal pirate town, desert
+      ruin, planar city. Authored on the 3-level grid; not on the critical path.
+- [ ] **Difficulty tuning from playtest data** — capture damage/HP/encounter
+      telemetry to inform tuning (the Giant Spider near-TPK was the latest signal).
+
+## Art / assets (optional polish)
+
+- [ ] Untapped Vivid Motion kit categories — **Currency** (gold display), **Core
+      UI** buttons, **Shops** (blacksmith/bank/alchemist), and the **animated
+      8-frame strips** (loot-drop / level-up flourishes via CSS steps).
+- [ ] Warmer **light/lantern** art + a clearer **sling** item icon (catalog swaps).
+- [ ] Box-drawing comment header rules shrank slightly after the SRD relabel —
+      purely cosmetic.
+
+## Type-share infrastructure
+
+- [ ] **Phase 3** (remaining workspace-local types: Character, GameState, Seed,
+      Trap, Room, OnHitEffect, BossPhase, EnemyTemplate, Enemy, Spell, BeastForm,
+      InventoryItem, TurnActions, DeathSaves, Context/FrontendContext, GameRule,
+      RuleFacts, CampaignFacts, and the map types). Defer until there's a concrete
+      reason to share each.
+
+## UX & polish
+
+- [ ] **Tutorial / onboarding** (deferred-to-launch) — 2-room intro; held until
+      the engine surface stabilizes near launch.
+- [ ] **Dynamic room/encounter image generation** — Google Imagen behind an
+      `IMAGE_PROVIDER` flag, off by default.
+- [ ] **Sound effects** — ambient audio per location type; combat cues.
+- [ ] **LLM enhancement cost guards** (deferred-to-launch) — per-session token
+      budget, short-event skip threshold, `LLM_ENHANCEMENT=off` kill switch.
+
+## Engine & infrastructure
+
+- [ ] **Save/state persistence across redeploys (manual verify)** — specs assert
+      a field-missing state loads + survives a `takeAction`; still need the end-to-end
+      exercise (start → redeploy → resume → confirm parity). ~30 min.
+- [ ] **Multiplayer delta protocol** (lower urgency) — full-state replace is fine
+      at current scale; revisit when broadcast size hurts. Don't prebuild.
+- [ ] **Server-side invariants** (lower urgency) — `castSpell` checks slots only as
+      a permission gate; with `turn_seq` on the wire, assert slot/hp/action budgets
+      and reject stale-state actions with 409.
+- [ ] **Observability** (needs-input) — only `console.log`; Sentry / structured
+      logging would surface prod issues. Requires choosing a service.
+- [ ] **CHANGELOG.md** (needs-input) — keep a user-visible change log? Which format?
+- [ ] **Post-deploy health check + rollback** (needs-input) — CI deploys via SSM
+      but doesn't poll `/api/health` or roll back on failure. ~2-3h.
+
+## Accessibility audit (WCAG 2.1 AA)
+
+> Already strong: focus-visible outlines, aria-labels on icon buttons, tablist
+> semantics + arrow-key nav, focus-trap + Esc-close dialogs, aria-live combat
+> narrative, real `<button>` party tiles.
+
+- [ ] **fieldset/legend on grouped form controls** — CharScreen's PORTRAIT /
+      ABILITY SCORES groups use plain `<label>`; want `<fieldset><legend>` (or
+      `role="group"` + `aria-labelledby`).
+- [ ] **HP / condition live-region updates** — they update silently; an off-screen
+      `aria-live` delta summary would help SR users. Needs UX tuning.
+- [ ] **Manual SR + keyboard-only validation** — VoiceOver / NVDA / JAWS + Tab-only.
+
+## Security audit
+
+> Solid foundation (helmet, pinned CORS, Postgres sessions, parameterized queries,
+> auth rate-limit, OAuth, session-fixation protection). Single-tenant today masks
+> issues that bite when `session_participants` lands.
+
+- [ ] **CSRF on state-changing endpoints** — prod cookies use `sameSite: 'none'`,
+      so the session cookie rides cross-origin POSTs. Tighten to `lax`, or
+      double-submit token, or `X-Requested-With`. **Needs a design call first.**
+- [ ] **Multiplayer: session ownership + turn enforcement** — `game_sessions.user_id`
+      is single-tenant; `takeAction` doesn't verify the active character's owner.
+- [ ] **CSP for any future HTML-serving paths** — helmet CSP is off (API returns no
+      HTML); re-enable with tight `script-src 'self'` if we ever serve files directly.
+
+## Local gate (run before pushing)
+
+- Lint + both `tsc` + `test:be` + `test:fe` + the Playwright e2e smoke
+  (`npx playwright test` against the running dev stack).
+- `npm run check-migrations` when migrations change.
+- The three `shared-types.ts` are generated — edit `src/shared/types.ts`, then
+  `npm run sync-types` (CI runs `sync-types:check`).
