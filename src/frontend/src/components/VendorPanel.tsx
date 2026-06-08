@@ -1,4 +1,5 @@
 import type { FrontendContext, GameChoice } from '../types';
+import { ItemIcon } from '../lib/itemIcons.tsx';
 import styles from '../styles.module.css';
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
   // `exit_shop` Back control.
   choices: GameChoice[];
   // Item icons / descriptions, keyed by item id (from the campaign context).
-  ctx: Pick<FrontendContext, 'itemIcons' | 'itemDescs'>;
+  ctx: Pick<FrontendContext, 'itemDescs'>;
   onChoose: (c: GameChoice) => void;
 }
 
@@ -43,7 +44,7 @@ function VendorPanel({ npcName, gold, choices, ctx, onChoose }: Props) {
             <li key={`w${i}`} className={styles.vendorItem}>
               <div className={styles.vendorItemMain}>
                 <span className={styles.vendorItemName}>
-                  {ctx.itemIcons[buy.itemId]} {name}
+                  <ItemIcon item={{ id: buy.itemId }} size={18} /> {name}
                 </span>
                 {desc && <span className={styles.vendorItemDesc}>{desc}</span>}
               </div>

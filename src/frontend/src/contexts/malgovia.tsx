@@ -137,43 +137,6 @@ export const context: FrontendContext = {
 
   // Item icons / descs intentionally mirror the sandbox vocabulary — the items
   // themselves are shared loot entries in the backend lootTable.
-  itemIcons: {
-    dagger: '🗡',
-    handaxe: '🪓',
-    quarterstaff: '🥢',
-    mace: '🔨',
-    shortbow: '🏹',
-    shortsword: '⚔',
-    rapier: '🤺',
-    longsword: '⚔',
-    greatsword: '⚔',
-    longbow: '🏹',
-    plus1_longsword: '✨',
-    leather_armor: '🛡',
-    studded_leather: '🛡',
-    chain_shirt: '🛡',
-    chain_mail: '🛡',
-    plate_armor: '🛡',
-    shield: '🛡',
-    healing_potion: '🧪',
-    holy_symbol: '✚',
-    component_pouch: '🎒',
-    moonstone_amulet: '🌙',
-    guild_ledger: '📜',
-    shadow_evidence: '✉',
-    // Folded-in Whispering Pines items.
-    warhammer: '🔨',
-    fur_cloak: '🧥',
-    elixir_of_warmth: '🍶',
-    halden_locket: '📿',
-    cult_idol: '🗿',
-    // Folded-in Grove of Thorns items.
-    greataxe: '🪓',
-    dart: '🎯',
-    scale_mail: '🛡',
-    circle_charm: '🍂',
-    oak_heart: '🌱',
-  },
 
   itemDescs: {
     dagger: '1d4 piercing, finesse, light, thrown',

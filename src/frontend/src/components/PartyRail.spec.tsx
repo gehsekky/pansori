@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
-import { makeState, mockCtx, mockSeed } from './test-fixtures';
+import { makeState, mockSeed } from './test-fixtures';
 import PartyRail from './PartyRail';
 
 // The per-tile ⓘ opens the character sheet without touching the tile's
@@ -15,7 +15,6 @@ describe('PartyRail — open-sheet (ⓘ) trigger', () => {
       <PartyRail
         state={state}
         activeCharId="h1"
-        ctx={mockCtx}
         seed={mockSeed}
         inCombat={false}
         onSetActive={onSetActive}
@@ -30,7 +29,7 @@ describe('PartyRail — open-sheet (ⓘ) trigger', () => {
   it('omits the ⓘ when onOpenSheet is not provided', () => {
     const state = makeState({ id: 'h1' });
     const { queryByTestId } = render(
-      <PartyRail state={state} activeCharId="h1" ctx={mockCtx} seed={mockSeed} inCombat={false} />
+      <PartyRail state={state} activeCharId="h1" seed={mockSeed} inCombat={false} />
     );
     expect(queryByTestId('open-sheet-btn')).toBeNull();
   });

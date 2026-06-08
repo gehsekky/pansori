@@ -745,7 +745,6 @@ export default function App() {
                   <PartyRail
                     state={gameState}
                     activeCharId={gameState.active_character_id ?? ''}
-                    ctx={ctx}
                     seed={seed}
                     inCombat={!!gameState.combat_active}
                     onSetActive={(charId) => {

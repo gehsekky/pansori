@@ -106,27 +106,6 @@ export const context: FrontendContext = {
     title: 'SANDBOX',
   },
 
-  itemIcons: {
-    dagger: '🗡',
-    handaxe: '🪓',
-    quarterstaff: '🥢',
-    mace: '🔨',
-    shortbow: '🏹',
-    shortsword: '⚔',
-    rapier: '🤺',
-    longsword: '⚔',
-    greatsword: '⚔',
-    longbow: '🏹',
-    plus1_longsword: '✨',
-    leather_armor: '🛡',
-    studded_leather: '🛡',
-    chain_shirt: '🛡',
-    chain_mail: '🛡',
-    plate_armor: '🛡',
-    shield: '🛡',
-    healing_potion: '🧪',
-  },
-
   itemDescs: {
     dagger: '1d4 piercing, finesse, light, thrown',
     handaxe: '1d6 slashing, light, thrown',

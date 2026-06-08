@@ -1,6 +1,7 @@
-import type { Character, FrontendContext, GameState, Seed } from '../types';
+import type { Character, GameState, Seed } from '../types';
 import { useEffect, useState } from 'react';
 import InitiativeStrip from './InitiativeStrip';
+import { ItemIcon } from '../lib/itemIcons.tsx';
 import { formatClassLabel } from '../lib/characterFmt';
 import { levelUpAvailable } from '../lib/multiclass';
 import styles from '../styles.module.css';
@@ -8,7 +9,6 @@ import styles from '../styles.module.css';
 interface Props {
   state: GameState;
   activeCharId: string;
-  ctx: FrontendContext;
   seed: Seed | null;
   inCombat: boolean;
   // Out-of-combat: clicking a non-active living tile dispatches a
@@ -37,7 +37,7 @@ interface Props {
 // `onSetActive` — RAW has no initiative outside combat (SRD 5.2.1
 //), so the player picks who's leading.
 
-function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onOpenSheet }: Props) {
+function PartyRail({ state, activeCharId, seed, inCombat, onSetActive, onOpenSheet }: Props) {
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
   useEffect(() => {
@@ -84,7 +84,6 @@ function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onOp
             )}
             <PartyTile
               char={c}
-              ctx={ctx}
               isActive={isActive}
               isSelected={isSelected}
               hasActed={hasActed}
@@ -110,7 +109,6 @@ function PartyRail({ state, activeCharId, ctx, seed, inCombat, onSetActive, onOp
 
 function PartyTile({
   char,
-  ctx,
   isActive,
   isSelected,
   hasActed,
@@ -119,7 +117,6 @@ function PartyTile({
   onSelect,
 }: {
   char: Character;
-  ctx: FrontendContext;
   isActive: boolean;
   isSelected: boolean;
   hasActed: boolean;
@@ -279,7 +276,7 @@ function PartyTile({
           <span className={styles.partyTileDetailVal}>
             {weapon ? (
               <>
-                <span aria-hidden="true">{ctx.itemIcons[weapon.id] ?? null}</span> {weapon.name}
+                <ItemIcon item={weapon as never} size={18} /> {weapon.name}
               </>
             ) : (
               <span style={{ color: 'var(--t-dim)' }}>unarmed</span>
@@ -289,7 +286,7 @@ function PartyTile({
           <span className={styles.partyTileDetailVal}>
             {armor ? (
               <>
-                <span aria-hidden="true">{ctx.itemIcons[armor.id] ?? null}</span> {armor.name}
+                <ItemIcon item={armor as never} size={18} /> {armor.name}
               </>
             ) : (
               <span style={{ color: 'var(--t-dim)' }}>none</span>
@@ -299,7 +296,7 @@ function PartyTile({
             <>
               <span className={styles.partyTileDetailKey}>SHIELD</span>
               <span className={styles.partyTileDetailVal}>
-                <span aria-hidden="true">{ctx.itemIcons[shield.id] ?? null}</span> {shield.name}
+                <ItemIcon item={shield as never} size={18} /> {shield.name}
               </span>
             </>
           )}

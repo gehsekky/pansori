@@ -1590,6 +1590,155 @@ export type WornEffect =
   | { kind: 'save_bonus'; ability: AbilityKey; bonus: number }
   | { kind: 'light'; radiusFt: number };
 
+// ─── Item icons (visual inventory) ───────────────────────────────────────
+//
+// Items are bucketed into a small set of visual ICONS by silhouette, so we
+// never hand-map hundreds of items: `iconForItem` derives the bucket from
+// an item's existing fields (type / weaponType / armorCategory / range /
+// slot) + an id-keyword backstop, and it covers any future or custom item
+// automatically. A campaign can override the bucket per item via
+// `LootItem.icon`. The FE maps each bucket id to concrete art (a
+// game-icons glyph today; a purchased icon-set tile later — one swap per
+// bucket, since the resolution is centralized here).
+export const ITEM_ICONS = [
+  // weapons
+  'blade',
+  'axe',
+  'dagger',
+  'blunt',
+  'polearm',
+  'bow',
+  'crossbow',
+  'sling',
+  'firearm',
+  // armor
+  'armor',
+  'shield',
+  // consumables
+  'potion',
+  'flask',
+  'food',
+  // gear + misc
+  'ammo',
+  'light',
+  'tools',
+  'gear',
+  'holy',
+  'misc',
+] as const;
+export type ItemIconId = (typeof ITEM_ICONS)[number];
+
+// The minimal item shape `iconForItem` reads — every field optional so it
+// works off a full LootItem (inventory), a slim { id } (a vendor ware), or
+// anything between.
+export interface IconableItem {
+  id: string;
+  name?: string;
+  type?: 'weapon' | 'armor' | 'consumable' | 'misc';
+  weaponType?: 'simple' | 'martial';
+  armorCategory?: 'light' | 'medium' | 'heavy' | 'shield';
+  range?: 'melee' | 'ranged';
+  slot?: ItemSlot | null;
+  // Per-item override — when set, it wins over the derived bucket.
+  icon?: ItemIconId;
+}
+
+// Item ids whose silhouette the structured fields can't infer — the misc
+// family (no type, or type 'misc'). Explicit because author-named ids
+// don't keyword cleanly; a custom misc item with no match falls to 'misc'
+// (or the author sets `icon`).
+const GEAR_IDS = new Set([
+  'backpack',
+  'bedroll',
+  'rope_hempen',
+  'grappling_hook',
+  'climbers_kit',
+  'crowbar',
+  'waterskin',
+  'mess_kit',
+  'tinderbox',
+]);
+const TOOLS_IDS = new Set([
+  'thieves_tools',
+  'herbalism_kit',
+  'disguise_kit',
+  'forgery_kit',
+  'navigators_tools',
+  'poisoners_kit',
+  'artisans_tools',
+  'healers_kit',
+  'component_pouch',
+  'gaming_set',
+  'musical_instrument',
+]);
+const LIGHT_IDS = new Set(['torch', 'hooded_lantern', 'bullseye_lantern']);
+const AMMO_IDS = new Set([
+  'arrows',
+  'crossbow_bolts',
+  'sling_bullets',
+  'blowgun_needles',
+  'firearm_bullets',
+]);
+
+/**
+ * The visual icon bucket for an item — a pure function of its fields, so it
+ * covers the whole catalog AND every future/custom item with no manual
+ * mapping. An explicit `item.icon` override wins; otherwise the silhouette
+ * is derived from type → weapon shape / armor class / consumable kind, with
+ * an id backstop for the misc family. Always returns a valid bucket
+ * ('misc' is the floor).
+ */
+export function iconForItem(item: IconableItem): ItemIconId {
+  if (item.icon) return item.icon;
+  const id = item.id;
+  const t = item.type;
+  const weaponish = t === 'weapon';
+
+  // ── Ranged weapons (id-keyword, so a type-less vendor ware works too) ──
+  if (/musket|pistol|flintlock|revolver|arquebus/.test(id)) return 'firearm';
+  if (id.includes('crossbow')) return 'crossbow';
+  if (id.includes('bow')) return 'bow'; // short/long bow (crossbow caught above)
+  if (/sling|blowgun/.test(id)) return 'sling';
+  if (weaponish && item.range === 'ranged') return 'bow'; // unknown ranged → generic missile
+
+  // ── Melee weapon shapes (id-keyword) ──
+  if (/sword|rapier|scimitar|glaive|falchion|katana|cutlass|messer|xiphos|dao|saber/.test(id))
+    return 'blade';
+  if (id.includes('axe') || id.includes('hatchet')) return 'axe';
+  if (/dagger|sickle|knife|poignard|stiletto|dirk/.test(id)) return 'dagger';
+  if (/spear|pike|lance|trident|halberd|partizan|whip|javelin|war_bill|pitchfork/.test(id))
+    return 'polearm';
+  if (/mace|club|maul|hammer|flail|morningstar|war_pick|quarterstaff|cudgel|warhammer/.test(id))
+    return 'blunt';
+  if (weaponish) return 'blunt'; // a weapon whose shape we couldn't name
+
+  // ── Shields + armor ──
+  if (item.armorCategory === 'shield' || item.slot === 'shield' || /shield|buckler/.test(id))
+    return 'shield';
+  if (
+    t === 'armor' ||
+    /armor|_mail$|chain_mail|plate|breastplate|brigandine|gambeson|cuirass/.test(id)
+  )
+    return 'armor';
+
+  // ── Consumables ──
+  if (/potion|antitoxin|elixir/.test(id)) return 'potion';
+  if (t === 'consumable') {
+    if (id.includes('ration')) return 'food';
+    return 'flask'; // oil, acid vial, alchemist's fire, holy water…
+  }
+  if (id.includes('ration')) return 'food';
+
+  // ── Misc family (id-keyed, with keyword backstops) ──
+  if (item.slot === 'quiver' || AMMO_IDS.has(id) || /arrow|bolt|quarrel|bullet|needle/.test(id))
+    return 'ammo';
+  if (LIGHT_IDS.has(id) || id.includes('lantern') || id.includes('torch')) return 'light';
+  if (id.includes('holy')) return 'holy';
+  if (GEAR_IDS.has(id)) return 'gear';
+  if (TOOLS_IDS.has(id) || id.endsWith('_kit') || id.endsWith('_tools')) return 'tools';
+  return 'misc';
+}
+
 export interface LootItem {
   id: string;
   name: string;
@@ -1666,6 +1815,10 @@ export interface LootItem {
   // Default stack size for a stackable item (ammunition — e.g. a bundle of 20
   // Arrows). Carried onto the inventory item; ranged attacks decrement it.
   count?: number;
+  // Visual inventory icon override (see `iconForItem` / `ITEM_ICONS`). When
+  // set, it wins over the silhouette derived from the item's other fields —
+  // so a campaign can pin a specific icon to a bespoke item.
+  icon?: ItemIconId;
 }
 
 /**

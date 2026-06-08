@@ -1,4 +1,4 @@
-import { FLOOR_TILES, MARKER_TILES, TERRAIN, TERRAIN_TILES } from '../shared-types.js';
+import { FLOOR_TILES, ITEM_ICONS, MARKER_TILES, TERRAIN, TERRAIN_TILES } from '../shared-types.js';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
@@ -548,6 +548,9 @@ const LootItemSchema = z
       .strict()
       .optional(),
     count: z.number().int().positive().max(999).optional(),
+    // Visual inventory icon override (one of the ITEM_ICONS buckets); when
+    // omitted the icon is derived from the item's other fields.
+    icon: z.enum(ITEM_ICONS as unknown as [string, ...string[]]).optional(),
   })
   .strict();
 

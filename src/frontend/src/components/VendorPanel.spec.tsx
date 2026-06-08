@@ -19,7 +19,6 @@ const choices: GameChoice[] = [
 ];
 
 const ctx = {
-  itemIcons: { healing_potion: '🧪', greatsword: '🗡️' },
   itemDescs: { healing_potion: 'Restores hit points.' },
 };
 

@@ -36,7 +36,6 @@ import type {
   TerrainCell,
   WeaponMastery,
 } from './shared-types.js';
-import type { ReactNode } from 'react';
 
 // ─── Structured actions ───────────────────────────────────────────────────────
 
@@ -111,7 +110,6 @@ export interface FrontendContext {
   previewArt: string;
   classes: CharClass[];
   theme: Theme;
-  itemIcons: Record<string, ReactNode>;
   itemDescs: Record<string, string>;
   art: Record<string, string>;
   classPrimaryStats: Record<string, string>;

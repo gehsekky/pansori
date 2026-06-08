@@ -1,6 +1,7 @@
 import type { Character, EquipSlot, FrontendContext, GameState } from '../types';
 import Dialog from './Dialog.tsx';
 import { EQUIP_SLOTS } from '../types';
+import { ItemIcon } from '../lib/itemIcons.tsx';
 import { formatClassLabel } from '../lib/characterFmt';
 import styles from '../styles.module.css';
 import { useState } from 'react';
@@ -159,7 +160,6 @@ function InventoryModal({
             const isEquippable = !!(
               (item as { damage?: string }).damage || (item as { slot?: string }).slot
             );
-            const icon = ctx.itemIcons[item.id];
             const desc = item.desc ?? ctx.itemDescs[item.id] ?? '';
             const w = (item as { weight?: number }).weight ?? 0;
             const target = transferTarget[item.instance_id] ?? otherChars[0]?.id ?? '';
@@ -167,7 +167,7 @@ function InventoryModal({
               <div key={item.instance_id} className={styles.invItem}>
                 <div className={styles.invItemHeader}>
                   <span className={styles.invItemName}>
-                    {icon} {item.name}
+                    <ItemIcon item={item as never} /> {item.name}
                     {isEquipped && (
                       <span className={styles.invBadge} style={{ color: 'var(--t-primary)' }}>
                         EQUIPPED

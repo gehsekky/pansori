@@ -15,7 +15,8 @@ describe('tile catalogs resolve to files on disk', () => {
   it('every TERRAIN_TILES family has all variants under /art/tiles', () => {
     const missing: string[] = [];
     for (const [id, spec] of Object.entries(TERRAIN_TILES)) {
-      for (let n = 1; n <= (spec.variants ?? 1); n++) {
+      const variants = (spec as { variants?: number }).variants ?? 1;
+      for (let n = 1; n <= variants; n++) {
         const rel = `tiles/${spec.base}_${n}.png`;
         if (!existsSync(`${ART}/${rel}`)) missing.push(`${id} → ${rel}`);
       }
@@ -26,7 +27,8 @@ describe('tile catalogs resolve to files on disk', () => {
   it('every MARKER_TILES family has all variants under /art/markers', () => {
     const missing: string[] = [];
     for (const [id, spec] of Object.entries(MARKER_TILES)) {
-      for (let n = 1; n <= (spec.variants ?? 1); n++) {
+      const variants = (spec as { variants?: number }).variants ?? 1;
+      for (let n = 1; n <= variants; n++) {
         const rel = `markers/${spec.base}_${n}.png`;
         if (!existsSync(`${ART}/${rel}`)) missing.push(`${id} → ${rel}`);
       }
@@ -49,7 +51,10 @@ describe('tile catalogs resolve to files on disk', () => {
       expect(TERRAIN_TILES[id as keyof typeof TERRAIN_TILES], id).toBeDefined();
     // The FROSTBOUND recolor ids now draw REAL paintings — no CSS filter.
     for (const id of ['plains-tundra', 'forest-frost', 'hills-frost', 'water-ice'])
-      expect(TERRAIN_TILES[id as keyof typeof TERRAIN_TILES].filter, id).toBeUndefined();
+      expect(
+        (TERRAIN_TILES[id as keyof typeof TERRAIN_TILES] as { filter?: string }).filter,
+        id
+      ).toBeUndefined();
     // Cold location markers.
     for (const id of ['ice-palace', 'frozen-ruins', 'logging-camp', 'ice-cave', 'frozen-giant'])
       expect(MARKER_TILES[id as keyof typeof MARKER_TILES], id).toBeDefined();
