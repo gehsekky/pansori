@@ -780,7 +780,7 @@ function GridMapView({
           {grid.width}×{grid.height} · {scaleLabel(grid.feetPerSquare)}
         </span>
       </div>
-      <div className={styles.gridBoardWrap} style={{ padding: Math.round(cellPx * 0.65) }}>
+      <div className={styles.gridBoardWrap} style={{ padding: Math.round(cellPx * 0.325) }}>
         <div
           className={styles.gridBoard}
           style={{
