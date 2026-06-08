@@ -5,11 +5,13 @@ import styles from '../styles.module.css';
 
 // Campaign content editor: one editable Context section at a time — raw
 // JSON for structured sections, raw text for the plain-string ones
-// (PLAIN_TEXT_SECTIONS — no quoting needed). Sections resolve DB-first
-// with code supplement — the source badge says which version the engine
-// is serving; SAVE writes the DB version (live immediately, no restart);
-// REVERT TO CODE deletes the DB version so the campaignData files take
-// over again.
+// (PLAIN_TEXT_SECTIONS — no quoting needed). Campaigns are pure DB; a section
+// resolves from the campaign's DB content, falling back to the shared SRD base
+// template (`campaignData/srd/baseCampaign.ts`) when the DB has none. The source
+// badge says which the engine is serving (DATABASE / TEMPLATE / EMPTY). SAVE
+// writes the DB version (live immediately, no restart); RESET TO TEMPLATE
+// deletes the campaign's DB content for that section so it falls back to the
+// base template (empty for most content sections).
 //
 // CUSTOMITEMS / CUSTOMMONSTERS hold only the campaign's OWN content — the
 // full SRD item + monster catalogs are ambient (every campaign gets them
@@ -32,7 +34,9 @@ function describeError(err: unknown): string {
 
 const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
   db: 'DATABASE',
-  code: 'CODE',
+  // No code campaigns exist anymore — a non-DB section resolves over the shared
+  // SRD base template, so this source means "template", not "code".
+  code: 'TEMPLATE',
   none: 'EMPTY',
 };
 
@@ -140,9 +144,14 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
     }
   }
 
-  async function handleRevert() {
+  async function handleResetToTemplate() {
     if (!active || busy) return;
-    if (!confirm(`Revert "${active}" to the code-defined version?`)) return;
+    if (
+      !confirm(
+        `Reset "${active}" to the SRD base template? This deletes this campaign's saved content for the section — most sections fall back to empty.`
+      )
+    )
+      return;
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -151,7 +160,7 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
       setSections((prev) =>
         prev.map((s) => (s.section === active ? { ...s, source: result.source } : s))
       );
-      // Reload what the engine now serves (the code version, or empty).
+      // Reload what the engine now serves (the base-template fallback, or empty).
       openSection(active);
     } catch (err) {
       setError(describeError(err));
@@ -266,8 +275,8 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
               SAVE TO DATABASE
             </button>
             {activeSource === 'db' && (
-              <button className={styles.ghostBtn} disabled={busy} onClick={handleRevert}>
-                REVERT TO CODE
+              <button className={styles.ghostBtn} disabled={busy} onClick={handleResetToTemplate}>
+                RESET TO TEMPLATE
               </button>
             )}
             {saved && (

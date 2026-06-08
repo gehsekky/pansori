@@ -265,7 +265,8 @@ campaignsRouter.delete(
 // effective value is DB-first (code supplements): GET returns the value the
 // engine currently serves plus where it came from; PUT writes the DB
 // version and re-resolves the live context immediately (no restart);
-// DELETE reverts the section to code.
+// DELETE clears the campaign's DB content for the section so it falls back to
+// the shared SRD base template (there are no code campaigns to revert to).
 
 // Where does a section's effective value come from for this campaign?
 // `present` = the DB has a version (wherever it's stored — JSONB key or a
@@ -411,7 +412,9 @@ campaignsRouter.put(
   }
 );
 
-// Revert a section to its code-defined version.
+// Reset a section to the base template — delete the campaign's DB content for
+// it (relational rows or the JSONB key) so resolution falls back to the SRD
+// base template (empty for most content sections).
 campaignsRouter.delete(
   '/:campaignId/data/:section',
   requireCampaignRole('editor'),

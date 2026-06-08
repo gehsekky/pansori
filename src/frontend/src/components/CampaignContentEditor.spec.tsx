@@ -33,7 +33,7 @@ describe('CampaignContentEditor', () => {
     expect(screen.getByText('NARRATIVES')).toBeTruthy();
     expect(screen.getByText('CUSTOMITEMS')).toBeTruthy();
     expect(screen.getByText('CUSTOMMONSTERS')).toBeTruthy();
-    expect(screen.getAllByText('CODE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('TEMPLATE').length).toBeGreaterThan(0);
     expect(screen.getByText('DATABASE')).toBeTruthy();
     expect(screen.getByText('EMPTY')).toBeTruthy();
   });
@@ -47,11 +47,11 @@ describe('CampaignContentEditor', () => {
     render(<CampaignContentEditor campaignId="malgovia" />);
     fireEvent.click(await screen.findByText('GAMESTART'));
     const textarea = (await screen.findByLabelText(
-      /GAMESTART — SERVING FROM CODE · PLAIN TEXT/
+      /GAMESTART — SERVING FROM TEMPLATE · PLAIN TEXT/
     )) as HTMLTextAreaElement;
     await waitFor(() => expect(textarea.value).toBe('A fresh world, waiting to be written.'));
-    // Code-sourced section has no DB version to revert.
-    expect(screen.queryByText('REVERT TO CODE')).toBeNull();
+    // Template-sourced section has no DB version to reset.
+    expect(screen.queryByText('RESET TO TEMPLATE')).toBeNull();
   });
 
   it('loads code customs as a starting point for the customs sections', async () => {
@@ -64,7 +64,7 @@ describe('CampaignContentEditor', () => {
     render(<CampaignContentEditor campaignId="malgovia" />);
     fireEvent.click(await screen.findByText('CUSTOMITEMS'));
     const textarea = (await screen.findByLabelText(
-      /CUSTOMITEMS — SERVING FROM CODE/
+      /CUSTOMITEMS — SERVING FROM TEMPLATE/
     )) as HTMLTextAreaElement;
     await waitFor(() => expect(textarea.value).toContain('Moonstone Amulet'));
   });
@@ -182,7 +182,7 @@ describe('CampaignContentEditor', () => {
     expect(screen.queryByText(/INSERT STARTER/)).toBeNull();
   });
 
-  it('reverts a DB section to code after confirm and reloads it', async () => {
+  it('resets a DB section to the base template after confirm and reloads it', async () => {
     mocked.getCampaignSection
       .mockResolvedValueOnce({ section: 'narratives', source: 'db', value: { a: 1 } })
       .mockResolvedValueOnce({ section: 'narratives', source: 'code', value: { b: 2 } });
@@ -194,12 +194,12 @@ describe('CampaignContentEditor', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<CampaignContentEditor campaignId="malgovia" />);
     fireEvent.click(await screen.findByText('NARRATIVES'));
-    fireEvent.click(await screen.findByText('REVERT TO CODE'));
+    fireEvent.click(await screen.findByText('RESET TO TEMPLATE'));
     await waitFor(() =>
       expect(mocked.deleteCampaignSection).toHaveBeenCalledWith('malgovia', 'narratives')
     );
-    // Reloaded as the code version.
-    expect(await screen.findByLabelText(/NARRATIVES — SERVING FROM CODE/)).toBeTruthy();
+    // Reloaded as the base-template fallback.
+    expect(await screen.findByLabelText(/NARRATIVES — SERVING FROM TEMPLATE/)).toBeTruthy();
     confirmSpy.mockRestore();
   });
 });
