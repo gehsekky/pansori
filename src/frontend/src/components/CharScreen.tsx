@@ -453,6 +453,10 @@ function CharScreen({
           tagline: b.tagline ?? 'A creator-built campaign.',
           previewArt: b.previewArt ?? '',
           hidden: false,
+          // The campaign's OWN party hint (the DB recommendedParty section) —
+          // not the donor context's, which would otherwise leak through.
+          recommendedPartySize: b.recommendedPartySize,
+          recommendedComposition: b.recommendedComposition,
         }));
   const pickerContexts = beLoaded
     ? [...visibleContexts.filter((c) => c.id in beContexts), ...beOnlyContexts]

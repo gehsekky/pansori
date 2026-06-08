@@ -342,6 +342,11 @@ gameRouter.get('/contexts', async (req, res) => {
             )
           : {},
         spells,
+        // Creation-screen party hint. Lives on the campaign block (DB
+        // `recommendedParty` section folds into it); the picker reads it so
+        // DB campaigns surface their own size/composition, not the donor's.
+        recommendedPartySize: c.campaign?.recommendedPartySize,
+        recommendedComposition: c.campaign?.recommendedComposition,
       };
     });
   res.json(list);

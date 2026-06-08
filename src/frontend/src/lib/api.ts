@@ -253,6 +253,9 @@ export interface BackendContextSummary {
     desc: string;
     spellList: Array<'arcane' | 'divine' | 'primal'>;
   }>;
+  // Creation-screen party hint (the DB `recommendedParty` section).
+  recommendedPartySize?: number;
+  recommendedComposition?: string[];
 }
 
 export const api = {
