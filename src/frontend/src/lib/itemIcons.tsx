@@ -9,10 +9,13 @@ import GameIcon from '../components/GameIcon';
 // centralized here: an item → its bucket (override-aware) → this entry → a
 // node. Swapping a bucket from glyph to PNG (or vice versa) is one line.
 //
-// Painted (David Baumgart, "Medieval Arms & Armor" — weapons / armor / ammo):
-//   /art/icons/<bucket>.png. Glyph buckets (consumables, light, tools, gear,
-//   holy, sling, firearm, misc) await a matching set — the glyph names are
-//   verified against the vendored game-icons font.
+// Two painted sets cover the catalog:
+//   - Weapons / armor / ammo: David Baumgart, "Medieval Arms & Armor".
+//   - Consumables + gear buckets: Vivid Motion, "Animated RPG Icons Ultimate
+//     Kit" (the static single-frame variants) — fills the buckets the arms set
+//     doesn't (potion, flask, food, light, tools, gear, holy, sling, misc).
+// Both live at /art/icons/<bucket>.png (128x128 RGBA). The only remaining glyph
+// is `firearm` — neither set has a gun and SRD 5.2.1 core carries no firearms.
 type IconArt = { png: string } | { glyph: string };
 
 const ITEM_ICON_ART: Record<ItemIconId, IconArt> = {
@@ -27,17 +30,18 @@ const ITEM_ICON_ART: Record<ItemIconId, IconArt> = {
   armor: { png: '/art/icons/armor.png' },
   shield: { png: '/art/icons/shield.png' },
   ammo: { png: '/art/icons/ammo.png' },
-  // Glyph placeholders — buckets the weapons/armor set doesn't cover.
-  sling: { glyph: 'slingshot' },
+  // Painted — the Vivid Motion kit (static variants).
+  sling: { png: '/art/icons/sling.png' },
+  potion: { png: '/art/icons/potion.png' },
+  flask: { png: '/art/icons/flask.png' },
+  food: { png: '/art/icons/food.png' },
+  light: { png: '/art/icons/light.png' },
+  tools: { png: '/art/icons/tools.png' },
+  gear: { png: '/art/icons/gear.png' },
+  holy: { png: '/art/icons/holy.png' },
+  misc: { png: '/art/icons/misc.png' },
+  // Glyph placeholder — no painted gun in either set (SRD core has no firearms).
   firearm: { glyph: 'pistol-gun' },
-  potion: { glyph: 'potion-ball' },
-  flask: { glyph: 'round-bottom-flask' },
-  food: { glyph: 'ham-shank' },
-  light: { glyph: 'torch' },
-  tools: { glyph: 'toolbox' },
-  gear: { glyph: 'knapsack' },
-  holy: { glyph: 'prayer-beads' },
-  misc: { glyph: 'swap-bag' },
 };
 
 /** Which buckets currently render painted art (the rest are glyph placeholders). */

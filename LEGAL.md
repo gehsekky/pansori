@@ -63,3 +63,24 @@ General Public License v3.0 — see [LICENSE](LICENSE).
   in free or commercial projects and may be modified; the assets may not
   be redistributed, resold, or repackaged on their own. Crediting is not
   required by the license but is given here.
+
+## Inventory item icons
+
+The visual inventory renders one painted icon per item "bucket" (see
+`src/shared/types.ts` `ITEM_ICONS` / `iconForItem`). Two painted sets
+cover the buckets, both vendored under `src/frontend/public/art/icons/`
+(see that folder's `CREDITS.txt` for the per-file provenance):
+
+- Weapons / armor / ammo by [David Baumgart](https://dgbaumgart.com),
+  "Icons: Medieval Arms & Armor". Usable in a free or commercial game,
+  may be modified/remixed, not given away or sold on their own.
+  Credit: "David Baumgart".
+- Consumable + gear buckets (potion, flask, food, light, tools, gear,
+  holy, sling, misc) from the
+  ["Animated RPG Icons Ultimate Kit"](https://vivid-motion-assets.itch.io/)
+  by Vivid Motion Studio — the static single-frame variants. A
+  non-exclusive worldwide commercial license: usable in any commercial
+  or personal game, may be modified/recolored/scaled, attribution
+  appreciated but not required; the raw sprites may not be resold or
+  redistributed as a standalone asset pack. Only the bucket
+  representatives actually used are committed.

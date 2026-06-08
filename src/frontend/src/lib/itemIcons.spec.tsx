@@ -10,10 +10,15 @@ describe('ItemIcon', () => {
     expect(img?.getAttribute('src')).toBe('/art/icons/blade.png');
   });
 
-  it('renders a game-icons glyph for an uncovered bucket (a potion)', () => {
+  it('renders a painted PNG for a now-covered consumable bucket (a potion)', () => {
     const { container } = render(<ItemIcon item={{ id: 'healing_potion', type: 'consumable' }} />);
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/art/icons/potion.png');
+  });
+
+  it('renders a game-icons glyph for the lone uncovered bucket (a firearm)', () => {
+    const { container } = render(<ItemIcon item={{ id: 'pistol', type: 'weapon' }} />);
     expect(container.querySelector('img')).toBeNull();
-    expect(container.querySelector('.game-icon-potion-ball')).toBeTruthy();
+    expect(container.querySelector('.game-icon-pistol-gun')).toBeTruthy();
   });
 
   it('honors the per-item override', () => {
@@ -24,7 +29,7 @@ describe('ItemIcon', () => {
   });
 
   it('PAINTED_ICON_BUCKETS lists exactly the png-backed buckets, all valid', () => {
-    expect(PAINTED_ICON_BUCKETS.length).toBe(10);
+    expect(PAINTED_ICON_BUCKETS.length).toBe(19);
     for (const b of PAINTED_ICON_BUCKETS) expect(ITEM_ICONS).toContain(b);
   });
 });
