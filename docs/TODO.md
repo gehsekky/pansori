@@ -40,6 +40,32 @@
 > sites editor icon DROPDOWN with painted previews + town sites honoring
 > per-site icons; bottom-aligned tile previews (overhang-aware) across
 > the sites editor + MAP ART panel; halved map-grid bleed padding.
+>
+> **Session 2026-06-08 (headline):** **sandbox + malgovia migrated to
+> pure DB campaigns; the code-only campaign path is deleted** — one
+> campaign-loading path now. Six green commits: (1) a code→DB
+> **serializer** (`scripts/serializeCampaign.ts`) that writes a code
+> Context through the content API's `put*` and proves it resolves over the
+> SRD base template byte-identical to the code context; reaching fidelity
+> added real authoring capabilities — per-placement enemy `id` (quest
+> targeting), `goldDrop`/`drops` overrides, NPC `proper_noun`, and
+> instance-derived custom monsters/items that shadow the ambient catalog.
+> (2) seed **migration 032** (idempotent: campaigns UPSERT data-only,
+> relational/custom content DELETE-then-INSERT; sandbox private, malgovia
+> global; `theme`/`tagline`/`previewArt`/`recommendedParty` seeded so the
+> picker survives). (3) a **base test fixture**
+> (`tests/fixtures/testContext.ts`) replacing the `campaignData/sandbox`
+> import across 224 specs. (4) the **FE collapsed to one donor**
+> (`contexts/base.tsx`, all 12 classes + a neutral theme); every campaign
+> synthesizes its card from the `/game/contexts` summary (now carrying
+> `theme`), and the in-game theme rides in via the seed. (5) **deleted**
+> `campaignData/{sandbox.ts,malgovia/}`, `contexts/{sandbox,malgovia}.tsx`,
+> and the malgovia-content specs (generic ones repointed to the fixture).
+> `contextLoader`/`campaignRegistry` are now dormant no-ops
+> (`Synced 0 campaign(s)`; `Resolved … over the base template`). Suite
+> after the cut: **BE 3030 / 321 files, FE 351 / 44**, plus
+> `check-migrations` + the e2e smoke (login → creation → begin → combat,
+> `?campaign=sandbox` resume), all against the DB-only campaigns.
 
 ## End-goal target
 
@@ -76,16 +102,20 @@ prettier clean). Backend specs live under `src/backend/src/tests/`
   `resolveMarkerMove`). Frontend renders all three grids (`GridMapView`); the
   map overlay shows the active grid read-only.
 - **One authored campaign — Malgovia — runs on the grid model** (+ the
-  sandbox dev campaign). Campaign data lives under `campaignData/malgovia/`,
-  split across sibling files assembled in `index.ts`: `entities.ts` (enemy
-  templates / placements / NPCs), `map.ts` (rooms / regions / towns), `game.ts`
-  (narratives / quests / factions / rules), `items.ts` (loot table / placements),
-  guarded by `integrity.spec.ts` (cross-refs / dup-ids / reachability) + an
-  order-insensitive `entities` snapshot. The context loader scans both top-level
-  `campaignData/*.ts` files (e.g. `sandbox.ts`) and campaign folders' `index.ts`.
-  Recommended party is **4** (Fighter / Cleric / Rogue / Wizard). Sandbox is
-  marked `hidden`, reachable via `?campaign=sandbox`; the FE world-type picker
-  only renders when more than one visible campaign exists.
+  sandbox dev campaign). Both are now **pure DB campaigns** (migrated
+  2026-06-08): their content lives in `campaigns.data` + the relational
+  tables, planted by seed `migration 032` and resolved over the SRD base
+  template (`campaignData/srd/baseCampaign.ts`) by `applyCampaignOverlays`
+  — the same path any creator-built campaign uses. There is no per-campaign
+  code: the old `campaignData/{sandbox.ts,malgovia/}` + FE
+  `contexts/{sandbox,malgovia}.tsx` are deleted, and `contextLoader` /
+  `campaignRegistry` are dormant (zero code campaigns → `loadContexts()`
+  returns `{}`). `campaignData/` now holds only `srd/` (the base template +
+  ambient catalogs). Recommended party is **4** (Fighter / Cleric / Rogue /
+  Wizard). Sandbox is seeded `visibility='private'`, reachable via
+  `?campaign=sandbox`; the FE world-type picker synthesizes each campaign's
+  card from the `/game/contexts` summary over the single
+  `contexts/base.tsx` donor.
 - **In-game clock** — a single integer `GameState.world_minute` (total elapsed
   in-world minutes since campaign start; Day 1 08:00 == 480) is the source of
   truth; day / time-of-day band are derived at display time (`gameClock.ts`,
@@ -390,14 +420,16 @@ a handful of **bounded subsystems**.
 > are fully DB-expressible — only its 8 GameRules still need code (each
 > reduces to a step condition + completion narrative).
 
-What code campaigns can still do that DB campaigns cannot, by impact:
+Remaining DB authoring-model gaps (no longer backed by any code campaign —
+sandbox + malgovia are pure DB as of 2026-06-08; these are just features the
+DB schema doesn't yet model), by impact:
 
-- [ ] **`rules` engine hook** (`GameRule[]`) — json-rules-engine conditions
-      firing arbitrary consequences with priority + once semantics. Pure
-      code-side scripting today; no DB section. Would need the same
-      condition-vocabulary treatment dialogue gates got. (Most uses reduce
-      to quest-step conditions now that advance_quest + add_narrative are
-      DB arms.)
+- [x] **`rules` engine hook** (`GameRule[]`) — DONE (2026-06-08): the `rules`
+      DB section landed (Phase 1), and malgovia's 8 rules are seeded + resolve
+      over the base template like any other section.
+- [x] **Campaign-meta: recommended party** — `recommendedPartySize` /
+      `recommendedComposition` now ride in the `recommendedParty` section
+      (seeded for both campaigns; drives the creation auto-fill).
 - [ ] **Remaining consequence arms** — spawn_enemy, unlock_room, set_escape,
       travel_to, set_faction_rep stay code-side. set_faction_rep is the
       safest next promotion; spawn_enemy/unlock_room would let DB dialogue
@@ -407,8 +439,7 @@ What code campaigns can still do that DB campaigns cannot, by impact:
       `spellTable` / `spellcastingAbility` stay base-template-only (these
       are SRD constants more than campaign flavor; port only if a real
       campaign needs to).
-- [ ] **Campaign-meta knobs with no section** — `recommendedPartySize`,
-      `recommendedComposition` (creation auto-fill), `defaultStartingLoot`,
+- [ ] **Remaining campaign-meta knobs with no section** — `defaultStartingLoot`,
       `displayNoun`, default `gridWidth`/`gridHeight`.
 - [ ] **Room tactical extras** — `coverPositions` (half/three-quarter cover)
       isn't paintable in the DB room schema. (The legacy obstacle/climb/swim
