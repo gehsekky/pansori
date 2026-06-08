@@ -266,7 +266,7 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
   const artRow = (
     name: string,
     value: RowValue,
-    catalog: Record<string, { base: string; label: string; filter?: string }>,
+    catalog: Record<string, { base: string; label: string; filter?: string; variants?: number }>,
     dir: string,
     defaultTile: string,
     onPatch: (patch: Partial<RowValue>) => void,
@@ -276,6 +276,9 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     const tintFilter = compileTint(cleanTint(value.tint));
     const filter = [spec.filter, tintFilter].filter(Boolean).join(' ') || undefined;
     const isDefault = value.tile === defaultTile && !tintFilter;
+    // Variant-bearing tile families live at <base>_<n>.png — preview the
+    // first painting; single-file art (markers) keeps the bare base name.
+    const previewSrc = `${dir}/${spec.base}${spec.variants !== undefined || dir === '/art/tiles' ? '_1' : ''}.png`;
     return (
       <div
         key={name}
@@ -289,7 +292,7 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
         }}
       >
         <span style={{ ...lbl, width: 96, letterSpacing: '0.08em' }}>{name.toUpperCase()}</span>
-        <Preview src={`${dir}/${spec.base}.png`} filter={filter} square={square} />
+        <Preview src={previewSrc} filter={filter} square={square} />
         <select
           className={styles.formInp}
           aria-label={`${name} tile`}

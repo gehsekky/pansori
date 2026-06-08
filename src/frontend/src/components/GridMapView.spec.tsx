@@ -160,7 +160,7 @@ describe('GridMapView', () => {
       <GridMapView grid={groveGrid} markerPos={{ x: 0, y: 0 }} />
     );
     const c = cell(container, 0, 2);
-    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/forest_');
     expect(c.querySelector('.game-icon-dungeon-gate')).toBeNull(); // tile replaces the glyph
     expect(getByText('The Silent Grove')).toBeTruthy(); // label kept
   });
@@ -225,7 +225,7 @@ describe('GridMapView', () => {
     // terrainGrid has a forest at (1,2) on a regional grid.
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
     const c = cell(container, 1, 2);
-    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(c.querySelector('img')?.getAttribute('src')).toContain('/art/tiles/forest_');
     expect(c.querySelector('.game-icon-forest')).toBeNull(); // tile replaces the glyph
   });
 
@@ -240,16 +240,16 @@ describe('GridMapView', () => {
       />
     );
     const forest = cell(container, 1, 2).querySelector('img')!;
-    expect(forest.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(forest.getAttribute('src')).toContain('/art/tiles/forest_');
     expect(forest.style.filter).toContain('sepia');
     // Unpainted regional cells default to plains — skinned to the snow tile,
     // with no filter (it's a base tile).
     const plains = cell(container, 4, 2).querySelector('img')!;
-    expect(plains.getAttribute('src')).toContain('/art/tiles/snow.png');
+    expect(plains.getAttribute('src')).toContain('/art/tiles/snow_');
     expect(plains.style.filter).toBe('');
     // Types without an override keep their default art.
     expect(cell(container, 0, 1).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/road.png'
+      '/art/tiles/road_'
     );
   });
 
@@ -267,7 +267,7 @@ describe('GridMapView', () => {
       />
     );
     const forest = cell(container, 1, 2).querySelector('img')!;
-    expect(forest.getAttribute('src')).toContain('/art/tiles/forest.png');
+    expect(forest.getAttribute('src')).toContain('/art/tiles/forest_');
     expect(forest.style.filter).toContain('sepia'); // the catalog recolor kept
     expect(forest.style.filter).toContain('hue-rotate(30deg) brightness(0.8)'); // tint after it
     const plains = cell(container, 4, 2).querySelector('img')!;
@@ -313,6 +313,23 @@ describe('GridMapView', () => {
     );
   });
 
+  it('picks a deterministic painted variant per cell (no reshuffle, varied stretches)', () => {
+    // Two plains-default cells at different coordinates draw different
+    // variants of the same family; re-rendering keeps each cell's pick.
+    const { container, rerender } = render(
+      <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />
+    );
+    const srcAt = (x: number, y: number) =>
+      cell(container, x, y).querySelector('img')!.getAttribute('src')!;
+    const a = srcAt(4, 2); // unpainted regional cell → plains family
+    const b = srcAt(4, 0);
+    expect(a).toMatch(/\/art\/tiles\/plains_[1-4]\.png$/);
+    expect(b).toMatch(/\/art\/tiles\/plains_[1-4]\.png$/);
+    expect(a).not.toBe(b); // (4,2) and (4,0) hash to different variants
+    rerender(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
+    expect(srcAt(4, 2)).toBe(a); // stable across renders
+  });
+
   it('renders the road terrain tile on a regional road cell (still clickable)', () => {
     // terrainGrid has a road at (0,1).
     const onMarkerMove = vi.fn();
@@ -320,7 +337,7 @@ describe('GridMapView', () => {
       <GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} onMarkerMove={onMarkerMove} />
     );
     expect(cell(container, 0, 1).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/road.png'
+      '/art/tiles/road_'
     );
     expect(cell(container, 0, 1).getAttribute('role')).toBe('button'); // passable
   });
@@ -333,7 +350,7 @@ describe('GridMapView', () => {
     };
     const { container } = render(<GridMapView grid={hillsGrid} markerPos={{ x: 0, y: 0 }} />);
     expect(cell(container, 1, 1).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/hills.png'
+      '/art/tiles/hills_'
     );
   });
 
@@ -351,10 +368,10 @@ describe('GridMapView', () => {
     );
     // Impassable terrain now carries its painted tile, and is not clickable.
     expect(cell(container, 2, 0).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/mountain.png'
+      '/art/tiles/mountain_'
     );
     expect(cell(container, 3, 1).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/water.png'
+      '/art/tiles/water_'
     );
     expect(cell(container, 2, 0).getAttribute('role')).toBe('gridcell');
     expect(cell(container, 3, 1).getAttribute('role')).toBe('gridcell');
@@ -496,7 +513,7 @@ describe('GridMapView', () => {
       )?.getAttribute('src');
     // Water keeps its Baumgart tile (no floor).
     expect(cell(container, 1, 1).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/water.png'
+      '/art/tiles/water_'
     );
     // The wall keeps its glyph and gets no floor.
     expect(cell(container, 2, 1).querySelector('.game-icon-brick-wall')).toBeTruthy();
@@ -548,7 +565,7 @@ describe('GridMapView', () => {
     // Regional: an unpainted cell on a terrain-bearing grid is plains → plains tile.
     const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
     expect(cell(container, 4, 2).querySelector('img')?.getAttribute('src')).toContain(
-      '/art/tiles/plains.png'
+      '/art/tiles/plains_'
     );
     // Local interior: cobblestone has no tile, and unpainted cells don't sprout
     // grass — so no tile images at all.

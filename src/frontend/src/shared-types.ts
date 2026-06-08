@@ -235,62 +235,107 @@ export const TERRAIN: Record<TerrainType, TerrainSpec> = {
 
 // ─── Terrain ART (campaign-scoped skin over the global tile set) ──────
 //
-// The base art is one hand-painted tileset (David Baumgart, 8 overland
-// PNGs under /art/tiles). The tile CATALOG below adds recolored variants:
-// each entry names a base PNG plus an optional CSS filter the renderer
-// applies — so alternate looks (ashlands, frostbound) cost no new assets.
+// The base art is David Baumgart's "Tile Basic Terrain Set" (the full
+// purchased pack: 14 biomes × 4 hand-painted variations, 256×384), plus
+// two single-variant tiles from his Cold Lands samples (snow, the wintry
+// road). Files live at /art/tiles/<base>_<n>.png; the renderer picks a
+// deterministic per-cell variant (the floors trick) so terrain stretches
+// don't look stamped. The CSS-filter recolors (ashlands, frostbound)
+// layer on top of any base.
 //
 // A campaign's `terrainArt` section maps terrain TYPE → tile id from this
 // catalog; unmapped types render their default tile. Shared so the FE
 // renders it and the BE validates it from one definition. PURELY VISUAL —
 // mechanics stay on the terrain type (see `TERRAIN`), whatever it looks like.
 export interface TerrainTileSpec {
-  // The PNG this tile draws: /art/tiles/<base>.png (the 8 shipped tiles).
-  base: 'plains' | 'road' | 'forest' | 'hills' | 'swamp' | 'snow' | 'water' | 'mountain';
+  // The PNG family this tile draws: /art/tiles/<base>_<n>.png.
+  base:
+    | 'plains'
+    | 'road'
+    | 'road_cold'
+    | 'forest'
+    | 'hills'
+    | 'swamp'
+    | 'snow'
+    | 'water'
+    | 'water_calm'
+    | 'mountain'
+    | 'desert'
+    | 'dirt'
+    | 'woodlands'
+    | 'highlands'
+    | 'scrubland'
+    | 'base'
+    | 'void';
   label: string;
+  // Hand-painted variations on disk (<base>_1.png … <base>_N.png). The
+  // renderer picks one per cell deterministically. Default 1.
+  variants?: number;
   // CSS filter recoloring the base PNG; omitted = the art as painted.
   filter?: string;
 }
 
 export const TERRAIN_TILES = {
-  // The base set — each overland type's own tile, unfiltered.
-  plains: { base: 'plains', label: 'plains' },
-  road: { base: 'road', label: 'road' },
-  forest: { base: 'forest', label: 'forest' },
-  hills: { base: 'hills', label: 'hills' },
-  swamp: { base: 'swamp', label: 'swamp' },
-  snow: { base: 'snow', label: 'snow' },
-  water: { base: 'water', label: 'water' },
-  mountain: { base: 'mountain', label: 'mountains' },
+  // The base set — each overland type's own tile family, unfiltered.
+  plains: { base: 'plains', label: 'plains', variants: 4 },
+  road: { base: 'road', label: 'road', variants: 4 }, // dirt track
+  forest: { base: 'forest', label: 'forest', variants: 4 },
+  hills: { base: 'hills', label: 'hills', variants: 4 },
+  swamp: { base: 'swamp', label: 'swamp', variants: 4 },
+  snow: { base: 'snow', label: 'snow' }, // Cold Lands sample — 1 variant
+  water: { base: 'water', label: 'water', variants: 4 },
+  mountain: { base: 'mountain', label: 'mountains', variants: 4 },
+  // The rest of the full Basic Terrain Set — extra biomes for skinning
+  // (and 'tile:<id>' site icons): no terrain TYPE defaults to these.
+  desert: { base: 'desert', label: 'desert dunes', variants: 4 },
+  'water-calm': { base: 'water_calm', label: 'calm water', variants: 4 },
+  woodlands: { base: 'woodlands', label: 'woodlands', variants: 4 },
+  highlands: { base: 'highlands', label: 'highlands', variants: 4 },
+  scrubland: { base: 'scrubland', label: 'scrubland', variants: 4 },
+  dirt: { base: 'dirt', label: 'bare dirt', variants: 4 },
+  'base-tile': { base: 'base', label: 'bare ground', variants: 4 },
+  void: { base: 'void', label: 'the void', variants: 4 },
+  'road-cold': { base: 'road_cold', label: 'wintry road' }, // Cold Lands sample
   // Ashlands — scorched, grey, post-cataclysm.
-  'plains-ash': { base: 'plains', label: 'ash flats', filter: 'grayscale(0.75) brightness(0.7)' },
+  'plains-ash': {
+    base: 'plains',
+    variants: 4,
+    label: 'ash flats',
+    filter: 'grayscale(0.75) brightness(0.7)',
+  },
   'road-cracked': {
     base: 'road',
+    variants: 4,
     label: 'cracked road',
     filter: 'grayscale(0.55) brightness(0.8)',
   },
   'forest-dead': {
     base: 'forest',
+    variants: 4,
     label: 'dead forest',
     filter: 'sepia(0.55) saturate(0.45) brightness(0.72)',
   },
   'hills-barren': {
     base: 'hills',
+    variants: 4,
     label: 'barren hills',
     filter: 'saturate(0.35) brightness(0.78)',
   },
   'swamp-blight': {
     base: 'swamp',
+    variants: 4,
     label: 'blighted mire',
     filter: 'hue-rotate(28deg) saturate(0.7) brightness(0.7)',
   },
   'water-murk': {
     base: 'water',
+    variants: 4,
     label: 'murkwater',
     filter: 'hue-rotate(45deg) saturate(0.5) brightness(0.55)',
   },
   'mountain-char': {
     base: 'mountain',
+    variants: 4,
     label: 'charred peaks',
     filter: 'grayscale(0.6) brightness(0.6)',
   },
@@ -298,30 +343,36 @@ export const TERRAIN_TILES = {
   // Frostbound — washed-out, icy.
   'plains-tundra': {
     base: 'plains',
+    variants: 4,
     label: 'tundra',
     filter: 'saturate(0.5) brightness(1.15) hue-rotate(-12deg)',
   },
-  'road-snowbound': {
-    base: 'road',
-    label: 'snowbound road',
-    filter: 'saturate(0.55) brightness(1.18)',
-  },
+  // Frostbound's road is the real Cold Lands painting now, not a filter.
+  'road-snowbound': { base: 'road_cold', label: 'snowbound road' },
   'forest-frost': {
     base: 'forest',
+    variants: 4,
     label: 'frosted forest',
     filter: 'saturate(0.45) brightness(1.2) hue-rotate(-18deg)',
   },
   'hills-frost': {
     base: 'hills',
+    variants: 4,
     label: 'frosted hills',
     filter: 'saturate(0.4) brightness(1.25)',
   },
   'swamp-frozen': {
     base: 'swamp',
+    variants: 4,
     label: 'frozen fen',
     filter: 'saturate(0.45) brightness(1.15) hue-rotate(-25deg)',
   },
-  'water-ice': { base: 'water', label: 'pack ice', filter: 'saturate(0.45) brightness(1.4)' },
+  'water-ice': {
+    base: 'water',
+    variants: 4,
+    label: 'pack ice',
+    filter: 'saturate(0.45) brightness(1.4)',
+  },
 } as const satisfies Record<string, TerrainTileSpec>;
 
 export type TerrainTileId = keyof typeof TERRAIN_TILES;

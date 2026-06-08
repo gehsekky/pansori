@@ -114,21 +114,18 @@ const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>
   town_wall: { name: 'brick-wall', color: 'rgba(150, 138, 120, 0.95)' }, // impassable masonry
 };
 
-// Hand-painted terrain tiles (David Baumgart). Each PNG is 256×384 and renders
-// bottom-anchored at 150% cell height so the top third overhangs the row above
-// (2.5D layered overland look). Terrains with no tile fall back to the tint +
-// game-icons glyph below — chiefly the town/interior types (road, cobblestone,
-// garden, town_wall) this terrain set doesn't cover.
-const TERRAIN_TILE: Partial<Record<TerrainType, string>> = {
-  plains: '/art/tiles/plains.png',
-  road: '/art/tiles/road.png',
-  forest: '/art/tiles/forest.png',
-  hills: '/art/tiles/hills.png',
-  swamp: '/art/tiles/swamp.png',
-  snow: '/art/tiles/snow.png',
-  water: '/art/tiles/water.png',
-  mountain: '/art/tiles/mountain.png',
-};
+// Hand-painted terrain tiles (David Baumgart, the full Basic Terrain Set).
+// Each PNG is 256×384 and renders bottom-anchored at 150% cell height so the
+// top third overhangs the row above (2.5D layered overland look). A terrain
+// type's DEFAULT tile is the catalog entry sharing its name (the 8 overland
+// types); types with no such entry fall back to the tint + game-icons glyph
+// below — chiefly the town/interior types (cobblestone, garden, town_wall).
+// Each tile family ships several painted variations; pick one per cell
+// deterministically (the floors trick) so stretches don't look stamped and
+// nothing reshuffles between renders.
+const tileVariant = (x: number, y: number, count: number) => ((x * 7 + y * 13) % count) + 1;
+const tileSrcFor = (spec: TerrainTileSpec, x: number, y: number): string =>
+  `/art/tiles/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`;
 
 // A town site on the regional map renders as this hand-painted village tile
 // (David Baumgart's dirtVillage) instead of the generic village glyph —
@@ -279,20 +276,21 @@ function GridMapView({
   terrainArt,
 }: Props) {
   // Resolve a terrain type's tile through the campaign skin: an override
-  // picks its catalog entry (base PNG + recolor filter), with any author
-  // tint compiled and layered after the catalog filter; otherwise the
-  // type's default tile (no filter). Types with no tile at all return src
-  // undefined and fall through to the tint + glyph path.
-  const tileFor = (t: TerrainType): { src?: string; filter?: string } => {
+  // picks its catalog entry (base PNG family + recolor filter), with any
+  // author tint compiled and layered after the catalog filter; otherwise
+  // the type's default tile family — the catalog entry sharing the type's
+  // name. Types with neither return src undefined and fall through to the
+  // tint + glyph path. The cell position picks the painted variant.
+  const tileFor = (t: TerrainType, x: number, y: number): { src?: string; filter?: string } => {
     const choice = terrainArt?.[t];
     const id = typeof choice === 'string' ? choice : choice?.tile;
     // Widen past the catalog's per-entry literal types (filter is optional).
-    const spec: TerrainTileSpec | undefined = id ? TERRAIN_TILES[id] : undefined;
-    if (spec) {
-      const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
-      return { src: `/art/tiles/${spec.base}.png`, filter: joinFilters(spec.filter, tint) };
-    }
-    return { src: TERRAIN_TILE[t] };
+    const spec: TerrainTileSpec | undefined = id
+      ? TERRAIN_TILES[id]
+      : (TERRAIN_TILES as Partial<Record<string, TerrainTileSpec>>)[t];
+    if (!spec) return {};
+    const tint = typeof choice === 'object' ? compileTint(choice.tint) : undefined;
+    return { src: tileSrcFor(spec, x, y), filter: joinFilters(spec.filter, tint) };
   };
   // The town-site marker through the campaign skin: `markers.town` picks a
   // MARKER_TILES entry (+ optional tint); absent = the painted village tile.
@@ -419,16 +417,21 @@ function GridMapView({
       // unpainted "plains" cell only tiles on the regional map (so interior
       // rooms don't sprout grass where they're just bare floor). Fogged cells
       // never show a tile.
+      // A site's 'tile:<id>' icon resolves through the catalog (variant 1 —
+      // a landmark shouldn't shimmer between variants across re-renders).
+      const sitePaintedSpec = siteTileName
+        ? (TERRAIN_TILES as Partial<Record<string, TerrainTileSpec>>)[siteTileName]
+        : undefined;
       const cellTile = fogged
         ? {}
         : isTownSite
           ? townMarkerTile()
-          : siteTileName
-            ? { src: `/art/tiles/${siteTileName}.png` }
+          : sitePaintedSpec
+            ? { src: `/art/tiles/${sitePaintedSpec.base}_1.png` }
             : terrainType
-              ? tileFor(terrainType)
+              ? tileFor(terrainType, x, y)
               : isRegional && plainsDefault
-                ? tileFor('plains')
+                ? tileFor('plains', x, y)
                 : {};
       const tileSrc = cellTile.src;
       // Seamless ground texture for a floored cell (local rooms + town maps). A
