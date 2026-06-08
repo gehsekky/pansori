@@ -1,8 +1,8 @@
 {
-  // The WIDE project: source + tests. This is what the typecheck gate
-  // (`tsc --noEmit -p src/backend/tsconfig.json`), eslint's type-aware
-  // linting (parserOptions.project) and the IDE resolve against. The
-  // production build uses tsconfig.build.json (src only, emits dist/).
+  // The WIDE project: source + the src/tests tree. This is what the
+  // typecheck gate (`tsc --noEmit -p src/backend/tsconfig.json`),
+  // eslint's type-aware linting and the IDE resolve against. The
+  // production build uses tsconfig.build.json (tests excluded, emits dist/).
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -12,6 +12,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
