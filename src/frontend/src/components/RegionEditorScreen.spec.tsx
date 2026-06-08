@@ -1178,9 +1178,11 @@ describe('region SITES card — icon dropdown + tile preview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'SITES' }));
     fireEvent.mouseDown(screen.getByTestId('cell-2-1')); // select The Pit
     const icon = (await screen.findByLabelText('ICON')) as HTMLSelectElement;
-    // Default = the dungeon glyph; no painted preview shown.
+    // Default = the dungeon glyph, shown as a glyph preview (The Pit is a
+    // LOCAL site; a town would preview the village painting instead).
     expect(icon.value).toBe('');
     expect(screen.queryByAltText('site tile preview')).toBeNull();
+    expect(screen.getByLabelText('site glyph preview')).toBeTruthy();
     // The dropdown carries marker locations AND terrain tiles as tile: ids.
     const values = [...icon.options].map((o) => o.value);
     expect(values).toContain('tile:barrow');
@@ -1227,6 +1229,9 @@ describe('region SITES card — icon dropdown + tile preview', () => {
     const icon = (await screen.findByLabelText('ICON')) as HTMLSelectElement;
     expect(icon.value).toBe('tombstone'); // kept, not clobbered
     expect([...icon.options].some((o) => o.text.includes('(custom)'))).toBe(true);
-    expect(screen.queryByAltText('site tile preview')).toBeNull(); // glyphs have no painting
+    // The legacy glyph previews AS its glyph (no painting).
+    expect(screen.queryByAltText('site tile preview')).toBeNull();
+    const glyph = screen.getByLabelText('site glyph preview');
+    expect(glyph.className).toContain('game-icon-tombstone');
   });
 });

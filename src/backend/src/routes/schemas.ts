@@ -307,7 +307,9 @@ const RegionSiteSchema = z
     desc: z.string().min(1).max(2000).optional(),
     // Narration hook — appended to "You enter X." on every landing.
     onEnter: z.string().min(1).max(2000).optional(),
-    // game-icons.net icon name for 'local' sites; towns use the village glyph.
+    // A game-icons.net glyph name, or 'tile:<id>' for a painted tile from
+    // the marker/terrain catalogs. On a TOWN site a painted icon overrides
+    // the campaign-wide markers.town skin (one town can be THE walled city).
     icon: z.string().min(1).max(60).optional(),
   })
   .strict();

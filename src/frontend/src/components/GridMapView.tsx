@@ -428,14 +428,17 @@ function GridMapView({
         siteTileName && !sitePaintedTerrain
           ? (MARKER_TILES as Partial<Record<string, MarkerTileSpec>>)[siteTileName]
           : undefined;
+      // Priority: an explicit painted site icon beats the campaign-wide
+      // town marker — so one town can be THE walled city while the rest
+      // keep the markers.town skin.
       const cellTile = fogged
         ? {}
-        : isTownSite
-          ? townMarkerTile(x, y)
-          : sitePaintedTerrain
-            ? { src: `/art/tiles/${sitePaintedTerrain.base}_1.png` }
-            : sitePaintedMarker
-              ? { src: `/art/markers/${sitePaintedMarker.base}_1.png` }
+        : sitePaintedTerrain
+          ? { src: `/art/tiles/${sitePaintedTerrain.base}_1.png` }
+          : sitePaintedMarker
+            ? { src: `/art/markers/${sitePaintedMarker.base}_1.png` }
+            : isTownSite
+              ? townMarkerTile(x, y)
               : terrainType
                 ? tileFor(terrainType, x, y)
                 : isRegional && plainsDefault

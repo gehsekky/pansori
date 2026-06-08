@@ -31,6 +31,7 @@ function siteIconPreview(icon: string | undefined): string | null {
   return null;
 }
 import { useCallback, useEffect, useState } from 'react';
+import GameIcon from './GameIcon.tsx';
 import MapsPanel from './MapsPanel.tsx';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
@@ -1301,17 +1302,23 @@ function RegionEditorScreen({
                             <label className={styles.formLbl} htmlFor="site-icon">
                               ICON
                             </label>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                               <select
                                 id="site-icon"
                                 className={styles.formInp}
                                 style={{ cursor: 'pointer', flex: 1 }}
                                 value={selectedSite.icon ?? ''}
                                 onChange={(e) =>
-                                  updateSite(selectedSite.id, { icon: e.target.value })
+                                  // '' (DEFAULT) stores undefined — the schema
+                                  // rejects empty icon strings.
+                                  updateSite(selectedSite.id, { icon: e.target.value || undefined })
                                 }
                               >
-                                <option value="">— DEFAULT (DUNGEON GLYPH) —</option>
+                                <option value="">
+                                  {selectedSite.kind === 'town'
+                                    ? '— DEFAULT (TOWN MARKER) —'
+                                    : '— DEFAULT (DUNGEON GLYPH) —'}
+                                </option>
                                 {/* A legacy game-icons glyph (or any value not in the
                                     catalogs) stays editable — listed, not dropped. */}
                                 {selectedSite.icon &&
@@ -1339,18 +1346,54 @@ function RegionEditorScreen({
                                     ))}
                                 </optgroup>
                               </select>
-                              {/* Live preview of the painted site tile (variant 1 —
-                                  what the overworld will draw). Glyph/custom icons
-                                  have no painting to preview. */}
-                              {siteIconPreview(selectedSite.icon) && (
-                                <img
-                                  src={siteIconPreview(selectedSite.icon)!}
-                                  alt="site tile preview"
-                                  width={40}
-                                  height={60}
-                                  style={{ display: 'block', border: '1px solid var(--t-line)' }}
-                                />
-                              )}
+                              {/* Live preview — always rendered (fixed footprint,
+                                  so the row doesn't reflow when the pick changes):
+                                  a painted tile shows its variant-1 art; DEFAULT
+                                  shows what the overworld actually draws (the
+                                  village marker for towns, the dungeon-gate glyph
+                                  otherwise); a legacy game-icons value shows its
+                                  glyph. */}
+                              <div
+                                style={{
+                                  width: 40,
+                                  height: 60,
+                                  flex: '0 0 40px',
+                                  border: '1px solid var(--t-line)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {(() => {
+                                  const painted =
+                                    siteIconPreview(selectedSite.icon) ??
+                                    (!selectedSite.icon && selectedSite.kind === 'town'
+                                      ? '/art/markers/village_1.png'
+                                      : null);
+                                  if (painted) {
+                                    return (
+                                      <img
+                                        src={painted}
+                                        alt="site tile preview"
+                                        width={40}
+                                        height={60}
+                                        style={{ display: 'block' }}
+                                      />
+                                    );
+                                  }
+                                  return (
+                                    <GameIcon
+                                      name={selectedSite.icon || 'dungeon-gate'}
+                                      aria-label="site glyph preview"
+                                      style={{
+                                        fontSize: '1.6rem',
+                                        color: 'rgba(206, 198, 182, 0.95)',
+                                      }}
+                                    />
+                                  );
+                                })()}
+                              </div>
                             </div>
                           </div>
                         )}

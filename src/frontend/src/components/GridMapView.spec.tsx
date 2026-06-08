@@ -165,6 +165,32 @@ describe('GridMapView', () => {
     expect(getByText('The Silent Grove')).toBeTruthy(); // label kept
   });
 
+  it('a painted icon on a TOWN site overrides the campaign town marker', () => {
+    const walled: ActiveGrid = {
+      ...grid,
+      transitions: [
+        {
+          pos: { x: 3, y: 0 },
+          kind: 'site',
+          label: 'Oakharrow',
+          toTownId: 'town1',
+          icon: 'tile:walled-city',
+        },
+      ],
+    };
+    const { container } = render(
+      <GridMapView
+        grid={walled}
+        markerPos={{ x: 0, y: 0 }}
+        terrainArt={{ markers: { town: 'castle' } }}
+      />
+    );
+    // The per-site painting wins over markers.town AND the village default.
+    expect(cell(container, 3, 0).querySelector('img')?.getAttribute('src')).toBe(
+      '/art/markers/walled_city_1.png'
+    );
+  });
+
   it('renders a per-dungeon icon override on a local site', () => {
     const withIcon: ActiveGrid = {
       ...grid,
