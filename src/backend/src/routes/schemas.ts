@@ -1,4 +1,11 @@
-import { FLOOR_TILES, ITEM_ICONS, MARKER_TILES, TERRAIN, TERRAIN_TILES } from '../shared-types.js';
+import {
+  FLOOR_TILES,
+  ITEM_ICONS,
+  MARKER_TILES,
+  SRD_CLASSES,
+  TERRAIN,
+  TERRAIN_TILES,
+} from '../shared-types.js';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
@@ -1591,6 +1598,18 @@ const ClassStartingEquipmentSchema = z.record(
     .max(4)
 );
 
+const CLASS_ID = z.enum(SRD_CLASSES as unknown as [string, ...string[]]);
+// The creation screen's party hint: a recommended size + an ideal class
+// composition the auto-fill button builds. Composition entries are SRD
+// class ids; length need not equal size (it falls back to a generic
+// template when shorter/empty).
+const RecommendedPartySchema = z
+  .object({
+    size: z.number().int().min(1).max(8),
+    composition: z.array(CLASS_ID).max(8),
+  })
+  .strict();
+
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Narration hook: the first narrative entry of a new game (overlays the
   // code/template campaign.intro).
@@ -1621,6 +1640,7 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   classSpells: ClassSpellsSchema,
   classStartingLoot: ClassStartingLootSchema,
   classStartingEquipment: ClassStartingEquipmentSchema,
+  recommendedParty: RecommendedPartySchema,
 };
 
 // PUT body for a section write: { value: <section payload> }.

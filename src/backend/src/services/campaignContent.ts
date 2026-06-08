@@ -127,6 +127,9 @@ export const EDITABLE_SECTIONS = [
   'classSpells',
   'classStartingLoot',
   'classStartingEquipment',
+  // Campaign-block field: the creation screen's party-size hint + auto-fill
+  // composition. Folded into campaign.recommendedPartySize / Composition.
+  'recommendedParty',
 ] as const;
 export type EditableSection = (typeof EDITABLE_SECTIONS)[number];
 
@@ -1179,6 +1182,15 @@ async function loadOverlay(
   const worldName = typeof overlay.worldName === 'string' ? overlay.worldName : undefined;
   delete overlay.worldName;
 
+  // recommendedParty {size, composition} folds into the campaign block's
+  // recommendedPartySize + recommendedComposition (the character-creation
+  // screen's party-size hint + auto-fill composition).
+  const recParty =
+    overlay.recommendedParty && typeof overlay.recommendedParty === 'object'
+      ? (overlay.recommendedParty as { size?: number; composition?: string[] })
+      : undefined;
+  delete overlay.recommendedParty;
+
   // Quests + factions are campaign-block fields too — extracted here and
   // folded below (wholesale replace), never left as top-level keys.
   const dbQuests =
@@ -1221,6 +1233,7 @@ async function loadOverlay(
     dbRooms.length > 0 ||
     gameStart !== undefined ||
     worldName !== undefined ||
+    recParty !== undefined ||
     dbQuests !== undefined ||
     dbFactions !== undefined
   ) {
@@ -1228,6 +1241,10 @@ async function loadOverlay(
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
       ...(gameStart !== undefined ? { intro: gameStart } : {}),
       ...(worldName !== undefined ? { world_name: worldName } : {}),
+      ...(typeof recParty?.size === 'number' ? { recommendedPartySize: recParty.size } : {}),
+      ...(Array.isArray(recParty?.composition)
+        ? { recommendedComposition: recParty.composition }
+        : {}),
       ...(dbQuests !== undefined ? { quests: dbQuests } : {}),
       ...(dbFactions !== undefined ? { factions: dbFactions } : {}),
       ...(dbRegions.length > 0

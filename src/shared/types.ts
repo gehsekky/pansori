@@ -1585,6 +1585,25 @@ export type WornEffect =
   | { kind: 'save_bonus'; ability: AbilityKey; bonus: number }
   | { kind: 'light'; radiusFt: number };
 
+// The 12 SRD classes (ids as used by Character.character_class + the keys
+// of the per-class context maps). Canonical here so the creator's
+// recommended-party control and the section schema share one list.
+export const SRD_CLASSES = [
+  'Barbarian',
+  'Bard',
+  'Cleric',
+  'Druid',
+  'Fighter',
+  'Monk',
+  'Paladin',
+  'Ranger',
+  'Rogue',
+  'Sorcerer',
+  'Warlock',
+  'Wizard',
+] as const;
+export type SrdClass = (typeof SRD_CLASSES)[number];
+
 // ─── Item icons (visual inventory) ───────────────────────────────────────
 //
 // Items are bucketed into a small set of visual ICONS by silhouette, so we

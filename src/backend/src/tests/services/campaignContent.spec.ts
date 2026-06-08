@@ -1673,6 +1673,41 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.malgovia.terrainArt).toBeUndefined();
   });
 
+  it('recommendedParty folds into the campaign block (size + composition)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const code = codeCtx({ id: 'malgovia' });
+    const contexts: Record<string, Context> = { malgovia: code };
+
+    expect(
+      await putCampaignSection(db.pool, 'malgovia', 'recommendedParty', {
+        size: 3,
+        composition: ['Fighter', 'Cleric', 'Wizard'],
+      })
+    ).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(contexts.malgovia.campaign?.recommendedPartySize).toBe(3);
+    expect(contexts.malgovia.campaign?.recommendedComposition).toEqual([
+      'Fighter',
+      'Cleric',
+      'Wizard',
+    ]);
+
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'recommendedParty')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    // Reverts to the code campaign's value (the base template has none).
+    expect(contexts.malgovia.campaign?.recommendedPartySize).toBeUndefined();
+  });
+
+  it('recommendedParty schema: bounded size + SRD-class composition', () => {
+    const sch = CAMPAIGN_SECTION_SCHEMAS.recommendedParty;
+    expect(
+      sch.safeParse({ size: 4, composition: ['Fighter', 'Rogue', 'Wizard', 'Cleric'] }).success
+    ).toBe(true);
+    expect(sch.safeParse({ size: 0, composition: [] }).success).toBe(false); // size floor
+    expect(sch.safeParse({ size: 9, composition: [] }).success).toBe(false); // size cap
+    expect(sch.safeParse({ size: 4, composition: ['Necromancer'] }).success).toBe(false); // not SRD
+  });
+
   it('theme overlays the context top-level (the FE merges it over the base)', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const code = codeCtx({ id: 'malgovia' });
