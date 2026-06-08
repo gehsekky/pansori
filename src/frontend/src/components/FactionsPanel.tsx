@@ -170,7 +170,15 @@ function FactionsPanel({ campaignId }: { campaignId: string }) {
       {(factions ?? []).map((f, i) => (
         <div
           key={f.id}
-          style={{ padding: '0.4rem 0', borderBottom: '1px solid var(--t-separator)' }}
+          // Bordered block per faction (matching the room editor's NPC
+          // blocks) — several rows each, so an outline keeps neighbours
+          // visually distinct.
+          style={{
+            padding: '0.5rem 0.6rem',
+            marginBottom: '0.6rem',
+            border: '1px solid var(--t-border)',
+            borderRadius: 4,
+          }}
         >
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: '2 1 160px' }}>
