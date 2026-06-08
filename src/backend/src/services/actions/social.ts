@@ -12,6 +12,7 @@ import {
   shopSellPrice,
   shopStockLeft,
 } from '../gameEngine.js';
+import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import { onceKey, visibleResponses } from '../dialogueGating.js';
 import type { ActionHandler } from './types.js';
@@ -20,7 +21,6 @@ import type { GridPos } from '../../types.js';
 import { activeGrid } from '../mapEngine.js';
 import { randomUUID } from 'crypto';
 import { responsesAtPath } from '../conversation.js';
-import { updatePcActor } from './actor.js';
 
 /**
  * The cell the party marker walks to when approaching an NPC: a free square
@@ -208,19 +208,24 @@ export const handleTalkResponse: ActionHandler<{
   if (response.check) {
     const chk = response.check;
     const luckActive = consumeLuckForCheck(char);
-    const result = skillCheck(
-      char.cha,
-      chk.dc,
-      char.skill_proficiencies?.includes(chk.skill) ?? false,
-      char.level,
-      false,
-      hasExpertise(char, chk.skill),
-      hasJackOfAllTrades(char),
-      luckActive,
-      char.species === 'halfling',
-      hasReliableTalent(char),
-      false,
-      d20TestPenalty(char)
+    const gDie = consumeGuidanceDie(ctx);
+    const result = applyGuidanceDie(
+      skillCheck(
+        char.cha,
+        chk.dc,
+        char.skill_proficiencies?.includes(chk.skill) ?? false,
+        char.level,
+        false,
+        hasExpertise(char, chk.skill),
+        hasJackOfAllTrades(char),
+        luckActive,
+        char.species === 'halfling',
+        hasReliableTalent(char),
+        false,
+        d20TestPenalty(char)
+      ),
+      gDie,
+      chk.dc
     );
     const skillLabel = chk.skill.charAt(0).toUpperCase() + chk.skill.slice(1);
     const outcomeReply = result.success ? chk.successReply : chk.failReply;
@@ -571,21 +576,26 @@ export const handleInfluence: ActionHandler<{
   const skillName = action.skill; // 'persuasion' | 'deception' | 'intimidation' (all CHA)
   // Lucky feat — queued via `use_luck` grants advantage on the check.
   const luckActive = consumeLuckForCheck(char);
+  const gDie = consumeGuidanceDie(ctx);
   // Routed through skillCheck so social checks gain Expertise / Jack of All
   // Trades / Reliable Talent / Halfling Lucky, consistent with other skills.
-  const check = skillCheck(
-    char.cha,
-    dc,
-    char.skill_proficiencies?.includes(skillName) ?? false,
-    char.level,
-    false,
-    hasExpertise(char, skillName),
-    hasJackOfAllTrades(char),
-    luckActive,
-    char.species === 'halfling',
-    hasReliableTalent(char),
-    false,
-    d20TestPenalty(char)
+  const check = applyGuidanceDie(
+    skillCheck(
+      char.cha,
+      dc,
+      char.skill_proficiencies?.includes(skillName) ?? false,
+      char.level,
+      false,
+      hasExpertise(char, skillName),
+      hasJackOfAllTrades(char),
+      luckActive,
+      char.species === 'halfling',
+      hasReliableTalent(char),
+      false,
+      d20TestPenalty(char)
+    ),
+    gDie,
+    dc
   );
   const total = check.total;
   const success = check.success;
@@ -691,19 +701,24 @@ export const handleStudy: ActionHandler<{
   // Routed through skillCheck (Study skills are all INT) so it gains Expertise /
   // Jack of All Trades / Reliable Talent / Halfling Lucky. The Thaumaturge bonus
   // folds into the DC (lowered by it), mirroring how Bardic dice are handled.
-  const studyCheck = skillCheck(
-    char.int,
-    dc - thaumaturgeBonus,
-    char.skill_proficiencies?.includes(skillName) ?? false,
-    char.level,
-    false,
-    hasExpertise(char, skillName),
-    hasJackOfAllTrades(char),
-    studyLuckActive,
-    char.species === 'halfling',
-    hasReliableTalent(char),
-    false,
-    d20TestPenalty(char)
+  const studyGuidance = consumeGuidanceDie(ctx);
+  const studyCheck = applyGuidanceDie(
+    skillCheck(
+      char.int,
+      dc - thaumaturgeBonus,
+      char.skill_proficiencies?.includes(skillName) ?? false,
+      char.level,
+      false,
+      hasExpertise(char, skillName),
+      hasJackOfAllTrades(char),
+      studyLuckActive,
+      char.species === 'halfling',
+      hasReliableTalent(char),
+      false,
+      d20TestPenalty(char)
+    ),
+    studyGuidance,
+    dc - thaumaturgeBonus
   );
   const total = studyCheck.total + thaumaturgeBonus;
   const success = studyCheck.success;

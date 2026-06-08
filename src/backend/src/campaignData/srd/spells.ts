@@ -529,10 +529,12 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['divine', 'primal'],
   },
   // SRD: Guidance — concentration cantrip. Touch a willing
-  // creature, pick a skill; until the spell ends, the creature
-  // adds 1d4 to any ability check using that skill. Pansori MVP
-  // is narrative — the +1d4 skill-check rider would need a
-  // per-skill-buff hook on the check pipeline.
+  // SRD: touch a willing creature, pick a skill; until the spell ends, the
+  // creature adds 1d4 to any ability check using that skill. Mechanized as a
+  // one-shot +1d4 on the target's NEXT ability check (the buff path sets
+  // `guidance_die`; the next skillCheck consumes it). Simplification: the
+  // bonus applies to the next ability check of ANY kind rather than tracking
+  // a chosen skill — pansori's checks don't carry a per-check skill tag.
   guidance: {
     id: 'guidance',
     name: 'Guidance',
@@ -540,8 +542,9 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     concentration: true,
     durationRounds: 10,
+    targetType: 'self_or_ally',
     narrative: "{name} murmurs a few quiet words — focus settles into the recipient's hands.",
-    desc: 'Touch buff: +1d4 on the chosen skill (concentration, 1 minute).',
+    desc: 'Touch buff: +1d4 on the target’s next ability check (concentration, 1 minute).',
     rangeKind: 'touch',
     spellList: ['divine', 'primal'],
   },

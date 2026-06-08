@@ -18,6 +18,7 @@
 //     monsters from one implementation.
 
 import type { Character, CombatEntity, Enemy } from '../../types.js';
+import { rollDice } from '../rulesEngine.js';
 
 /**
  * A PC acting through the dispatcher. `char` is the live Character
@@ -87,4 +88,33 @@ export function updatePcActor(ctx: { actor: Actor }, patch: Partial<Character>):
   const updated = { ...ctx.actor.char, ...patch };
   ctx.actor.char = updated;
   return updated;
+}
+
+/**
+ * SRD Guidance — consume the acting PC's one-shot +1d4 ability-check rider.
+ * If `guidance_die` is set, roll 1d4, clear the flag (canonically, via
+ * `updatePcActor`, so it persists with the turn commit), and return the bonus;
+ * otherwise return 0. Call once per `skillCheck` site, then fold the result in
+ * with `applyGuidanceDie`.
+ */
+export function consumeGuidanceDie(ctx: { actor: Actor }): number {
+  if (ctx.actor.kind !== 'pc' || !ctx.actor.char.guidance_die) return 0;
+  updatePcActor(ctx, { guidance_die: false });
+  return rollDice('1d4');
+}
+
+/**
+ * Fold a consumed Guidance die into a `skillCheck` result: add it to the total
+ * and recompute success against the DC. A no-op when `die` is 0, so callers can
+ * wrap unconditionally. (Applied after the check's own luck/peerless logic —
+ * Guidance simply adds to the final total.)
+ */
+export function applyGuidanceDie<T extends { total: number; success: boolean }>(
+  check: T,
+  die: number,
+  dc: number
+): T {
+  if (die <= 0) return check;
+  const total = check.total + die;
+  return { ...check, total, success: total >= dc };
 }

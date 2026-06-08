@@ -1,4 +1,5 @@
 import { abilityMod, d, d20TestPenalty, profBonus, skillCheck } from '../rulesEngine.js';
+import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
   applyIndomitableMight,
   hasExpertise,
@@ -10,7 +11,6 @@ import { checkMountFallOff } from './mount.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
 import { getEnemyById } from '../gameEngine.js';
-import { updatePcActor } from './actor.js';
 
 /**
  * `grapple`: SRD Unarmed Strike: Grapple. Contested STR
@@ -54,19 +54,24 @@ export const handleGrapple: ActionHandler<{
   // Jack of All Trades / Reliable Talent / Halfling Lucky + the exhaustion
   // penalty; Indomitable Might (Barbarian L18) floors the total at STR after.
   const athProf = (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === 'athletics');
-  const grappleCheck = skillCheck(
-    char.str,
-    enemyRoll + 1,
-    athProf,
-    char.level,
-    false,
-    hasExpertise(char, 'athletics'),
-    hasJackOfAllTrades(char),
-    false,
-    char.species === 'halfling',
-    hasReliableTalent(char),
-    false,
-    d20TestPenalty(char)
+  const gDie = consumeGuidanceDie(ctx);
+  const grappleCheck = applyGuidanceDie(
+    skillCheck(
+      char.str,
+      enemyRoll + 1,
+      athProf,
+      char.level,
+      false,
+      hasExpertise(char, 'athletics'),
+      hasJackOfAllTrades(char),
+      false,
+      char.species === 'halfling',
+      hasReliableTalent(char),
+      false,
+      d20TestPenalty(char)
+    ),
+    gDie,
+    enemyRoll + 1
   );
   const playerRoll = applyIndomitableMight(char, grappleCheck.total);
   ctx.usedInitiative = true;
@@ -144,19 +149,24 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
     abilityMod(char.dex) + (acrProf ? prof : 0) + (hasExpertise(char, 'acrobatics') ? prof : 0);
   const useAthletics = athMod >= acrMod;
   const escapeSkill = useAthletics ? 'athletics' : 'acrobatics';
-  const escapeCheck = skillCheck(
-    useAthletics ? char.str : char.dex,
-    grapplerRoll + 1,
-    useAthletics ? athProf : acrProf,
-    char.level,
-    false,
-    hasExpertise(char, escapeSkill),
-    hasJackOfAllTrades(char),
-    false,
-    char.species === 'halfling',
-    hasReliableTalent(char),
-    false,
-    d20TestPenalty(char)
+  const gDie = consumeGuidanceDie(ctx);
+  const escapeCheck = applyGuidanceDie(
+    skillCheck(
+      useAthletics ? char.str : char.dex,
+      grapplerRoll + 1,
+      useAthletics ? athProf : acrProf,
+      char.level,
+      false,
+      hasExpertise(char, escapeSkill),
+      hasJackOfAllTrades(char),
+      false,
+      char.species === 'halfling',
+      hasReliableTalent(char),
+      false,
+      d20TestPenalty(char)
+    ),
+    gDie,
+    grapplerRoll + 1
   );
   const myRoll = useAthletics ? applyIndomitableMight(char, escapeCheck.total) : escapeCheck.total;
   const skillUsed = useAthletics ? 'Athletics' : 'Acrobatics';
@@ -224,19 +234,24 @@ export const handleShove: ActionHandler<{
   // Jack of All Trades / Reliable Talent / Halfling Lucky + the exhaustion
   // penalty; Indomitable Might (Barbarian L18) floors the total at STR after.
   const athProf = (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === 'athletics');
-  const grappleCheck = skillCheck(
-    char.str,
-    enemyRoll + 1,
-    athProf,
-    char.level,
-    false,
-    hasExpertise(char, 'athletics'),
-    hasJackOfAllTrades(char),
-    false,
-    char.species === 'halfling',
-    hasReliableTalent(char),
-    false,
-    d20TestPenalty(char)
+  const gDie = consumeGuidanceDie(ctx);
+  const grappleCheck = applyGuidanceDie(
+    skillCheck(
+      char.str,
+      enemyRoll + 1,
+      athProf,
+      char.level,
+      false,
+      hasExpertise(char, 'athletics'),
+      hasJackOfAllTrades(char),
+      false,
+      char.species === 'halfling',
+      hasReliableTalent(char),
+      false,
+      d20TestPenalty(char)
+    ),
+    gDie,
+    enemyRoll + 1
   );
   const playerRoll = applyIndomitableMight(char, grappleCheck.total);
   ctx.usedInitiative = true;

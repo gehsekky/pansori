@@ -421,6 +421,22 @@ export function runBuffSpell(
     }
   }
 
+  // SRD Guidance — arm a one-shot +1d4 on the target's next ability check.
+  // `consumeGuidanceDie` reads + clears `guidance_die` at the next skillCheck;
+  // breakConcentration clears it if concentration drops first.
+  if (spell.id === 'guidance') {
+    if (isCasterTarget) {
+      char.guidance_die = true;
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === buffTarget.id ? { ...c, guidance_die: true } : c
+        ),
+      };
+    }
+  }
+
   // SRD Death Ward — set the one-shot flag on the target. The
   // interception logic lives in `applyDamage` where HP would hit
   // 0; the flag clears there on consumption.

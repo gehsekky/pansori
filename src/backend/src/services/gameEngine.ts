@@ -531,9 +531,14 @@ export function breakConcentration(
   // rider (and any still-armed one-shot smite) tied to this spell.
   const wasWeaponRider = char.weapon_rider?.spellId === char.concentrating_on.spellId;
   const wasPendingSmite = char.pending_smite?.spellId === char.concentrating_on.spellId;
+  // SRD Guidance — dropping concentration loses the unused +1d4 die. (Cleared
+  // on the caster; an ally-targeted die persists until used — a minor
+  // simplification, harmless since it's a one-shot bonus.)
+  const wasGuidance = char.concentrating_on.spellId === 'guidance';
   let newChar: Character = {
     ...char,
     concentrating_on: null,
+    ...(wasGuidance ? { guidance_die: false } : {}),
     ...(wasHuntersMark ? { hunters_mark_target_id: undefined } : {}),
     ...(wasHex ? { hex_target_id: undefined } : {}),
     ...(wasMagicWeapon ? { weapon_enhancement: undefined } : {}),

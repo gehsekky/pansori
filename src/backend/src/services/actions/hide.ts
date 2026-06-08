@@ -1,5 +1,6 @@
 import type { ActionContext, ActionHandler } from './types.js';
 import { abilityMod, d20TestPenalty, skillCheck } from '../rulesEngine.js';
+import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
   canAttemptHide,
   consumeBardicForCheck,
@@ -15,7 +16,6 @@ import {
   hasReliableTalent,
   peerlessSkillDie,
 } from '../multiclass.js';
-import { updatePcActor } from './actor.js';
 
 /**
  * Result of a Hide attempt:
@@ -54,20 +54,26 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
   const luckAdv = consumeLuckForCheck(pc.char);
   const bardicRoll = consumeBardicForCheck(pc.char);
   const peerlessRoll = peerlessSkillDie(pc.char);
-  const check = skillCheck(
-    pc.char.dex,
-    HIDE_DC - bardicRoll - passWithoutTraceBonus,
-    hideProf,
-    pc.char.level,
-    isHeavilyEncumbered(pc.char),
-    hasExpertise(pc.char, 'Stealth'),
-    hasJackOfAllTrades(pc.char),
-    inspAdv || luckAdv,
-    pc.char.species === 'halfling',
-    hasReliableTalent(pc.char),
-    strokeOfLuckAvailable(pc.char),
-    d20TestPenalty(pc.char),
-    peerlessRoll
+  const gDie = consumeGuidanceDie(ctx);
+  const hideDc = HIDE_DC - bardicRoll - passWithoutTraceBonus;
+  const check = applyGuidanceDie(
+    skillCheck(
+      pc.char.dex,
+      hideDc,
+      hideProf,
+      pc.char.level,
+      isHeavilyEncumbered(pc.char),
+      hasExpertise(pc.char, 'Stealth'),
+      hasJackOfAllTrades(pc.char),
+      inspAdv || luckAdv,
+      pc.char.species === 'halfling',
+      hasReliableTalent(pc.char),
+      strokeOfLuckAvailable(pc.char),
+      d20TestPenalty(pc.char),
+      peerlessRoll
+    ),
+    gDie,
+    hideDc
   );
   if (check.strokeOfLuckUsed) updatePcActor(ctx, consumeStrokeOfLuck(pc.char));
   else if (check.peerlessSkillUsed) {

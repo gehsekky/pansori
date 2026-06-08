@@ -1198,6 +1198,12 @@ export interface Character {
   // at combat end. (RAW: the ward ends when the warded creature attacks/casts —
   // that break-on-action is deferred.)
   sanctuary_dc?: number;
+  // SRD Guidance (cantrip) — a one-shot +1d4 on the target's NEXT ability
+  // check. Set by the buff cast path (concentration); consumed at the next
+  // `skillCheck` (via `consumeGuidanceDie`), or cleared if concentration
+  // breaks first. (Simplification: RAW keys the bonus to a chosen skill;
+  // pansori grants it to the next ability check of any kind.)
+  guidance_die?: boolean;
   // SRD one-shot smite (Searing / Shining / Ensnaring Strike) — armed on cast,
   // consumed by the NEXT melee-weapon hit: adds `dice` damage (optional) and an
   // on-hit effect (Faerie-Fire-style advantage, or a saved condition that ends
