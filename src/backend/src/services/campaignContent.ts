@@ -41,7 +41,6 @@ import type {
   RoomExit,
   TerrainCell,
   TerrainType,
-  TierZone,
   Town,
 } from '../types.js';
 import {
@@ -178,23 +177,22 @@ export interface CampaignRegionSite {
 }
 
 // One square of the dense terrain grid: `t` is the terrain type (behavior
-// derives from the shared TERRAIN registry); `tier` / `enc` are rare
-// per-cell overrides of the region-level defaults; `ez` (optional) tags the
-// square into an encounter zone (a single id per cell ⇒ zones never overlap).
+// derives from the shared TERRAIN registry); `ez` (optional) tags the square
+// into an encounter zone (a single id per cell ⇒ zones never overlap).
 export interface CampaignRegionCell {
   t: string;
-  tier?: number;
-  enc?: number;
   ez?: string;
 }
 
 // An intra-region encounter zone as authored/stored (metadata only — the cell
 // geometry lives on the grid via each cell's `ez` tag). Resolved into the engine
-// `EncounterZone` (with materialized `cells`) by dbRegionsToEngine.
+// `EncounterZone` (with materialized `cells`) by dbRegionsToEngine. The sole
+// source of random encounters: tier + chance + table all live here.
 export interface CampaignEncounterZone {
   id: string;
   name: string;
-  encounterChance?: number;
+  tier: number;
+  encounterChance: number;
   encounterTable?: string[];
 }
 
@@ -215,14 +213,9 @@ export interface CampaignRegion {
   // (validated rectangular at the API). Stored as a JSONB column.
   grid: CampaignRegionCell[][];
   startPos: { x: number; y: number };
-  encounterChance?: number;
-  // Wilderness-encounter creature names (composed bestiary). Unknown names
-  // warn-and-skip at overlay; absent/empty = no random encounters here. This is
-  // the FALLBACK pool for squares not painted into an encounter zone.
-  encounterTable?: string[];
   // Painted intra-region encounter zones (metadata; geometry on the grid `ez`).
+  // The ONLY source of random encounters — the region carries no chance/table.
   encounterZones?: CampaignEncounterZone[];
-  baseTier?: number;
   // Transition cells — stored in campaign_region_sites, authored inside
   // the region's JSON. Present only when the region has sites.
   sites?: CampaignRegionSite[];
@@ -241,10 +234,7 @@ interface RegionRow {
   grid: CampaignRegionCell[][];
   start_x: number;
   start_y: number;
-  encounter_chance: number | null;
-  encounter_table: string[];
   encounter_zones: CampaignEncounterZone[];
-  base_tier: number | null;
 }
 
 function rowToRegion(r: RegionRow): CampaignRegion {
@@ -260,16 +250,12 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     feetPerSquare: r.feet_per_square,
     grid: r.grid,
     startPos: { x: r.start_x, y: r.start_y },
-    ...(r.encounter_chance !== null ? { encounterChance: r.encounter_chance } : {}),
-    ...(r.encounter_table.length > 0 ? { encounterTable: r.encounter_table } : {}),
     ...((r.encounter_zones ?? []).length > 0 ? { encounterZones: r.encounter_zones } : {}),
-    ...(r.base_tier !== null ? { baseTier: r.base_tier } : {}),
   };
 }
 
 const REGION_COLUMNS = `id, name, is_starting_region, description, on_enter, feet_per_square,
-       grid, start_x, start_y, encounter_chance, base_tier, on_first_enter, on_exit,
-       on_first_exit, encounter_table, encounter_zones`;
+       grid, start_x, start_y, on_first_enter, on_exit, on_first_exit, encounter_zones`;
 
 interface SiteRow {
   region_id: string;
@@ -377,12 +363,15 @@ export async function putCampaignRegions(
           JSON.stringify(r.grid),
           r.startPos.x,
           r.startPos.y,
-          r.encounterChance ?? null,
-          r.baseTier ?? null,
+          // Region-level encounter chance / table / base_tier are retired —
+          // encounters live entirely in zones. These columns stay (dropping
+          // them would break migration 032's double-apply) but are written inert.
+          null,
+          null,
           r.onFirstEnter ?? null,
           r.onExit ?? null,
           r.onFirstExit ?? null,
-          JSON.stringify(r.encounterTable ?? []),
+          '[]',
           JSON.stringify(r.encounterZones ?? []),
         ]
       );
@@ -1007,34 +996,26 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
   });
 }
 
-// Convert DB regions (dense {t, tier?, enc?} grid + child sites) into the
-// engine's map model (sparse terrain + tierZones rectangles):
+// Convert DB regions (dense {t, ez?} grid + child sites) into the engine's map
+// model:
 //
 //   - grid cells of any non-default type become sparse TerrainCells
 //     (unlisted cells default to 'plains' in the engine — same default)
-//   - per-cell `tier` overrides become 1x1 TierZone rectangles, which
-//     `regionTierAt` already resolves (highest covering zone, else
-//     baseTier) — painted tier bands of any shape Just Work
+//   - cells' `ez` tags materialize each encounter zone's `cells` (the sole
+//     source of random encounters; the region carries no chance/table)
 //   - the starting region sorts FIRST: initMapState opens the campaign at
 //     campaign.regions[0]
-//   - per-cell `enc` has no engine slot yet — encounters only roll where a
-//     region has an encounterTable, which DB regions don't carry until the
-//     entities cross-validation lands. Ignored (documented) for now.
 export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
   const ordered = [...regions].sort(
     (a, b) => Number(b.isStartingRegion) - Number(a.isStartingRegion)
   );
   return ordered.map((r) => {
     const terrain: TerrainCell[] = [];
-    const tierZones: TierZone[] = [];
     // Collect the painted cells of each encounter zone from the grid's `ez` tags.
     const zoneCells = new Map<string, GridPos[]>();
     r.grid.forEach((row, y) =>
       row.forEach((cell, x) => {
         if (cell.t !== 'plains') terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
-        if (cell.tier !== undefined) {
-          tierZones.push({ tier: cell.tier, from: { x, y }, to: { x, y } });
-        }
         if (cell.ez) {
           const list = zoneCells.get(cell.ez);
           if (list) list.push({ x, y });
@@ -1048,7 +1029,8 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
       .map((z) => ({
         id: z.id,
         ...(z.name !== undefined ? { name: z.name } : {}),
-        ...(z.encounterChance !== undefined ? { encounterChance: z.encounterChance } : {}),
+        tier: z.tier,
+        encounterChance: z.encounterChance,
         ...(z.encounterTable && z.encounterTable.length > 0
           ? { encounterTable: z.encounterTable }
           : {}),
@@ -1069,13 +1051,7 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
       ...(terrain.length > 0 ? { terrain } : {}),
       startPos: r.startPos,
       sites: (r.sites ?? []).map((s) => ({ ...s })),
-      ...(r.encounterChance !== undefined ? { encounterChance: r.encounterChance } : {}),
-      ...(r.encounterTable && r.encounterTable.length > 0
-        ? { encounterTable: r.encounterTable }
-        : {}),
       ...(encounterZones.length > 0 ? { encounterZones } : {}),
-      ...(r.baseTier !== undefined ? { baseTier: r.baseTier } : {}),
-      ...(tierZones.length > 0 ? { tierZones } : {}),
     };
   });
 }
@@ -1347,25 +1323,17 @@ function filterEncounterTables(
       return false;
     });
   return regions.map((r) => {
-    let next = r;
-    // Region-level fallback table.
-    if (r.encounterTable && r.encounterTable.length > 0) {
-      const kept = filterNames(r.encounterTable, r.id);
-      if (kept.length !== r.encounterTable.length) next = { ...next, encounterTable: kept };
-    }
-    // Each painted zone's own table.
-    if (r.encounterZones && r.encounterZones.length > 0) {
-      let zonesChanged = false;
-      const zones = r.encounterZones.map((z) => {
-        if (!z.encounterTable || z.encounterTable.length === 0) return z;
-        const kept = filterNames(z.encounterTable, `${r.id}/zone:${z.id}`);
-        if (kept.length === z.encounterTable.length) return z;
-        zonesChanged = true;
-        return { ...z, encounterTable: kept };
-      });
-      if (zonesChanged) next = { ...next, encounterZones: zones };
-    }
-    return next;
+    // Each painted zone's creature table (the only encounter source).
+    if (!r.encounterZones || r.encounterZones.length === 0) return r;
+    let zonesChanged = false;
+    const zones = r.encounterZones.map((z) => {
+      if (!z.encounterTable || z.encounterTable.length === 0) return z;
+      const kept = filterNames(z.encounterTable, `${r.id}/zone:${z.id}`);
+      if (kept.length === z.encounterTable.length) return z;
+      zonesChanged = true;
+      return { ...z, encounterTable: kept };
+    });
+    return zonesChanged ? { ...r, encounterZones: zones } : r;
   });
 }
 

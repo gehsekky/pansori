@@ -2125,45 +2125,25 @@ export interface Region extends LevelNarrationHooks {
   difficultTerrain?: GridPos[]; // (legacy) 2× travel cost — superseded by `terrain`
   startPos: GridPos; // where the party marker begins
   sites: MapSite[];
-  // Random travel encounters: per square crossed, an `encounterChance` roll can
-  // drop the party into a local encounter map drawn from `encounterTable`. This
-  // region-level table/chance is the FALLBACK for squares not in an encounter zone.
-  encounterTable?: string[];
-  encounterChance?: number; // 0–1 per square moved
-  // Painted intra-region encounter zones (non-overlapping). A square inside a
-  // zone rolls from that zone's table/chance instead of the region-level ones;
-  // squares outside every zone fall back to `encounterTable`/`encounterChance`.
-  // Each square belongs to at most one zone (the dense grid carries a single
-  // `ez` tag per cell — see CampaignRegionCell). `cells` is materialized from
-  // those tags by dbRegionsToEngine.
+  // Random travel encounters live ENTIRELY in encounter zones — the region
+  // itself carries no encounter chance or table. A square rolls an encounter
+  // only if it's painted into a zone whose creature list is non-empty; squares
+  // outside every zone never roll. Zones never overlap (one `ez` tag per grid
+  // cell — see CampaignRegionCell); `cells` is materialized from those tags by
+  // dbRegionsToEngine.
   encounterZones?: EncounterZone[];
-  // SRD Tiers of Play (loosely) — the encounter-difficulty band of each overland
-  // square, so future PROCEDURAL wilderness encounters can scale creatures to the
-  // party level expected in that area. tier 1 ≈ levels 1–4, 2 ≈ 5–7, 3 ≈ 8–10
-  // (this campaign tops out near level 10). A square resolves via `regionTierAt`:
-  // the highest `tierZones` rectangle covering it, else `baseTier`. Carries no
-  // mechanics yet — pure data the encounter generator will read later.
-  baseTier?: number; // default tier for squares outside any tierZone (default 1)
-  tierZones?: TierZone[];
-}
-
-// A rectangular band of overland squares sharing an encounter tier (inclusive
-// corners; order-independent). See `Region.tierZones` / `regionTierAt`.
-export interface TierZone {
-  tier: number;
-  from: GridPos;
-  to: GridPos;
 }
 
 // A painted intra-region encounter zone — an arbitrary set of squares (`cells`)
-// that share their own wilderness encounter pool. `encounterTable`/
-// `encounterChance` fall back to the region-level values when unset. Zones never
-// overlap (one `ez` tag per grid cell). See `Region.encounterZones`.
+// that share a self-contained wilderness encounter pool: a difficulty `tier`
+// (which scopes CR-appropriate creatures), a per-square roll `encounterChance`,
+// and the `encounterTable` creatures. The sole source of random encounters.
 export interface EncounterZone {
   id: string;
   name?: string;
-  encounterChance?: number; // 0–1; falls back to the region's chance
-  encounterTable?: string[]; // creature names; falls back to the region's table
+  tier: number; // 1–4 (SRD tiers of play) — gates which CRs the table may hold
+  encounterChance: number; // 0–1 per square crossed
+  encounterTable?: string[]; // creature names; empty / absent ⇒ the zone never rolls
   cells: GridPos[]; // squares painted into this zone (materialized from grid `ez`)
 }
 

@@ -23,7 +23,7 @@ const REGION = {
   feetPerSquare: 5280,
   grid: [
     [{ t: 'plains' }, { t: 'plains' }, { t: 'road' }],
-    [{ t: 'plains' }, { t: 'forest', tier: 2 }, { t: 'road' }],
+    [{ t: 'plains' }, { t: 'forest' }, { t: 'road' }],
   ],
   startPos: { x: 0, y: 0 },
   sites: [{ id: 'pit', name: 'The Pit', pos: { x: 2, y: 1 }, kind: 'local', entryRoomId: 'pit' }],
@@ -52,8 +52,9 @@ beforeEach(() => {
   );
   mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'regions', source: 'db' });
   mocked.getMonsterCatalog.mockResolvedValue([
-    { id: 'goblin', definition: { name: 'Goblin', cr: 0.25 } },
-    { id: 'wolf', definition: { name: 'Wolf', cr: 0.25 } },
+    { id: 'goblin', definition: { name: 'Goblin', cr: 0.25 } }, // Tier 1
+    { id: 'wolf', definition: { name: 'Wolf', cr: 0.25 } }, // Tier 1
+    { id: 'troll', definition: { name: 'Troll', cr: 7 } }, // Tier 2
   ]);
   mocked.getItemCatalog.mockResolvedValue([
     { id: 'dagger', name: 'Dagger' },
@@ -75,8 +76,6 @@ describe('RegionEditorScreen', () => {
     // Start marker + site marker land on the right cells.
     expect(screen.getByTestId('cell-0-0').getAttribute('aria-label')).toContain('(start)');
     expect(screen.getByTestId('cell-2-1').getAttribute('aria-label')).toContain('site: The Pit');
-    // Tier override shows in the label.
-    expect(screen.getByTestId('cell-1-1').getAttribute('aria-label')).toContain('tier 2');
   });
 
   it('paints terrain and saves the whole regions list with the edit', async () => {
@@ -117,28 +116,23 @@ describe('RegionEditorScreen', () => {
     expect(screen.getByTestId('cell-0-1').getAttribute('aria-label')).toContain('plains');
   });
 
-  it('tier tool paints and clears per-cell overrides', async () => {
-    renderEditor();
-    await screen.findByTestId('cell-0-0');
-    fireEvent.click(screen.getByRole('button', { name: 'TIER' }));
-    fireEvent.click(screen.getByRole('button', { name: 'TIER 3' }));
-    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
-    expect(screen.getByTestId('cell-0-0').getAttribute('aria-label')).toContain('tier 3');
-    fireEvent.click(screen.getByRole('button', { name: 'CLEAR' }));
-    fireEvent.mouseDown(screen.getByTestId('cell-1-1')); // had tier 2
-    expect(screen.getByTestId('cell-1-1').getAttribute('aria-label')).not.toContain('tier');
-  });
-
-  it('zone tool paints cells, reassigns on overlap, and saves encounterZones', async () => {
+  it('zone tool paints cells, reassigns on overlap, and saves tier/chance/table', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
     fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
-    // Create the first zone (auto-selected) and paint (0,0).
+    // Create the first zone (auto-selected, defaults Tier 1) and paint (0,0).
     fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
     fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
     expect(screen.getByTestId('cell-0-0').getAttribute('data-zone')).toBe('zone-1');
-    // Give the zone a creature from the pool.
-    fireEvent.change(screen.getByLabelText('Add zone creature'), { target: { value: 'Wolf' } });
+    // The picker is filtered to the zone's tier — a Tier-1 zone offers the CR≤4
+    // creatures (Goblin, Wolf) but NOT the CR-7 Troll.
+    const picker = screen.getByLabelText('Add zone creature') as HTMLSelectElement;
+    const options = Array.from(picker.options)
+      .map((o) => o.value)
+      .filter(Boolean);
+    expect(options).toContain('Wolf');
+    expect(options).not.toContain('Troll');
+    fireEvent.change(picker, { target: { value: 'Wolf' } });
     // Create a SECOND zone and repaint the SAME cell — non-overlap reassigns it.
     fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
     fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
@@ -148,9 +142,14 @@ describe('RegionEditorScreen', () => {
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const [, , value] = mocked.putCampaignSection.mock.calls[0];
     const saved = (value as Array<Record<string, unknown>>)[0];
-    const zones = saved.encounterZones as Array<{ id: string; encounterTable?: string[] }>;
+    const zones = saved.encounterZones as Array<{
+      id: string;
+      tier: number;
+      encounterChance: number;
+      encounterTable?: string[];
+    }>;
     expect(zones.map((z) => z.id)).toEqual(['zone-1', 'zone-2']);
-    expect(zones[0].encounterTable).toEqual(['Wolf']);
+    expect(zones[0]).toMatchObject({ tier: 1, encounterChance: 0.1, encounterTable: ['Wolf'] });
     // The painted cell carries the (reassigned) zone id; no cell holds two zones.
     const grid = saved.grid as Array<Array<{ ez?: string }>>;
     expect(grid[0][0].ez).toBe('zone-2');
@@ -187,7 +186,7 @@ describe('RegionEditorScreen', () => {
     expect(await screen.findByText(/No region "proving-grounds"/)).toBeTruthy();
   });
 
-  it('details form edits name/desc/scale/tiering and saves them with the map', async () => {
+  it('details form edits name/desc/scale and saves them with the map', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
     // Pre-filled from the loaded region.
@@ -196,10 +195,6 @@ describe('RegionEditorScreen', () => {
 
     fireEvent.change(screen.getByLabelText('NAME'), { target: { value: 'The Crucible' } });
     fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: 'Iron and ash.' } });
-    fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), {
-      target: { value: '0.25' },
-    });
-    fireEvent.change(screen.getByLabelText('BASE TIER'), { target: { value: '2' } });
     expect(screen.getByText(/UNSAVED/)).toBeTruthy();
 
     fireEvent.click(screen.getByText('SAVE'));
@@ -207,8 +202,6 @@ describe('RegionEditorScreen', () => {
     const list = mocked.putCampaignSection.mock.calls[0][2] as (typeof REGION)[];
     expect(list[0].name).toBe('The Crucible');
     expect((list[0] as { desc?: string }).desc).toBe('Iron and ash.');
-    expect((list[0] as { encounterChance?: number }).encounterChance).toBe(0.25);
-    expect((list[0] as { baseTier?: number }).baseTier).toBe(2);
     // Untouched fields survive the merge.
     expect(list[0].isStartingRegion).toBe(true);
     expect(list[0].sites).toEqual(REGION.sites);
@@ -240,33 +233,17 @@ describe('RegionEditorScreen', () => {
     mocked.getCampaignSection.mockResolvedValue({
       section: 'regions',
       source: 'db',
-      value: [
-        { ...REGION, desc: 'old', onEnter: 'old hook', encounterChance: 0.5, baseTier: 3 },
-        OTHER,
-      ],
+      value: [{ ...REGION, desc: 'old', onEnter: 'old hook' }, OTHER],
     });
     renderEditor();
     await screen.findByTestId('cell-0-0');
     fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('ON ENTER'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText('BASE TIER'), { target: { value: '' } });
     fireEvent.click(screen.getByText('SAVE'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
     expect('desc' in saved[0]).toBe(false);
     expect('onEnter' in saved[0]).toBe(false);
-    expect('encounterChance' in saved[0]).toBe(false);
-    expect('baseTier' in saved[0]).toBe(false);
-  });
-
-  it('rejects an out-of-range encounter chance client-side', async () => {
-    renderEditor();
-    await screen.findByTestId('cell-0-0');
-    fireEvent.change(screen.getByLabelText('ENCOUNTER CHANCE (0–1)'), { target: { value: '2' } });
-    fireEvent.click(screen.getByText('SAVE'));
-    expect(await screen.findByText(/ENCOUNTER CHANCE must be between 0 and 1/)).toBeTruthy();
-    expect(mocked.putCampaignSection).not.toHaveBeenCalled();
   });
 
   it('MAKE STARTING REGION claims the flag and releases it from the others', async () => {
@@ -319,23 +296,6 @@ describe('RegionEditorScreen', () => {
     // Flipping to town pruned the local target; empty optionals pruned too.
     expect('entryRoomId' in added).toBe(false);
     expect('icon' in added).toBe(false);
-  });
-
-  it('ENCOUNTER TABLE: chips add/remove from the bestiary picker; save folds the list', async () => {
-    renderEditor();
-    await screen.findByTestId('cell-0-0');
-    // The picker carries the mocked catalog names.
-    const add = screen.getByLabelText('Add encounter creature') as HTMLSelectElement;
-    expect([...add.options].map((o) => o.value)).toEqual(['', 'Goblin', 'Wolf']);
-    fireEvent.change(add, { target: { value: 'Wolf' } });
-    fireEvent.change(add, { target: { value: 'Goblin' } });
-    expect(screen.getByText('Wolf ✕')).toBeTruthy();
-    // Removing a chip drops it from the save.
-    fireEvent.click(screen.getByText('Goblin ✕'));
-    fireEvent.click(screen.getByText('SAVE'));
-    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
-    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
-    expect(saved[0].encounterTable).toEqual(['Wolf']);
   });
 
   it('REGION GATE sites: kind option, TO REGION picker, save folds regionId', async () => {
@@ -659,7 +619,13 @@ describe('RegionEditorScreen', () => {
       fireEvent.click(screen.getByTestId('add-enemy-btn'));
       // The picker offers the campaign custom first, then the catalog.
       const picker = screen.getByLabelText('Enemy 1') as HTMLSelectElement;
-      expect([...picker.options].map((o) => o.value)).toEqual(['', 'Pit Horror', 'Goblin', 'Wolf']);
+      expect([...picker.options].map((o) => o.value)).toEqual([
+        '',
+        'Pit Horror',
+        'Goblin',
+        'Wolf',
+        'Troll',
+      ]);
       // The new row defaults to the first bestiary name.
       expect(picker.value).toBe('Pit Horror');
       fireEvent.change(picker, { target: { value: 'Goblin' } });
@@ -1132,8 +1098,6 @@ describe('RegionEditorScreen', () => {
     );
     await screen.findByTestId('cell-0-0');
     expect((screen.getByLabelText('FLOOR') as HTMLSelectElement).value).toBe('dirt');
-    expect(screen.queryByLabelText('ENCOUNTER CHANCE (0–1)')).toBeNull();
-    expect(screen.queryByLabelText('BASE TIER')).toBeNull();
     expect(screen.queryByLabelText(/ON ENTER NARRATION/)).toBeNull();
     expect(screen.queryByTestId('make-starter-btn')).toBeNull();
     fireEvent.change(screen.getByLabelText('FLOOR'), { target: { value: 'cobblestone' } });

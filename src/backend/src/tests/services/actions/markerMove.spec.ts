@@ -37,8 +37,16 @@ const campaign: CampaignData = {
       gridHeight: 12,
       startPos: { x: 0, y: 0 },
       sites: [],
-      encounterTable: ['Bandit Ruffian'],
-      encounterChance: 1, // always triggers
+      // A full-grid Tier-1 zone that always triggers (encounters are zones-only).
+      encounterZones: [
+        {
+          id: 'wilds',
+          tier: 1,
+          encounterChance: 1,
+          encounterTable: ['Bandit Ruffian'],
+          cells: Array.from({ length: 12 * 12 }, (_, i) => ({ x: i % 12, y: Math.floor(i / 12) })),
+        },
+      ],
     },
   ],
 };

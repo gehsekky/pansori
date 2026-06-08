@@ -31,7 +31,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
 import type { Context } from '../../types.js';
 import type { Pool } from 'pg';
-import { regionTierAt } from '../../services/mapEngine.js';
 import { context as shippedCtx } from '../fixtures/testContext.js';
 
 function codeCtx(partial: Partial<Context> & { id: string }): Context {
@@ -287,8 +286,6 @@ const REGION_A: CampaignRegion = {
   feetPerSquare: 5280,
   grid: G(12, 10),
   startPos: { x: 3, y: 4 },
-  encounterChance: 0.15,
-  baseTier: 1,
 };
 
 const REGION_B: CampaignRegion = {
@@ -526,8 +523,9 @@ describe('editable sections registry', () => {
       region({
         desc: 'A mist-shrouded vale.',
         onEnter: 'The mists part as you crest the ridge.',
-        encounterChance: 0.15,
-        baseTier: 1,
+        encounterZones: [
+          { id: 'wilds', name: 'Wilds', tier: 1, encounterChance: 0.15, encounterTable: ['Wolf'] },
+        ],
       }),
       region({ id: 'frost-reach', name: 'The Frost Reach', isStartingRegion: false }),
     ]);
@@ -1144,10 +1142,15 @@ describe('editable sections registry', () => {
     ];
     const ok = regions.safeParse(pair(gate({ entryPos: { x: 1, y: 1 } })));
     expect(ok.success, JSON.stringify(ok.error?.issues)).toBe(true);
-    // The wilderness encounter table: a list of creature names (composed-
+    // An encounter zone's creature table: a list of creature names (composed-
     // bestiary cross-check is overlay-time warn-skip, not schema).
-    expect(regions.safeParse([region({ encounterTable: ['Wolf', 'Goblin'] })]).success).toBe(true);
-    expect(regions.safeParse([region({ encounterTable: [''] })]).success).toBe(false);
+    const zoneWith = (encounterTable: string[]) => [
+      { id: 'wilds', name: 'Wilds', tier: 1, encounterChance: 0.1, encounterTable },
+    ];
+    expect(
+      regions.safeParse([region({ encounterZones: zoneWith(['Wolf', 'Goblin']) })]).success
+    ).toBe(true);
+    expect(regions.safeParse([region({ encounterZones: zoneWith(['']) })]).success).toBe(false);
     // A gate needs a target…
     expect(regions.safeParse(pair(gate({ regionId: undefined }))).success).toBe(false);
     // …that exists in the payload…
@@ -1191,18 +1194,21 @@ describe('editable sections registry', () => {
         region({ grid: [[{ t: 'road', slippery: true }]], startPos: { x: 0, y: 0 } }),
       ]).success
     ).toBe(false);
+    // The retired per-cell `tier` / `enc` keys are now unknown ⇒ rejected.
     expect(
-      regions.safeParse([region({ grid: [[{ t: 'road', tier: 9 }]], startPos: { x: 0, y: 0 } })])
+      regions.safeParse([region({ grid: [[{ t: 'road', tier: 2 }]], startPos: { x: 0, y: 0 } })])
         .success
     ).toBe(false);
-    expect(
-      regions.safeParse([region({ grid: [[{ t: 'road', enc: 1.5 }]], startPos: { x: 0, y: 0 } })])
-        .success
-    ).toBe(false);
-    // Valid per-cell overrides pass.
+    // A cell `ez` tag referencing a declared encounter zone is valid.
     expect(
       regions.safeParse([
-        region({ grid: [[{ t: 'forest', tier: 2, enc: 0.4 }]], startPos: { x: 0, y: 0 } }),
+        region({
+          grid: [[{ t: 'forest', ez: 'wilds' }]],
+          startPos: { x: 0, y: 0 },
+          encounterZones: [
+            { id: 'wilds', name: 'Wilds', tier: 1, encounterChance: 0.1, encounterTable: ['Wolf'] },
+          ],
+        }),
       ]).success
     ).toBe(true);
   });
@@ -1254,8 +1260,10 @@ describe('editable sections registry', () => {
     expect(regions.safeParse([region(), region({ id: 'b' })]).success).toBe(false);
     expect(regions.safeParse([]).success).toBe(false);
     expect(regions.safeParse([region({ biome: 'swamp' })]).success).toBe(false);
-    expect(regions.safeParse([region({ encounterChance: 1.5 })]).success).toBe(false);
-    expect(regions.safeParse([region({ baseTier: 9 })]).success).toBe(false);
+    // Region-level encounter fields were retired (encounters live in zones) — now
+    // unknown keys, so they're rejected.
+    expect(regions.safeParse([region({ encounterChance: 0.5 })]).success).toBe(false);
+    expect(regions.safeParse([region({ baseTier: 1 })]).success).toBe(false);
   });
 
   // A minimal valid town — tests tweak single fields off this base.
@@ -1888,7 +1896,7 @@ describe('section CRUD + live refresh', () => {
     expect(smuggler?.responses).toEqual([gated, oneShot]);
   });
 
-  it('region encounter tables warn-skip unknown creatures on refresh', async () => {
+  it('zone encounter tables warn-skip unknown creatures on refresh', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     const code = codeCtx({
       id: 'malgovia',
@@ -1897,12 +1905,28 @@ describe('section CRUD + live refresh', () => {
     });
     const contexts: Record<string, Context> = { malgovia: code };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const grid = G(12, 10);
+    grid[0][0] = { t: 'plains', ez: 'wilds' };
     await putCampaignSection(db.pool, 'malgovia', 'regions', [
-      { ...REGION_A, encounterTable: ['Wolf', 'Vanished Horror'] },
+      {
+        ...REGION_A,
+        grid,
+        encounterZones: [
+          {
+            id: 'wilds',
+            name: 'Wilds',
+            tier: 1,
+            encounterChance: 0.1,
+            encounterTable: ['Wolf', 'Vanished Horror'],
+          },
+        ],
+      },
     ]);
     await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
     // The known creature survives; the unknown one is dropped with a warning.
-    expect(contexts.malgovia.campaign?.regions?.[0].encounterTable).toEqual(['Wolf']);
+    expect(contexts.malgovia.campaign?.regions?.[0].encounterZones?.[0].encounterTable).toEqual([
+      'Wolf',
+    ]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Vanished Horror'));
     warn.mockRestore();
   });
@@ -2052,7 +2076,6 @@ describe('section CRUD + live refresh', () => {
     const withSites: CampaignRegion = {
       ...REGION_A,
       onEnter: 'The mists part as you crest the ridge.',
-      encounterTable: ['Wolf', 'Goblin'],
       sites: [
         { id: 'oakvale', name: 'Oakvale', pos: { x: 1, y: 1 }, kind: 'town', townId: 'oakvale' },
         {
@@ -2132,13 +2155,26 @@ describe('dbRegionsToEngine', () => {
     expect(dbRegionsToEngine([REGION_A])[0].terrain).toBeUndefined();
   });
 
-  it('per-cell tiers become 1x1 tierZones that regionTierAt resolves', () => {
+  it('materializes encounter-zone cells from grid `ez` tags (and drops empty zones)', () => {
     const grid = G(3, 2);
-    grid[1][1] = { t: 'hills', tier: 3 };
-    const [region] = dbRegionsToEngine([{ ...REGION_A, grid, baseTier: 1 }]);
-    expect(region.tierZones).toEqual([{ tier: 3, from: { x: 1, y: 1 }, to: { x: 1, y: 1 } }]);
-    expect(regionTierAt(region, { x: 1, y: 1 })).toBe(3);
-    expect(regionTierAt(region, { x: 0, y: 0 })).toBe(1); // baseTier elsewhere
+    grid[0][1] = { t: 'plains', ez: 'wilds' };
+    grid[1][2] = { t: 'plains', ez: 'wilds' };
+    const [region] = dbRegionsToEngine([
+      {
+        ...REGION_A,
+        grid,
+        encounterZones: [
+          { id: 'wilds', name: 'Wilds', tier: 2, encounterChance: 0.2, encounterTable: ['Wolf'] },
+          { id: 'empty', name: 'Empty', tier: 1, encounterChance: 0.1, encounterTable: ['Goblin'] },
+        ],
+      },
+    ]);
+    expect(region.encounterZones).toHaveLength(1); // "empty" dropped (no painted cells)
+    expect(region.encounterZones![0]).toMatchObject({ id: 'wilds', tier: 2, encounterChance: 0.2 });
+    expect(region.encounterZones![0].cells).toEqual([
+      { x: 1, y: 0 },
+      { x: 2, y: 1 },
+    ]);
   });
 
   it('puts the starting region first (initMapState opens at regions[0])', () => {
@@ -2165,8 +2201,6 @@ describe('dbRegionsToEngine', () => {
     const [region] = dbRegionsToEngine([withSites]);
     expect(region.sites).toEqual(withSites.sites);
     expect(region.feetPerSquare).toBe(5280);
-    expect(region.encounterChance).toBe(0.15);
-    expect(region.baseTier).toBe(1);
     expect(region.desc).toBe('A mist-shrouded vale.');
     expect(region.onEnter).toBe('The mists part.');
   });
@@ -2186,14 +2220,6 @@ describe('dbTownsToEngine', () => {
     ]);
     // An all-plains grid carries no terrain key at all.
     expect(dbTownsToEngine([TOWN_A])[0].terrain).toBeUndefined();
-  });
-
-  it('drops per-cell tier/enc — meaningless at town scale', () => {
-    const grid = G(10, 8);
-    grid[1][1] = { t: 'road', tier: 3, enc: 0.5 };
-    const [town] = dbTownsToEngine([{ ...TOWN_A, grid }]);
-    expect(town.terrain).toEqual([{ pos: { x: 1, y: 1 }, type: 'road' }]);
-    expect('tierZones' in town).toBe(false);
   });
 
   it('passes venues, floor, and scalars through; venueless towns get []', () => {

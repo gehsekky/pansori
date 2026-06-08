@@ -57,17 +57,12 @@ import { pool } from '../src/db/pool.js';
 function denseRegionGrid(
   width: number,
   height: number,
-  terrain: TerrainCell[] | undefined,
-  tierZones: { tier: number; from: GridPos; to: GridPos }[] | undefined
+  terrain: TerrainCell[] | undefined
 ): CampaignRegionCell[][] {
   const grid: CampaignRegionCell[][] = Array.from({ length: height }, () =>
     Array.from({ length: width }, () => ({ t: 'plains' }) as CampaignRegionCell)
   );
   for (const c of terrain ?? []) grid[c.pos.y][c.pos.x] = { ...grid[c.pos.y][c.pos.x], t: c.type };
-  for (const z of tierZones ?? []) {
-    for (let y = z.from.y; y <= z.to.y; y++)
-      for (let x = z.from.x; x <= z.to.x; x++) grid[y][x] = { ...grid[y][x], tier: z.tier };
-  }
   return grid;
 }
 
@@ -82,13 +77,9 @@ function regionToDb(r: Region): CampaignRegion {
     ...(r.onExit !== undefined ? { onExit: r.onExit } : {}),
     ...(r.onFirstExit !== undefined ? { onFirstExit: r.onFirstExit } : {}),
     feetPerSquare: r.feetPerSquare,
-    grid: denseRegionGrid(r.gridWidth ?? 0, r.gridHeight ?? 0, r.terrain, r.tierZones),
+    grid: denseRegionGrid(r.gridWidth ?? 0, r.gridHeight ?? 0, r.terrain),
     startPos: r.startPos,
-    ...(r.encounterChance !== undefined ? { encounterChance: r.encounterChance } : {}),
-    ...(r.encounterTable && r.encounterTable.length > 0
-      ? { encounterTable: r.encounterTable }
-      : {}),
-    ...(r.baseTier !== undefined ? { baseTier: r.baseTier } : {}),
+    // (Code campaigns predate encounter zones — none to serialize.)
     ...(r.sites && r.sites.length > 0 ? { sites: r.sites.map((s) => ({ ...s })) } : {}),
   };
 }
@@ -407,7 +398,9 @@ async function serialize(
   for (const list of Object.values(c.enemies ?? {}))
     for (const e of list) if (!firstInstance.has(e.name)) firstInstance.set(e.name, e);
   const referencedNames = new Set<string>(firstInstance.keys());
-  for (const r of c.regions ?? []) for (const n of r.encounterTable ?? []) referencedNames.add(n);
+  for (const r of c.regions ?? [])
+    for (const z of r.encounterZones ?? [])
+      for (const n of z.encounterTable ?? []) referencedNames.add(n);
 
   const templatesByName = new Map<string, EnemyTemplate>();
   for (const t of code.enemyTemplates ?? []) templatesByName.set(t.name, t);
@@ -555,44 +548,8 @@ function normRegions(regions: unknown): unknown {
       terrain: byPos(o.terrain),
       obstacles: byPos(o.obstacles),
       difficultTerrain: byPos(o.difficultTerrain),
-      // Compare the EFFECTIVE per-cell tier map, not the zone list: the
-      // serializer round-trip rebuilds compact rectangles as one zone per cell
-      // (e.g. 2 → 60), but `regionTierAt` reads the same value everywhere.
-      tierZones: undefined,
-      baseTier: undefined,
-      tierGrid: tierGrid(o),
     };
   });
-}
-
-// Materialize a region's per-cell tier grid from baseTier + the (rectangular)
-// tierZones (highest covering zone wins; default tier 1) — the canonical form
-// `regionTierAt` resolves, independent of how the zones are grouped.
-function tierGrid(r: Record<string, unknown>): number[][] | undefined {
-  const W = r.gridWidth as number | undefined;
-  const H = r.gridHeight as number | undefined;
-  if (!W || !H) return undefined;
-  const base = (r.baseTier as number | undefined) ?? 1;
-  const zones = (r.tierZones as { tier: number; from: GridPos; to: GridPos }[] | undefined) ?? [];
-  const grid: number[][] = [];
-  for (let y = 0; y < H; y++) {
-    const row: number[] = [];
-    for (let x = 0; x < W; x++) {
-      let t = base;
-      for (const z of zones) {
-        if (
-          x >= Math.min(z.from.x, z.to.x) &&
-          x <= Math.max(z.from.x, z.to.x) &&
-          y >= Math.min(z.from.y, z.to.y) &&
-          y <= Math.max(z.from.y, z.to.y)
-        )
-          t = Math.max(t, z.tier);
-      }
-      row.push(t);
-    }
-    grid.push(row);
-  }
-  return grid;
 }
 
 // Strip per-placement flavor (desc) and aliases from placed loot items — the

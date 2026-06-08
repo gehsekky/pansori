@@ -275,8 +275,6 @@ const SLUG = z
 const TerrainCellSchema = z
   .object({
     t: z.enum(Object.keys(TERRAIN) as [string, ...string[]]),
-    tier: z.number().int().min(1).max(4).optional(),
-    enc: z.number().min(0).max(1).optional(),
     // Encounter-zone tag: the id of the encounter zone this square belongs to
     // (one per cell ⇒ zones never overlap). Validated against the region's
     // `encounterZones` ids in the region superRefine below.
@@ -342,30 +340,24 @@ const RegionsSchema = z
         grid: RegionGridSchema,
         // Where the party marker begins on this region's grid.
         startPos: GridPosSchema,
-        // Random-encounter roll per square crossed (0–1).
-        encounterChance: z.number().min(0).max(1).optional(),
-        // The creatures those rolls materialize — composed-bestiary names
-        // (unknown names warn-and-skip at overlay time). This is the FALLBACK
-        // pool for squares not painted into an encounter zone.
-        encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
-        // Painted intra-region encounter zones (metadata only — the geometry is
-        // the grid cells' `ez` tags). A zone's table/chance override the
-        // region-level ones for its squares.
+        // Painted intra-region encounter zones — the SOLE source of random
+        // encounters (the region carries no chance/table). Each zone is fully
+        // self-contained: a difficulty tier, a per-square roll chance, and the
+        // creature table. Geometry is the grid cells' `ez` tags.
         encounterZones: z
           .array(
             z
               .object({
                 id: SLUG,
                 name: z.string().min(1).max(80),
-                encounterChance: z.number().min(0).max(1).optional(),
+                tier: z.number().int().min(1).max(4),
+                encounterChance: z.number().min(0).max(1),
                 encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
               })
               .strict()
           )
           .max(32)
           .optional(),
-        // SRD tiers of play (1 ≈ L1–4, 2 ≈ L5–7, 3 ≈ L8–10).
-        baseTier: z.number().int().min(1).max(4).optional(),
         // Transition cells. Omitted = a region with no sites (yet).
         sites: z.array(RegionSiteSchema).max(100).optional(),
       })

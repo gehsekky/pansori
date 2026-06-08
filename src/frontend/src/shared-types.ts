@@ -233,6 +233,25 @@ export const TERRAIN: Record<TerrainType, TerrainSpec> = {
   town_wall: { passable: false, travelMult: 1, encounterMult: 0, label: 'town wall' },
 };
 
+// ─── Encounter tiers (SRD tiers of play) ──────────────────────────────────
+// Each encounter zone carries a tier (1–4); a zone may only spawn creatures
+// whose Challenge Rating falls in its band. Tier ≈ the party level the area is
+// built for (T1 ≈ L1–4, T2 ≈ L5–10, T3 ≈ L11–16, T4 ≈ L17–20), expressed as a CR
+// range so the zone's creature picker can filter the bestiary. Bounds inclusive.
+export const TIER_CR_BANDS: Record<number, [number, number]> = {
+  1: [0, 4],
+  2: [5, 10],
+  3: [11, 16],
+  4: [17, Infinity],
+};
+
+// Whether a creature of the given CR belongs in a zone of the given tier.
+export function crInTier(cr: number, tier: number): boolean {
+  const band = TIER_CR_BANDS[tier];
+  if (!band) return false;
+  return cr >= band[0] && cr <= band[1];
+}
+
 // ─── Campaign THEME (the DB-editable visual identity) ─────────────────
 //
 // A PARTIAL set of the FE theme knobs (CSS custom properties + the donor

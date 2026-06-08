@@ -214,22 +214,6 @@ export function regionById(campaign: CampaignData | undefined, id?: string): Reg
   return campaign?.regions?.find((r) => r.id === id);
 }
 
-/**
- * The encounter-difficulty tier of an overland square (SRD Tiers of Play,
- * loosely): the highest tier among the region's `tierZones` rectangles covering
- * `pos`, else the region's `baseTier` (default 1). Forward-looking data for
- * procedural wilderness encounters — it lets the generator pick creatures scaled
- * to the party level expected in that part of the map. No mechanics today.
- */
-export function regionTierAt(region: Region, pos: GridPos): number {
-  let tier = region.baseTier ?? 1;
-  for (const z of region.tierZones ?? []) {
-    const inX = pos.x >= Math.min(z.from.x, z.to.x) && pos.x <= Math.max(z.from.x, z.to.x);
-    const inY = pos.y >= Math.min(z.from.y, z.to.y) && pos.y <= Math.max(z.from.y, z.to.y);
-    if (inX && inY) tier = Math.max(tier, z.tier);
-  }
-  return tier;
-}
 export function townById(campaign: CampaignData | undefined, id?: string): Town | undefined {
   return campaign?.towns?.find((t) => t.id === id);
 }
@@ -432,13 +416,11 @@ export function resolveMarkerMove(
     const milesPerSquare = grid.feetPerSquare / FEET_PER_MILE;
     const pace: TravelPace = st.travel_pace ?? 'normal';
     const mph = PACE_MILES_PER_HOUR[pace];
-    // Region-level chance/table are the FALLBACK for squares not in a painted
-    // encounter zone; a zone overrides either per square (see encounterZoneAt).
-    const regionChance = region?.encounterChance ?? 0;
-    const regionTable = region?.encounterTable ?? [];
-    const hasRegionPool = regionChance > 0 && regionTable.length > 0;
+    // Random encounters come ONLY from painted encounter zones — a square not in
+    // a zone (or in a zone with an empty creature list) never rolls. The region
+    // itself has no chance/table.
     const hasZonePool = (region?.encounterZones ?? []).some(
-      (z) => (z.encounterChance ?? regionChance) > 0 && (z.encounterTable ?? regionTable).length > 0
+      (z) => z.encounterChance > 0 && (z.encounterTable ?? []).length > 0
     );
     // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
     // production) suppresses random wilderness encounters so a scripted journey
@@ -446,7 +428,7 @@ export function resolveMarkerMove(
     // ambush. Unit tests (vitest, no such env) still roll encounters.
     const encountersDisabled =
       process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true';
-    const rollEncounters = !encountersDisabled && (hasRegionPool || hasZonePool);
+    const rollEncounters = !encountersDisabled && hasZonePool;
     const fatigueNotes: string[] = [];
     const crossed: GridPos[] = [from];
     let stopCell: GridPos = to;
@@ -481,15 +463,15 @@ export function resolveMarkerMove(
         elapsedMin += cellMin;
         crossed.push(cell);
       }
-      // This square's random encounter — uses the painted zone's pool if the
-      // square is in one, else the region-level fallback. Fires combat right here.
+      // This square's random encounter — only if the square is painted into a
+      // zone with a non-empty creature list. Fires combat right here.
       const zone = encounterZoneAt(region, cell);
-      const cellChance = zone?.encounterChance ?? regionChance;
-      const cellTable = zone?.encounterTable ?? regionTable;
+      const cellTable = zone?.encounterTable ?? [];
       if (
         rollEncounters &&
+        zone &&
         cellTable.length > 0 &&
-        Math.random() < cellChance * spec.encounterMult
+        Math.random() < zone.encounterChance * spec.encounterMult
       ) {
         encounter = cellTable[Math.floor(Math.random() * cellTable.length)];
         stopCell = cell;

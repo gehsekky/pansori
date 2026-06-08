@@ -1,7 +1,7 @@
-// Painted intra-region encounter zones (SRD-flavored wilderness): a region's
-// grid can hold non-overlapping sub-areas, each rolling its own creature table.
-// Covers the resolution (dbRegionsToEngine), the runtime roll (resolveMarkerMove
-// reads the zone's pool with region fallback), and the save-time schema.
+// Painted intra-region encounter zones — the SOLE source of random wilderness
+// encounters. Each zone is self-contained: tier + chance + creature table,
+// painted onto squares. A square outside every zone never rolls. Covers the
+// resolution (dbRegionsToEngine), the runtime roll, and the save-time schema.
 
 import type { CampaignData, GameState } from '../../types.js';
 import {
@@ -27,19 +27,29 @@ describe('dbRegionsToEngine — encounter zones', () => {
       // one row, three columns: (0,0) + (1,0) in zone "north"; (2,0) unzoned.
       grid: [[cell('plains', 'north'), cell('plains', 'north'), cell('plains')]],
       startPos: { x: 0, y: 0 },
-      encounterTable: ['Bandit'],
-      encounterChance: 0.2,
       encounterZones: [
-        { id: 'north', name: 'Frozen North', encounterChance: 0.5, encounterTable: ['Frost Wolf'] },
-        { id: 'ghost', name: 'Empty Zone', encounterTable: ['Wraith'] }, // no painted cells
+        {
+          id: 'north',
+          name: 'Frozen North',
+          tier: 1,
+          encounterChance: 0.5,
+          encounterTable: ['Frost Wolf'],
+        },
+        {
+          id: 'ghost',
+          name: 'Empty Zone',
+          tier: 2,
+          encounterChance: 0.3,
+          encounterTable: ['Wraith'],
+        }, // no cells
       ],
     };
     const [engine] = dbRegionsToEngine([region]);
-    expect(engine.encounterTable).toEqual(['Bandit']); // region fallback preserved
-    expect(engine.encounterZones).toHaveLength(1); // "ghost" dropped (no cells)
+    expect(engine.encounterZones).toHaveLength(1); // "ghost" dropped (no painted cells)
     const z = engine.encounterZones![0];
     expect(z.id).toBe('north');
     expect(z.name).toBe('Frozen North');
+    expect(z.tier).toBe(1);
     expect(z.encounterChance).toBe(0.5);
     expect(z.encounterTable).toEqual(['Frost Wolf']);
     expect(z.cells).toEqual([
@@ -64,14 +74,14 @@ function valeCampaign(): CampaignData {
         gridHeight: 4,
         startPos: { x: 0, y: 0 },
         sites: [],
-        encounterChance: 0.5,
-        encounterTable: ['Bandit'], // region fallback pool
         encounterZones: [
           {
             id: 'north',
             name: 'Frozen North',
+            tier: 1,
+            encounterChance: 0.5,
             encounterTable: ['Frost Wolf'],
-            cells: [{ x: 1, y: 0 }], // the square at (1,0) only
+            cells: [{ x: 1, y: 0 }], // only the square at (1,0)
           },
         ],
       },
@@ -87,18 +97,17 @@ const start = (): GameState =>
     visited_rooms: [],
   }) as unknown as GameState;
 
-describe('resolveMarkerMove — zone vs region encounter pool', () => {
+describe('resolveMarkerMove — encounters come only from zones', () => {
   it('a square inside a zone rolls from the zone’s table', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // 0 < chance → encounter on the first cell
     const r = resolveMarkerMove(valeCampaign(), [], start(), { x: 1, y: 0 });
     expect(r.encounter).toBe('Frost Wolf'); // (1,0) is in the "north" zone
   });
 
-  it('a square outside every zone falls back to the region table', () => {
+  it('a square outside every zone never rolls (no region fallback)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    // (0,1) is not painted into any zone → the region-level pool.
     const r = resolveMarkerMove(valeCampaign(), [], start(), { x: 0, y: 1 });
-    expect(r.encounter).toBe('Bandit');
+    expect(r.encounter).toBeUndefined(); // (0,1) is unzoned → no encounter
   });
 });
 
@@ -113,7 +122,15 @@ const baseRegion = (over: Record<string, unknown> = {}) => ({
     [{ t: 'plains' }, { t: 'plains' }],
   ],
   startPos: { x: 0, y: 0 },
-  encounterZones: [{ id: 'north', name: 'Frozen North', encounterTable: ['Goblin'] }],
+  encounterZones: [
+    {
+      id: 'north',
+      name: 'Frozen North',
+      tier: 1,
+      encounterChance: 0.1,
+      encounterTable: ['Goblin'],
+    },
+  ],
   ...over,
 });
 
@@ -137,10 +154,29 @@ describe('RegionsSchema — encounter zones', () => {
   it('rejects duplicate zone ids', () => {
     const bad = baseRegion({
       encounterZones: [
-        { id: 'north', name: 'A', encounterTable: ['Goblin'] },
-        { id: 'north', name: 'B', encounterTable: ['Orc'] },
+        { id: 'north', name: 'A', tier: 1, encounterChance: 0.1, encounterTable: ['Goblin'] },
+        { id: 'north', name: 'B', tier: 2, encounterChance: 0.1, encounterTable: ['Orc'] },
       ],
     });
     expect(schema.safeParse([bad]).success).toBe(false);
+  });
+
+  it('requires a zone tier (and chance), and rejects out-of-range tiers', () => {
+    const noTier = baseRegion({
+      encounterZones: [
+        { id: 'north', name: 'A', encounterChance: 0.1, encounterTable: ['Goblin'] },
+      ],
+    });
+    expect(schema.safeParse([noTier]).success).toBe(false);
+    const noChance = baseRegion({
+      encounterZones: [{ id: 'north', name: 'A', tier: 1, encounterTable: ['Goblin'] }],
+    });
+    expect(schema.safeParse([noChance]).success).toBe(false);
+    const tier5 = baseRegion({
+      encounterZones: [
+        { id: 'north', name: 'A', tier: 5, encounterChance: 0.1, encounterTable: ['Goblin'] },
+      ],
+    });
+    expect(schema.safeParse([tier5]).success).toBe(false);
   });
 });

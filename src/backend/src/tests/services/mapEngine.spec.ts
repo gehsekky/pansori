@@ -563,6 +563,10 @@ describe('SRD travel pace (set_pace + perception effects)', () => {
   });
 });
 
+// A zone covering every square of a w×h grid (encounters are zones-only now).
+const gridCells = (w: number, h: number) =>
+  Array.from({ length: w * h }, (_, i) => ({ x: i % w, y: Math.floor(i / w) }));
+
 describe('regional encounters', () => {
   const encounterCampaign: CampaignData = {
     world_name: 'Enc',
@@ -577,8 +581,15 @@ describe('regional encounters', () => {
         gridHeight: 12,
         startPos: { x: 0, y: 0 },
         sites: [{ id: 's', name: 'Keep', pos: { x: 3, y: 0 }, kind: 'town', townId: 'town1' }],
-        encounterTable: ['Bandit Ruffian'],
-        encounterChance: 1, // always triggers in the test
+        encounterZones: [
+          {
+            id: 'wilds',
+            tier: 1,
+            encounterChance: 1, // always triggers in the test
+            encounterTable: ['Bandit Ruffian'],
+            cells: gridCells(12, 12),
+          },
+        ],
       },
     ],
     towns: campaign.towns,
@@ -635,7 +646,14 @@ describe('regional encounters', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999); // ≥ chance(1)? no — but use a 0-chance check
     const noChance: CampaignData = {
       ...encounterCampaign,
-      regions: [{ ...encounterCampaign.regions![0], encounterChance: 0 }],
+      regions: [
+        {
+          ...encounterCampaign.regions![0],
+          encounterZones: [
+            { ...encounterCampaign.regions![0].encounterZones![0], encounterChance: 0 },
+          ],
+        },
+      ],
     };
     const st = {
       map_level: 'regional',
@@ -663,8 +681,15 @@ describe('typed overland terrain (unified model)', () => {
         gridHeight: 10,
         startPos: { x: 0, y: 0 },
         sites: [],
-        encounterTable: ['Bandit Ruffian'],
-        encounterChance: 0.5,
+        encounterZones: [
+          {
+            id: 'wilds',
+            tier: 1,
+            encounterChance: 0.5,
+            encounterTable: ['Bandit Ruffian'],
+            cells: gridCells(10, 10),
+          },
+        ],
         terrain: [
           { pos: { x: 2, y: 0 }, type: 'mountain' }, // impassable
           { pos: { x: 0, y: 1 }, type: 'road' }, // quick + safe

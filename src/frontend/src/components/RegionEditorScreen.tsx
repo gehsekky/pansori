@@ -1,6 +1,12 @@
 import Breadcrumb, { type Crumb } from './Breadcrumb.tsx';
 import DialogueEditor, { type DialogueNode } from './DialogueEditor.tsx';
-import { MARKER_TILES, TERRAIN, TERRAIN_TILES, type TerrainType } from '../shared-types.ts';
+import {
+  MARKER_TILES,
+  TERRAIN,
+  TERRAIN_TILES,
+  type TerrainType,
+  crInTier,
+} from '../shared-types.ts';
 
 // ─── Site icon options (the SITES tool's ICON dropdown) ──────────────────────
 //
@@ -60,17 +66,17 @@ import styles from '../styles.module.css';
 
 interface Cell {
   t?: string;
-  tier?: number;
-  enc?: number;
   ez?: string; // regions only — encounter-zone id (one per cell ⇒ no overlap)
   m?: string; // rooms only — one mechanical flag per cell
 }
 
 // A painted intra-region encounter zone (metadata; geometry is the cells' `ez`).
+// The sole source of random encounters: tier + chance + table all live here.
 interface EditorEncounterZone {
   id: string;
   name: string;
-  encounterChance?: number;
+  tier: number; // 1–4 — gates which CRs the creature table may hold
+  encounterChance: number; // 0–1 per square crossed
   encounterTable: string[];
 }
 
@@ -129,10 +135,7 @@ interface EditorRegion {
   onFirstEnter?: string;
   onExit?: string;
   onFirstExit?: string;
-  encounterChance?: number; // regions only
-  encounterTable?: string[]; // regions only — wilderness creature names (fallback pool)
-  encounterZones?: EditorEncounterZone[]; // regions only — painted sub-area pools
-  baseTier?: number; // regions only
+  encounterZones?: EditorEncounterZone[]; // regions only — the sole encounter source
   floor?: string; // towns + rooms
   lighting?: string; // rooms only
   canRest?: boolean; // rooms only
@@ -214,8 +217,6 @@ interface Details {
   onFirstEnter: string;
   onExit: string;
   onFirstExit: string;
-  encounterChance: string; // regions only
-  baseTier: string; // regions only
   floor: string; // towns + rooms
   lighting: string; // rooms only
 }
@@ -229,8 +230,6 @@ function detailsFrom(r: EditorRegion): Details {
     onFirstEnter: r.onFirstEnter ?? '',
     onExit: r.onExit ?? '',
     onFirstExit: r.onFirstExit ?? '',
-    encounterChance: r.encounterChance !== undefined ? String(r.encounterChance) : '',
-    baseTier: r.baseTier !== undefined ? String(r.baseTier) : '',
     floor: r.floor ?? '',
     // An absent lighting key IS bright (the engine defaults it everywhere),
     // so the form shows BRIGHT rather than exposing the omitted-key detail.
@@ -261,7 +260,7 @@ const LOCAL_TERRAINS = ['cobblestone', 'garden', 'town_wall'].filter((t) =>
 ) as TerrainType[];
 const REGIONAL_TERRAINS = TERRAIN_TYPES.filter((t) => !LOCAL_TERRAINS.includes(t));
 
-type Tool = 'terrain' | 'tier' | 'start' | 'site' | 'mech' | 'size' | 'zone';
+type Tool = 'terrain' | 'start' | 'site' | 'mech' | 'size' | 'zone';
 
 const CELL_PX = 30;
 
@@ -351,9 +350,8 @@ function RegionEditorScreen({
   // names that feed the picker (ambient catalog + campaign customs).
   const [placedEnemies, setPlacedEnemies] = useState<Array<{ name: string; count: number }>>([]);
   const [monsterNames, setMonsterNames] = useState<string[]>([]);
-  // Region wilderness encounter table (creature names), edited as chips. This is
-  // the FALLBACK pool for squares not painted into an encounter zone.
-  const [encounterTable, setEncounterTable] = useState<string[]>([]);
+  // Creature name → Challenge Rating, for filtering a zone's picker to its tier.
+  const [monsterCr, setMonsterCr] = useState<Record<string, number>>({});
   // Region painted encounter zones + the currently-selected zone for the paint
   // tool (its id, or null = the eraser, which clears a cell's zone).
   const [zones, setZones] = useState<EditorEncounterZone[]>([]);
@@ -383,7 +381,6 @@ function RegionEditorScreen({
   const [tool, setTool] = useState<Tool>('terrain');
   // '' = the clear brush (rooms: erase the cosmetic paint back to bare floor).
   const [terrainBrush, setTerrainBrush] = useState<string>('plains');
-  const [tierBrush, setTierBrush] = useState<number>(1); // 0 = clear override
   // Rooms only: the mechanical-flag brush ('' = clear the flag).
   const [mechBrush, setMechBrush] = useState<string>('obstacle');
   // Rooms only: SRD short-rest spot.
@@ -422,13 +419,26 @@ function RegionEditorScreen({
           );
           return;
         }
-        setGrid(r.grid.map((row) => row.map((c) => ({ ...c }))));
+        // Sanitize cells on load: keep only the live keys (t / ez / m), stripping
+        // the retired `tier` / `enc` keys legacy grids may still carry so a
+        // re-save validates against the now-strict cell schema.
+        setGrid(
+          r.grid.map((row) =>
+            row.map((c) => {
+              const cc = c as Cell & { tier?: unknown; enc?: unknown };
+              const cell: Cell = {};
+              if (cc.t !== undefined) cell.t = cc.t;
+              if (cc.ez !== undefined) cell.ez = cc.ez;
+              if (cc.m !== undefined) cell.m = cc.m;
+              return cell;
+            })
+          )
+        );
         const marker = (kind === 'room' ? r.entryPos : r.startPos) ?? { x: 0, y: 0 };
         setStartPos({ ...marker });
         setDetails(detailsFrom(r));
         setMakeStarter(false);
         setCanRest(!!r.canRest);
-        setEncounterTable([...(r.encounterTable ?? [])]);
         setZones(
           (r.encounterZones ?? []).map((z) => ({ ...z, encounterTable: [...z.encounterTable] }))
         );
@@ -458,15 +468,27 @@ function RegionEditorScreen({
           .getCampaignSection(campaignId, 'customMonsters')
           .catch(() => ({ value: null }) as { value: unknown }),
       ]).then(([catalog, customs]) => {
-        const customNames = Array.isArray(customs.value)
-          ? (customs.value as Array<{ name?: unknown }>)
-              .map((c) => c.name)
-              .filter((n): n is string => typeof n === 'string')
+        // Build name → CR alongside the name list so a zone's picker can filter
+        // the bestiary to its tier. Customs shadow the catalog by name.
+        const crByName: Record<string, number> = {};
+        for (const c of catalog) {
+          const def = c.definition;
+          if (def?.name) crByName[def.name] = typeof def.cr === 'number' ? def.cr : 0;
+        }
+        const customDefs = Array.isArray(customs.value)
+          ? (customs.value as Array<{ name?: unknown; cr?: unknown }>)
           : [];
+        for (const c of customDefs) {
+          if (typeof c.name === 'string') crByName[c.name] = typeof c.cr === 'number' ? c.cr : 0;
+        }
+        const customNames = customDefs
+          .map((c) => c.name)
+          .filter((n): n is string => typeof n === 'string');
         const catalogNames = catalog
           .map((c) => c.definition?.name)
           .filter((n): n is string => typeof n === 'string');
         setMonsterNames([...new Set([...customNames, ...catalogNames])]);
+        setMonsterCr(crByName);
       });
       Promise.all([
         api.getItemCatalog().catch(() => []),
@@ -603,10 +625,6 @@ function RegionEditorScreen({
           if ((cell.ez ?? undefined) === target) return prev;
           if (target === undefined) delete cell.ez;
           else cell.ez = target;
-        } else {
-          // tier tool: 0 clears the override.
-          if (tierBrush === 0) delete cell.tier;
-          else cell.tier = tierBrush;
         }
         next[y] = next[y].slice();
         next[y][x] = cell;
@@ -614,18 +632,7 @@ function RegionEditorScreen({
       });
       setDirty(true);
     },
-    [
-      tool,
-      terrainBrush,
-      tierBrush,
-      mechBrush,
-      activeZoneId,
-      sites,
-      selectedSiteId,
-      moveArmed,
-      kind,
-      placeArm,
-    ]
+    [tool, terrainBrush, mechBrush, activeZoneId, sites, selectedSiteId, moveArmed, kind, placeArm]
   );
 
   // Patch the selected site; clearing a kind's target also clears the
@@ -821,24 +828,14 @@ function RegionEditorScreen({
       else delete next[key];
     }
     if (kind === 'region') {
-      if (details.encounterChance.trim() === '') delete next.encounterChance;
-      else {
-        const enc = Number(details.encounterChance);
-        if (!Number.isFinite(enc) || enc < 0 || enc > 1) {
-          return { error: 'ENCOUNTER CHANCE must be between 0 and 1.' };
-        }
-        next.encounterChance = enc;
-      }
-      if (details.baseTier === '') delete next.baseTier;
-      else next.baseTier = Number(details.baseTier);
-      if (encounterTable.length > 0) next.encounterTable = encounterTable;
-      else delete next.encounterTable;
-      // Encounter zones (metadata; the cells' `ez` tags carry the geometry).
+      // Encounter zones are the SOLE encounter source (tier + chance + table;
+      // the cells' `ez` tags carry the geometry).
       if (zones.length > 0) {
         next.encounterZones = zones.map((z) => ({
           id: z.id,
           name: z.name,
-          ...(z.encounterChance !== undefined ? { encounterChance: z.encounterChance } : {}),
+          tier: z.tier,
+          encounterChance: z.encounterChance,
           ...(z.encounterTable.length > 0 ? { encounterTable: z.encounterTable } : {}),
         })) as EditorEncounterZone[];
       } else {
@@ -1029,7 +1026,6 @@ function RegionEditorScreen({
                     {(
                       [
                         ['terrain', 'TERRAIN'],
-                        ...(kind === 'region' ? [['tier', 'TIER'] as [Tool, string]] : []),
                         ...(kind === 'region' ? [['zone', 'ENC. ZONES'] as [Tool, string]] : []),
                         ...(kind === 'room' ? [['mech', 'MECHANICS'] as [Tool, string]] : []),
                         ['start', kind === 'room' ? 'ENTRY POS' : 'START POS'],
@@ -1124,29 +1120,6 @@ function RegionEditorScreen({
                     );
                   })()}
 
-                {tool === 'tier' && (
-                  <div>
-                    <p className={styles.formLbl}>TIER (PAINTS A PER-CELL OVERRIDE)</p>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {[1, 2, 3, 4, 0].map((t) => (
-                        <button
-                          key={t}
-                          className={styles.ghostBtn}
-                          aria-pressed={tierBrush === t}
-                          style={{
-                            padding: '0.25rem 0.6rem',
-                            fontSize: '0.7rem',
-                            borderColor: tierBrush === t ? 'var(--t-primary)' : undefined,
-                          }}
-                          onClick={() => setTierBrush(t)}
-                        >
-                          {t === 0 ? 'CLEAR' : `TIER ${t}`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {tool === 'zone' && (
                   <div>
                     <p className={styles.formLbl}>
@@ -1212,7 +1185,13 @@ function RegionEditorScreen({
                           while (used.has(id)) id = `zone-${++n}`;
                           setZones((prev) => [
                             ...prev,
-                            { id, name: `Zone ${n}`, encounterTable: [] },
+                            {
+                              id,
+                              name: `Zone ${n}`,
+                              tier: 1,
+                              encounterChance: 0.1,
+                              encounterTable: [],
+                            },
                           ]);
                           setActiveZoneId(id);
                           setDirty(true);
@@ -1250,9 +1229,34 @@ function RegionEditorScreen({
                               }}
                             />
                           </div>
-                          <div style={{ flex: '0 0 150px' }}>
+                          <div style={{ flex: '0 0 90px' }}>
+                            <label className={styles.formLbl} htmlFor="zone-tier">
+                              TIER
+                            </label>
+                            <select
+                              id="zone-tier"
+                              className={styles.formInp}
+                              style={{ cursor: 'pointer' }}
+                              value={String(activeZone.tier)}
+                              onChange={(e) => {
+                                const t = Number(e.target.value);
+                                setZones((prev) =>
+                                  prev.map((z) => (z.id === activeZone.id ? { ...z, tier: t } : z))
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              }}
+                            >
+                              {[1, 2, 3, 4].map((t) => (
+                                <option key={t} value={String(t)}>
+                                  TIER {t}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={{ flex: '0 0 110px' }}>
                             <label className={styles.formLbl} htmlFor="zone-chance">
-                              CHANCE (0–1, blank = region)
+                              CHANCE (0–1)
                             </label>
                             <input
                               id="zone-chance"
@@ -1261,18 +1265,12 @@ function RegionEditorScreen({
                               min={0}
                               max={1}
                               step={0.05}
-                              placeholder="region default"
-                              value={activeZone.encounterChance ?? ''}
+                              value={activeZone.encounterChance}
                               onChange={(e) => {
-                                const raw = e.target.value;
+                                const v = Math.max(0, Math.min(1, Number(e.target.value) || 0));
                                 setZones((prev) =>
                                   prev.map((z) =>
-                                    z.id === activeZone.id
-                                      ? {
-                                          ...z,
-                                          encounterChance: raw === '' ? undefined : Number(raw),
-                                        }
-                                      : z
+                                    z.id === activeZone.id ? { ...z, encounterChance: v } : z
                                   )
                                 );
                                 setDirty(true);
@@ -1368,12 +1366,14 @@ function RegionEditorScreen({
                                 setSaved(false);
                               }}
                             >
-                              <option value="">+ ADD CREATURE…</option>
-                              {monsterNames.map((n) => (
-                                <option key={n} value={n}>
-                                  {n}
-                                </option>
-                              ))}
+                              <option value="">+ ADD CREATURE (TIER {activeZone.tier})…</option>
+                              {monsterNames
+                                .filter((n) => crInTier(monsterCr[n] ?? 0, activeZone.tier))
+                                .map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}
+                                  </option>
+                                ))}
                             </select>
                           </div>
                         </div>
@@ -1839,7 +1839,7 @@ function RegionEditorScreen({
                         key={`${x},${y}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.tier ? ` tier ${cell.tier}` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}${cellNpc ? ` (npc: ${cellNpc.name})` : ''}${cellObject ? ` (object: ${cellObject.name})` : ''}`}
+                        aria-label={`cell ${x},${y}: ${cell.t ?? 'floor'}${cell.m ? ` [${cell.m}]` : ''}${isStart ? ' (start)' : ''}${site ? ` (site: ${site.name})` : ''}${cellLoot ? ` (loot: ${itemName(cellLoot.itemId)})` : ''}${cellNpc ? ` (npc: ${cellNpc.name})` : ''}${cellObject ? ` (object: ${cellObject.name})` : ''}`}
                         data-testid={`cell-${x}-${y}`}
                         data-zone={cell.ez ?? undefined}
                         title={`(${x},${y}) ${cell.t ? (TERRAIN[cell.t as TerrainType]?.label ?? cell.t) : 'floor'}${cell.m ? ` [${cell.m}]` : ''}${cell.ez ? ` {zone: ${zones.find((z) => z.id === cell.ez)?.name ?? cell.ez}}` : ''}${site ? ` — ${site.name}` : ''}`}
@@ -1880,21 +1880,6 @@ function RegionEditorScreen({
                           }
                         }}
                       >
-                        {cell.tier !== undefined && (
-                          <span
-                            aria-hidden="true"
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              right: 2,
-                              fontSize: 9,
-                              color: '#fff',
-                              textShadow: '0 0 2px #000',
-                            }}
-                          >
-                            {cell.tier}
-                          </span>
-                        )}
                         {cell.m && (
                           <span
                             aria-hidden="true"
@@ -2018,91 +2003,8 @@ function RegionEditorScreen({
                     />
                   </div>
                 )}
-                {kind === 'region' && (
-                  <>
-                    <div style={{ flex: '1 1 120px' }}>
-                      <label className={styles.formLbl} htmlFor="map-detail-enc">
-                        ENCOUNTER CHANCE (0–1)
-                      </label>
-                      <input
-                        id="map-detail-enc"
-                        className={styles.formInp}
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        placeholder="none"
-                        value={details.encounterChance}
-                        onChange={(e) => updateDetail('encounterChance', e.target.value)}
-                      />
-                    </div>
-                    <div style={{ flex: '1 1 100px' }}>
-                      <label className={styles.formLbl} htmlFor="map-detail-tier">
-                        BASE TIER
-                      </label>
-                      <select
-                        id="map-detail-tier"
-                        className={styles.formInp}
-                        style={{ cursor: 'pointer' }}
-                        value={details.baseTier}
-                        onChange={(e) => updateDetail('baseTier', e.target.value)}
-                      >
-                        <option value="">—</option>
-                        {[1, 2, 3, 4].map((t) => (
-                          <option key={t} value={String(t)}>
-                            TIER {t}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* Wilderness encounter table — the creatures the
-                        per-square ENCOUNTER CHANCE rolls materialize. */}
-                    <div style={{ flexBasis: '100%' }}>
-                      <p className={styles.formLbl}>ENCOUNTER TABLE (rolled by ENCOUNTER CHANCE)</p>
-                      <div
-                        style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}
-                      >
-                        {encounterTable.map((name) => (
-                          <button
-                            key={name}
-                            className={styles.ghostBtn}
-                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                            title="Remove from the table"
-                            onClick={() => {
-                              setEncounterTable((prev) => prev.filter((n) => n !== name));
-                              setDirty(true);
-                              setSaved(false);
-                            }}
-                          >
-                            {name} ✕
-                          </button>
-                        ))}
-                        <select
-                          className={styles.formInp}
-                          style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
-                          aria-label="Add encounter creature"
-                          value=""
-                          onChange={(ev) => {
-                            const name = ev.target.value;
-                            if (!name) return;
-                            setEncounterTable((prev) =>
-                              prev.includes(name) ? prev : [...prev, name]
-                            );
-                            setDirty(true);
-                            setSaved(false);
-                          }}
-                        >
-                          <option value="">+ ADD CREATURE…</option>
-                          {monsterNames.map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </>
-                )}
+                {/* Region wilderness encounters are authored in the ENC. ZONES
+                    tool (each zone has its own tier + chance + creature table). */}
                 {kind !== 'region' && (
                   <div style={{ flex: '1 1 120px' }}>
                     <label className={styles.formLbl} htmlFor="map-detail-floor">

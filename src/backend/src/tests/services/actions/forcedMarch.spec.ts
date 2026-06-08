@@ -89,8 +89,7 @@ const campaign: CampaignData = {
       gridHeight: 12,
       startPos: { x: 0, y: 0 },
       sites: [],
-      encounterTable: [],
-      encounterChance: 0, // no encounter interruptions for this test
+      // No encounter zones → no encounter interruptions for this test.
     },
   ],
 };
@@ -143,9 +142,26 @@ describe('handleMarkerMove — forced-march wiring', () => {
 
   it('an encounter leaves the marker ON the encounter square, not the destination', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // < chance → ambush on the first square
+    const allCells = Array.from({ length: 12 * 12 }, (_, i) => ({
+      x: i % 12,
+      y: Math.floor(i / 12),
+    }));
     const campEnc: CampaignData = {
       ...campaign,
-      regions: [{ ...campaign.regions![0], encounterChance: 1, encounterTable: ['Goblin'] }],
+      regions: [
+        {
+          ...campaign.regions![0],
+          encounterZones: [
+            {
+              id: 'wilds',
+              tier: 1,
+              encounterChance: 1,
+              encounterTable: ['Goblin'],
+              cells: allCells,
+            },
+          ],
+        },
+      ],
     };
     const st = {
       map_level: 'regional',
