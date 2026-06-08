@@ -118,11 +118,11 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   }
 
   // Entering a new local room (a site interior or a room-exit passage): the
-  // transition narrative FIRST — it carries the announcement plus the authored
-  // narration hooks (the old room's exit hook, the site/venue hook, the new
-  // room's enter hook) — then the full arrival cues (a "Hostile here" listing,
-  // passive trap detection, loot-spotting), the same cues the old room `move`
-  // gave. Plain moves fall back to the terse transition / move text.
+  // transition narrative FIRST — the announcement plus the OLD room's exit hook
+  // and the site/venue hook — then buildArrivalNarrative, which carries the new
+  // room's enter line (pooled onEnter / onFirstEnter on first visit) and the
+  // full arrival cues (a "Hostile here" listing, passive trap detection,
+  // loot-spotting). Plain moves fall back to the terse transition / move text.
   const enteredRoom =
     res.transitioned &&
     ctx.st.current_room &&
