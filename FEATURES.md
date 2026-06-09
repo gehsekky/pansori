@@ -101,7 +101,8 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
 - **Conversation mode** — a dedicated dialogue window; arbitrarily nested
   responses; condition/once/check-gated nodes; a safe consequence subset
   (advance_quest, add_narrative, modify_hp, consume_item, start_quest); parley
-  with authored-hostile NPCs; greeting/goodbye narrative hooks.
+  with authored-hostile NPCs; greeting/goodbye narrative hooks (variant pools —
+  see below). Dialogue replies are single lines (index-addressed, inline JSONB).
 - **Vendor economy** — buy + sell (half price), per-entry stock quantities,
   vendor wallets, daily restock, general buyback off SRD catalog values.
 
@@ -114,8 +115,16 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
 - **Creator / editor**: visual region/town/room **painters** (terrain, tiers,
   mechanics, SIZE, markers, encounter zones, narration-hook cards), placed
   content in rooms (enemies/loot/NPCs/objects/traps), a structured dialogue-tree
-  editor + QUESTS/FACTIONS panels (shared condition/effect vocabulary), and the
+  editor + QUESTS/FACTIONS panels (shared condition/effect vocabulary), a
+  structured **NARRATIVE panel** for the campaign-wide flavor pools, and the
   **MAP ART editor** (terrain tints, town-marker tiles, floor skins, level tabs).
+- **Structured narrative hooks** — authored prose attached to an entity
+  (region/town/room enter+exit, site arrival, room object/trap text, NPC
+  greeting/goodbye) is normalized into the `campaign_narratives` table, one row
+  per **variant**: the engine picks one at random (`pickHookText`) and a variant
+  may be multi-paragraph. Edited in-place via the **variant-list control**
+  (add/remove variant; multi-line each). The section payloads still carry the
+  hooks inline — only the persistence is normalized.
 - **Editable sections** (DB-first, live via `refreshCampaignOverlay`, per-section
   schema-validated): gameStart, narratives, regions, towns, rooms, quests,
   factions, terrainArt, customItems, customMonsters, theme, rules,

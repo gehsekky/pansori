@@ -113,13 +113,19 @@ documented deferrals.
 
 ## Creator backlog (smaller)
 
-- [ ] **Narratives section editor** — the last JSON-only section with a natural
-      structured surface (keyed string-lists).
-- [ ] **Venue-level narration hooks** — venues carry only the per-landing site
-      `onEnter`; no first/exit variants.
+- [ ] **Venue-level narration hooks** — venues still carry only the per-landing
+      site `onEnter`; no first/exit variants. Now cheap via `campaign_narratives`
+      (add a `venue` owner_kind alongside the other scopes).
+- [ ] **Narrative normalization — remaining scopes.** Entity hooks are now
+      structured in `campaign_narratives` (level/site, object, trap, NPC
+      greetings/goodbyes as variant pools). Still inline JSONB: **quest**
+      title/desc/step.desc (would make the quests section hybrid — mechanics in
+      JSONB, prose in rows) and **NPC dialogue replies** (index-addressed, no
+      stable node ids — needs its own table + an id-keyed dispatcher first).
 - [ ] **Dialogue follow-ups** — `say` field (menu label vs spoken line),
-      `goto`/node-ids for hub-and-spoke trees, mid-combat surrender, NPC ICON sprite
-      picker (`/art/sprites` stems; schema already stores `icon`).
+      `goto`/node-ids for hub-and-spoke trees (the node-id work also unblocks
+      moving dialogue replies into `campaign_narratives`), mid-combat surrender,
+      NPC ICON sprite picker (`/art/sprites` stems; schema already stores `icon`).
 - [ ] Continue the **auto-pick → player-driven** creation migration (Divine Order
       + caster spells done) for any remaining auto-assigned choices.
 
