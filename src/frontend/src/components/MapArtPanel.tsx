@@ -1,6 +1,7 @@
 import { FLOOR_TILES, MARKER_TILES, TERRAIN_TILES, compileTint } from '../types.ts';
 import type { FloorType, TerrainTileId, TileChoice, TileTint } from '../types.ts';
 import React, { useEffect, useState } from 'react';
+import { artUrl, paintedArt } from '../lib/art.ts';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
 
@@ -117,13 +118,51 @@ const lbl: React.CSSProperties = { fontSize: '0.65rem', color: 'var(--t-dim)' };
 // A live tile preview: the picked tile's base PNG with its catalog recolor
 // + the row tint. Terrain/marker tiles keep their own 2:3 (256×384) ratio;
 // floor textures are square.
-function Preview({ src, filter, square }: { src: string; filter?: string; square?: boolean }) {
+function Preview({
+  src,
+  filter,
+  square,
+  gated,
+  label,
+}: {
+  src: string;
+  filter?: string;
+  square?: boolean;
+  // Tiles/markers are gated on the painted tier; floors (CC0) are not.
+  gated?: boolean;
+  label?: string;
+}) {
+  const height = square ? 40 : 60;
+  // Free tier (no painted art for a gated category): show the picked tile's
+  // label, not a broken image.
+  if (gated && !paintedArt()) {
+    return (
+      <div
+        style={{
+          width: 40,
+          height,
+          border: '1px solid var(--t-line)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '0.5rem',
+          textAlign: 'center',
+          color: 'var(--t-mid)',
+          overflow: 'hidden',
+          padding: 2,
+        }}
+        title={label}
+      >
+        {label ?? '—'}
+      </div>
+    );
+  }
   return (
     <img
       src={src}
       alt=""
       width={40}
-      height={square ? 40 : 60}
+      height={height}
       style={{ display: 'block', filter, border: '1px solid var(--t-line)' }}
     />
   );
@@ -278,7 +317,7 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
     const isDefault = value.tile === defaultTile && !tintFilter;
     // Tile + marker families live at <base>_<n>.png — preview the first
     // painting. Floor catalog bases already embed their variant suffix.
-    const previewSrc = `${dir}/${spec.base}${dir === '/art/floors' ? '' : '_1'}.png`;
+    const previewSrc = artUrl(`${dir}/${spec.base}${dir === '/art/floors' ? '' : '_1'}.png`);
     return (
       // Bottom-aligned: the 2.5D tile previews carry a transparent overhang
       // up top, so the painted ground sits at the bottom edge — controls
@@ -296,7 +335,13 @@ function MapArtPanel({ campaignId }: { campaignId: string }) {
         }}
       >
         <span style={{ ...lbl, width: 96, letterSpacing: '0.08em' }}>{name.toUpperCase()}</span>
-        <Preview src={previewSrc} filter={filter} square={square} />
+        <Preview
+          src={previewSrc}
+          filter={filter}
+          square={square}
+          gated={dir !== '/art/floors'}
+          label={spec.label}
+        />
         <select
           className={styles.formInp}
           aria-label={`${name} tile`}

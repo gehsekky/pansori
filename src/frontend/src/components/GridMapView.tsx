@@ -9,6 +9,7 @@ import type {
   TerrainType,
 } from '../types';
 import { MARKER_TILES, TERRAIN, TERRAIN_TILES, compileTint } from '../types';
+import { NPC_GLYPH, PARTY_GLYPH, TOWN_GLYPH, artUrl, markerGlyph, paintedArt } from '../lib/art';
 import GameIcon from './GameIcon';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
 import styles from '../styles.module.css';
@@ -124,12 +125,18 @@ const TERRAIN_ICON: Partial<Record<TerrainType, { name: string; color: string }>
 // deterministically (the floors trick) so stretches don't look stamped and
 // nothing reshuffles between renders.
 const tileVariant = (x: number, y: number, count: number) => ((x * 7 + y * 13) % count) + 1;
-const tileSrcFor = (spec: TerrainTileSpec, x: number, y: number): string =>
-  `/art/tiles/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`;
+// Painted tile URL — only in the painted tier (VITE_PAINTED_ART); the free tier
+// returns undefined so the cell falls through to its terrain tint + glyph.
+const tileSrcFor = (spec: TerrainTileSpec, x: number, y: number): string | undefined =>
+  paintedArt()
+    ? artUrl(`/art/tiles/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`)
+    : undefined;
 
 // Marker (location) tiles share the variant scheme: /art/markers/<base>_<n>.png.
-const markerSrcFor = (spec: MarkerTileSpec, x: number, y: number): string =>
-  `/art/markers/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`;
+const markerSrcFor = (spec: MarkerTileSpec, x: number, y: number): string | undefined =>
+  paintedArt()
+    ? artUrl(`/art/markers/${spec.base}_${tileVariant(x, y, spec.variants ?? 1)}.png`)
+    : undefined;
 
 // A tile's effective CSS filter: the catalog's recolor first, then the
 // author tint layered over it (order matters — tint adjusts the themed look).
@@ -295,7 +302,7 @@ function GridMapView({
   // MARKER_TILES entry (+ optional tint); absent = the painted village
   // family. The cell position picks the variant, so two towns on the same
   // region draw different village paintings.
-  const townMarkerTile = (x: number, y: number): { src: string; filter?: string } => {
+  const townMarkerTile = (x: number, y: number): { src?: string; filter?: string } => {
     const choice = terrainArt?.markers?.town;
     const id = typeof choice === 'string' ? choice : choice?.tile;
     const spec: MarkerTileSpec = (id ? MARKER_TILES[id] : undefined) ?? MARKER_TILES.village;
@@ -433,10 +440,10 @@ function GridMapView({
       // keep the markers.town skin.
       const cellTile = fogged
         ? {}
-        : sitePaintedTerrain
-          ? { src: `/art/tiles/${sitePaintedTerrain.base}_1.png` }
-          : sitePaintedMarker
-            ? { src: `/art/markers/${sitePaintedMarker.base}_1.png` }
+        : sitePaintedTerrain && paintedArt()
+          ? { src: artUrl(`/art/tiles/${sitePaintedTerrain.base}_1.png`) }
+          : sitePaintedMarker && paintedArt()
+            ? { src: artUrl(`/art/markers/${sitePaintedMarker.base}_1.png`) }
             : isTownSite
               ? townMarkerTile(x, y)
               : terrainType
@@ -459,9 +466,10 @@ function GridMapView({
       // The authored floor family resolves through the campaign skin (remap
       // and/or tint) before picking the per-cell variant.
       const skinnedFloor = cellFloor ? floorFor(cellFloor) : undefined;
+      // Floors are CC0 — always painted (only prefixed with the asset base).
       const floorSrc =
         skinnedFloor && !fogged && !isObstacle && !tileSrc
-          ? `/art/floors/${skinnedFloor.type}_${floorVariant(x, y)}.png`
+          ? artUrl(`/art/floors/${skinnedFloor.type}_${floorVariant(x, y)}.png`)
           : undefined;
       const fillTint = tStyle?.tint ?? (plainsDefault ? TERRAIN_STYLE.plains.tint : undefined);
       let cellBg = fillTint
@@ -529,7 +537,7 @@ function GridMapView({
         // cell is already highlighted via gridMapCellCurrent.
         const markerPx = Math.round(cellPx * 1.6);
         const shiftX = Math.round(cellPx * 0.13);
-        token = (
+        token = paintedArt() ? (
           <div
             className={styles.gridMapMarkerSprite}
             style={
@@ -538,9 +546,19 @@ function GridMapView({
                 height: markerPx,
                 '--mk': `${markerPx}px`,
                 transform: `translateX(${shiftX}px)`,
+                // Inline (via artUrl) so an asset-base/CDN prefix applies — the
+                // CSS class only carries the size/animation.
+                backgroundImage: `url('${artUrl('/art/sprites/warrior_blue_idle.png')}')`,
               } as React.CSSProperties
             }
             aria-hidden="true"
+          />
+        ) : (
+          // Free tier — no Tiny Swords sprite; a glyph token stands in.
+          <GameIcon
+            name={PARTY_GLYPH}
+            className={styles.gridMapGlyph}
+            style={{ fontSize: iconFontSize, color: 'rgba(150, 200, 255, 1)' }}
           />
         );
       } else if (isEnemyMarker) {
@@ -558,11 +576,18 @@ function GridMapView({
         // marker) from /art/sprites/<stem>.png — and NO icon at all defaults to
         // the purple pawn strip. An explicit non-sprite icon renders as a gold
         // game-icons glyph. Either way, a name label.
-        const npcSprite = cellNpc!.icon?.startsWith('sprite:')
-          ? cellNpc!.icon.slice('sprite:'.length)
-          : cellNpc!.icon
-            ? null
-            : DEFAULT_NPC_SPRITE;
+        // Painted tier: a `sprite:<stem>` icon (or no icon → default pawn) renders
+        // the animated Tiny Swords strip; an explicit non-sprite icon is a gold
+        // glyph. Free tier: no sprites — a `sprite:`/iconless NPC falls back to
+        // the default NPC glyph; an explicit glyph icon still renders.
+        const npcSprite =
+          paintedArt() && (cellNpc!.icon?.startsWith('sprite:') || !cellNpc!.icon)
+            ? cellNpc!.icon?.startsWith('sprite:')
+              ? cellNpc!.icon.slice('sprite:'.length)
+              : DEFAULT_NPC_SPRITE
+            : null;
+        const npcGlyph =
+          cellNpc!.icon && !cellNpc!.icon.startsWith('sprite:') ? cellNpc!.icon : NPC_GLYPH;
         token = npcSprite ? (
           <>
             <div
@@ -572,7 +597,7 @@ function GridMapView({
                   width: Math.round(cellPx * 1.4),
                   height: Math.round(cellPx * 1.4),
                   '--mk': `${Math.round(cellPx * 1.4)}px`,
-                  '--sprite-url': `url('/art/sprites/${npcSprite}.png')`,
+                  '--sprite-url': `url('${artUrl(`/art/sprites/${npcSprite}.png`)}')`,
                 } as React.CSSProperties
               }
               aria-hidden="true"
@@ -584,7 +609,7 @@ function GridMapView({
         ) : (
           <>
             <GameIcon
-              name={cellNpc!.icon!}
+              name={npcGlyph}
               className={styles.gridMapGlyph}
               style={{ fontSize: iconFontSize, color: NPC_GOLD }}
             />
@@ -630,12 +655,21 @@ function GridMapView({
         // their authored icon (default); town venues / local room exits /
         // ascents → their TRANSITION_ICON glyph.
         const isLocalSite = transition.kind === 'site' && !transition.toTownId;
-        const transIcon = isLocalSite
-          ? { name: transition.icon ?? DEFAULT_SITE_ICON, color: SITE_STONE }
-          : (TRANSITION_ICON[transition.kind] ?? null);
+        // Town + `tile:`-icon sites are carried by their painted tile in the
+        // painted tier (glyph suppressed); in the FREE tier they have no tile, so
+        // fall back to a representative glyph (town → village; tile:id → its
+        // marker-family glyph). A plain-glyph local site always shows its glyph.
+        const paintedCovers = paintedArt() && (isTownSite || !!siteTileName);
+        const transIcon = siteTileName
+          ? { name: markerGlyph(siteTileName), color: SITE_STONE }
+          : isTownSite
+            ? { name: TOWN_GLYPH, color: SITE_STONE }
+            : isLocalSite
+              ? { name: transition.icon ?? DEFAULT_SITE_ICON, color: SITE_STONE }
+              : (TRANSITION_ICON[transition.kind] ?? null);
         token = (
           <>
-            {isTownSite || siteTileName ? null : transIcon ? (
+            {paintedCovers ? null : transIcon ? (
               <GameIcon
                 name={transIcon.name}
                 className={styles.gridMapGlyph}

@@ -2,6 +2,7 @@ import type { CombatEntity, FloorType, GameState, GridPos, Seed, TerrainType } f
 import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
+import { artUrl } from '../lib/art';
 import styles from '../styles.module.css';
 
 const SQUARE_SIZE_FT = 5;
@@ -481,7 +482,7 @@ function GridCombatView({
       const cellFloor = (terrainType ? TERRAIN_FLOOR[terrainType] : undefined) ?? roomFloor;
       const floorLayer = isObstacle(x, y)
         ? '' // walls keep their own look — no floor under the obstacle marker
-        : `url('/art/floors/${cellFloor}_${floorVariant(x, y)}.png') center / cover no-repeat`;
+        : `url('${artUrl(`/art/floors/${cellFloor}_${floorVariant(x, y)}.png`)}') center / cover no-repeat`;
       // The single tint colour for this cell's live state (later states win).
       let tint = (terrainType && TERRAIN_STYLE[terrainType].tint) || '';
       if (illum === 'dim') tint = 'rgba(0, 0, 0, 0.30)';

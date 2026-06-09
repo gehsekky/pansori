@@ -16,5 +16,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.spec.{ts,tsx}'],
+    // Default specs to the PAINTED tier so the existing exact-`/art/...`
+    // assertions hold; free-tier specs flip it off with vi.stubEnv.
+    env: { VITE_PAINTED_ART: '1' },
   },
 });

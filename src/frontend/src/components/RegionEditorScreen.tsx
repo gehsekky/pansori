@@ -27,16 +27,18 @@ const siteIconOptions: Array<{ value: string; label: string; group: 'marker' | '
 ];
 
 // The painted preview for a 'tile:<id>' icon (variant 1, matching what the
-// overworld renderer pins landmarks to). Glyph / custom icons → null.
+// overworld renderer pins landmarks to). Glyph / custom icons → null, and the
+// free tier (no painted art) → null too, so the caller shows the glyph.
 function siteIconPreview(icon: string | undefined): string | null {
-  if (!icon?.startsWith('tile:')) return null;
+  if (!icon?.startsWith('tile:') || !paintedArt()) return null;
   const id = icon.slice('tile:'.length);
   const marker = (MARKER_TILES as Partial<Record<string, { base: string }>>)[id];
-  if (marker) return `/art/markers/${marker.base}_1.png`;
+  if (marker) return artUrl(`/art/markers/${marker.base}_1.png`);
   const terrain = (TERRAIN_TILES as Partial<Record<string, { base: string }>>)[id];
-  if (terrain) return `/art/tiles/${terrain.base}_1.png`;
+  if (terrain) return artUrl(`/art/tiles/${terrain.base}_1.png`);
   return null;
 }
+import { artUrl, markerGlyph, paintedArt } from '../lib/art.ts';
 import { useCallback, useEffect, useState } from 'react';
 import GameIcon from './GameIcon.tsx';
 import MapsPanel from './MapsPanel.tsx';
@@ -1830,8 +1832,10 @@ function RegionEditorScreen({
                                 {(() => {
                                   const painted =
                                     siteIconPreview(selectedSite.icon) ??
-                                    (!selectedSite.icon && selectedSite.kind === 'town'
-                                      ? '/art/markers/village_1.png'
+                                    (paintedArt() &&
+                                    !selectedSite.icon &&
+                                    selectedSite.kind === 'town'
+                                      ? artUrl('/art/markers/village_1.png')
                                       : null);
                                   if (painted) {
                                     return (
@@ -1844,9 +1848,15 @@ function RegionEditorScreen({
                                       />
                                     );
                                   }
+                                  // A `tile:<id>` pick (free tier, or a glyph-only
+                                  // build) previews as its marker-family glyph.
+                                  const glyphName = selectedSite.icon?.startsWith('tile:')
+                                    ? markerGlyph(selectedSite.icon.slice('tile:'.length))
+                                    : selectedSite.icon ||
+                                      (selectedSite.kind === 'town' ? 'village' : 'dungeon-gate');
                                   return (
                                     <GameIcon
-                                      name={selectedSite.icon || 'dungeon-gate'}
+                                      name={glyphName}
                                       aria-label="site glyph preview"
                                       style={{
                                         fontSize: '1.6rem',

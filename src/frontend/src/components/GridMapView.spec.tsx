@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import type { ActiveGrid } from '../types';
 import GridMapView from './GridMapView';
@@ -823,5 +823,31 @@ describe('GridMapView', () => {
       expect(container.querySelector('[class*="gridMapMarkerSprite"]')).toBeTruthy();
       expect(container.querySelector('.game-icon-swords-emblem')).toBeNull();
     }
+  });
+});
+
+describe('GridMapView — free tier (VITE_PAINTED_ART unset)', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('emits no painted tile/marker images — tints + glyphs only', () => {
+    vi.stubEnv('VITE_PAINTED_ART', '');
+    const { container } = render(<GridMapView grid={terrainGrid} markerPos={{ x: 0, y: 0 }} />);
+    expect(container.querySelector('img[src*="/art/tiles"]')).toBeNull();
+    expect(container.querySelector('img[src*="/art/markers"]')).toBeNull();
+    // The typed forest cell still reads as forest via its game-icons glyph.
+    expect(container.querySelector('.game-icon-forest')).toBeTruthy();
+  });
+
+  it('renders the party as a glyph token (no Tiny Swords sprite)', () => {
+    vi.stubEnv('VITE_PAINTED_ART', '');
+    const { container } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    expect(container.querySelector('[class*="gridMapMarkerSprite"]')).toBeNull();
+    expect(cell(container, 0, 0).querySelector('.game-icon-person')).toBeTruthy();
+  });
+
+  it('renders a town site as a village glyph (no painted marker)', () => {
+    vi.stubEnv('VITE_PAINTED_ART', '');
+    const { container } = render(<GridMapView grid={grid} markerPos={{ x: 0, y: 0 }} />);
+    expect(cell(container, 3, 0).querySelector('.game-icon-village')).toBeTruthy();
   });
 });

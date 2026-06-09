@@ -1,5 +1,5 @@
 import { ItemIcon, PAINTED_ICON_BUCKETS } from './itemIcons';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ITEM_ICONS } from '../types';
 import { render } from '@testing-library/react';
 
@@ -31,5 +31,15 @@ describe('ItemIcon', () => {
   it('PAINTED_ICON_BUCKETS lists exactly the png-backed buckets, all valid', () => {
     expect(PAINTED_ICON_BUCKETS.length).toBe(19);
     for (const b of PAINTED_ICON_BUCKETS) expect(ITEM_ICONS).toContain(b);
+  });
+
+  describe('free tier (VITE_PAINTED_ART unset)', () => {
+    afterEach(() => vi.unstubAllEnvs());
+    it('renders the bucket glyph, not the painted PNG', () => {
+      vi.stubEnv('VITE_PAINTED_ART', '');
+      const { container } = render(<ItemIcon item={{ id: 'longsword', type: 'weapon' }} />);
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('.game-icon-broadsword')).toBeTruthy();
+    });
   });
 });

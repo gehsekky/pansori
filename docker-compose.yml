@@ -61,6 +61,12 @@ services:
       - backend
     ports:
       - '5173:5173'
+    environment:
+      # Painted art tier — set VITE_PAINTED_ART=1 in your .env (you have the
+      # licensed packs); unset ⇒ free glyph/color tier (a fresh clone with no
+      # painted assets). VITE_ASSET_BASE_URL optionally points painted URLs at a CDN.
+      - VITE_PAINTED_ART=${VITE_PAINTED_ART:-}
+      - VITE_ASSET_BASE_URL=${VITE_ASSET_BASE_URL:-}
     volumes:
       - ./src/frontend:/app
       - /app/node_modules
