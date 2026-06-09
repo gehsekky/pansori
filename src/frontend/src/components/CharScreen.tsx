@@ -369,6 +369,10 @@ function CharScreen({
   // BE context summaries (incl. DB-only campaigns). Lazy-loaded on mount;
   // the synthesized contexts below need them, so this is declared up here.
   const [beContexts, setBeContexts] = useState<Record<string, BackendContextSummary>>({});
+  // Whether the server campaign list has resolved (success OR failure) — distinct
+  // from `beLoaded` (which is "≥1 campaign"). An empty list leaves beLoaded false
+  // but contextsLoaded true, which is exactly the "no campaigns" empty state.
+  const [contextsLoaded, setContextsLoaded] = useState(false);
   // The world picker's list: code contexts minus hidden, intersected with
   // what the server says this user may see — PLUS server-listed campaigns
   // with no code context (creator-built, DB-only). A DB campaign gets a
@@ -463,10 +467,14 @@ function CharScreen({
         const map: Record<string, BackendContextSummary> = {};
         for (const c of list) map[c.id] = c;
         setBeContexts(map);
+        setContextsLoaded(true);
       },
-      // Silent failure — picker just stays hidden. Character creation
-      // still works for backgrounds without choice-requiring feats.
-      () => {}
+      // Failure — the list resolved (to nothing). Mark it loaded so the empty
+      // state ("no campaigns found, try again later") shows rather than the
+      // builder hanging on a context that never arrives.
+      () => {
+        if (!cancelled) setContextsLoaded(true);
+      }
     );
     return () => {
       cancelled = true;
@@ -783,6 +791,24 @@ function CharScreen({
     } catch (e) {
       setError((e as { error?: string })?.error || 'Failed to start adventure');
     }
+  }
+
+  // No campaigns to play: once the server list has resolved with nothing
+  // visible to this user, there's nothing to build a party for — show a small
+  // holding message instead of the (campaign-less) party builder.
+  if (contextsLoaded && pickerContexts.length === 0) {
+    return (
+      <div className={styles.pageFlex}>
+        <div className={styles.charInner}>
+          <div className={styles.charPartyCol} data-testid="no-campaigns">
+            <h1 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
+              HERO REGISTRY
+            </h1>
+            <p className={styles.sub}>No campaigns found. Try again later.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

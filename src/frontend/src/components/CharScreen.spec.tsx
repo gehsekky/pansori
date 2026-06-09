@@ -274,3 +274,18 @@ describe('CharScreen — caster spell picker', () => {
     expect(queryByTestId('caster-spells-trigger-0')).toBeNull();
   });
 });
+
+describe('CharScreen — no campaigns available', () => {
+  it('shows the empty-state message and not the party builder', async () => {
+    // No code contexts and the server returns no campaigns.
+    vi.spyOn(api, 'listContexts').mockResolvedValue([]);
+    const { findByTestId, queryByTestId } = render(
+      <CharScreen onStart={vi.fn()} loading={false} availableContexts={[]} user={null} />
+    );
+    const empty = await findByTestId('no-campaigns');
+    expect(empty.textContent).toContain('No campaigns found. Try again later.');
+    // The party builder is gone — no auto-fill / begin buttons, no setup block.
+    expect(queryByTestId('auto-fill-party-btn')).toBeNull();
+    expect(queryByTestId('begin-adventure-btn')).toBeNull();
+  });
+});

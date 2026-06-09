@@ -134,8 +134,16 @@ documented deferrals.
 - [~] **Boss legendary + lair actions** — legendary `extra_attack` live on 26
       bosses; remaining: lair actions unwired, more legendary effect KINDS
       (teleport, gaze, debuff aura, spell-cast).
-- [ ] **Another campaign module (opportunistic)** — coastal pirate town, desert
-      ruin, planar city. Authored on the 3-level grid; not on the critical path.
+- [ ] **A shipped/starter campaign** — the project now ships NO built-in campaign
+      (the malgovia/sandbox seeds were dropped 2026-06-09; the e2e self-seeds a
+      throwaway one). A fresh deploy shows the "No campaigns found" empty state
+      until someone authors one through the creator. Decide whether to ship a
+      starter campaign (and how to seed it) vs. leave it author-only. Candidates
+      if we do: coastal pirate town, desert ruin, planar city — authored on the
+      3-level grid. Ties into onboarding (deferred until launch).
+- [ ] **Re-enable the skipped combat-loop e2e** (`smoke.spec.ts` — the
+      "enter a fight and resolve an attack" test, skipped for a layout-race
+      click-intercept flake) now that it runs in the isolated ephemeral stack.
 - [ ] **Difficulty tuning from playtest data** — capture damage/HP/encounter
       telemetry to inform tuning (the Giant Spider near-TPK was the latest signal).
 
@@ -211,8 +219,11 @@ documented deferrals.
 
 ## Local gate (run before pushing)
 
-- Lint + both `tsc` + `test:be` + `test:fe` + the Playwright e2e smoke
-  (`npx playwright test` against the running dev stack).
+- Lint + both `tsc` + `test:be` + `test:fe` + the Playwright e2e smoke via the
+  ephemeral stack (`npm run test:e2e:stack` — brings up `docker-compose.e2e.yml`,
+  self-seeds a throwaway campaign, runs Playwright, tears down with `down -v`).
+  (`npx playwright test` still works against an already-up stack via
+  `E2E_BASE_URL` / `E2E_BACKEND_URL`.)
 - `npm run check-migrations` when migrations change.
 - The three `shared-types.ts` are generated — edit `src/shared/types.ts`, then
   `npm run sync-types` (CI runs `sync-types:check`).
