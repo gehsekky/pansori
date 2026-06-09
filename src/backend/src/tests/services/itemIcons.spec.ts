@@ -89,7 +89,12 @@ describe('painted item icons resolve to files', () => {
     'shield',
     'ammo',
   ];
-  it('every painted bucket has its PNG under /art/icons', () => {
+  // The painted icons live in the private overlay (pansori-assets), gitignored
+  // here — a fresh checkout (CI, free tier) has no /art/icons. Guard the disk
+  // check: it only applies when the overlay is synced (sync-assets creates the
+  // dir only when copying it in); skip otherwise.
+  const PAINTED_PRESENT = existsSync(ART);
+  it.skipIf(!PAINTED_PRESENT)('every painted bucket has its PNG under /art/icons', () => {
     const missing = PAINTED.filter((b) => !existsSync(`${ART}/${b}.png`));
     expect(missing).toEqual([]);
   });
