@@ -7,6 +7,7 @@
     "sync-types": "tsx scripts/sync-shared-types.ts",
     "sync-types:check": "tsx scripts/sync-shared-types.ts --check",
     "check-migrations": "bash scripts/check-migrations.sh",
+    "sync-assets": "bash scripts/sync-assets.sh",
     "pretest": "npm run sync-types",
     "predev": "npm run sync-types",
     "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",

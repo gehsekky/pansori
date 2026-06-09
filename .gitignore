@@ -13,3 +13,11 @@ playwright/.cache/
 reference/
 
 docs/latestlog
+
+# Licensed painted-art overlay — lives in the private pansori-assets repo (not
+# redistributable standalone). The free tier needs none of it; `npm run
+# sync-assets` populates these for the painted tier. floors/ (CC0) stays tracked.
+src/frontend/public/art/tiles/
+src/frontend/public/art/markers/
+src/frontend/public/art/icons/
+src/frontend/public/art/sprites/
