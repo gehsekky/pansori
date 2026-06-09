@@ -83,13 +83,13 @@ import {
   slotsForInstance,
   toggleWornItem,
 } from '../services/equipment.js';
+import { generateSeed, reconcileSeedWithContext } from '../services/procgen.js';
 import { initMapState, regionEnterNarration } from '../services/mapEngine.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
 import { derivedProgressFacts } from '../services/dialogueGating.js';
-import { generateSeed } from '../services/procgen.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
@@ -364,6 +364,21 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
     }
     const ctxId = row.seed?.context_id;
     const ctx = ctxId ? CONTEXTS[ctxId] : undefined;
+    // Re-resolve the seed against the LIVE campaign so edits made in the creator
+    // show up on refresh (rooms/theme/maps/NPC dialogue everywhere; enemy/loot
+    // placements for rooms not yet reached). Engaged rooms keep their live
+    // combat/cleared snapshot. Persist the merge so subsequent actions match
+    // (without bumping updated_at — a refresh isn't a play action).
+    if (ctx?.campaign && row.seed && row.state) {
+      const merged = reconcileSeedWithContext(row.seed, ctx, normalizeState(row.state));
+      if (JSON.stringify(merged) !== JSON.stringify(row.seed)) {
+        await pool.query('UPDATE game_sessions SET seed = $1 WHERE id = $2', [
+          JSON.stringify(merged),
+          row.id,
+        ]);
+        row.seed = merged;
+      }
+    }
     res.json({ ...row, campaignMeta: await campaignMetaFor(ctx) });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });

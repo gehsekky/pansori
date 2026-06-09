@@ -1,4 +1,4 @@
-import type { Context, Enemy, Seed } from '../types.js';
+import type { Context, Enemy, GameState, Seed } from '../types.js';
 import { randomUUID } from 'crypto';
 import { scaleRoomEnemiesByCount } from './enemyFactory.js';
 
@@ -40,5 +40,60 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     towns: c.towns,
     terrain_art: context.terrainArt,
     theme: context.theme,
+  };
+}
+
+/**
+ * Re-resolve a running session's seed against the live campaign context so
+ * campaign edits show up when the session is refreshed.
+ *
+ * A session's seed is a snapshot of the campaign taken at creation — and during
+ * play the engine MUTATES `seed.enemies` in place (live combat HP, boss phases),
+ * so it can't simply be replaced. This merge:
+ *   - takes the presentation + structure + map + NPC definitions FRESH
+ *     (world/intro/theme/terrain art, regions/towns, room text & layout, NPC
+ *     dialogue) — these carry no per-session runtime state, so an edit is safe
+ *     to surface everywhere, including the room the party is standing in;
+ *   - preserves per-room enemy/loot PLACEMENTS for rooms the party has already
+ *     entered (`visited_rooms`) — their live combat HP and cleared/looted state
+ *     lives in the seed/state and must not reset or resurrect. (The engine
+ *     blocks travelling on while a hostile is alive, so a visited room is either
+ *     the current room or already cleared — locking it is always correct.)
+ *   - takes enemy/loot placements FRESH for rooms not yet reached, so edits to
+ *     upcoming encounters appear.
+ *
+ * Identity (`context_id`, `seed_id`) is carried over. Returns a new seed; inputs
+ * are not mutated. Caller should skip when the context has no campaign data.
+ */
+export function reconcileSeedWithContext(existing: Seed, context: Context, state: GameState): Seed {
+  if (!context.campaign) return existing;
+  const partySize = state.characters?.length ?? 1;
+  const fresh = generateSeed(context, partySize);
+  const visited = new Set(state.visited_rooms ?? []);
+
+  // For a visited room keep the existing placements verbatim (incl. "none" — a
+  // room the party passed through doesn't gain new spawns); for an unreached
+  // room take the fresh placements (the author's edits to that encounter).
+  const mergePlacements = <T>(
+    freshMap: Record<string, T>,
+    existingMap: Record<string, T>
+  ): Record<string, T> => {
+    const out: Record<string, T> = {};
+    for (const roomId of new Set([...Object.keys(freshMap), ...Object.keys(existingMap)])) {
+      if (visited.has(roomId)) {
+        if (existingMap[roomId] !== undefined) out[roomId] = existingMap[roomId];
+      } else if (freshMap[roomId] !== undefined) {
+        out[roomId] = freshMap[roomId];
+      }
+    }
+    return out;
+  };
+
+  return {
+    ...fresh,
+    context_id: existing.context_id,
+    seed_id: existing.seed_id,
+    enemies: mergePlacements(fresh.enemies, existing.enemies ?? {}),
+    loot: mergePlacements(fresh.loot, existing.loot ?? {}),
   };
 }
