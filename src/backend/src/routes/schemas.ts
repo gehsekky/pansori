@@ -253,9 +253,9 @@ const NarrativesSchema = z
 // (feetPerSquare / gridWidth / gridHeight) and startPos are REQUIRED —
 // every region must declare the grid its future children (terrain, sites,
 // tierZones) will sit on; desc / encounterChance / baseTier are optional
-// flavor + tuning. encounterTable carries composed-bestiary creature NAMES
-// (cross-validation is overlay-time warn-skip, like room enemy placements);
-// legacy obstacles/difficultTerrain never migrate.
+// flavor + tuning. encounterTable carries composed-bestiary creatures — bare
+// NAMES or {name, weight} pairs (cross-validation is overlay-time warn-skip,
+// like room enemy placements); legacy obstacles/difficultTerrain never migrate.
 const GridPosSchema = z
   .object({
     x: z.number().int().nonnegative(),
@@ -364,7 +364,23 @@ const RegionsSchema = z
                 name: z.string().min(1).max(80),
                 tier: z.number().int().min(1).max(4),
                 encounterChance: z.number().min(0).max(1),
-                encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
+                // Each entry is a bare creature name (weight 1) or a
+                // {name, weight} pair so some creatures roll more often. Weight
+                // is a small integer (1–99); selection is weight-proportional.
+                encounterTable: z
+                  .array(
+                    z.union([
+                      z.string().min(1).max(80),
+                      z
+                        .object({
+                          name: z.string().min(1).max(80),
+                          weight: z.number().int().min(1).max(99),
+                        })
+                        .strict(),
+                    ])
+                  )
+                  .max(20)
+                  .optional(),
                 // Battleground rooms per triggering-square terrain type: a map
                 // of terrain (e.g. 'forest') → room ids the encounter may use as
                 // its map. Missing / empty list ⇒ the default bare arena.

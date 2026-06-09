@@ -7,6 +7,7 @@
 
 import {
   type CampaignData,
+  type EncounterEntry,
   type EncounterZone,
   type FloorType,
   type GameState,
@@ -47,6 +48,37 @@ function terrainTypeAt(terrain: TerrainCell[] | undefined, pos: GridPos): Terrai
 /** The painted encounter zone covering a square, if any (zones never overlap). */
 function encounterZoneAt(region: Region | undefined, pos: GridPos): EncounterZone | undefined {
   return region?.encounterZones?.find((z) => z.cells.some((c) => posEqual(c, pos)));
+}
+
+/** The creature name of an encounter entry (a bare string is its own name). */
+export function encounterEntryName(e: EncounterEntry): string {
+  return typeof e === 'string' ? e : e.name;
+}
+
+/**
+ * The roll weight of an encounter entry — bare strings weigh 1, and an explicit
+ * weight floors at 1 so a stray 0 / negative / non-finite value can't silently
+ * drop a creature from the pool (it just becomes the minimum-likelihood entry).
+ */
+export function encounterEntryWeight(e: EncounterEntry): number {
+  const w = typeof e === 'string' ? 1 : e.weight;
+  return Number.isFinite(w) && w >= 1 ? Math.floor(w) : 1;
+}
+
+/**
+ * Weight-proportional pick of a creature name from a NON-EMPTY encounter table.
+ * `rnd` is a uniform [0, 1) draw (i.e. `Math.random()`); the table's total
+ * weight scales it, then we walk entries subtracting weights. Equal weights
+ * reduce to the old uniform pick. The final return guards floating-point drift.
+ */
+export function pickWeightedEncounter(table: EncounterEntry[], rnd: number): string {
+  const total = table.reduce((s, e) => s + encounterEntryWeight(e), 0);
+  let r = rnd * total;
+  for (const e of table) {
+    r -= encounterEntryWeight(e);
+    if (r < 0) return encounterEntryName(e);
+  }
+  return encounterEntryName(table[table.length - 1]);
 }
 
 const DEFAULT_LOCAL_GRID = 10;
@@ -493,7 +525,7 @@ export function resolveMarkerMove(
         cellTable.length > 0 &&
         Math.random() < zone.encounterChance * spec.encounterMult
       ) {
-        encounter = cellTable[Math.floor(Math.random() * cellTable.length)];
+        encounter = pickWeightedEncounter(cellTable, Math.random());
         // Pick the battleground: a room listed for THIS square's terrain type in
         // the zone's arenaRooms. No entry / empty list ⇒ leave undefined (the
         // caller uses the default bare arena).

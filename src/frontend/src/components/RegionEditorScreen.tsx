@@ -75,12 +75,22 @@ interface Cell {
 
 // A painted intra-region encounter zone (metadata; geometry is the cells' `ez`).
 // The sole source of random encounters: tier + chance + table all live here.
+// An encounter-table entry: a bare creature name (weight 1) or a {name, weight}
+// pair. Mirrors the engine's EncounterEntry; weight-1 entries stay bare strings
+// so all-default tables round-trip unchanged.
+type EncounterEntry = string | { name: string; weight: number };
+const entryName = (e: EncounterEntry): string => (typeof e === 'string' ? e : e.name);
+const entryWeight = (e: EncounterEntry): number => (typeof e === 'string' ? 1 : e.weight);
+// Re-wrap a creature as a bare string (weight 1) or a {name, weight} pair.
+const makeEntry = (name: string, weight: number): EncounterEntry =>
+  weight <= 1 ? name : { name, weight };
+
 interface EditorEncounterZone {
   id: string;
   name: string;
   tier: number; // 1–4 — gates which CRs the creature table may hold
   encounterChance: number; // 0–1 per square crossed
-  encounterTable: string[];
+  encounterTable: EncounterEntry[];
   // Battleground rooms per triggering-square terrain type (engine EncounterZone).
   // No editor UI yet — carried through load/save so an API-set value isn't lost.
   arenaRooms?: Record<string, string[]>;
@@ -1476,7 +1486,7 @@ function RegionEditorScreen({
                         </div>
                         <div>
                           <p className={styles.formLbl}>
-                            ENCOUNTER TABLE (blank = use the region table)
+                            ENCOUNTER TABLE (blank = use the region table) · ×N = ROLL WEIGHT
                           </p>
                           <div
                             style={{
@@ -1486,32 +1496,78 @@ function RegionEditorScreen({
                               flexWrap: 'wrap',
                             }}
                           >
-                            {activeZone.encounterTable.map((name) => (
-                              <button
-                                key={name}
-                                className={styles.ghostBtn}
-                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                                title="Remove from this zone's table"
-                                onClick={() => {
-                                  setZones((prev) =>
-                                    prev.map((z) =>
-                                      z.id === activeZone.id
-                                        ? {
-                                            ...z,
-                                            encounterTable: z.encounterTable.filter(
-                                              (nm) => nm !== name
-                                            ),
-                                          }
-                                        : z
-                                    )
-                                  );
-                                  setDirty(true);
-                                  setSaved(false);
-                                }}
-                              >
-                                {name} ✕
-                              </button>
-                            ))}
+                            {activeZone.encounterTable.map((entry) => {
+                              const name = entryName(entry);
+                              const weight = entryWeight(entry);
+                              // Replace the matching entry across the active zone's
+                              // table (used by both the weight input and removal).
+                              const editTable = (fn: (t: EncounterEntry[]) => EncounterEntry[]) => {
+                                setZones((prev) =>
+                                  prev.map((z) =>
+                                    z.id === activeZone.id
+                                      ? { ...z, encounterTable: fn(z.encounterTable) }
+                                      : z
+                                  )
+                                );
+                                setDirty(true);
+                                setSaved(false);
+                              };
+                              return (
+                                <span
+                                  key={name}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    border: '1px solid var(--t-border)',
+                                    borderRadius: 4,
+                                    padding: '0.15rem 0.3rem',
+                                    fontSize: '0.7rem',
+                                  }}
+                                >
+                                  <span>{name}</span>
+                                  <span style={{ color: 'var(--t-dim)' }} aria-hidden="true">
+                                    ×
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={99}
+                                    value={weight}
+                                    aria-label={`${name} weight`}
+                                    title="Roll weight — higher spawns more often, relative to the other creatures in this zone"
+                                    className={styles.formInp}
+                                    style={{
+                                      width: '2.8rem',
+                                      fontSize: '0.7rem',
+                                      padding: '0.1rem 0.2rem',
+                                    }}
+                                    onChange={(ev) => {
+                                      const w = Math.max(
+                                        1,
+                                        Math.min(99, Math.floor(Number(ev.target.value) || 1))
+                                      );
+                                      editTable((t) =>
+                                        t.map((e) =>
+                                          entryName(e) === name ? makeEntry(name, w) : e
+                                        )
+                                      );
+                                    }}
+                                  />
+                                  <button
+                                    className={styles.ghostBtn}
+                                    style={{ padding: '0 0.3rem', fontSize: '0.7rem' }}
+                                    title="Remove from this zone's table"
+                                    aria-label={`Remove ${name}`}
+                                    onClick={() =>
+                                      editTable((t) => t.filter((e) => entryName(e) !== name))
+                                    }
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              );
+                            })}
                             <select
                               className={styles.formInp}
                               style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
@@ -1523,7 +1579,7 @@ function RegionEditorScreen({
                                 setZones((prev) =>
                                   prev.map((z) =>
                                     z.id === activeZone.id
-                                      ? z.encounterTable.includes(name)
+                                      ? z.encounterTable.some((e) => entryName(e) === name)
                                         ? z
                                         : { ...z, encounterTable: [...z.encounterTable, name] }
                                       : z

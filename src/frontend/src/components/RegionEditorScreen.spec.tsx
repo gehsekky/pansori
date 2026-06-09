@@ -155,6 +155,31 @@ describe('RegionEditorScreen', () => {
     expect(grid[0][0].ez).toBe('zone-2');
   });
 
+  it('saves a creature weight as {name, weight}; weight 1 stays a bare string', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    // Add two creatures; both start at weight 1.
+    const picker = screen.getByLabelText('Add zone creature') as HTMLSelectElement;
+    fireEvent.change(picker, { target: { value: 'Wolf' } });
+    fireEvent.change(picker, { target: { value: 'Goblin' } });
+    // Bump only the Wolf to weight 3 (Goblin stays default 1).
+    fireEvent.change(screen.getByLabelText('Wolf weight'), { target: { value: '3' } });
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const [, , value] = mocked.putCampaignSection.mock.calls[0];
+    const saved = (value as Array<Record<string, unknown>>)[0];
+    const zones = saved.encounterZones as Array<{
+      encounterTable?: Array<string | { name: string; weight: number }>;
+    }>;
+    // Weighted creature → {name, weight}; the default-weight one → bare string.
+    // Insertion order is preserved (Wolf added first, then Goblin).
+    expect(zones[0].encounterTable).toEqual([{ name: 'Wolf', weight: 3 }, 'Goblin']);
+  });
+
   it('preserves a zone’s arenaRooms (no editor UI yet) through a save round-trip', async () => {
     // A region whose zone already carries arenaRooms (set via the API). The
     // editor can't edit it yet, but a save must not silently drop it.

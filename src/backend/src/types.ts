@@ -2150,6 +2150,12 @@ export interface Region extends LevelNarrationHooks {
   encounterZones?: EncounterZone[];
 }
 
+// An encounter-table entry: a bare creature name, or a {name, weight} pair so
+// some creatures roll more often than others. Selection is weight-proportional;
+// a bare string is sugar for weight 1 (and stays the stored form for weight-1
+// entries, so existing all-string tables are unchanged). See pickWeightedEncounter.
+export type EncounterEntry = string | { name: string; weight: number };
+
 // A painted intra-region encounter zone — an arbitrary set of squares (`cells`)
 // that share a self-contained wilderness encounter pool: a difficulty `tier`
 // (which scopes CR-appropriate creatures), a per-square roll `encounterChance`,
@@ -2159,7 +2165,7 @@ export interface EncounterZone {
   name?: string;
   tier: number; // 1–4 (SRD tiers of play) — gates which CRs the table may hold
   encounterChance: number; // 0–1 per square crossed
-  encounterTable?: string[]; // creature names; empty / absent ⇒ the zone never rolls
+  encounterTable?: EncounterEntry[]; // creatures (weighted); empty / absent ⇒ the zone never rolls
   cells: GridPos[]; // squares painted into this zone (materialized from grid `ez`)
   // Battleground rooms to fight a rolled encounter in, keyed by the terrain type
   // of the square the ambush triggers on (e.g. 'forest', 'hills'). When the

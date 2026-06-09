@@ -26,6 +26,7 @@
 
 import type {
   Context,
+  EncounterEntry,
   EncounterZone,
   Enemy,
   EnemyTemplate,
@@ -194,7 +195,7 @@ export interface CampaignEncounterZone {
   name: string;
   tier: number;
   encounterChance: number;
-  encounterTable?: string[];
+  encounterTable?: EncounterEntry[]; // creatures (weighted); see EncounterEntry in types.ts
   // Battleground rooms per triggering-square terrain type (see EncounterZone in
   // types.ts). Stored as-is in the encounter_zones JSONB.
   arenaRooms?: Record<string, string[]>;
@@ -1514,8 +1515,11 @@ function filterEncounterTables(
   templates: EnemyTemplate[]
 ): CampaignRegion[] {
   const isKnown = (name: string) => templates.some((t) => t.name === name);
-  const filterNames = (names: string[], where: string): string[] =>
-    names.filter((name) => {
+  // Drop entries (bare names OR {name, weight} pairs) whose creature isn't in
+  // the composed bestiary, warning per drop. The weight rides along untouched.
+  const filterNames = (entries: EncounterEntry[], where: string): EncounterEntry[] =>
+    entries.filter((e) => {
+      const name = typeof e === 'string' ? e : e.name;
       if (isKnown(name)) return true;
       console.warn(
         `[campaignContent] ${campaignId}/${where}: no enemy template named "${name}" — encounter entry dropped`

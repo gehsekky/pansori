@@ -10,8 +10,12 @@ import {
   dbRegionsToEngine,
 } from '../../services/campaignContent.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  encounterEntryWeight,
+  pickWeightedEncounter,
+  resolveMarkerMove,
+} from '../../services/mapEngine.js';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
-import { resolveMarkerMove } from '../../services/mapEngine.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -109,6 +113,53 @@ describe('resolveMarkerMove — encounters come only from zones', () => {
     const r = resolveMarkerMove(valeCampaign(), [], start(), { x: 0, y: 1 });
     expect(r.encounter).toBeUndefined(); // (0,1) is unzoned → no encounter
   });
+
+  it('picks weight-proportionally from a {name, weight} table', () => {
+    // A zone weighted 1 Goblin : 3 Orc (total 4). resolveMarkerMove draws
+    // Math.random() twice on the triggering square: the chance check, then the
+    // selection. Script the selection draw to land in each creature's band.
+    const weighted = () => {
+      const c = valeCampaign();
+      c.regions![0].encounterZones![0].encounterTable = ['Goblin', { name: 'Orc', weight: 3 }];
+      return c;
+    };
+    // selection draw 0.5 → 0.5*4 = 2.0 → past Goblin's weight 1 → Orc.
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.5);
+    expect(resolveMarkerMove(weighted(), [], start(), { x: 1, y: 0 }).encounter).toBe('Orc');
+    // selection draw 0.1 → 0.4 → within Goblin's weight 1 → Goblin.
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.1);
+    expect(resolveMarkerMove(weighted(), [], start(), { x: 1, y: 0 }).encounter).toBe('Goblin');
+  });
+});
+
+describe('pickWeightedEncounter', () => {
+  it('a bare string weighs 1; an explicit weight floors at 1', () => {
+    expect(encounterEntryWeight('Goblin')).toBe(1);
+    expect(encounterEntryWeight({ name: 'Orc', weight: 5 })).toBe(5);
+    // Defensive: 0 / negative / non-finite never zero out a creature.
+    expect(encounterEntryWeight({ name: 'X', weight: 0 })).toBe(1);
+    expect(encounterEntryWeight({ name: 'X', weight: -4 })).toBe(1);
+    expect(encounterEntryWeight({ name: 'X', weight: NaN })).toBe(1);
+  });
+
+  it('an all-string table reduces to a uniform pick', () => {
+    const table = ['A', 'B', 'C'];
+    expect(pickWeightedEncounter(table, 0)).toBe('A'); // [0, 1) → A
+    expect(pickWeightedEncounter(table, 0.5)).toBe('B'); // [1, 2) → B
+    expect(pickWeightedEncounter(table, 0.9)).toBe('C'); // [2, 3) → C
+  });
+
+  it('walks the weight bands in order (total weight scales the draw)', () => {
+    const table = ['A', { name: 'B', weight: 3 }]; // bands: A=[0,1), B=[1,4), total 4
+    expect(pickWeightedEncounter(table, 0)).toBe('A'); // 0.0
+    expect(pickWeightedEncounter(table, 0.2)).toBe('A'); // 0.8 < 1 → A
+    expect(pickWeightedEncounter(table, 0.25)).toBe('B'); // 1.0 → B
+    expect(pickWeightedEncounter(table, 0.99)).toBe('B'); // ~3.96 → B
+  });
+
+  it('returns the last entry when the draw rounds to the total (fp guard)', () => {
+    expect(pickWeightedEncounter(['A', 'B'], 1)).toBe('B'); // rnd=1 → r never < 0 mid-loop
+  });
 });
 
 // ── Save-time schema ─────────────────────────────────────────────────────────
@@ -139,6 +190,39 @@ describe('RegionsSchema — encounter zones', () => {
 
   it('accepts a region whose cell `ez` references a declared zone', () => {
     expect(schema.safeParse([baseRegion()]).success).toBe(true);
+  });
+
+  it('accepts a mixed bare-name / {name, weight} table', () => {
+    const ok = baseRegion({
+      encounterZones: [
+        {
+          id: 'north',
+          name: 'A',
+          tier: 1,
+          encounterChance: 0.1,
+          encounterTable: ['Goblin', { name: 'Orc', weight: 4 }],
+        },
+      ],
+    });
+    expect(schema.safeParse([ok]).success).toBe(true);
+  });
+
+  it('rejects a non-integer / out-of-range / zero weight', () => {
+    const bad = (weight: unknown) =>
+      baseRegion({
+        encounterZones: [
+          {
+            id: 'north',
+            name: 'A',
+            tier: 1,
+            encounterChance: 0.1,
+            encounterTable: [{ name: 'Orc', weight }],
+          },
+        ],
+      });
+    expect(schema.safeParse([bad(0)]).success).toBe(false);
+    expect(schema.safeParse([bad(1.5)]).success).toBe(false);
+    expect(schema.safeParse([bad(100)]).success).toBe(false);
   });
 
   it('rejects a cell `ez` that points at an unknown zone', () => {

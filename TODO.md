@@ -90,7 +90,10 @@ documented deferrals.
 
 ## Encounter zones (follow-ups)
 
-- [ ] **Weighted creature entries** (`{name, weight}`) — selection is uniform today.
+- [x] **Weighted creature entries** (`{name, weight}`) — a zone's encounter table
+      now accepts bare names (weight 1) or `{name, weight}` pairs; selection is
+      weight-proportional (`pickWeightedEncounter`). The creator's zone picker has
+      a per-creature weight input (weight 1 stays a bare string on save).
 - [ ] **Mixed-group entries** — spawn a small group (e.g. "2 wolves + 1 bandit")
       instead of N of a single creature.
 - [ ] **Per-terrain weighting within a zone** (optional) — terrain selects the
