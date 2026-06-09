@@ -1094,13 +1094,15 @@ const RoomObjectSchema = z
   .object({
     id: SLUG,
     name: z.string().min(1).max(80),
-    desc: z.string().min(1).max(2000).optional(),
-    interactText: z.string().min(1).max(2000).optional(),
+    // Narrative hooks — variant pools (the shared HOOK union), persisted as
+    // campaign_narratives rows.
+    desc: HOOK,
+    interactText: HOOK,
     searchable: z.boolean().optional(),
     searchDC: z.number().int().min(1).max(30).optional(),
     lootIds: z.array(z.string().min(1).max(80)).max(10).optional(),
-    foundText: z.string().min(1).max(2000).optional(),
-    emptyText: z.string().min(1).max(2000).optional(),
+    foundText: HOOK,
+    emptyText: HOOK,
     pos: GridPosSchema.optional(),
   })
   .strict();
@@ -1142,16 +1144,18 @@ const RoomTrapSchema = z
   .object({
     id: SLUG.optional(),
     name: z.string().min(1).max(80),
-    desc: z.string().min(1).max(2000).optional(),
     dc: z.number().int().min(1).max(30),
     damage: z.string().min(1).max(20),
     damageType: z.enum(SRD_DAMAGE_TYPES),
     condition: z.enum(SRD_TRAP_CONDITIONS).optional(),
     conditionDuration: z.number().int().min(1).max(99).optional(),
-    triggerNarrative: z.string().min(1).max(2000).optional(),
-    detectNarrative: z.string().min(1).max(2000).optional(),
-    disarmSuccess: z.string().min(1).max(2000).optional(),
-    disarmFail: z.string().min(1).max(2000).optional(),
+    // Narrative hooks — variant pools (the shared HOOK union), persisted as
+    // campaign_narratives rows.
+    desc: HOOK,
+    triggerNarrative: HOOK,
+    detectNarrative: HOOK,
+    disarmSuccess: HOOK,
+    disarmFail: HOOK,
   })
   .strict();
 

@@ -3890,7 +3890,7 @@ export function buildArrivalNarrative(
   const trap = getRoomTrap(targetId, seed, context);
   if (trap && !trapSpent(state, targetId)) {
     if (partyDetectsTrap(state.characters, trap, pacePerceptionMod(state))) {
-      text += ' ' + trap.detectNarrative;
+      text += ' ' + (pickHookText(trap.detectNarrative) ?? '');
     }
     // If not detected, trap fires silently on next action — handled in takeAction
   }
@@ -10192,7 +10192,7 @@ export async function takeAction({
       char = dmgResult.char;
       st = dmgResult.st;
       narrative +=
-        hiddenTrap.triggerNarrative
+        (pickHookText(hiddenTrap.triggerNarrative) ?? '')
           .replace(/{name}/g, char.name)
           .replace(/{dmg}/g, String(trapDmg)) +
         dmgResult.concentrationNote +

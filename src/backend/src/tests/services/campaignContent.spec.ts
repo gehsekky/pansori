@@ -1495,6 +1495,41 @@ describe('rooms table store', () => {
     expect('onEnter' in (await getCampaignRooms(db.pool, 'malgovia'))[0]).toBe(false);
   });
 
+  it('object + trap narrative round-trip as campaign_narratives rows (pool stays array, one collapses)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const room: CampaignRoom = {
+      ...ROOM_B,
+      objects: [
+        {
+          id: 'chest',
+          name: 'Iron Chest',
+          // a multi-variant pool + a single-variant field
+          foundText: ['Gold gleams.', 'A false bottom!'],
+          interactText: 'The lid resists.',
+          searchDC: 13,
+          lootIds: ['dagger'],
+        },
+      ],
+      trap: {
+        name: 'Dart Trap',
+        dc: 13,
+        damage: '1d6',
+        damageType: 'piercing',
+        triggerNarrative: ['Darts hiss out.', 'A volley of needles!'],
+        detectNarrative: 'A seam in the wall.',
+      },
+    };
+    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [room])).toBe(true);
+    const [back] = await getCampaignRooms(db.pool, 'malgovia');
+    expect(back.objects![0].foundText).toEqual(['Gold gleams.', 'A false bottom!']); // pool
+    expect(back.objects![0].interactText).toBe('The lid resists.'); // 1 variant → string
+    expect(back.trap!.triggerNarrative).toEqual(['Darts hiss out.', 'A volley of needles!']);
+    expect(back.trap!.detectNarrative).toBe('A seam in the wall.');
+    // Mechanics stay in the room JSONB alongside.
+    expect(back.objects![0].searchDC).toBe(13);
+    expect(back.trap!.dc).toBe(13);
+  });
+
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);

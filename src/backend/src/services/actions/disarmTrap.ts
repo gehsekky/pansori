@@ -2,6 +2,7 @@ import { d20TestPenalty, disarmTrap, rollDice } from '../rulesEngine.js';
 import { getRoomTrap, partyDetectsTrap, trapSpent } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { pickHookText } from '../mapEngine.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -37,15 +38,16 @@ export const handleDisarmTrap: ActionHandler<{ type: 'disarm_trap' }> = (ctx) =>
   let narrative: string;
   if (total >= trap.dc) {
     nextSt = { ...nextSt, traps_disarmed: [...(nextSt.traps_disarmed ?? []), ctx.roomId] };
-    narrative = `${trap.disarmSuccess} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc})`;
+    // Narrative hooks are variant pools — pick one (always present, defaulted at overlay).
+    narrative = `${pickHookText(trap.disarmSuccess) ?? ''} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc})`;
   } else {
     nextSt = { ...nextSt, traps_triggered: [...(nextSt.traps_triggered ?? []), ctx.roomId] };
     const trapDmg = rollDice(trap.damage);
     const dmgResult = applyDamage(next, nextSt, trapDmg);
     next = dmgResult.char;
     nextSt = dmgResult.st;
-    let failNarr = `${trap.disarmFail} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
-    failNarr += trap.triggerNarrative
+    let failNarr = `${pickHookText(trap.disarmFail) ?? ''} (DEX ${roll} + ${total - roll}${profNote} = ${total} vs DC ${trap.dc}). `;
+    failNarr += (pickHookText(trap.triggerNarrative) ?? '')
       .replace(/{name}/g, next.name)
       .replace(/{dmg}/g, String(trapDmg));
     failNarr += dmgResult.concentrationNote;

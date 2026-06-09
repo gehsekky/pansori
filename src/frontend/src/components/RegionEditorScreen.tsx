@@ -156,10 +156,11 @@ interface EditorRegion {
 interface EditorObject {
   id: string;
   name: string;
-  desc?: string;
-  interactText?: string;
-  foundText?: string;
-  emptyText?: string;
+  // Narrative hooks — variant pools (string | string[]); edited via HookVariants.
+  desc?: string | string[];
+  interactText?: string | string[];
+  foundText?: string | string[];
+  emptyText?: string | string[];
   searchDC?: number;
   lootIds?: string[];
   pos?: { x: number; y: number };
@@ -174,10 +175,11 @@ interface EditorTrap {
   damage: string;
   damageType: string;
   condition?: string;
-  detectNarrative?: string;
-  triggerNarrative?: string;
-  disarmSuccess?: string;
-  disarmFail?: string;
+  // Narrative hooks — variant pools (string | string[]); edited via HookVariants.
+  detectNarrative?: string | string[];
+  triggerNarrative?: string | string[];
+  disarmSuccess?: string | string[];
+  disarmFail?: string | string[];
   [key: string]: unknown;
 }
 
@@ -223,6 +225,15 @@ type HookKey = (typeof HOOK_KEYS)[number];
 // Normalize a stored hook (string | string[] | undefined) to a variant list.
 function toVariants(v: string | string[] | undefined): string[] {
   return Array.isArray(v) ? [...v] : v ? [v] : [];
+}
+
+// Trim + drop blank variants for save; undefined when the pool is empty (so the
+// caller deletes the key rather than persisting an empty array / blank string).
+function pruneVariants(v: string | string[] | undefined): string[] | undefined {
+  const vs = toVariants(v)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return vs.length ? vs : undefined;
 }
 
 // The non-map fields editable on this page. Scalars held as strings ('' = unset);
@@ -978,10 +989,12 @@ function RegionEditorScreen({
         if (placedObjects.length > 0) {
           next.objects = placedObjects.map((o) => {
             const c: EditorObject = { ...o, name: o.name.trim() };
-            // Empty flavor strings are omitted (the schema requires min-1 / the
-            // engine defaults them); never persist a '' that would fail validation.
+            // Narrative hooks are variant pools — prune blank variants; an empty
+            // pool drops the key (the schema rejects empties / the engine defaults).
             for (const k of ['desc', 'interactText', 'foundText', 'emptyText'] as const) {
-              if (!(c[k] as string | undefined)?.trim()) delete c[k];
+              const vs = pruneVariants(c[k] as string | string[] | undefined);
+              if (vs) c[k] = vs;
+              else delete c[k];
             }
             if (c.searchDC === undefined) delete c.searchDC;
             if (!c.lootIds || c.lootIds.length === 0) delete c.lootIds;
@@ -1000,7 +1013,9 @@ function RegionEditorScreen({
             'disarmSuccess',
             'disarmFail',
           ] as const) {
-            if (!(t[k] as string | undefined)?.trim()) delete t[k];
+            const vs = pruneVariants(t[k] as string | string[] | undefined);
+            if (vs) t[k] = vs;
+            else delete t[k];
           }
           next.trap = t;
         } else {
@@ -3032,25 +3047,6 @@ function RegionEditorScreen({
                             }}
                           />
                         </div>
-                        <div style={{ flex: '3 1 200px' }}>
-                          <label className={styles.formLbl} htmlFor={`obj-interact-${i}`}>
-                            INTERACT TEXT
-                          </label>
-                          <input
-                            id={`obj-interact-${i}`}
-                            className={styles.formInp}
-                            placeholder="default"
-                            value={o.interactText ?? ''}
-                            onChange={(ev) => {
-                              const interactText = ev.target.value;
-                              setPlacedObjects((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, interactText } : p))
-                              );
-                              setDirty(true);
-                              setSaved(false);
-                            }}
-                          />
-                        </div>
                         <div style={{ flex: '0 1 90px' }}>
                           <label className={styles.formLbl} htmlFor={`obj-dc-${i}`}>
                             SEARCH DC
@@ -3173,34 +3169,31 @@ function RegionEditorScreen({
                           ))}
                         </select>
                       </div>
-                      {/* Flavor text (all optional — blank uses the engine default). */}
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                      {/* Flavor hooks — each a variant pool (blank uses the engine
+                          default). Labels carry the object index so the aria
+                          labels stay unique across objects. */}
+                      <div style={{ marginTop: 6 }}>
                         {(
                           [
+                            ['interactText', 'INTERACT TEXT'],
                             ['desc', 'DESCRIPTION'],
                             ['foundText', 'FOUND TEXT (search hit)'],
                             ['emptyText', 'EMPTY TEXT (search miss)'],
                           ] as const
                         ).map(([field, label]) => (
-                          <div key={field} style={{ flex: '1 1 180px' }}>
-                            <label className={styles.formLbl} htmlFor={`obj-${field}-${i}`}>
-                              {label}
-                            </label>
-                            <input
-                              id={`obj-${field}-${i}`}
-                              className={styles.formInp}
-                              placeholder="default"
-                              value={(o[field] as string | undefined) ?? ''}
-                              onChange={(ev) => {
-                                const v = ev.target.value;
-                                setPlacedObjects((prev) =>
-                                  prev.map((p, j) => (j === i ? { ...p, [field]: v } : p))
-                                );
-                                setDirty(true);
-                                setSaved(false);
-                              }}
-                            />
-                          </div>
+                          <HookVariants
+                            key={field}
+                            field={`obj-${field}-${i}`}
+                            label={`OBJECT ${i + 1} ${label}`}
+                            variants={toVariants(o[field] as string | string[] | undefined)}
+                            onChange={(variants) => {
+                              setPlacedObjects((prev) =>
+                                prev.map((p, j) => (j === i ? { ...p, [field]: variants } : p))
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            }}
+                          />
                         ))}
                       </div>
                     </div>
@@ -3381,7 +3374,8 @@ function RegionEditorScreen({
                         ))}
                       </select>
                     </div>
-                    {/* Narrative overrides — blank uses the engine default. */}
+                    {/* Narrative overrides — each a variant pool (blank uses the
+                        engine default). */}
                     {(
                       [
                         ['detectNarrative', 'DETECT TEXT'],
@@ -3391,17 +3385,12 @@ function RegionEditorScreen({
                       ] as const
                     ).map(([field, label]) => (
                       <div key={field} style={{ flex: '1 1 240px' }}>
-                        <label className={styles.formLbl} htmlFor={`trap-${field}`}>
-                          {label}
-                        </label>
-                        <input
-                          id={`trap-${field}`}
-                          className={styles.formInp}
-                          placeholder="default"
-                          value={(trapDraft[field] as string | undefined) ?? ''}
-                          onChange={(ev) => {
-                            const v = ev.target.value;
-                            setTrapDraft((t) => (t ? { ...t, [field]: v } : t));
+                        <HookVariants
+                          field={`trap-${field}`}
+                          label={label}
+                          variants={toVariants(trapDraft[field] as string | string[] | undefined)}
+                          onChange={(variants) => {
+                            setTrapDraft((t) => (t ? { ...t, [field]: variants } : t));
                             setDirty(true);
                             setSaved(false);
                           }}

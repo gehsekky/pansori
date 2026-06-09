@@ -229,6 +229,14 @@ export interface CampaignRegion {
 // (pickHookText). The section payloads still carry hooks inline (onEnter etc. as
 // string | string[]) — these helpers just move the persistence to the table.
 const LEVEL_HOOKS = ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const;
+const OBJECT_HOOKS = ['desc', 'interactText', 'foundText', 'emptyText'] as const;
+const TRAP_HOOKS = [
+  'desc',
+  'triggerNarrative',
+  'detectNarrative',
+  'disarmSuccess',
+  'disarmFail',
+] as const;
 
 // Collapse a variant list to the wire shape: absent when empty, a lone string
 // for one variant (keeps single-string round-trips stable), else the array.
@@ -259,27 +267,30 @@ export async function getCampaignNarratives(
   );
   const m = new Map<string, string[]>();
   for (const r of rows) {
-    const key = `${r.owner_kind} ${r.owner_id} ${r.hook}`;
+    const key = `${r.owner_kind}|${r.owner_id}|${r.hook}`;
     const list = m.get(key);
     if (list) list.push(r.text);
     else m.set(key, [r.text]);
   }
-  return { get: (k, id, h) => m.get(`${k} ${id} ${h}`) };
+  return { get: (k, id, h) => m.get(`${k}|${id}|${h}`) };
 }
 
-// The four level hooks for an owner, collapsed to wire shape (absent ones omitted).
-function levelHookFields(
+// The named hooks for an owner, collapsed to wire shape (absent ones omitted).
+function hookFields(
   nar: NarrativeLookup,
   ownerKind: string,
-  ownerId: string
+  ownerId: string,
+  hooks: readonly string[]
 ): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
-  for (const hook of LEVEL_HOOKS) {
+  for (const hook of hooks) {
     const v = collapseHook(nar.get(ownerKind, ownerId, hook));
     if (v !== undefined) out[hook] = v;
   }
   return out;
 }
+const levelHookFields = (nar: NarrativeLookup, ownerKind: string, ownerId: string) =>
+  hookFields(nar, ownerKind, ownerId, LEVEL_HOOKS);
 
 // Insert a hook bundle as variant rows for one owner, inside a transaction.
 // Accepts the wire shape (string | string[]); blanks are skipped.
@@ -818,13 +829,15 @@ export interface CampaignRoomNpcResponse {
 export interface CampaignRoomObject {
   id: string;
   name: string;
-  desc?: string;
-  interactText?: string;
+  // Narrative hooks — variant pools persisted as campaign_narratives rows
+  // (owner_kind 'roomObject'); default at overlay time when absent.
+  desc?: string | string[];
+  interactText?: string | string[];
   searchable?: boolean;
   searchDC?: number;
   lootIds?: string[];
-  foundText?: string;
-  emptyText?: string;
+  foundText?: string | string[];
+  emptyText?: string | string[];
   pos?: GridPos;
 }
 
@@ -834,16 +847,18 @@ export interface CampaignRoomObject {
 export interface CampaignRoomTrap {
   id?: string;
   name: string;
-  desc?: string;
   dc: number;
   damage: string;
   damageType: string;
   condition?: string;
   conditionDuration?: number;
-  triggerNarrative?: string;
-  detectNarrative?: string;
-  disarmSuccess?: string;
-  disarmFail?: string;
+  // Narrative hooks — variant pools persisted as campaign_narratives rows
+  // (owner_kind 'roomTrap'); default at overlay time when absent.
+  desc?: string | string[];
+  triggerNarrative?: string | string[];
+  detectNarrative?: string | string[];
+  disarmSuccess?: string | string[];
+  disarmFail?: string | string[];
 }
 
 export interface CampaignRoomNpc {
@@ -938,9 +953,28 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.enemies.length > 0 ? { enemies: r.enemies } : {}),
     ...(r.loot.length > 0 ? { loot: r.loot } : {}),
     ...(r.npcs.length > 0 ? { npcs: r.npcs } : {}),
-    ...(r.objects.length > 0 ? { objects: r.objects } : {}),
-    ...(r.trap !== null ? { trap: r.trap } : {}),
+    // Object / trap narrative lives in campaign_narratives — overlay it onto the
+    // mechanics-only JSONB (rows win the spread).
+    ...(r.objects.length > 0
+      ? {
+          objects: r.objects.map((o) => ({
+            ...o,
+            ...hookFields(nar, 'roomObject', `${r.id}/${o.id}`, OBJECT_HOOKS),
+          })),
+        }
+      : {}),
+    ...(r.trap !== null
+      ? { trap: { ...r.trap, ...hookFields(nar, 'roomTrap', r.id, TRAP_HOOKS) } }
+      : {}),
   }));
+}
+
+// Strip a CampaignRoom entity's narrative keys for mechanics-only JSONB storage
+// (the narrative goes to campaign_narratives rows). Returns a shallow copy.
+function stripHooks<T extends object>(entity: T, hooks: readonly string[]): T {
+  const out = { ...entity } as Record<string, unknown>;
+  for (const h of hooks) delete out[h];
+  return out as T;
 }
 
 // Replace-all write, matching the editor's whole-section semantics.
@@ -959,7 +993,8 @@ export async function putCampaignRooms(
     }
     await client.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
     await client.query(
-      `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'room'`,
+      `DELETE FROM campaign_narratives WHERE campaign_id = $1
+         AND owner_kind IN ('room', 'roomObject', 'roomTrap')`,
       [campaignId]
     );
     for (let i = 0; i < rooms.length; i++) {
@@ -992,8 +1027,10 @@ export async function putCampaignRooms(
           null,
           null,
           null,
-          JSON.stringify(r.objects ?? []),
-          r.trap ? JSON.stringify(r.trap) : null,
+          // Object / trap narrative also moves to campaign_narratives — store the
+          // mechanics-only projection here (strip the narrative keys).
+          JSON.stringify((r.objects ?? []).map((o) => stripHooks(o, OBJECT_HOOKS))),
+          r.trap ? JSON.stringify(stripHooks(r.trap, TRAP_HOOKS)) : null,
         ]
       );
       await insertNarratives(client, campaignId, 'room', r.id, {
@@ -1002,6 +1039,23 @@ export async function putCampaignRooms(
         onExit: r.onExit,
         onFirstExit: r.onFirstExit,
       });
+      for (const o of r.objects ?? []) {
+        await insertNarratives(client, campaignId, 'roomObject', `${r.id}/${o.id}`, {
+          desc: o.desc,
+          interactText: o.interactText,
+          foundText: o.foundText,
+          emptyText: o.emptyText,
+        });
+      }
+      if (r.trap) {
+        await insertNarratives(client, campaignId, 'roomTrap', r.id, {
+          desc: r.trap.desc,
+          triggerNarrative: r.trap.triggerNarrative,
+          detectNarrative: r.trap.detectNarrative,
+          disarmSuccess: r.trap.disarmSuccess,
+          disarmFail: r.trap.disarmFail,
+        });
+      }
     }
     await client.query('COMMIT');
     return true;
@@ -1018,7 +1072,8 @@ export async function deleteCampaignRooms(pool: Pool, campaignId: string): Promi
   if (!rowCount) return false;
   await pool.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
   await pool.query(
-    `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'room'`,
+    `DELETE FROM campaign_narratives WHERE campaign_id = $1
+       AND owner_kind IN ('room', 'roomObject', 'roomTrap')`,
     [campaignId]
   );
   return true;

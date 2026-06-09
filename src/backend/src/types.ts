@@ -43,16 +43,19 @@ import type {
 export interface Trap {
   id: string;
   name: string;
-  desc: string; // flavour description shown when detected
   dc: number; // Perception DC to detect; Dexterity DC to disarm
   damage: string; // dice expr on trigger (e.g. '2d6')
   damageType: string;
   condition?: ConditionName; // optional condition applied on trigger
   conditionDuration?: number; // rounds; undefined = until cleared
-  triggerNarrative: string; // text when trap fires (use {name}, {dmg})
-  detectNarrative: string; // text when party spots the trap
-  disarmSuccess: string; // text on successful disarm
-  disarmFail: string; // text on failed disarm (trap fires)
+  // Narrative hooks — each a VARIANT POOL (engine picks one via pickHookText;
+  // multi-paragraph via newlines). Persisted as campaign_narratives rows
+  // (owner_kind 'roomTrap'); {name}/{dmg} substituted after the pick.
+  desc: string | string[]; // flavour shown when detected
+  triggerNarrative: string | string[]; // text when the trap fires
+  detectNarrative: string | string[]; // text when the party spots it
+  disarmSuccess: string | string[]; // text on successful disarm
+  disarmFail: string | string[]; // text on failed disarm (trap fires)
 }
 
 // `RoomObject` is re-exported from ./shared-types (see src/shared/types.ts).

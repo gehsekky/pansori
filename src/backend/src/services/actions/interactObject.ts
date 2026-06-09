@@ -12,6 +12,7 @@ import {
   peerlessSkillDie,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { pickHookText } from '../mapEngine.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
 
@@ -46,6 +47,9 @@ export const handleInteractObject: ActionHandler<{
     return;
   }
 
+  // Narrative hooks are variant pools — pick one (post-pick token substitution
+  // stays as-is). interactText is always present (defaulted at overlay time).
+  const interactText = pickHookText(obj.interactText) ?? '';
   const searchKey = `${ctx.roomId}:${obj.id}`;
   if ((ctx.st.objects_searched ?? []).includes(searchKey)) {
     ctx.narrative = (ctx.narrative ?? '') + `You have already searched the ${obj.name}.`;
@@ -64,7 +68,7 @@ export const handleInteractObject: ActionHandler<{
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
     updatePcActor(ctx, nextChar);
     ctx.st = nextSt;
-    ctx.narrative = (ctx.narrative ?? '') + obj.interactText;
+    ctx.narrative = (ctx.narrative ?? '') + interactText;
     return;
   }
 
@@ -133,10 +137,10 @@ export const handleInteractObject: ActionHandler<{
       nextSt = { ...nextSt, loot_taken: [...(nextSt.loot_taken ?? []), ...gainedIds] };
     }
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
-    const foundDesc = obj.foundText ?? `You find: ${gained.join(', ')}.`;
-    narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
+    const foundDesc = pickHookText(obj.foundText) ?? `You find: ${gained.join(', ')}.`;
+    narrative = `${interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
   } else {
-    narrative = `${obj.interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${obj.emptyText ?? 'You can try again.'}`;
+    narrative = `${interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${pickHookText(obj.emptyText) ?? 'You can try again.'}`;
   }
   updatePcActor(ctx, nextChar);
   ctx.st = nextSt;

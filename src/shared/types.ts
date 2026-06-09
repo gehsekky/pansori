@@ -1208,13 +1208,16 @@ export type GameConsequence =
 export interface RoomObject {
   id: string;
   name: string;
-  desc: string;
-  interactText: string;
+  // Narrative hooks — each a VARIANT POOL (engine picks one via pickHookText;
+  // multi-paragraph via newlines). Persisted as campaign_narratives rows
+  // (owner_kind 'roomObject').
+  desc: string | string[];
+  interactText: string | string[];
   searchable?: boolean;
   searchDC?: number;
   lootIds?: string[];
-  foundText?: string;
-  emptyText?: string;
+  foundText?: string | string[];
+  emptyText?: string | string[];
   // Grid cell for the object on the local-room map. When set, the object
   // renders as a clickable map token; clicking walks the party adjacent
   // (the `approach` action) and the "Interact" choice is gated on adjacency.

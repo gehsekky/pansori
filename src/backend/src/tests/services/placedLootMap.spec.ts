@@ -188,3 +188,31 @@ describe('arrival narrative lists every spotted item', () => {
     expect(text).toContain('Dagger');
   });
 });
+
+describe('object narrative is a variant pool — the engine picks one', () => {
+  it('a foundText pool yields exactly one variant on a successful search', async () => {
+    // Constant random: a high d20 (search succeeds vs DC 5) and a deterministic
+    // pickHookText index (floor(0.6 * 2) = 1 → the second variant).
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+    const poolSeed: Seed = {
+      ...seed,
+      rooms: [
+        {
+          ...seed.rooms[0],
+          objects: [{ ...seed.rooms[0].objects![0], foundText: ['First find.', 'Second find.'] }],
+        },
+      ],
+    };
+    const result = await takeAction({
+      action: { type: 'interact_object', objectId: 'chest' },
+      history: [],
+      state: vaultState({ x: 6, y: 6 }),
+      seed: poolSeed,
+      context: ctx,
+    });
+    const hasFirst = result.narrative.includes('First find.');
+    const hasSecond = result.narrative.includes('Second find.');
+    expect(hasFirst || hasSecond).toBe(true); // a pool variant was used
+    expect(hasFirst && hasSecond).toBe(false); // never both — exactly one pick
+  });
+});
