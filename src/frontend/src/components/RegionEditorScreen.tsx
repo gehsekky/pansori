@@ -190,12 +190,12 @@ interface EditorNpc {
   id: string;
   name: string;
   attitude: string;
-  greeting: string;
-  // NPC narrative hooks — FIRST overrides the plain one once (first talk /
-  // first explicit end of conversation).
-  firstGreeting?: string;
-  goodbye?: string;
-  firstGoodbye?: string;
+  // Greeting/goodbye hooks — variant pools (string | string[]); edited via
+  // HookVariants. FIRST overrides the plain one once. greeting required.
+  greeting: string | string[];
+  firstGreeting?: string | string[];
+  goodbye?: string | string[];
+  firstGoodbye?: string | string[];
   pos?: { x: number; y: number };
   icon?: string;
   responses?: DialogueNode[];
@@ -845,7 +845,7 @@ function RegionEditorScreen({
     if (kind === 'room' && placedLoot.some((l) => !l.itemId)) {
       return { error: 'Every loot placement needs an item picked.' };
     }
-    if (kind === 'room' && placedNpcs.some((n) => !n.name.trim() || !n.greeting.trim())) {
+    if (kind === 'room' && placedNpcs.some((n) => !n.name.trim() || !pruneVariants(n.greeting))) {
       return { error: 'Every NPC needs a name and a greeting.' };
     }
     if (
@@ -967,12 +967,17 @@ function RegionEditorScreen({
           // Preserve JSON-authored extras (dialogue / shop / stat block);
           // prune the painter-managed optionals when emptied.
           next.npcs = placedNpcs.map((n) => {
-            const c: EditorNpc = { ...n, name: n.name.trim(), greeting: n.greeting.trim() };
+            const c: EditorNpc = { ...n, name: n.name.trim() };
             if (!c.icon) delete c.icon;
             if (!c.pos) delete c.pos;
-            if (!c.firstGreeting) delete c.firstGreeting;
-            if (!c.goodbye) delete c.goodbye;
-            if (!c.firstGoodbye) delete c.firstGoodbye;
+            // Greeting/goodbye are variant pools — prune blank variants. greeting
+            // is required (validated above), so it always survives.
+            c.greeting = pruneVariants(n.greeting) ?? [];
+            for (const k of ['firstGreeting', 'goodbye', 'firstGoodbye'] as const) {
+              const vs = pruneVariants(c[k] as string | string[] | undefined);
+              if (vs) c[k] = vs;
+              else delete c[k];
+            }
             if (!c.responses || c.responses.length === 0) delete c.responses;
             if (!c.shop || c.shop.length === 0) delete c.shop;
             else
@@ -2704,38 +2709,31 @@ function RegionEditorScreen({
                           </button>
                         </div>
                       </div>
-                      {/* NPC narrative fields — one full-width row each, like
-                          the room NARRATION HOOKS card. FIRST overrides the
-                          plain one once (first talk / first end). */}
+                      {/* NPC greeting/goodbye hooks — each a variant pool (FIRST
+                          overrides the plain one once). Dialogue replies are
+                          edited separately (the DIALOGUE tree, single lines).
+                          Labels carry the NPC index for aria-uniqueness. */}
                       {(
                         [
-                          ['greeting', 'GREETING', 'What they say when the party talks to them'],
-                          ['firstGreeting', 'FIRST GREETING', 'defaults to greeting'],
-                          ['goodbye', 'GOODBYE', 'none'],
-                          ['firstGoodbye', 'FIRST GOODBYE', 'defaults to goodbye'],
+                          ['greeting', 'GREETING'],
+                          ['firstGreeting', 'FIRST GREETING'],
+                          ['goodbye', 'GOODBYE'],
+                          ['firstGoodbye', 'FIRST GOODBYE'],
                         ] as const
-                      ).map(([key, label, ph]) => (
-                        <div key={key} style={{ marginTop: 6 }}>
-                          <label className={styles.formLbl} htmlFor={`npc-${key}-${i}`}>
-                            {label}
-                          </label>
-                          <textarea
-                            id={`npc-${key}-${i}`}
-                            className={styles.formInp}
-                            rows={3}
-                            style={{ resize: 'vertical' }}
-                            placeholder={ph}
-                            value={(n[key] as string) ?? ''}
-                            onChange={(ev) => {
-                              const v = ev.target.value;
-                              setPlacedNpcs((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, [key]: v } : p))
-                              );
-                              setDirty(true);
-                              setSaved(false);
-                            }}
-                          />
-                        </div>
+                      ).map(([key, label]) => (
+                        <HookVariants
+                          key={key}
+                          field={`npc-${key}-${i}`}
+                          label={`NPC ${i + 1} ${label}`}
+                          variants={toVariants(n[key] as string | string[] | undefined)}
+                          onChange={(variants) => {
+                            setPlacedNpcs((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, [key]: variants } : p))
+                            );
+                            setDirty(true);
+                            setSaved(false);
+                          }}
+                        />
                       ))}
                       {/* Shop — wares from the composed item list, with a
                           faction tie so the tier price multipliers apply. */}

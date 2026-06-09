@@ -297,9 +297,13 @@ const RegionGridSchema = z.array(z.array(TerrainCellSchema).min(1).max(200)).min
 // variants (the engine picks one at random; multi-paragraph = newlines within a
 // variant). A 1-element pool is fine; blank variants are pruned client-side.
 // Persisted as campaign_narratives rows.
-const HOOK = z
-  .union([z.string().min(1).max(2000), z.array(z.string().min(1).max(2000)).min(1).max(50)])
-  .optional();
+// HOOK_REQUIRED for hooks that must be present (e.g. an NPC greeting); HOOK is
+// the optional form used by everything else.
+const HOOK_REQUIRED = z.union([
+  z.string().min(1).max(2000),
+  z.array(z.string().min(1).max(2000)).min(1).max(50),
+]);
+const HOOK = HOOK_REQUIRED.optional();
 const LEVEL_HOOK_FIELDS = {
   onEnter: HOOK,
   onFirstEnter: HOOK,
@@ -1170,13 +1174,13 @@ const RoomNpcSchema = z
     // single-word personal names a heuristic can't catch (e.g. "Dusk").
     proper_noun: z.boolean().optional(),
     attitude: z.enum(['friendly', 'indifferent', 'hostile']),
-    greeting: z.string().min(1).max(2000),
-    // NPC narrative hooks — the FIRST variant overrides the plain one once:
-    // firstGreeting on the first talk, firstGoodbye on the first explicit
-    // END CONVERSATION; goodbye plays on every later end (optional).
-    firstGreeting: z.string().min(1).max(2000).optional(),
-    goodbye: z.string().min(1).max(2000).optional(),
-    firstGoodbye: z.string().min(1).max(2000).optional(),
+    // Greeting/goodbye hooks are variant pools (the shared HOOK union), persisted
+    // as campaign_narratives rows. greeting is required; FIRST overrides plain
+    // once (firstGreeting on the first talk, firstGoodbye on the first end).
+    greeting: HOOK_REQUIRED,
+    firstGreeting: HOOK,
+    goodbye: HOOK,
+    firstGoodbye: HOOK,
     responses: z.array(RoomNpcResponseSchema).max(8).optional(),
     persuasionDC: z.number().int().min(1).max(30).optional(),
     pos: GridPosSchema.optional(),

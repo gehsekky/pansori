@@ -768,20 +768,17 @@ describe('RegionEditorScreen', () => {
       expect(
         (screen.getByLabelText('NAME', { selector: '#npc-name-0' }) as HTMLInputElement).value
       ).toBe('Old Hob');
-      // Edit the card fields + place the token.
-      fireEvent.change(screen.getByLabelText('GREETING'), {
+      // Greeting/goodbye are variant pools. The loaded greeting shows as one
+      // variant — edit it; add variants for two more; leave FIRST GOODBYE empty.
+      const addFill = (label: string, value: string) => {
+        fireEvent.click(screen.getByLabelText(`Add ${label} variant`));
+        fireEvent.change(screen.getByLabelText(`${label} variant 1`), { target: { value } });
+      };
+      fireEvent.change(screen.getByLabelText('NPC 1 GREETING variant 1'), {
         target: { value: 'Mind the step.' },
       });
-      // NPC narrative hooks: set two; the third stays empty and is pruned.
-      fireEvent.change(
-        screen.getByLabelText('FIRST GREETING', { selector: '#npc-firstGreeting-0' }),
-        {
-          target: { value: 'New faces! Welcome.' },
-        }
-      );
-      fireEvent.change(screen.getByLabelText('GOODBYE', { selector: '#npc-goodbye-0' }), {
-        target: { value: 'Walk safe.' },
-      });
+      addFill('NPC 1 FIRST GREETING', 'New faces! Welcome.');
+      addFill('NPC 1 GOODBYE', 'Walk safe.');
       fireEvent.click(screen.getByTestId('place-npc-0'));
       fireEvent.mouseDown(screen.getByTestId('cell-1-1'));
       expect(screen.getByText('AT (1,1)')).toBeTruthy();
@@ -793,9 +790,7 @@ describe('RegionEditorScreen', () => {
       fireEvent.change(screen.getByLabelText('NAME', { selector: '#npc-name-1' }), {
         target: { value: 'Mute Meg' },
       });
-      fireEvent.change(screen.getByLabelText('GREETING', { selector: '#npc-greeting-1' }), {
-        target: { value: '…' },
-      });
+      addFill('NPC 2 GREETING', '…');
       fireEvent.click(screen.getByText('SAVE'));
       await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
       const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
@@ -807,9 +802,10 @@ describe('RegionEditorScreen', () => {
         id: 'old-hob',
         name: 'Old Hob',
         attitude: 'friendly',
-        greeting: 'Mind the step.',
-        firstGreeting: 'New faces! Welcome.',
-        goodbye: 'Walk safe.',
+        // Hooks save as variant pools; the empty FIRST GOODBYE is pruned.
+        greeting: ['Mind the step.'],
+        firstGreeting: ['New faces! Welcome.'],
+        goodbye: ['Walk safe.'],
         pos: { x: 1, y: 1 },
         // JSON-authored extras preserved untouched.
         responses: [{ label: 'Ask', reply: 'No.' }],
@@ -819,7 +815,7 @@ describe('RegionEditorScreen', () => {
         id: 'npc-2',
         name: 'Mute Meg',
         attitude: 'indifferent',
-        greeting: '…',
+        greeting: ['…'],
       });
     });
 

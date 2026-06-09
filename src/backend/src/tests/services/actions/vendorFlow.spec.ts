@@ -47,7 +47,12 @@ function state(over: Partial<GameState> = {}, gold = 100): GameState {
 const talking = (over: Partial<GameState> = {}, gold = 100): GameState =>
   state(
     {
-      active_conversation: { npcId: NPC, roomId: ROOM, path: [], prompt: aldric.greeting },
+      active_conversation: {
+        npcId: NPC,
+        roomId: ROOM,
+        path: [],
+        prompt: aldric.greeting as string,
+      },
       ...over,
     },
     gold

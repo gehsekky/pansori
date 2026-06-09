@@ -1530,6 +1530,32 @@ describe('rooms table store', () => {
     expect(back.trap!.dc).toBe(13);
   });
 
+  it('NPC greeting/goodbye round-trip as rows; dialogue replies stay inline', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const room: CampaignRoom = {
+      ...ROOM_B,
+      npcs: [
+        {
+          id: 'hob',
+          name: 'Hob',
+          attitude: 'friendly',
+          greeting: ['Evening.', 'You again.'], // a variant pool
+          goodbye: 'Mind the step.', // single → collapses to string
+          responses: [{ label: 'Ask', reply: 'No.' }], // dialogue stays inline
+          shop: [{ itemId: 'rope', price: 1 }],
+        },
+      ],
+    };
+    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [room])).toBe(true);
+    const npc = (await getCampaignRooms(db.pool, 'malgovia'))[0].npcs![0];
+    expect(npc.greeting).toEqual(['Evening.', 'You again.']); // pool preserved + ordered
+    expect(npc.goodbye).toBe('Mind the step.'); // 1 variant → string
+    expect('firstGreeting' in npc).toBe(false); // unset hook absent
+    // Dialogue + shop ride along in the JSONB, untouched.
+    expect(npc.responses).toEqual([{ label: 'Ask', reply: 'No.' }]);
+    expect(npc.shop).toEqual([{ itemId: 'rope', price: 1 }]);
+  });
+
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
     await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);

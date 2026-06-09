@@ -105,7 +105,12 @@ describe('multiple NPCs in one room', () => {
     // Aria has a shop; Bram does not. With the vendor open on Aria:
     const choices = generateChoices(
       pcState({
-        active_conversation: { npcId: 'npc_aria', roomId: ROOM, path: [], prompt: aria.greeting },
+        active_conversation: {
+          npcId: 'npc_aria',
+          roomId: ROOM,
+          path: [],
+          prompt: aria.greeting as string,
+        },
         active_shop: { npcId: 'npc_aria', roomId: ROOM },
       }),
       seed,
@@ -118,7 +123,12 @@ describe('multiple NPCs in one room', () => {
   it('the wares control only appears for the shop-owning npc in conversation', () => {
     const withAria = generateChoices(
       pcState({
-        active_conversation: { npcId: 'npc_aria', roomId: ROOM, path: [], prompt: aria.greeting },
+        active_conversation: {
+          npcId: 'npc_aria',
+          roomId: ROOM,
+          path: [],
+          prompt: aria.greeting as string,
+        },
       }),
       seed,
       ctx
@@ -126,7 +136,12 @@ describe('multiple NPCs in one room', () => {
     expect(withAria.some((c) => c.action.type === 'enter_shop')).toBe(true);
     const withBram = generateChoices(
       pcState({
-        active_conversation: { npcId: 'npc_bram', roomId: ROOM, path: [], prompt: bram.greeting },
+        active_conversation: {
+          npcId: 'npc_bram',
+          roomId: ROOM,
+          path: [],
+          prompt: bram.greeting as string,
+        },
       }),
       seed,
       ctx

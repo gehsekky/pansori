@@ -1,4 +1,5 @@
 import { abilityMod, d20TestPenalty, profBonus, rollDice, skillCheck } from '../rulesEngine.js';
+import { activeGrid, pickHookText } from '../mapEngine.js';
 import { adjacentPositions, chebyshev } from '../gridEngine.js';
 import {
   applyConsequence,
@@ -18,7 +19,6 @@ import { onceKey, visibleResponses } from '../dialogueGating.js';
 import type { ActionHandler } from './types.js';
 import type { ActiveGrid } from '../mapEngine.js';
 import type { GridPos } from '../../types.js';
-import { activeGrid } from '../mapEngine.js';
 import { randomUUID } from 'crypto';
 import { responsesAtPath } from '../conversation.js';
 
@@ -80,9 +80,10 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
   // FIRST-time talks (npc_talked) play firstGreeting when authored; every
   // later talk plays the plain greeting — the NPC-hook twin of the level
   // hooks' FIRST-overrides-plain rule.
+  // Greeting/goodbye are variant pools — pick one. FIRST overrides plain once.
   const greetingText = ctx.st.npc_talked.includes(npc.id)
-    ? npc.greeting
-    : (npc.firstGreeting ?? npc.greeting);
+    ? (pickHookText(npc.greeting) ?? '')
+    : (pickHookText(npc.firstGreeting) ?? pickHookText(npc.greeting) ?? '');
   const spokenGreeting = `${npc.name}: "${greetingText}"`;
   let narrative: string;
   if (attitude === 'indifferent') {
@@ -281,11 +282,12 @@ export const handleConversationBack: ActionHandler<{ type: 'conversation_back' }
   }
   const npc = npcById(ctx.seed, conv.npcId);
   const newPath = conv.path.slice(0, -1);
-  let prompt = npc?.greeting ?? '';
+  let prompt = pickHookText(npc?.greeting) ?? '';
   if (npc && newPath.length > 0) {
-    // The response that opened this (now-parent) level.
+    // The response that opened this (now-parent) level. `reply` is a single
+    // dialogue line (stays inline); fall back to the greeting pool.
     const parent = responsesAtPath(npc, newPath.slice(0, -1))[newPath[newPath.length - 1]];
-    prompt = parent?.reply ?? npc.greeting;
+    prompt = parent?.reply ?? pickHookText(npc.greeting) ?? '';
   }
   ctx.st = { ...ctx.st, active_conversation: { ...conv, path: newPath, prompt } };
   ctx.narrative = prompt;
@@ -307,7 +309,9 @@ export const handleEndConversation: ActionHandler<{ type: 'end_conversation' }> 
   let goodbye = '';
   if (npc) {
     const farewelled = ctx.st.npc_farewelled ?? [];
-    const text = farewelled.includes(npc.id) ? npc.goodbye : (npc.firstGoodbye ?? npc.goodbye);
+    const text = farewelled.includes(npc.id)
+      ? pickHookText(npc.goodbye)
+      : (pickHookText(npc.firstGoodbye) ?? pickHookText(npc.goodbye));
     if (text) goodbye = `${npc.name}: "${text}" `;
     if (!farewelled.includes(npc.id)) {
       ctx.st = { ...ctx.st, npc_farewelled: [...farewelled, npc.id] };

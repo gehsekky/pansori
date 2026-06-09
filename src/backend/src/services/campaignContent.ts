@@ -230,6 +230,7 @@ export interface CampaignRegion {
 // string | string[]) — these helpers just move the persistence to the table.
 const LEVEL_HOOKS = ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const;
 const OBJECT_HOOKS = ['desc', 'interactText', 'foundText', 'emptyText'] as const;
+const NPC_HOOKS = ['greeting', 'firstGreeting', 'goodbye', 'firstGoodbye'] as const;
 const TRAP_HOOKS = [
   'desc',
   'triggerNarrative',
@@ -868,10 +869,13 @@ export interface CampaignRoomNpc {
   // single-word personal names a heuristic can't catch (e.g. "Dusk").
   proper_noun?: boolean;
   attitude: 'friendly' | 'indifferent' | 'hostile';
-  greeting: string;
-  firstGreeting?: string;
-  goodbye?: string;
-  firstGoodbye?: string;
+  // Greeting/goodbye hooks — variant pools persisted as campaign_narratives
+  // rows (owner_kind 'roomNpc'). greeting required; the rest optional. (Dialogue
+  // responses stay inline in this JSONB.)
+  greeting: string | string[];
+  firstGreeting?: string | string[];
+  goodbye?: string | string[];
+  firstGoodbye?: string | string[];
   responses?: CampaignRoomNpcResponse[];
   persuasionDC?: number;
   pos?: GridPos;
@@ -952,7 +956,16 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     ...(r.can_rest ? { canRest: true } : {}),
     ...(r.enemies.length > 0 ? { enemies: r.enemies } : {}),
     ...(r.loot.length > 0 ? { loot: r.loot } : {}),
-    ...(r.npcs.length > 0 ? { npcs: r.npcs } : {}),
+    // NPC greeting/goodbye narrative lives in campaign_narratives — overlay it
+    // onto the JSONB (dialogue replies stay inline).
+    ...(r.npcs.length > 0
+      ? {
+          npcs: r.npcs.map((n) => ({
+            ...n,
+            ...hookFields(nar, 'roomNpc', `${r.id}/${n.id}`, NPC_HOOKS),
+          })),
+        }
+      : {}),
     // Object / trap narrative lives in campaign_narratives — overlay it onto the
     // mechanics-only JSONB (rows win the spread).
     ...(r.objects.length > 0
@@ -994,7 +1007,7 @@ export async function putCampaignRooms(
     await client.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
     await client.query(
       `DELETE FROM campaign_narratives WHERE campaign_id = $1
-         AND owner_kind IN ('room', 'roomObject', 'roomTrap')`,
+         AND owner_kind IN ('room', 'roomNpc', 'roomObject', 'roomTrap')`,
       [campaignId]
     );
     for (let i = 0; i < rooms.length; i++) {
@@ -1021,7 +1034,9 @@ export async function putCampaignRooms(
           r.canRest ?? false,
           JSON.stringify(r.enemies ?? []),
           JSON.stringify(r.loot ?? []),
-          JSON.stringify(r.npcs ?? []),
+          // NPC greeting/goodbye narrative moves to campaign_narratives — store the
+          // rest of the NPC (incl. the dialogue tree) here, sans those keys.
+          JSON.stringify((r.npcs ?? []).map((n) => stripHooks(n, NPC_HOOKS))),
           // Narration hooks moved to campaign_narratives; on_* columns inert.
           null,
           null,
@@ -1039,6 +1054,14 @@ export async function putCampaignRooms(
         onExit: r.onExit,
         onFirstExit: r.onFirstExit,
       });
+      for (const n of r.npcs ?? []) {
+        await insertNarratives(client, campaignId, 'roomNpc', `${r.id}/${n.id}`, {
+          greeting: n.greeting,
+          firstGreeting: n.firstGreeting,
+          goodbye: n.goodbye,
+          firstGoodbye: n.firstGoodbye,
+        });
+      }
       for (const o of r.objects ?? []) {
         await insertNarratives(client, campaignId, 'roomObject', `${r.id}/${o.id}`, {
           desc: o.desc,
@@ -1073,7 +1096,7 @@ export async function deleteCampaignRooms(pool: Pool, campaignId: string): Promi
   await pool.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
   await pool.query(
     `DELETE FROM campaign_narratives WHERE campaign_id = $1
-       AND owner_kind IN ('room', 'roomObject', 'roomTrap')`,
+       AND owner_kind IN ('room', 'roomNpc', 'roomObject', 'roomTrap')`,
     [campaignId]
   );
   return true;

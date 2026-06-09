@@ -1264,17 +1264,17 @@ export interface NpcTemplate {
   // omitted the token uses a generic NPC glyph — a per-NPC override over that
   // default, mirroring how dungeon sites override DEFAULT_SITE_ICON.
   icon?: string;
-  // Social
-  greeting: string;
-  // NPC narrative hooks, mirroring the level-hook pattern: the FIRST variant
-  // overrides the plain one once. firstGreeting plays the first time the
-  // party ever talks to this NPC (GameState.npc_talked); goodbye plays on
-  // END CONVERSATION, with firstGoodbye overriding the first time
-  // (GameState.npc_farewelled). All optional — greeting is the fallback,
-  // and no goodbye means the generic "You end the conversation" line.
-  firstGreeting?: string;
-  goodbye?: string;
-  firstGoodbye?: string;
+  // Social — each greeting/goodbye hook is a VARIANT POOL (the engine picks one
+  // via pickHookText; multi-paragraph via newlines). Persisted as
+  // campaign_narratives rows (owner_kind 'roomNpc'). The FIRST variant overrides
+  // the plain one once: firstGreeting plays the first time the party talks to
+  // this NPC (GameState.npc_talked); goodbye plays on END CONVERSATION, with
+  // firstGoodbye overriding the first time (GameState.npc_farewelled). greeting
+  // is required (the fallback); the rest optional. (Dialogue replies stay inline.)
+  greeting: string | string[];
+  firstGreeting?: string | string[];
+  goodbye?: string | string[];
+  firstGoodbye?: string | string[];
   responses: NpcDialogueResponse[];
   persuasionDC?: number; // CHA check DC when indifferent (default 12)
   // Trade

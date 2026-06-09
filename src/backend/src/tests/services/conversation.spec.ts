@@ -192,6 +192,27 @@ describe('NPC narrative hooks (firstGreeting / goodbye / firstGoodbye)', () => {
     r = await act(r.newState, { type: 'end_conversation' });
     expect(r.narrative).toBe('You end the conversation with The Sage.');
   });
+
+  it('a greeting variant pool plays exactly one variant (random pick)', async () => {
+    const crier: PlacedNpc = {
+      ...npc,
+      id: 'crier',
+      name: 'Crier',
+      greeting: ['Hear ye!', 'News from the road!'],
+      responses: [],
+    };
+    const cSeed = { ...seed, npcs: { crier } } as unknown as Seed;
+    vi.spyOn(Math, 'random').mockReturnValue(0.6); // floor(0.6 * 2) = 1 → 2nd variant
+    const r = await takeAction({
+      action: { type: 'talk', npcId: 'crier' },
+      history: [],
+      state: makeState({ id: 'pc-1' }, { current_room: ROOM }),
+      seed: cSeed,
+      context: ctx,
+    });
+    expect(r.narrative).toContain('Crier: "News from the road!"');
+    expect(r.narrative).not.toContain('Hear ye!'); // never both variants
+  });
 });
 
 describe('gated dialogue (condition + once)', () => {
