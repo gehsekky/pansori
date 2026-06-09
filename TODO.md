@@ -96,10 +96,11 @@ documented deferrals.
 - [ ] **Per-terrain weighting within a zone** (optional) — terrain selects the
       arena battleground (done) and modulates encounter *frequency*, but not yet
       *which creature*.
-- [ ] **Arena-room size in the picker** — the zone's arena-room dropdown lists
-      room ids only; show each room's grid size (e.g. `clearing (8×8)`). Needs the
-      hosted ROOMS panel's `onMaps` to pass `gridWidth`/`gridHeight` through to the
-      RegionEditor (currently `{id, name}` only).
+- [x] **Arena-room size in the picker** — the zone's arena-room dropdown + chips
+      now show each room's clamped combat-grid size (e.g. `clearing (8×6)`). The
+      hosted ROOMS panel's `onMaps` carries `gridWidth`/`gridHeight` (derived from
+      the painted grid, as the backend does), and the picker runs them through
+      `clampCombatDim` so the label matches what combat will render.
 
 ## Campaign platform — DB authoring-model gaps
 

@@ -5,6 +5,7 @@ import {
   TERRAIN,
   TERRAIN_TILES,
   type TerrainType,
+  clampCombatDim,
   crInTier,
 } from '../shared-types.ts';
 
@@ -452,6 +453,10 @@ function RegionEditorScreen({
   // Town pages get them live from the hosted ROOMS panel; region pages
   // fetch them once (their hosted panel is TOWNS).
   const [roomOptions, setRoomOptions] = useState<string[]>([]);
+  // room id → painted grid cell count, kept fresh by the same hosted ROOMS
+  // panel that feeds `roomOptions`. The encounter-zone ARENA picker shows each
+  // room's combat-grid size (clamped, as combat derives it) next to its id.
+  const [roomDims, setRoomDims] = useState<Record<string, { w: number; h: number }>>({});
   // Rooms only: enemy placements ({template name, count}) + the bestiary
   // names that feed the picker (ambient catalog + campaign customs).
   const [placedEnemies, setPlacedEnemies] = useState<Array<{ name: string; count: number }>>([]);
@@ -1123,6 +1128,14 @@ function RegionEditorScreen({
   const defaultScale = kind === 'region' ? 5280 : kind === 'town' ? 25 : 5;
   // Exit targets for the room form: every room in the section.
   const roomIds = kind === 'room' ? (regions ?? []).map((r) => r.id) : [];
+  // Label a room for the ARENA picker as `id (W×H)`, where W×H is the combat
+  // grid the fight will actually use — the room's painted cell count clamped to
+  // the combat range, exactly as gameEngine.combatGridDims derives it. Falls
+  // back to the bare id until the hosted ROOMS panel reports its dims.
+  const roomSizeLabel = (id: string): string => {
+    const d = roomDims[id];
+    return d ? `${id} (${clampCombatDim(d.w)}×${clampCombatDim(d.h)})` : id;
+  };
 
   return (
     <div className={styles.pageFlex}>
@@ -1609,7 +1622,7 @@ function RegionEditorScreen({
                                               })
                                             }
                                           >
-                                            {rid} ✕
+                                            {roomSizeLabel(rid)} ✕
                                           </button>
                                         ))}
                                         <select
@@ -1632,7 +1645,7 @@ function RegionEditorScreen({
                                             .filter((r) => !ids.includes(r))
                                             .map((r) => (
                                               <option key={r} value={r}>
-                                                {r}
+                                                {roomSizeLabel(r)}
                                               </option>
                                             ))}
                                         </select>
@@ -3622,7 +3635,12 @@ function RegionEditorScreen({
               <MapsPanel
                 campaignId={campaignId}
                 kind="room"
-                onMaps={(maps) => setRoomOptions(maps.map((m) => m.id))}
+                onMaps={(maps) => {
+                  setRoomOptions(maps.map((m) => m.id));
+                  setRoomDims(
+                    Object.fromEntries(maps.map((m) => [m.id, { w: m.gridWidth, h: m.gridHeight }]))
+                  );
+                }}
                 onOpenMap={
                   onOpenMap
                     ? (mapId) => {
@@ -3637,7 +3655,12 @@ function RegionEditorScreen({
               <MapsPanel
                 campaignId={campaignId}
                 kind="room"
-                onMaps={(maps) => setRoomOptions(maps.map((m) => m.id))}
+                onMaps={(maps) => {
+                  setRoomOptions(maps.map((m) => m.id));
+                  setRoomDims(
+                    Object.fromEntries(maps.map((m) => [m.id, { w: m.gridWidth, h: m.gridHeight }]))
+                  );
+                }}
                 onOpenMap={
                   onOpenMap
                     ? (mapId) => {

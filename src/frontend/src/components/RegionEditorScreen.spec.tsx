@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import RegionEditorScreen from './RegionEditorScreen';
 
@@ -243,6 +243,68 @@ describe('RegionEditorScreen', () => {
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
     const zones = saved[0].encounterZones as Array<{ arenaRooms?: Record<string, string[]> }>;
     expect(zones[0].arenaRooms).toEqual({ forest: ['forest_clearing'] });
+  });
+
+  it('shows each room’s combat-grid size in the arena picker', async () => {
+    const withZone = {
+      ...REGION,
+      grid: [
+        [{ t: 'forest', ez: 'zone-1' }, { t: 'plains' }, { t: 'road' }],
+        [{ t: 'plains' }, { t: 'forest' }, { t: 'road' }],
+      ],
+      encounterZones: [
+        { id: 'zone-1', name: 'Wood', tier: 1, encounterChance: 0.1, encounterTable: ['Wolf'] },
+      ],
+    };
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'regions'
+        ? { section, source: 'db', value: [withZone, OTHER] }
+        : section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [
+                {
+                  id: 'forest_clearing',
+                  name: 'Clearing',
+                  desc: 'd',
+                  // 8 wide × 6 tall painted grid → within the combat range, so
+                  // the picker should label it `forest_clearing (8×6)`.
+                  grid: Array.from({ length: 6 }, () =>
+                    Array.from({ length: 8 }, () => ({ t: 'grass' }))
+                  ),
+                  entryPos: { x: 0, y: 0 },
+                },
+                {
+                  id: 'huge_hall',
+                  name: 'Hall',
+                  desc: 'd',
+                  // 20×20 oversize → clamped down to the combat max (16×16).
+                  grid: Array.from({ length: 20 }, () =>
+                    Array.from({ length: 20 }, () => ({ t: 'stone' }))
+                  ),
+                  entryPos: { x: 0, y: 0 },
+                },
+              ],
+            }
+          : { section, source: 'db', value: [] }
+    );
+    render(
+      <RegionEditorScreen
+        campaignId="camp"
+        regionId="proving-grounds"
+        kind="region"
+        onBack={vi.fn()}
+        onOpenMap={vi.fn()}
+      />
+    );
+    await screen.findByText('+ NEW ROOM');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    fireEvent.change(screen.getByLabelText('Add arena terrain'), { target: { value: 'forest' } });
+    const picker = await screen.findByLabelText('Add forest arena room');
+    // The option label carries the clamped combat-grid size, not just the id.
+    expect(within(picker).getByRole('option', { name: 'forest_clearing (8×6)' })).toBeTruthy();
+    expect(within(picker).getByRole('option', { name: 'huge_hall (16×16)' })).toBeTruthy();
   });
 
   it('start tool relocates the marker', async () => {

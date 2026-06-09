@@ -25,6 +25,23 @@ interface PanelMap {
 const SECTION = { region: 'regions', town: 'towns', room: 'rooms' } as const;
 const MARKER_NOUN = { region: 'SITE', town: 'VENUE', room: 'EXIT' } as const;
 
+// The lite shape passed to `onMaps` — id, name, and the painted grid's cell
+// count. gridWidth/gridHeight mirror the backend derivation in campaignContent
+// (`grid[0].length` × `grid.length`), so a host picker can show a room's size.
+function toMapInfo(m: PanelMap): {
+  id: string;
+  name: string;
+  gridWidth: number;
+  gridHeight: number;
+} {
+  return {
+    id: m.id,
+    name: m.name,
+    gridWidth: m.grid?.[0]?.length ?? 0,
+    gridHeight: m.grid?.length ?? 0,
+  };
+}
+
 function starterMap(
   kind: 'region' | 'town' | 'room',
   id: string,
@@ -78,7 +95,12 @@ function MapsPanel({
   onOpenMap?: (mapId: string) => void;
   // Fired with the current map list on load and after a create — lets a
   // host page (the region painter's TOWNS panel) keep its pickers fresh.
-  onMaps?: (maps: Array<{ id: string; name: string }>) => void;
+  // Each entry also carries the painted grid's cell count (gridWidth ×
+  // gridHeight, derived from the grid array exactly as the backend does in
+  // campaignContent) so a picker can show a room's size, e.g. `clearing (8×8)`.
+  onMaps?: (
+    maps: Array<{ id: string; name: string; gridWidth: number; gridHeight: number }>
+  ) => void;
 }) {
   const section = SECTION[kind];
   const [maps, setMaps] = useState<PanelMap[] | null>(null);
@@ -106,7 +128,7 @@ function MapsPanel({
       .then((s) => {
         const list = Array.isArray(s.value) ? (s.value as PanelMap[]) : [];
         setMaps(list);
-        onMaps?.(list);
+        onMaps?.(list.map(toMapInfo));
       })
       .catch(() => setLoadErr(`Could not load this campaign’s ${section}.`));
     // onMaps identity is unstable in hosts (inline arrow) — load on
@@ -127,7 +149,7 @@ function MapsPanel({
     try {
       await api.putCampaignSection(campaignId, section, next);
       setMaps(next);
-      onMaps?.(next);
+      onMaps?.(next.map(toMapInfo));
       setCreating(false);
       setNewName('');
       onOpenMap?.(newId);
