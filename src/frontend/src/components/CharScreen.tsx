@@ -349,13 +349,13 @@ function CharScreen({
   availableContexts: FrontendContext[];
   user: AuthUser | null;
 }) {
-  // Player-facing campaigns (internal/test campaigns are `hidden`). The
-  // picker only renders when there's a real choice (>1 visible); with a single
-  // campaign we drop the selector and use it directly. Once the BE context
-  // list loads it also constrains the picker: the server only returns
-  // campaigns visible to this user (global + their memberships), so a
-  // private campaign never shows for non-members. Until/unless it loads,
-  // fall back to the full code-context list (those are the global built-ins).
+  // Player-facing campaigns (internal/test campaigns are `hidden`). The picker
+  // renders whenever there's at least one campaign — even a single one — so the
+  // selection is always visible (the empty case shows a holding message). Once
+  // the BE context list loads it constrains the picker: the server only returns
+  // campaigns visible to this user (global + their memberships), so a private
+  // campaign never shows for non-members. Until/unless it loads, fall back to
+  // the full code-context list (those are the global built-ins).
   const visibleContexts = availableContexts.filter((c) => !c.hidden);
   const [contextId, setContextId] = useState(() => {
     // `?campaign=<id>` is the internal-testing escape hatch — it can select a
@@ -2104,7 +2104,7 @@ function CharScreen({
           </div>
         </div>
 
-        {pickerContexts.length > 1 && (
+        {pickerContexts.length > 0 && (
           <div className={styles.charWorldCol}>
             <h2 className={styles.title} style={{ fontSize: '1.1rem', marginBottom: 4 }}>
               WORLD TYPE

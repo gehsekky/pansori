@@ -243,6 +243,18 @@ describe('CharScreen — campaign selector includes DB-only campaigns', () => {
     const chars = onStart.mock.calls[0][0] as Array<{ character_class: string }>;
     expect(chars.map((c) => c.character_class)).toEqual(['Wizard', 'Wizard']);
   });
+
+  it('shows the world picker even when there is only one campaign', async () => {
+    // The selector used to hide for a single campaign; now it always shows so
+    // the player can always see what they're playing.
+    vi.spyOn(api, 'listContexts').mockResolvedValue([
+      { ...wizardSummary, id: ctx.id } as BackendContextSummary,
+    ]);
+    const { findByTestId } = render(
+      <CharScreen onStart={vi.fn()} loading={false} availableContexts={[ctx]} user={null} />
+    );
+    expect(await findByTestId(`world-picker-${ctx.id}`)).toBeTruthy();
+  });
 });
 
 describe('CharScreen — caster spell picker', () => {
