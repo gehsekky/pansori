@@ -80,6 +80,9 @@ interface EditorEncounterZone {
   tier: number; // 1–4 — gates which CRs the creature table may hold
   encounterChance: number; // 0–1 per square crossed
   encounterTable: string[];
+  // Battleground rooms per triggering-square terrain type (engine EncounterZone).
+  // No editor UI yet — carried through load/save so an API-set value isn't lost.
+  arenaRooms?: Record<string, string[]>;
 }
 
 const MECH_FLAGS = ['obstacle', 'difficult', 'climb', 'swim', 'cover'] as const;
@@ -934,6 +937,11 @@ function RegionEditorScreen({
           tier: z.tier,
           encounterChance: z.encounterChance,
           ...(z.encounterTable.length > 0 ? { encounterTable: z.encounterTable } : {}),
+          // Pass through battleground arena rooms (no editor UI yet) so saving a
+          // region doesn't drop an API-set value.
+          ...(z.arenaRooms && Object.keys(z.arenaRooms).length > 0
+            ? { arenaRooms: z.arenaRooms }
+            : {}),
         })) as EditorEncounterZone[];
       } else {
         delete next.encounterZones;

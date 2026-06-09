@@ -195,6 +195,9 @@ export interface CampaignEncounterZone {
   tier: number;
   encounterChance: number;
   encounterTable?: string[];
+  // Battleground rooms per triggering-square terrain type (see EncounterZone in
+  // types.ts). Stored as-is in the encounter_zones JSONB.
+  arenaRooms?: Record<string, string[]>;
 }
 
 export interface CampaignRegion {
@@ -1227,6 +1230,9 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
         encounterChance: z.encounterChance,
         ...(z.encounterTable && z.encounterTable.length > 0
           ? { encounterTable: z.encounterTable }
+          : {}),
+        ...(z.arenaRooms && Object.keys(z.arenaRooms).length > 0
+          ? { arenaRooms: z.arenaRooms }
           : {}),
         cells: zoneCells.get(z.id) ?? [],
       }))

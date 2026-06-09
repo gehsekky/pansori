@@ -365,6 +365,12 @@ const RegionsSchema = z
                 tier: z.number().int().min(1).max(4),
                 encounterChance: z.number().min(0).max(1),
                 encounterTable: z.array(z.string().min(1).max(80)).max(20).optional(),
+                // Battleground rooms per triggering-square terrain type: a map
+                // of terrain (e.g. 'forest') → room ids the encounter may use as
+                // its map. Missing / empty list ⇒ the default bare arena.
+                arenaRooms: z
+                  .record(z.string().min(1).max(40), z.array(z.string().min(1).max(80)).max(50))
+                  .optional(),
               })
               .strict()
           )

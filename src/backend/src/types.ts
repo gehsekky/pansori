@@ -2155,6 +2155,14 @@ export interface EncounterZone {
   encounterChance: number; // 0–1 per square crossed
   encounterTable?: string[]; // creature names; empty / absent ⇒ the zone never rolls
   cells: GridPos[]; // squares painted into this zone (materialized from grid `ez`)
+  // Battleground rooms to fight a rolled encounter in, keyed by the terrain type
+  // of the square the ambush triggers on (e.g. 'forest', 'hills'). When the
+  // triggering square's terrain has a non-empty list, a room id is picked at
+  // random and its tactical/cosmetic layout (floor, obstacles, terrain, cover,
+  // lighting) becomes the encounter battleground. No entry, or an empty list,
+  // for the terrain ⇒ the default bare arena. The rooms are borrowed as a
+  // battleground only — their own enemies/loot/NPCs/exits don't come along.
+  arenaRooms?: Record<string, string[]>;
 }
 
 // A transition cell on a TOWN grid.

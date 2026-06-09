@@ -15,6 +15,7 @@ import {
   type MapLevel,
   type Region,
   type Room,
+  type Seed,
   TERRAIN,
   type TerrainCell,
   type TerrainType,
@@ -352,6 +353,10 @@ export interface MarkerMoveResult {
   /** A random encounter triggered en route — the rolled enemy template name. The
    *  marker is left ON the encounter cell; the caller drops into combat there. */
   encounter?: string;
+  /** The room id whose layout should be the encounter's battleground, picked
+   *  from the zone's `arenaRooms` for the triggering square's terrain. Undefined
+   *  ⇒ the default bare arena. */
+  encounterArenaRoomId?: string;
   /** Accumulated forced-march notes for the cells crossed this leg. */
   fatigueNote?: string;
   /** When the transition entered a local ROOM, whether it was the party's FIRST
@@ -413,6 +418,7 @@ export function resolveMarkerMove(
   let squaresMoved = path.length;
   let elapsedHours = 0;
   let encounter: string | undefined;
+  let encounterArenaRoomId: string | undefined;
   let fatigueNote: string | undefined;
   let narrative = '';
   // Whether the marker actually settled on `to` (vs. stopping early at an event).
@@ -488,6 +494,12 @@ export function resolveMarkerMove(
         Math.random() < zone.encounterChance * spec.encounterMult
       ) {
         encounter = cellTable[Math.floor(Math.random() * cellTable.length)];
+        // Pick the battleground: a room listed for THIS square's terrain type in
+        // the zone's arenaRooms. No entry / empty list ⇒ leave undefined (the
+        // caller uses the default bare arena).
+        const arena = zone.arenaRooms?.[terrainTypeAt(region?.terrain, cell)] ?? [];
+        if (arena.length > 0)
+          encounterArenaRoomId = arena[Math.floor(Math.random() * arena.length)];
         stopCell = cell;
         reachedDest = false;
         break;
@@ -531,6 +543,7 @@ export function resolveMarkerMove(
     transitioned,
     elapsedHours,
     encounter,
+    encounterArenaRoomId,
     fatigueNote,
     enteredRoomFirst,
   };
@@ -771,6 +784,40 @@ export function stageEncounter(st: GameState): GameState {
     current_room: ENCOUNTER_ROOM_ID,
     marker_pos: { x: 1, y: 1 },
   };
+}
+
+/**
+ * Give the transient encounter room (`__encounter__`) the battleground layout of
+ * an authored room, so a rolled encounter is fought on that room's map instead
+ * of the default bare arena. Copies ONLY the tactical + cosmetic layout (floor,
+ * lighting, obstacles, difficult/climb/swim terrain, cover, cosmetic paint) — the
+ * room's own enemies/loot/NPCs/exits/objects do NOT come along; it's borrowed as
+ * a battleground only. The combat grid stays the standard size (neither engine
+ * nor FE keys combat off a room's `gridWidth`), so authored arenas should fit it.
+ *
+ * Pass `undefined` (or an id with no matching room) to clear any borrowed arena
+ * left from a previous encounter so the default bare grid is used. Mutates
+ * `seed.rooms` in place.
+ */
+export function applyEncounterArena(seed: Seed, arenaRoomId: string | undefined): void {
+  const rooms = (seed.rooms ?? []).filter((r) => r.id !== ENCOUNTER_ROOM_ID);
+  const src = arenaRoomId ? rooms.find((r) => r.id === arenaRoomId) : undefined;
+  if (src) {
+    rooms.push({
+      id: ENCOUNTER_ROOM_ID,
+      name: src.name,
+      desc: src.desc,
+      ...(src.floor !== undefined ? { floor: src.floor } : {}),
+      ...(src.lighting !== undefined ? { lighting: src.lighting } : {}),
+      ...(src.obstacles ? { obstacles: src.obstacles } : {}),
+      ...(src.difficultTerrain ? { difficultTerrain: src.difficultTerrain } : {}),
+      ...(src.climbTerrain ? { climbTerrain: src.climbTerrain } : {}),
+      ...(src.swimTerrain ? { swimTerrain: src.swimTerrain } : {}),
+      ...(src.coverPositions ? { coverPositions: src.coverPositions } : {}),
+      ...(src.terrain ? { terrain: src.terrain } : {}),
+    });
+  }
+  seed.rooms = rooms;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { Context, Enemy, GameState, Seed } from '../types.js';
+import { ENCOUNTER_ROOM_ID } from './mapEngine.js';
 import { randomUUID } from 'crypto';
 import { scaleRoomEnemiesByCount } from './enemyFactory.js';
 
@@ -70,8 +71,12 @@ export function reconcileSeedWithContext(existing: Seed, context: Context, state
   const partySize = state.characters?.length ?? 1;
   const fresh = generateSeed(context, partySize);
   const visited = new Set(state.visited_rooms ?? []);
+  // A room whose placements must be kept as-is: one the party has entered, OR the
+  // transient wilderness-encounter room (its rolled enemies + borrowed arena are
+  // pure run state — never in the authored campaign, so `fresh` has no version).
+  const preserve = (roomId: string) => visited.has(roomId) || roomId === ENCOUNTER_ROOM_ID;
 
-  // For a visited room keep the existing placements verbatim (incl. "none" — a
+  // For a preserved room keep the existing placements verbatim (incl. "none" — a
   // room the party passed through doesn't gain new spawns); for an unreached
   // room take the fresh placements (the author's edits to that encounter).
   const mergePlacements = <T>(
@@ -80,7 +85,7 @@ export function reconcileSeedWithContext(existing: Seed, context: Context, state
   ): Record<string, T> => {
     const out: Record<string, T> = {};
     for (const roomId of new Set([...Object.keys(freshMap), ...Object.keys(existingMap)])) {
-      if (visited.has(roomId)) {
+      if (preserve(roomId)) {
         if (existingMap[roomId] !== undefined) out[roomId] = existingMap[roomId];
       } else if (freshMap[roomId] !== undefined) {
         out[roomId] = freshMap[roomId];
@@ -89,8 +94,15 @@ export function reconcileSeedWithContext(existing: Seed, context: Context, state
     return out;
   };
 
+  // Carry over the transient encounter room (an in-progress wilderness fight) —
+  // it isn't an authored room, so the fresh rooms don't include it.
+  const rooms = [...fresh.rooms];
+  const encounterRoom = (existing.rooms ?? []).find((r) => r.id === ENCOUNTER_ROOM_ID);
+  if (encounterRoom) rooms.push(encounterRoom);
+
   return {
     ...fresh,
+    rooms,
     context_id: existing.context_id,
     seed_id: existing.seed_id,
     enemies: mergePlacements(fresh.enemies, existing.enemies ?? {}),

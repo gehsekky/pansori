@@ -1,5 +1,10 @@
 import type { Context, GameState, GridPos } from '../../types.js';
-import { ENCOUNTER_ROOM_ID, resolveMarkerMove, stageEncounter } from '../mapEngine.js';
+import {
+  ENCOUNTER_ROOM_ID,
+  applyEncounterArena,
+  resolveMarkerMove,
+  stageEncounter,
+} from '../mapEngine.js';
 import { buildArrivalNarrative, hasSaveProficiency } from '../gameEngine.js';
 import { materializeEnemy, scaledEnemyCount } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
@@ -166,6 +171,9 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
         materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${stamp}-${k}`, template.hp)
       );
       ctx.seed.enemies = { ...(ctx.seed.enemies ?? {}), [ENCOUNTER_ROOM_ID]: enemies };
+      // Borrow the chosen room's layout as the battleground (else the default
+      // bare arena). The roll picked it from the zone's arenaRooms by terrain.
+      applyEncounterArena(ctx.seed, res.encounterArenaRoomId);
       ctx.st = stageEncounter(ctx.st);
       // Drop straight into the fight instead of arriving out of combat with an
       // Attack button. stageEncounter moved the party into the encounter room,

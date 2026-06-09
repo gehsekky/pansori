@@ -155,6 +155,42 @@ describe('RegionEditorScreen', () => {
     expect(grid[0][0].ez).toBe('zone-2');
   });
 
+  it('preserves a zone’s arenaRooms (no editor UI yet) through a save round-trip', async () => {
+    // A region whose zone already carries arenaRooms (set via the API). The
+    // editor can't edit it yet, but a save must not silently drop it.
+    const withArena = {
+      ...REGION,
+      grid: [
+        [{ t: 'plains', ez: 'zone-1' }, { t: 'plains' }, { t: 'road' }],
+        [{ t: 'plains' }, { t: 'forest' }, { t: 'road' }],
+      ],
+      encounterZones: [
+        {
+          id: 'zone-1',
+          name: 'Deep Wood',
+          tier: 1,
+          encounterChance: 0.1,
+          encounterTable: ['Wolf'],
+          arenaRooms: { forest: ['forest_clearing'] },
+        },
+      ],
+    };
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'regions'
+        ? { section, source: 'db', value: [withArena, OTHER] }
+        : { section, source: 'db', value: [] }
+    );
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    // A trivial edit to enable SAVE, without touching the zone.
+    fireEvent.change(screen.getByLabelText('NAME'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    const zones = saved[0].encounterZones as Array<{ arenaRooms?: Record<string, string[]> }>;
+    expect(zones[0].arenaRooms).toEqual({ forest: ['forest_clearing'] });
+  });
+
   it('start tool relocates the marker', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');

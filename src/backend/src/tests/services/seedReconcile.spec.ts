@@ -5,6 +5,7 @@
 import type { Context, GameState } from '../../types.js';
 import { describe, expect, it } from 'vitest';
 import { generateSeed, reconcileSeedWithContext } from '../../services/procgen.js';
+import { ENCOUNTER_ROOM_ID } from '../../services/mapEngine.js';
 import { context as baseCtx } from '../fixtures/testContext.js';
 
 // The test fixture's campaign places one enemy each in guard_post / bone_crypt /
@@ -90,6 +91,28 @@ describe('reconcileSeedWithContext', () => {
     const merged = reconcileSeedWithContext(existing, edited, visitedEmpty);
     // The visited-but-empty room stays empty — no surprise spawn behind the party.
     expect(merged.enemies.storage_room).toBeUndefined();
+  });
+
+  it('preserves an in-progress wilderness encounter (room + enemies) across a refresh', () => {
+    const existing = generateSeed(baseCtx, 1);
+    // Simulate a staged wilderness encounter: a transient room + its rolled
+    // enemies live only on the run seed (never in the authored campaign).
+    existing.rooms = [
+      ...existing.rooms,
+      { id: ENCOUNTER_ROOM_ID, name: 'Ambush', desc: '', floor: 'grass' } as never,
+    ];
+    existing.enemies = {
+      ...existing.enemies,
+      [ENCOUNTER_ROOM_ID]: [
+        { id: `${ENCOUNTER_ROOM_ID}#0`, name: 'Goblin Warrior', hp: 3 } as never,
+      ],
+    };
+    // The encounter room is NOT in visited_rooms — preservation is by its id.
+    const fighting = { characters: [{}], visited_rooms: [] } as unknown as GameState;
+
+    const merged = reconcileSeedWithContext(existing, baseCtx, fighting);
+    expect(merged.rooms.find((r) => r.id === ENCOUNTER_ROOM_ID)?.floor).toBe('grass');
+    expect(merged.enemies[ENCOUNTER_ROOM_ID]?.[0]?.hp).toBe(3);
   });
 
   it('returns the seed untouched when the context has no campaign data', () => {
