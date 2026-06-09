@@ -2086,9 +2086,10 @@ export interface MapSite {
   regionId?: string;
   entryPos?: GridPos;
   desc?: string;
-  // Narration hook — authored flavor appended to the "You enter X." line
-  // every time the party lands on this site's square.
-  onEnter?: string;
+  // Narration hook — authored flavor appended to the "You enter X." line every
+  // time the party lands on this site's square. A variant pool (pick one);
+  // persisted as `campaign_narratives` rows (owner_kind 'regionSite').
+  onEnter?: string | string[];
   // Overland map glyph for a `local` site (dungeon): a game-icons.net icon name
   // (e.g. 'tombstone', 'ice-iris'). Omitted ⇒ a default dungeon icon. Towns use
   // the village glyph regardless.
@@ -2102,13 +2103,14 @@ export interface MapSite {
 // does not exit the region. The FIRST variant overrides the plain one on
 // the first occurrence; the plain one fires every other time.
 export interface LevelNarrationHooks {
-  // A pool on rooms (random pick per visit — absorbs the old campaign-level
-  // `narratives.roomArrival`); regions/towns use the single-string form. The
-  // engine picks via `pickHookText` (mapEngine), which accepts either shape.
+  // Each hook is a variant pool — the engine picks ONE at random via
+  // `pickHookText` (mapEngine), which accepts a string or string[]. Multi-
+  // paragraph narrative lives as newlines inside a variant. Persisted as rows in
+  // the `campaign_narratives` table (one row per variant).
   onEnter?: string | string[];
-  onFirstEnter?: string;
-  onExit?: string;
-  onFirstExit?: string;
+  onFirstEnter?: string | string[];
+  onExit?: string | string[];
+  onFirstExit?: string | string[];
 }
 
 export interface Region extends LevelNarrationHooks {

@@ -179,7 +179,7 @@ export function regionEnterNarration(
   regionId: string | undefined
 ): string {
   const region = regionById(campaign, regionId);
-  const text = region?.onFirstEnter ?? pickHookText(region?.onEnter) ?? region?.desc;
+  const text = pickHookText(region?.onFirstEnter) ?? pickHookText(region?.onEnter) ?? region?.desc;
   return text ? `\n\n${text}` : '';
 }
 
@@ -195,8 +195,8 @@ export interface MapTransition {
   entrancePos?: GridPos; // arrival cell in the destination room / region
   ascendTo?: 'town' | 'region'; // ascend / gate
   // Narration hook (site enter) — authored flavor appended to the
-  // "You enter X." line when the transition resolves.
-  onEnter?: string;
+  // "You enter X." line when the transition resolves. A variant pool (pick one).
+  onEnter?: string | string[];
 }
 
 // The grid the party marker is currently on, normalized for movement + render.
@@ -589,7 +589,8 @@ export function resolveTransition(
 ): { st: GameState; narrative: string; enteredRoomFirst?: boolean } {
   // The site-enter narration hook: authored flavor follows the
   // announcement line every time the party lands on the site's square.
-  const hook = t.onEnter ? ` ${t.onEnter}` : '';
+  const siteHook = pickHookText(t.onEnter);
+  const hook = siteHook ? ` ${siteHook}` : '';
   // ── Cross into another region (a region GATE site) ───────────────────
   if (t.kind === 'site' && t.toRegionId) {
     const next = regionById(campaign, t.toRegionId);
@@ -603,7 +604,7 @@ export function resolveTransition(
     // onEnter ?? desc) so authored regions narrate for free; re-entry
     // plays the plain onEnter.
     const enterText = visit.first
-      ? (next.onFirstEnter ?? pickHookText(next.onEnter) ?? next.desc)
+      ? (pickHookText(next.onFirstEnter) ?? pickHookText(next.onEnter) ?? next.desc)
       : pickHookText(next.onEnter);
     return {
       st: {

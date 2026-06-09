@@ -43,6 +43,7 @@ import type {
   TerrainType,
   Town,
 } from '../types.js';
+import type { Pool, PoolClient } from 'pg';
 import {
   composeEnemyTemplates,
   deleteCampaignCustomMonsters,
@@ -57,7 +58,6 @@ import {
   getItemCatalog,
   putCampaignCustomItems,
 } from './itemCatalog.js';
-import type { Pool } from 'pg';
 import { baseCampaignContext } from '../campaignData/srd/baseCampaign.js';
 import { materializeEnemy } from './enemyFactory.js';
 
@@ -171,8 +171,9 @@ export interface CampaignRegionSite {
   regionId?: string;
   entryPos?: { x: number; y: number };
   desc?: string;
-  // Narration hook — fires every time the party lands on this site.
-  onEnter?: string;
+  // Narration hook — fires every time the party lands on this site. A variant
+  // pool (pick one); persisted as campaign_narratives rows ('regionSite').
+  onEnter?: string | string[];
   icon?: string;
 }
 
@@ -201,14 +202,14 @@ export interface CampaignRegion {
   name: string;
   isStartingRegion: boolean;
   desc?: string;
-  // Level narration hooks (FIRST variant overrides plain on the first
-  // occurrence; region first-enter falls back to desc; region exits are
-  // dormant until region travel exists). `onEnter` is typed as the shared
-  // pool shape, but regions store/serve a single string (only rooms pool).
+  // Level narration hooks — each a variant pool (pick one), persisted as
+  // campaign_narratives rows. FIRST overrides plain on the first occurrence;
+  // region first-enter falls back to desc; region exits are dormant until
+  // region travel exists.
   onEnter?: string | string[];
-  onFirstEnter?: string;
-  onExit?: string;
-  onFirstExit?: string;
+  onFirstEnter?: string | string[];
+  onExit?: string | string[];
+  onFirstExit?: string | string[];
   feetPerSquare: number;
   // Dense [y][x] terrain grid — dimensions derive from its shape
   // (validated rectangular at the API). Stored as a JSONB column.
@@ -222,15 +223,91 @@ export interface CampaignRegion {
   sites?: CampaignRegionSite[];
 }
 
+// ── Narrative hooks (campaign_narratives) ────────────────────────────────────
+// Every level/site narration hook is a VARIANT POOL persisted as rows: one row
+// per variant, ordered by sort_order; the engine picks one at random
+// (pickHookText). The section payloads still carry hooks inline (onEnter etc. as
+// string | string[]) — these helpers just move the persistence to the table.
+const LEVEL_HOOKS = ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const;
+
+// Collapse a variant list to the wire shape: absent when empty, a lone string
+// for one variant (keeps single-string round-trips stable), else the array.
+function collapseHook(variants: string[] | undefined): string | string[] | undefined {
+  if (!variants || variants.length === 0) return undefined;
+  return variants.length === 1 ? variants[0] : variants;
+}
+
+export interface NarrativeLookup {
+  get(ownerKind: string, ownerId: string, hook: string): string[] | undefined;
+}
+
+export async function getCampaignNarratives(
+  pool: Pool,
+  campaignId: string
+): Promise<NarrativeLookup> {
+  const { rows } = await pool.query<{
+    owner_kind: string;
+    owner_id: string;
+    hook: string;
+    text: string;
+  }>(
+    `SELECT owner_kind, owner_id, hook, text
+       FROM campaign_narratives
+      WHERE campaign_id = $1
+      ORDER BY owner_kind, owner_id, hook, sort_order`,
+    [campaignId]
+  );
+  const m = new Map<string, string[]>();
+  for (const r of rows) {
+    const key = `${r.owner_kind} ${r.owner_id} ${r.hook}`;
+    const list = m.get(key);
+    if (list) list.push(r.text);
+    else m.set(key, [r.text]);
+  }
+  return { get: (k, id, h) => m.get(`${k} ${id} ${h}`) };
+}
+
+// The four level hooks for an owner, collapsed to wire shape (absent ones omitted).
+function levelHookFields(
+  nar: NarrativeLookup,
+  ownerKind: string,
+  ownerId: string
+): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const hook of LEVEL_HOOKS) {
+    const v = collapseHook(nar.get(ownerKind, ownerId, hook));
+    if (v !== undefined) out[hook] = v;
+  }
+  return out;
+}
+
+// Insert a hook bundle as variant rows for one owner, inside a transaction.
+// Accepts the wire shape (string | string[]); blanks are skipped.
+async function insertNarratives(
+  client: PoolClient,
+  campaignId: string,
+  ownerKind: string,
+  ownerId: string,
+  hooks: Record<string, string | string[] | undefined>
+): Promise<void> {
+  for (const [hook, val] of Object.entries(hooks)) {
+    if (val === undefined) continue;
+    const variants = (Array.isArray(val) ? val : [val]).filter((v) => v && v.trim());
+    for (let k = 0; k < variants.length; k++) {
+      await client.query(
+        `INSERT INTO campaign_narratives (campaign_id, owner_kind, owner_id, hook, sort_order, text)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [campaignId, ownerKind, ownerId, hook, k, variants[k]]
+      );
+    }
+  }
+}
+
 interface RegionRow {
   id: string;
   name: string;
   is_starting_region: boolean;
   description: string | null;
-  on_enter: string | null;
-  on_first_enter: string | null;
-  on_exit: string | null;
-  on_first_exit: string | null;
   feet_per_square: number;
   grid: CampaignRegionCell[][];
   start_x: number;
@@ -244,10 +321,6 @@ function rowToRegion(r: RegionRow): CampaignRegion {
     name: r.name,
     isStartingRegion: r.is_starting_region,
     ...(r.description !== null ? { desc: r.description } : {}),
-    ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
-    ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
-    ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
-    ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
     feetPerSquare: r.feet_per_square,
     grid: r.grid,
     startPos: { x: r.start_x, y: r.start_y },
@@ -255,8 +328,10 @@ function rowToRegion(r: RegionRow): CampaignRegion {
   };
 }
 
-const REGION_COLUMNS = `id, name, is_starting_region, description, on_enter, feet_per_square,
-       grid, start_x, start_y, on_first_enter, on_exit, on_first_exit, encounter_zones`;
+// Hooks now come from campaign_narratives (see getCampaignRegions); the legacy
+// on_* columns stay inert.
+const REGION_COLUMNS = `id, name, is_starting_region, description, feet_per_square,
+       grid, start_x, start_y, encounter_zones`;
 
 interface SiteRow {
   region_id: string;
@@ -268,13 +343,13 @@ interface SiteRow {
   town_id: string | null;
   entry_room_id: string | null;
   description: string | null;
-  on_enter: string | null;
   icon: string | null;
   target_region_id: string | null;
   entry_x: number | null;
   entry_y: number | null;
 }
 
+// `onEnter` is attached from campaign_narratives by the caller (needs the lookup).
 function rowToSite(r: SiteRow): CampaignRegionSite {
   return {
     id: r.id,
@@ -288,7 +363,6 @@ function rowToSite(r: SiteRow): CampaignRegionSite {
       ? { entryPos: { x: r.entry_x, y: r.entry_y } }
       : {}),
     ...(r.description !== null ? { desc: r.description } : {}),
-    ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
     ...(r.icon !== null ? { icon: r.icon } : {}),
   };
 }
@@ -307,20 +381,23 @@ export async function getCampaignRegions(
   if (rows.length === 0) return [];
   const { rows: siteRows } = await pool.query<SiteRow>(
     `SELECT region_id, id, name, pos_x, pos_y, kind, town_id, entry_room_id, description,
-            on_enter, icon, target_region_id, entry_x, entry_y
+            icon, target_region_id, entry_x, entry_y
        FROM campaign_region_sites
       WHERE campaign_id = $1
       ORDER BY region_id, sort_order, id`,
     [campaignId]
   );
+  const nar = await getCampaignNarratives(pool, campaignId);
   const sitesByRegion = new Map<string, CampaignRegionSite[]>();
   for (const row of siteRows) {
+    const site = rowToSite(row);
+    const onEnter = collapseHook(nar.get('regionSite', `${row.region_id}/${row.id}`, 'onEnter'));
     const list = sitesByRegion.get(row.region_id) ?? [];
-    list.push(rowToSite(row));
+    list.push(onEnter !== undefined ? { ...site, onEnter } : site);
     sitesByRegion.set(row.region_id, list);
   }
   return rows.map((r) => {
-    const region = rowToRegion(r);
+    const region = { ...rowToRegion(r), ...levelHookFields(nar, 'region', r.id) };
     const sites = sitesByRegion.get(r.id);
     return sites && sites.length > 0 ? { ...region, sites } : region;
   });
@@ -341,8 +418,14 @@ export async function putCampaignRegions(
       await client.query('ROLLBACK');
       return false;
     }
-    // Replace-all: deleting the regions cascades their sites away too.
+    // Replace-all: deleting the regions cascades their sites away too. Narrative
+    // rows have no FK to the region rows (campaigns-only), so clear this
+    // section's owners explicitly (scoped by owner_kind — don't touch towns/rooms).
     await client.query('DELETE FROM campaign_regions WHERE campaign_id = $1', [campaignId]);
+    await client.query(
+      `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind IN ('region', 'regionSite')`,
+      [campaignId]
+    );
     for (let i = 0; i < regions.length; i++) {
       const r = regions[i];
       await client.query(
@@ -359,23 +442,30 @@ export async function putCampaignRegions(
           r.name,
           r.isStartingRegion,
           r.desc ?? null,
-          r.onEnter ?? null,
+          // Narration hooks moved to campaign_narratives; the on_* TEXT columns
+          // (and the retired encounter_chance / base_tier / encounter_table)
+          // stay but are written inert — dropping them would break migration
+          // 032's double-apply (CLAUDE.md's 015/020 lesson).
+          null,
           r.feetPerSquare,
           JSON.stringify(r.grid),
           r.startPos.x,
           r.startPos.y,
-          // Region-level encounter chance / table / base_tier are retired —
-          // encounters live entirely in zones. These columns stay (dropping
-          // them would break migration 032's double-apply) but are written inert.
           null,
           null,
-          r.onFirstEnter ?? null,
-          r.onExit ?? null,
-          r.onFirstExit ?? null,
+          null,
+          null,
+          null,
           '[]',
           JSON.stringify(r.encounterZones ?? []),
         ]
       );
+      await insertNarratives(client, campaignId, 'region', r.id, {
+        onEnter: r.onEnter,
+        onFirstEnter: r.onFirstEnter,
+        onExit: r.onExit,
+        onFirstExit: r.onFirstExit,
+      });
       const sites = r.sites ?? [];
       for (let j = 0; j < sites.length; j++) {
         const s = sites[j];
@@ -397,13 +487,16 @@ export async function putCampaignRegions(
             s.townId ?? null,
             s.entryRoomId ?? null,
             s.desc ?? null,
-            s.onEnter ?? null,
+            null, // on_enter moved to campaign_narratives (inert column)
             s.icon ?? null,
             s.regionId ?? null,
             s.entryPos?.x ?? null,
             s.entryPos?.y ?? null,
           ]
         );
+        await insertNarratives(client, campaignId, 'regionSite', `${r.id}/${s.id}`, {
+          onEnter: s.onEnter,
+        });
       }
     }
     await client.query('COMMIT');
@@ -422,6 +515,10 @@ export async function deleteCampaignRegions(pool: Pool, campaignId: string): Pro
   const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
   if (!rowCount) return false;
   await pool.query('DELETE FROM campaign_regions WHERE campaign_id = $1', [campaignId]);
+  await pool.query(
+    `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind IN ('region', 'regionSite')`,
+    [campaignId]
+  );
   return true;
 }
 
@@ -440,13 +537,13 @@ export interface CampaignTown {
   id: string;
   name: string;
   desc?: string;
-  // Level narration hooks (enter via a region site; exit via the gate —
-  // venue descends stay inside the town's scope). `onEnter` typed as the
-  // shared pool shape, but towns store/serve a single string (only rooms pool).
+  // Level narration hooks — each a variant pool (pick one), persisted as
+  // campaign_narratives rows. Enter via a region site; exit via the gate
+  // (venue descents stay inside the town's scope).
   onEnter?: string | string[];
-  onFirstEnter?: string;
-  onExit?: string;
-  onFirstExit?: string;
+  onFirstEnter?: string | string[];
+  onExit?: string | string[];
+  onFirstExit?: string | string[];
   feetPerSquare: number;
   grid: CampaignRegionCell[][];
   startPos: { x: number; y: number };
@@ -458,10 +555,6 @@ interface TownRow {
   id: string;
   name: string;
   description: string | null;
-  on_enter: string | null;
-  on_first_enter: string | null;
-  on_exit: string | null;
-  on_first_exit: string | null;
   feet_per_square: number;
   grid: CampaignRegionCell[][];
   start_x: number;
@@ -493,8 +586,7 @@ function rowToVenue(r: VenueRow): CampaignTownVenue {
 
 export async function getCampaignTowns(pool: Pool, campaignId: string): Promise<CampaignTown[]> {
   const { rows } = await pool.query<TownRow>(
-    `SELECT id, name, description, feet_per_square, grid, start_x, start_y, floor,
-            on_enter, on_first_enter, on_exit, on_first_exit
+    `SELECT id, name, description, feet_per_square, grid, start_x, start_y, floor
        FROM campaign_towns
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
@@ -508,6 +600,7 @@ export async function getCampaignTowns(pool: Pool, campaignId: string): Promise<
       ORDER BY town_id, sort_order, id`,
     [campaignId]
   );
+  const nar = await getCampaignNarratives(pool, campaignId);
   const venuesByTown = new Map<string, CampaignTownVenue[]>();
   for (const row of venueRows) {
     const list = venuesByTown.get(row.town_id) ?? [];
@@ -519,10 +612,7 @@ export async function getCampaignTowns(pool: Pool, campaignId: string): Promise<
       id: r.id,
       name: r.name,
       ...(r.description !== null ? { desc: r.description } : {}),
-      ...(r.on_enter !== null ? { onEnter: r.on_enter } : {}),
-      ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
-      ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
-      ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
+      ...levelHookFields(nar, 'town', r.id),
       feetPerSquare: r.feet_per_square,
       grid: r.grid,
       startPos: { x: r.start_x, y: r.start_y },
@@ -548,6 +638,10 @@ export async function putCampaignTowns(
       return false;
     }
     await client.query('DELETE FROM campaign_towns WHERE campaign_id = $1', [campaignId]);
+    await client.query(
+      `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'town'`,
+      [campaignId]
+    );
     for (let i = 0; i < towns.length; i++) {
       const t = towns[i];
       await client.query(
@@ -566,12 +660,19 @@ export async function putCampaignTowns(
           t.startPos.x,
           t.startPos.y,
           t.floor ?? null,
-          t.onEnter ?? null,
-          t.onFirstEnter ?? null,
-          t.onExit ?? null,
-          t.onFirstExit ?? null,
+          // Narration hooks moved to campaign_narratives; on_* columns inert.
+          null,
+          null,
+          null,
+          null,
         ]
       );
+      await insertNarratives(client, campaignId, 'town', t.id, {
+        onEnter: t.onEnter,
+        onFirstEnter: t.onFirstEnter,
+        onExit: t.onExit,
+        onFirstExit: t.onFirstExit,
+      });
       const venues = t.venues ?? [];
       for (let j = 0; j < venues.length; j++) {
         const v = venues[j];
@@ -609,6 +710,10 @@ export async function deleteCampaignTowns(pool: Pool, campaignId: string): Promi
   const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
   if (!rowCount) return false;
   await pool.query('DELETE FROM campaign_towns WHERE campaign_id = $1', [campaignId]);
+  await pool.query(
+    `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'town'`,
+    [campaignId]
+  );
   return true;
 }
 
@@ -770,14 +875,13 @@ export interface CampaignRoom {
   id: string;
   name: string;
   desc: string;
-  // Level narration hooks. `onEnter` is a POOL on rooms (random pick per visit
-  // — it absorbed the old campaign-level `narratives.roomArrival`); it's stored
-  // in the on_enter TEXT column JSON-encoded when an array (see onEnter
-  // parse/encode helpers). `onFirstEnter` stays the single once-only beat.
+  // Level narration hooks — each a variant pool (pick one), persisted as
+  // campaign_narratives rows (owner_kind 'room'). Multi-paragraph = newlines
+  // within a variant.
   onEnter?: string | string[];
-  onFirstEnter?: string;
-  onExit?: string;
-  onFirstExit?: string;
+  onFirstEnter?: string | string[];
+  onExit?: string | string[];
+  onFirstExit?: string | string[];
   grid: CampaignRoomCell[][];
   entryPos: GridPos;
   exits?: CampaignRoomExit[];
@@ -795,10 +899,6 @@ interface RoomRow {
   id: string;
   name: string;
   description: string;
-  on_enter: string | null;
-  on_first_enter: string | null;
-  on_exit: string | null;
-  on_first_exit: string | null;
   feet_per_square: number;
   grid: CampaignRoomCell[][];
   entry_x: number;
@@ -814,44 +914,21 @@ interface RoomRow {
   trap: CampaignRoomTrap | null;
 }
 
-// A room's `on_enter` is pool-capable: stored in the TEXT column JSON-encoded
-// when it's an array, plain when a single string. A leading '[' marks the JSON
-// form; legacy plain strings (and prose, which never starts with '[') read
-// verbatim. Rooms only — region/town `on_enter` stay plain strings.
-function parseRoomOnEnter(raw: string): string | string[] {
-  if (raw.startsWith('[')) {
-    try {
-      const v: unknown = JSON.parse(raw);
-      if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v as string[];
-    } catch {
-      /* not JSON — fall through to the literal string */
-    }
-  }
-  return raw;
-}
-function encodeRoomOnEnter(v: string | string[] | undefined): string | null {
-  if (v === undefined) return null;
-  return Array.isArray(v) ? JSON.stringify(v) : v;
-}
-
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, grid, entry_x, entry_y, exits,
-            lighting, floor, can_rest, enemies, loot, npcs, objects, trap,
-            on_enter, on_first_enter, on_exit, on_first_exit
+            lighting, floor, can_rest, enemies, loot, npcs, objects, trap
        FROM campaign_rooms
       WHERE campaign_id = $1
       ORDER BY sort_order, id`,
     [campaignId]
   );
+  const nar = await getCampaignNarratives(pool, campaignId);
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     desc: r.description,
-    ...(r.on_enter !== null ? { onEnter: parseRoomOnEnter(r.on_enter) } : {}),
-    ...(r.on_first_enter !== null ? { onFirstEnter: r.on_first_enter } : {}),
-    ...(r.on_exit !== null ? { onExit: r.on_exit } : {}),
-    ...(r.on_first_exit !== null ? { onFirstExit: r.on_first_exit } : {}),
+    ...levelHookFields(nar, 'room', r.id),
     grid: r.grid,
     entryPos: { x: r.entry_x, y: r.entry_y },
     ...(r.exits.length > 0 ? { exits: r.exits } : {}),
@@ -881,6 +958,10 @@ export async function putCampaignRooms(
       return false;
     }
     await client.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
+    await client.query(
+      `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'room'`,
+      [campaignId]
+    );
     for (let i = 0; i < rooms.length; i++) {
       const r = rooms[i];
       await client.query(
@@ -906,14 +987,21 @@ export async function putCampaignRooms(
           JSON.stringify(r.enemies ?? []),
           JSON.stringify(r.loot ?? []),
           JSON.stringify(r.npcs ?? []),
-          encodeRoomOnEnter(r.onEnter),
-          r.onFirstEnter ?? null,
-          r.onExit ?? null,
-          r.onFirstExit ?? null,
+          // Narration hooks moved to campaign_narratives; on_* columns inert.
+          null,
+          null,
+          null,
+          null,
           JSON.stringify(r.objects ?? []),
           r.trap ? JSON.stringify(r.trap) : null,
         ]
       );
+      await insertNarratives(client, campaignId, 'room', r.id, {
+        onEnter: r.onEnter,
+        onFirstEnter: r.onFirstEnter,
+        onExit: r.onExit,
+        onFirstExit: r.onFirstExit,
+      });
     }
     await client.query('COMMIT');
     return true;
@@ -929,6 +1017,10 @@ export async function deleteCampaignRooms(pool: Pool, campaignId: string): Promi
   const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
   if (!rowCount) return false;
   await pool.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
+  await pool.query(
+    `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'room'`,
+    [campaignId]
+  );
   return true;
 }
 

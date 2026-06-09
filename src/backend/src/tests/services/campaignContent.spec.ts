@@ -66,6 +66,9 @@ function makeContentDb(initial: {
   // exitsJson, lighting, floor, can_rest, enemiesJson, lootJson, npcsJson,
   // on_enter, on_first_enter, on_exit, on_first_exit, objectsJson, trapJson]
   const rooms = new Map<string, unknown[][]>();
+  // campaignId → narrative insert params after campaign_id:
+  // [owner_kind, owner_id, hook, sort_order, text]
+  const narratives = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -263,6 +266,32 @@ function makeContentDb(initial: {
       list.push(rest);
       regions.set(campaignId as string, list);
       return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('INSERT INTO campaign_narratives')) {
+      const [campaignId, ...rest] = params;
+      const list = narratives.get(campaignId as string) ?? [];
+      list.push(rest);
+      narratives.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_narratives') && sql.includes('SELECT')) {
+      const list = [...(narratives.get(params[0] as string) ?? [])].sort((a, b) => {
+        for (const i of [0, 1, 2]) {
+          if (a[i] !== b[i]) return String(a[i]) < String(b[i]) ? -1 : 1;
+        }
+        return (a[3] as number) - (b[3] as number); // sort_order
+      });
+      const rows = list.map((p) => ({ owner_kind: p[0], owner_id: p[1], hook: p[2], text: p[4] }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('DELETE FROM campaign_narratives')) {
+      // Scoped by the owner_kind(s) named inline in the SQL.
+      const list = narratives.get(params[0] as string) ?? [];
+      narratives.set(
+        params[0] as string,
+        list.filter((p) => !sql.includes(`'${p[0]}'`))
+      );
+      return { rows: [], rowCount: 0 };
     }
     throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
   });
@@ -1426,17 +1455,44 @@ describe('rooms table store', () => {
     expect('feetPerSquare' in back[1]).toBe(false); // rooms are LOCKED to 5 ft — no scale key
   });
 
-  it('room onEnter pools round-trip through the TEXT column; a single string stays a string', async () => {
+  it('hooks round-trip as campaign_narratives rows: a pool stays an array, one variant collapses to a string', async () => {
     const db = makeContentDb({ campaigns: { malgovia: {} } });
-    // Pool form (array) — stored JSON-encoded in the on_enter TEXT column,
-    // parsed back to an array (it absorbed the old roomArrival pool).
-    const pooled: CampaignRoom = { ...ROOM_B, onEnter: ['Line one.', 'Line two.'] };
-    // Single-string form — stored verbatim, read back as a string (legacy shape).
+    // A multi-variant pool persists as ordered rows and reads back as an array;
+    // a single variant collapses to a plain string on read.
+    const pooled: CampaignRoom = {
+      ...ROOM_B,
+      onEnter: ['Line one.', 'Line two.'],
+      onExit: ['You leave.'],
+    };
     const single: CampaignRoom = { ...ROOM_A, onEnter: 'Just the one line.' };
     expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [pooled, single])).toBe(true);
     const back = await getCampaignRooms(db.pool, 'malgovia');
-    expect(back.find((r) => r.id === 'cellar')!.onEnter).toEqual(['Line one.', 'Line two.']);
+    const cellar = back.find((r) => r.id === 'cellar')!;
+    expect(cellar.onEnter).toEqual(['Line one.', 'Line two.']); // order preserved
+    expect(cellar.onExit).toBe('You leave.'); // 1 variant → string
     expect(back.find((r) => r.id === 'taproom')!.onEnter).toBe('Just the one line.');
+  });
+
+  it('replace-all of rooms leaves region/town narratives intact (owner-kind scoped)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    await putCampaignSection(db.pool, 'malgovia', 'regions', [
+      { ...REGION_A, onEnter: 'Region flavor.' },
+    ]);
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A]);
+    // Re-save rooms — the region's hooks must survive (different owner_kind).
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_B]);
+    const regions = await getCampaignRegions(db.pool, 'malgovia');
+    expect(regions[0].onEnter).toBe('Region flavor.');
+  });
+
+  it('reverting the rooms section clears its narratives (no orphan rows)', async () => {
+    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [{ ...ROOM_A, onEnter: ['A.', 'B.'] }]);
+    expect(await deleteCampaignSection(db.pool, 'malgovia', 'rooms')).toBe(true);
+    // Re-create the same room with NO hooks — if the old narrative rows lingered
+    // they'd reappear; they don't.
+    await putCampaignSection(db.pool, 'malgovia', 'rooms', [{ ...ROOM_A, onEnter: undefined }]);
+    expect('onEnter' in (await getCampaignRooms(db.pool, 'malgovia'))[0]).toBe(false);
   });
 
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {

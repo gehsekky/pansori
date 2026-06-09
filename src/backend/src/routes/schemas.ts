@@ -293,19 +293,19 @@ const RegionGridSchema = z.array(z.array(TerrainCellSchema).min(1).max(200)).min
 // Level narration hooks shared by regions/towns/rooms: the FIRST variant
 // overrides the plain one on the first scope entry/exit; the plain one
 // fires every other time.
-const HOOK = z.string().min(1).max(2000).optional();
+// Every narration hook is a VARIANT POOL: a single string or an array of
+// variants (the engine picks one at random; multi-paragraph = newlines within a
+// variant). A 1-element pool is fine; blank variants are pruned client-side.
+// Persisted as campaign_narratives rows.
+const HOOK = z
+  .union([z.string().min(1).max(2000), z.array(z.string().min(1).max(2000)).min(1).max(50)])
+  .optional();
 const LEVEL_HOOK_FIELDS = {
   onEnter: HOOK,
   onFirstEnter: HOOK,
   onExit: HOOK,
   onFirstExit: HOOK,
 };
-// Rooms allow a POOL for `onEnter` (random pick per visit — absorbed the old
-// campaign-level `narratives.roomArrival`). Region/town keep the single-string
-// HOOK. A 1-element pool is fine; blank lines are pruned client-side.
-const ROOM_ENTER_HOOK = z
-  .union([z.string().min(1).max(2000), z.array(z.string().min(1).max(2000)).min(1).max(50)])
-  .optional();
 
 // the region-level superRefine below (they need the region's grid size).
 const RegionSiteSchema = z
@@ -321,8 +321,9 @@ const RegionSiteSchema = z
     regionId: SLUG.optional(),
     entryPos: GridPosSchema.optional(),
     desc: z.string().min(1).max(2000).optional(),
-    // Narration hook — appended to "You enter X." on every landing.
-    onEnter: z.string().min(1).max(2000).optional(),
+    // Narration hook — appended to "You enter X." on every landing. A variant
+    // pool (pick one).
+    onEnter: HOOK,
     // A game-icons.net glyph name, or 'tile:<id>' for a painted tile from
     // the marker/terrain catalogs. On a TOWN site a painted icon overrides
     // the campaign-wide markers.town skin (one town can be THE walled city).
@@ -1212,10 +1213,8 @@ const RoomsSchema = z
         name: z.string().min(1).max(80),
         desc: z.string().min(1).max(4000),
         // Level narration hooks (enter on every descend/passage in; exit
-        // on leaving to another room or ascending). `onEnter` is a pool on
-        // rooms — override the single-string HOOK from LEVEL_HOOK_FIELDS.
+        // on leaving to another room or ascending) — each a variant pool.
         ...LEVEL_HOOK_FIELDS,
-        onEnter: ROOM_ENTER_HOOK,
         // SRD tactical scale: 5 ft per square (the default when omitted).
         grid: RoomGridSchema,
         entryPos: GridPosSchema,

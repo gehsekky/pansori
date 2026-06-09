@@ -107,7 +107,7 @@ interface EditorSite {
   toRoomId?: string; // rooms only — exit target
   entrancePos?: { x: number; y: number }; // rooms only — preserved, not edited
   desc?: string;
-  onEnter?: string;
+  onEnter?: string | string[]; // a variant pool (pick one)
   icon?: string;
   [key: string]: unknown;
 }
@@ -129,14 +129,13 @@ interface EditorRegion {
   desc?: string;
   feetPerSquare?: number;
   isStartingRegion?: boolean; // regions only
-  // Level narration hooks (all kinds): FIRST variant overrides plain on
-  // the first scope entry/exit; region first-enter falls back to desc.
-  // `onEnter` is a POOL on rooms (random pick per visit — absorbed the old
-  // campaign-level roomArrival); region/town use the single-string form.
+  // Level narration hooks (all kinds) — each a VARIANT POOL (pick one); FIRST
+  // overrides plain on the first scope entry/exit; region first-enter falls back
+  // to desc. Multi-paragraph = newlines within a variant.
   onEnter?: string | string[];
-  onFirstEnter?: string;
-  onExit?: string;
-  onFirstExit?: string;
+  onFirstEnter?: string | string[];
+  onExit?: string | string[];
+  onFirstExit?: string | string[];
   encounterZones?: EditorEncounterZone[]; // regions only — the sole encounter source
   floor?: string; // towns + rooms
   lighting?: string; // rooms only
@@ -216,16 +215,26 @@ const exitsToSites = (exits?: EditorExit[]): EditorSite[] =>
     ...(e.entrancePos ? { entrancePos: { ...e.entrancePos } } : {}),
   }));
 
-// The non-map fields editable on this page, held as strings ('' = unset)
-// and parsed/pruned at save time.
+// The four narration hooks (every scope). Each is a VARIANT POOL — the engine
+// picks one at random; multi-paragraph = newlines within a variant.
+const HOOK_KEYS = ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const;
+type HookKey = (typeof HOOK_KEYS)[number];
+
+// Normalize a stored hook (string | string[] | undefined) to a variant list.
+function toVariants(v: string | string[] | undefined): string[] {
+  return Array.isArray(v) ? [...v] : v ? [v] : [];
+}
+
+// The non-map fields editable on this page. Scalars held as strings ('' = unset);
+// the four narration hooks held as variant lists, parsed/pruned at save time.
 interface Details {
   name: string;
   desc: string;
   feetPerSquare: string;
-  onEnter: string;
-  onFirstEnter: string;
-  onExit: string;
-  onFirstExit: string;
+  onEnter: string[];
+  onFirstEnter: string[];
+  onExit: string[];
+  onFirstExit: string[];
   floor: string; // towns + rooms
   lighting: string; // rooms only
 }
@@ -235,12 +244,10 @@ function detailsFrom(r: EditorRegion): Details {
     name: r.name ?? '',
     desc: r.desc ?? '',
     feetPerSquare: r.feetPerSquare !== undefined ? String(r.feetPerSquare) : '',
-    // Rooms hold a pool (string[]); show it one line per entry. Region/town
-    // are a single string.
-    onEnter: Array.isArray(r.onEnter) ? r.onEnter.join('\n') : (r.onEnter ?? ''),
-    onFirstEnter: r.onFirstEnter ?? '',
-    onExit: r.onExit ?? '',
-    onFirstExit: r.onFirstExit ?? '',
+    onEnter: toVariants(r.onEnter),
+    onFirstEnter: toVariants(r.onFirstEnter),
+    onExit: toVariants(r.onExit),
+    onFirstExit: toVariants(r.onFirstExit),
     floor: r.floor ?? '',
     // An absent lighting key IS bright (the engine defaults it everywhere),
     // so the form shows BRIGHT rather than exposing the omitted-key detail.
@@ -307,6 +314,62 @@ function describeError(err: unknown): string {
     return `Invalid shape — ${first}`;
   }
   return 'Request failed — try again.';
+}
+
+// One narration hook = a pool of variant entries. Each variant is a multi-line
+// textarea (blank line = paragraph break); the engine picks one variant at
+// random. A 1-variant pool serves as a plain string; 0 variants = hook unset.
+function HookVariants({
+  field,
+  label,
+  variants,
+  onChange,
+}: {
+  field: string;
+  label: string;
+  variants: string[];
+  onChange: (variants: string[]) => void;
+}) {
+  return (
+    <div style={{ marginBottom: '0.75rem' }}>
+      <label className={styles.formLbl}>{label}</label>
+      {variants.length === 0 && (
+        <p style={{ fontSize: '0.7rem', color: 'var(--t-dim)', margin: '2px 0' }}>none</p>
+      )}
+      {variants.map((v, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 4 }}>
+          <textarea
+            id={`map-hook-${field}-${i}`}
+            aria-label={`${label} variant ${i + 1}`}
+            className={styles.formInp}
+            rows={2}
+            style={{ resize: 'vertical', flex: 1 }}
+            placeholder="a variant (blank line = paragraph break)"
+            value={v}
+            onChange={(e) => onChange(variants.map((x, j) => (j === i ? e.target.value : x)))}
+          />
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+            aria-label={`Remove ${label} variant ${i + 1}`}
+            onClick={() => onChange(variants.filter((_, j) => j !== i))}
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className={styles.ghostBtn}
+        style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem' }}
+        aria-label={`Add ${label} variant`}
+        onClick={() => onChange([...variants, ''])}
+      >
+        + ADD VARIANT
+      </button>
+    </div>
+  );
 }
 
 function RegionEditorScreen({
@@ -741,6 +804,12 @@ function RegionEditorScreen({
     }
     const cleaned = sites.map((s) => {
       const c: EditorSite = { ...s };
+      // onEnter is a variant pool — prune blank variants; drop the hook if empty.
+      if (Array.isArray(c.onEnter)) {
+        const vs = c.onEnter.map((x) => x.trim()).filter(Boolean);
+        if (vs.length) c.onEnter = vs;
+        else delete c.onEnter;
+      }
       for (const k of ['townId', 'entryRoomId', 'regionId', 'desc', 'onEnter', 'icon'] as const) {
         if (!c[k]) delete c[k];
       }
@@ -833,22 +902,13 @@ function RegionEditorScreen({
       }
       next.feetPerSquare = fps;
     }
-    // Level narration hooks. `onEnter` is a POOL on rooms (one line per entry,
-    // random-picked per visit); region/town keep a single string. The other
-    // three hooks are always single strings.
-    if (kind === 'room') {
-      const pool = details.onEnter
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-      if (pool.length) next.onEnter = pool;
-      else delete next.onEnter;
-    } else {
-      if (details.onEnter.trim()) next.onEnter = details.onEnter.trim();
-      else delete next.onEnter;
-    }
-    for (const key of ['onFirstEnter', 'onExit', 'onFirstExit'] as const) {
-      if (details[key].trim()) next[key] = details[key].trim();
+    // Level narration hooks — each a VARIANT POOL (engine picks one; multi-
+    // paragraph = newlines within a variant). Prune blank variants; an empty
+    // pool drops the hook. A 1-variant pool serializes as an array; the server
+    // collapses it to a single string on read.
+    for (const key of HOOK_KEYS) {
+      const variants = details[key].map((v) => v.trim()).filter(Boolean);
+      if (variants.length) next[key] = variants;
       else delete next[key];
     }
     if (kind === 'region') {
@@ -979,8 +1039,19 @@ function RegionEditorScreen({
     }
   }
 
-  function updateDetail(key: keyof Details, value: string) {
+  // Scalar (string-valued) detail fields; the four narration hooks are variant
+  // lists, updated via updateHook.
+  function updateDetail(
+    key: 'name' | 'desc' | 'feetPerSquare' | 'floor' | 'lighting',
+    value: string
+  ) {
     setDetails((d) => ({ ...d, [key]: value }));
+    setDirty(true);
+    setSaved(false);
+  }
+
+  function updateHook(key: HookKey, variants: string[]) {
+    setDetails((d) => ({ ...d, [key]: variants }));
     setDirty(true);
     setSaved(false);
   }
@@ -1770,21 +1841,17 @@ function RegionEditorScreen({
                         )}
                         {kind === 'region' && (
                           // Sites only — venues/exits carry no narration hook
-                          // (the schema would reject one). Full-width, sized
-                          // like the map-level NARRATION HOOKS fields.
+                          // (the schema would reject one). A variant pool, like
+                          // the map-level NARRATION HOOKS.
                           <div style={{ flexBasis: '100%' }}>
-                            <label className={styles.formLbl} htmlFor="site-on-enter">
-                              ON ENTER NARRATION
-                            </label>
-                            <textarea
-                              id="site-on-enter"
-                              className={styles.formInp}
-                              rows={3}
-                              style={{ resize: 'vertical' }}
-                              placeholder="none"
-                              value={selectedSite.onEnter ?? ''}
-                              onChange={(e) =>
-                                updateSite(selectedSite.id, { onEnter: e.target.value })
+                            <HookVariants
+                              field="site-on-enter"
+                              label="ON ENTER NARRATION"
+                              variants={toVariants(selectedSite.onEnter)}
+                              onChange={(v) =>
+                                updateSite(selectedSite.id, {
+                                  onEnter: v.length ? v : undefined,
+                                })
                               }
                             />
                           </div>
@@ -2176,30 +2243,25 @@ function RegionEditorScreen({
                 NARRATION HOOKS — &quot;FIRST&quot; OVERRIDES THE PLAIN ONE ONCE
                 {kind === 'region' ? ' · FIRST ENTER FALLS BACK TO DESCRIPTION' : ''}
               </p>
+              <p style={{ fontSize: '0.68rem', color: 'var(--t-dim)', marginBottom: '0.5rem' }}>
+                EACH HOOK IS A POOL — ADD VARIANTS AND THE ENGINE PICKS ONE AT RANDOM. A VARIANT MAY
+                SPAN MULTIPLE PARAGRAPHS (BLANK LINE BETWEEN).
+              </p>
               {(
                 [
-                  // On rooms, ON ENTER is a pool: one line per entry, random-
-                  // picked each visit (it absorbed the old roomArrival pool).
-                  ['onEnter', kind === 'room' ? 'ON ENTER (ONE LINE = ONE ENTRY)' : 'ON ENTER'],
+                  ['onEnter', 'ON ENTER'],
                   ['onFirstEnter', 'ON FIRST ENTER'],
                   ['onExit', 'ON EXIT'],
                   ['onFirstExit', 'ON FIRST EXIT'],
-                ] as Array<[keyof Details, string]>
+                ] as Array<[HookKey, string]>
               ).map(([key, label]) => (
-                <div key={key} style={{ marginBottom: '0.75rem' }}>
-                  <label className={styles.formLbl} htmlFor={`map-hook-${key}`}>
-                    {label}
-                  </label>
-                  <textarea
-                    id={`map-hook-${key}`}
-                    className={styles.formInp}
-                    rows={key === 'onEnter' && kind === 'room' ? 5 : 3}
-                    style={{ resize: 'vertical' }}
-                    placeholder="none"
-                    value={details[key]}
-                    onChange={(e) => updateDetail(key, e.target.value)}
-                  />
-                </div>
+                <HookVariants
+                  key={key}
+                  field={key}
+                  label={label}
+                  variants={details[key]}
+                  onChange={(v) => updateHook(key, v)}
+                />
               ))}
             </div>
 

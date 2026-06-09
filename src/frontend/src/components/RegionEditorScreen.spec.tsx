@@ -207,26 +207,40 @@ describe('RegionEditorScreen', () => {
     expect(list[0].sites).toEqual(REGION.sites);
   });
 
-  it('the four narration hooks round-trip through the details form', async () => {
+  it('the four narration hooks round-trip as variant pools', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
-    fireEvent.change(screen.getByLabelText('ON ENTER'), {
+    // Each hook is a variant pool — add a variant, then fill it. ON ENTER gets
+    // two variants to prove the ordered-array round-trip.
+    for (const label of ['ON ENTER', 'ON FIRST ENTER', 'ON EXIT', 'ON FIRST EXIT']) {
+      fireEvent.click(screen.getByLabelText(`Add ${label} variant`));
+    }
+    fireEvent.click(screen.getByLabelText('Add ON ENTER variant')); // a 2nd ON ENTER variant
+    fireEvent.change(screen.getByLabelText('ON ENTER variant 1'), {
       target: { value: 'The mists part as you crest the ridge.' },
     });
-    fireEvent.change(screen.getByLabelText('ON FIRST ENTER'), {
+    fireEvent.change(screen.getByLabelText('ON ENTER variant 2'), {
+      target: { value: 'A second way the vale greets you.' },
+    });
+    fireEvent.change(screen.getByLabelText('ON FIRST ENTER variant 1'), {
       target: { value: 'For the first time, the vale opens.' },
     });
-    fireEvent.change(screen.getByLabelText('ON EXIT'), { target: { value: 'The mists close.' } });
-    fireEvent.change(screen.getByLabelText('ON FIRST EXIT'), {
+    fireEvent.change(screen.getByLabelText('ON EXIT variant 1'), {
+      target: { value: 'The mists close.' },
+    });
+    fireEvent.change(screen.getByLabelText('ON FIRST EXIT variant 1'), {
       target: { value: 'You will not forget the vale.' },
     });
     fireEvent.click(screen.getByText('SAVE'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
-    expect(saved[0].onEnter).toBe('The mists part as you crest the ridge.');
-    expect(saved[0].onFirstEnter).toBe('For the first time, the vale opens.');
-    expect(saved[0].onExit).toBe('The mists close.');
-    expect(saved[0].onFirstExit).toBe('You will not forget the vale.');
+    expect(saved[0].onEnter).toEqual([
+      'The mists part as you crest the ridge.',
+      'A second way the vale greets you.',
+    ]);
+    expect(saved[0].onFirstEnter).toEqual(['For the first time, the vale opens.']);
+    expect(saved[0].onExit).toEqual(['The mists close.']);
+    expect(saved[0].onFirstExit).toEqual(['You will not forget the vale.']);
   });
 
   it('clearing an optional detail removes the key instead of writing empty', async () => {
@@ -238,7 +252,8 @@ describe('RegionEditorScreen', () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
     fireEvent.change(screen.getByLabelText('DESCRIPTION'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText('ON ENTER'), { target: { value: '' } });
+    // The loaded onEnter ('old hook') shows as one variant — blank it to clear.
+    fireEvent.change(screen.getByLabelText('ON ENTER variant 1'), { target: { value: '' } });
     fireEvent.click(screen.getByText('SAVE'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
@@ -280,7 +295,8 @@ describe('RegionEditorScreen', () => {
     });
     fireEvent.change(screen.getByLabelText('KIND'), { target: { value: 'town' } });
     fireEvent.change(screen.getByLabelText('TOWN'), { target: { value: 'oakvale' } });
-    fireEvent.change(screen.getByLabelText('ON ENTER NARRATION', { selector: '#site-on-enter' }), {
+    fireEvent.click(screen.getByLabelText('Add ON ENTER NARRATION variant'));
+    fireEvent.change(screen.getByLabelText('ON ENTER NARRATION variant 1'), {
       target: { value: 'Smoke curls from the chimneys.' },
     });
     fireEvent.click(screen.getByText('SAVE'));
@@ -291,7 +307,7 @@ describe('RegionEditorScreen', () => {
     const added = sites.find((s) => s.name === 'Oakvale')! as Record<string, unknown>;
     expect(added.kind).toBe('town');
     expect(added.townId).toBe('oakvale');
-    expect(added.onEnter).toBe('Smoke curls from the chimneys.');
+    expect(added.onEnter).toEqual(['Smoke curls from the chimneys.']);
     expect(added.pos).toEqual({ x: 1, y: 0 });
     // Flipping to town pruned the local target; empty optionals pruned too.
     expect('entryRoomId' in added).toBe(false);
@@ -560,7 +576,7 @@ describe('RegionEditorScreen', () => {
       expect(screen.getByTestId('cell-2-2').getAttribute('aria-label')).toContain('site: Door');
     });
 
-    it('room ON ENTER is a pool: loads joined, saves split into an array (blanks pruned)', async () => {
+    it('room ON ENTER is a variant pool: loads one textarea per variant, saves an array', async () => {
       mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
         section === 'rooms'
           ? {
@@ -574,13 +590,20 @@ describe('RegionEditorScreen', () => {
       render(
         <RegionEditorScreen campaignId="sandbox" regionId="taproom" kind="room" onBack={vi.fn()} />
       );
-      const ta = (await screen.findByLabelText(
-        'ON ENTER (ONE LINE = ONE ENTRY)'
-      )) as HTMLTextAreaElement;
-      // The pool loads one line per entry.
-      expect(ta.value).toBe('First glimpse.\nSecond glimpse.');
-      // Edit: a blank line + trailing spaces are pruned on save; result is an array.
-      fireEvent.change(ta, { target: { value: 'First glimpse.\n\nThird glimpse.  ' } });
+      // The pool loads one textarea per variant, in order.
+      const v1 = (await screen.findByLabelText('ON ENTER variant 1')) as HTMLTextAreaElement;
+      const v2 = screen.getByLabelText('ON ENTER variant 2') as HTMLTextAreaElement;
+      expect(v1.value).toBe('First glimpse.');
+      expect(v2.value).toBe('Second glimpse.');
+      // Remove the 2nd, add a fresh 3rd, and a multi-paragraph variant survives.
+      fireEvent.click(screen.getByLabelText('Remove ON ENTER variant 2'));
+      fireEvent.change(screen.getByLabelText('ON ENTER variant 1'), {
+        target: { value: 'A scene.\n\nWith two paragraphs.' },
+      });
+      fireEvent.click(screen.getByLabelText('Add ON ENTER variant'));
+      fireEvent.change(screen.getByLabelText('ON ENTER variant 2'), {
+        target: { value: 'Another variant.' },
+      });
       fireEvent.click(screen.getByText('SAVE'));
       await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
       const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<{
@@ -588,8 +611,8 @@ describe('RegionEditorScreen', () => {
         onEnter?: unknown;
       }>;
       expect(saved.find((r) => r.id === 'taproom')!.onEnter).toEqual([
-        'First glimpse.',
-        'Third glimpse.',
+        'A scene.\n\nWith two paragraphs.',
+        'Another variant.',
       ]);
     });
 
@@ -1244,10 +1267,8 @@ describe('region SITES card — icon dropdown + tile preview', () => {
     expect((screen.getByAltText('site tile preview') as HTMLImageElement).getAttribute('src')).toBe(
       '/art/markers/barrow_1.png'
     );
-    // The on-enter narration is now a full-width textarea below the row.
-    expect((screen.getByLabelText('ON ENTER NARRATION') as HTMLTextAreaElement).tagName).toBe(
-      'TEXTAREA'
-    );
+    // The on-enter narration is now a variant pool (add-variant control present).
+    expect(screen.getByLabelText('Add ON ENTER NARRATION variant')).toBeTruthy();
   });
 
   it('a legacy game-icons glyph value survives as a (custom) option', async () => {
