@@ -94,27 +94,27 @@ describe('syncMonsterCatalog / getMonsterCatalog', () => {
 
 describe('campaign custom monsters CRUD', () => {
   it('keys rows by name slugs, suffixing duplicates', async () => {
-    const db = makeMonstersDb({ campaigns: ['malgovia'] });
-    expect(await putCampaignCustomMonsters(db.pool, 'malgovia', [FROST_WOLF, FROST_WOLF])).toBe(
-      true
-    );
-    const stored = db.customs.get('malgovia')!;
+    const db = makeMonstersDb({ campaigns: ['demo_campaign'] });
+    expect(
+      await putCampaignCustomMonsters(db.pool, 'demo_campaign', [FROST_WOLF, FROST_WOLF])
+    ).toBe(true);
+    const stored = db.customs.get('demo_campaign')!;
     expect(stored.map((s) => s.monster_id)).toEqual(['frost-wolf', 'frost-wolf-2']);
-    expect((await getCampaignCustomMonsters(db.pool, 'malgovia')).map((t) => t.name)).toEqual([
+    expect((await getCampaignCustomMonsters(db.pool, 'demo_campaign')).map((t) => t.name)).toEqual([
       'Frost Wolf',
       'Frost Wolf',
     ]);
   });
 
   it('replace-all, delete, and missing-campaign behaviors', async () => {
-    const db = makeMonstersDb({ campaigns: ['malgovia'] });
-    await putCampaignCustomMonsters(db.pool, 'malgovia', [FROST_WOLF, BANDIT]);
-    await putCampaignCustomMonsters(db.pool, 'malgovia', [FROST_WOLF]);
-    expect((await getCampaignCustomMonsters(db.pool, 'malgovia')).map((t) => t.name)).toEqual([
+    const db = makeMonstersDb({ campaigns: ['demo_campaign'] });
+    await putCampaignCustomMonsters(db.pool, 'demo_campaign', [FROST_WOLF, BANDIT]);
+    await putCampaignCustomMonsters(db.pool, 'demo_campaign', [FROST_WOLF]);
+    expect((await getCampaignCustomMonsters(db.pool, 'demo_campaign')).map((t) => t.name)).toEqual([
       'Frost Wolf',
     ]);
-    expect(await deleteCampaignCustomMonsters(db.pool, 'malgovia')).toBe(true);
-    expect(await getCampaignCustomMonsters(db.pool, 'malgovia')).toEqual([]);
+    expect(await deleteCampaignCustomMonsters(db.pool, 'demo_campaign')).toBe(true);
+    expect(await getCampaignCustomMonsters(db.pool, 'demo_campaign')).toEqual([]);
     expect(await putCampaignCustomMonsters(db.pool, 'nope', [BANDIT])).toBe(false);
     expect(await deleteCampaignCustomMonsters(db.pool, 'nope')).toBe(false);
   });

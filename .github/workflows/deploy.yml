@@ -49,62 +49,19 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Compose env. docker-compose.yml requires GOOGLE_CLIENT_ID/SECRET to be
-      # set (no defaults). The E2E suite uses /api/auth/test-login (bypass),
-      # so these can be dummy values — but they must be present or passport's
-      # GoogleStrategy will fail to register. E2E_TEST_LOGIN_ENABLED=true
-      # exposes the bypass; double-gated against NODE_ENV=production.
-      - name: Write CI env
-        run: |
-          cat > .env <<EOF
-          GOOGLE_CLIENT_ID=ci-dummy
-          GOOGLE_CLIENT_SECRET=ci-dummy
-          SESSION_SECRET=ci-session-secret-do-not-use-in-prod
-          E2E_TEST_LOGIN_ENABLED=true
-          EOF
-
-      - name: Bring up dev stack
-        run: docker compose up -d --build
-
-      # Backend and frontend take a few seconds to start. Poll for readiness
-      # before installing Playwright so we fail fast if compose is broken.
-      - name: Wait for backend ready
-        run: |
-          # /api/auth/me returns 401 when not authenticated — that's the
-          # signal the server is up and Passport is registered.
-          for i in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/api/auth/me || echo 000)
-            if [ "$code" = "401" ]; then
-              echo "backend up after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "backend never came up; dumping logs"
-          docker compose logs backend
-          exit 1
-
-      - name: Wait for frontend ready
-        run: |
-          for i in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/ || echo 000)
-            if [ "$code" = "200" ]; then
-              echo "frontend up after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          docker compose logs frontend
-          exit 1
-
       - name: Install Playwright (Chromium + system deps)
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
-        run: npm run test:e2e
+      # The ephemeral e2e stack (docker-compose.e2e.yml) brings itself up, self-
+      # seeds a throwaway campaign via POST /api/test/seed-campaign, runs the
+      # Playwright suite, and tears down with `down -v`. No persistent database
+      # or built-in campaign is involved. The backend needs no Google OAuth env
+      # (the suite uses /api/auth/test-login; passport skips Google when unset).
+      - name: Run E2E (ephemeral stack)
+        run: npm run test:e2e:stack
 
-      # Upload diagnostics on failure: Playwright's trace + HTML report +
-      # docker compose logs make post-mortem possible without re-running.
+      # Upload diagnostics on failure: Playwright's trace + HTML report make
+      # post-mortem possible without re-running.
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -115,16 +72,13 @@ jobs:
             test-results/
           retention-days: 7
 
-      - name: Dump container logs on failure
+      - name: Dump e2e container logs on failure
         if: failure()
-        run: |
-          echo "=== backend ===" && docker compose logs backend
-          echo "=== frontend ===" && docker compose logs frontend
-          echo "=== postgres ===" && docker compose logs postgres
+        run: docker compose -f docker-compose.e2e.yml logs --no-color || true
 
-      - name: Tear down stack
+      - name: Tear down e2e stack
         if: always()
-        run: docker compose down -v
+        run: docker compose -f docker-compose.e2e.yml down -v --remove-orphans || true
 
   build-and-deploy:
     name: Build → ECR → Deploy

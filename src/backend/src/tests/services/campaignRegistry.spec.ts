@@ -30,9 +30,13 @@ describe('campaignDisplayName', () => {
   it('prefers campaign.world_name, then displayNoun, then id', () => {
     expect(
       campaignDisplayName(
-        ctx({ id: 'malgovia', displayNoun: 'vale', campaign: { world_name: 'Malgovia' } as never })
+        ctx({
+          id: 'demo_campaign',
+          displayNoun: 'vale',
+          campaign: { world_name: 'Demo Campaign' } as never,
+        })
       )
-    ).toBe('Malgovia');
+    ).toBe('Demo Campaign');
     expect(campaignDisplayName(ctx({ id: 'sandbox', displayNoun: 'sandbox' }))).toBe('sandbox');
     expect(campaignDisplayName(ctx({ id: 'bare' }))).toBe('bare');
   });
@@ -42,11 +46,14 @@ describe('syncCampaignRegistry', () => {
   it('upserts one row per context with the resolved display name', async () => {
     const mock = makeMockPool();
     await syncCampaignRegistry(mock.pool, {
-      malgovia: ctx({ id: 'malgovia', campaign: { world_name: 'Malgovia' } as never }),
+      demo_campaign: ctx({
+        id: 'demo_campaign',
+        campaign: { world_name: 'Demo Campaign' } as never,
+      }),
       sandbox: ctx({ id: 'sandbox', displayNoun: 'sandbox' }),
     });
     expect(mock.upserts).toEqual([
-      { id: 'malgovia', name: 'Malgovia' },
+      { id: 'demo_campaign', name: 'Demo Campaign' },
       { id: 'sandbox', name: 'sandbox' },
     ]);
     // Upsert, not plain insert — re-running on an existing registry updates.

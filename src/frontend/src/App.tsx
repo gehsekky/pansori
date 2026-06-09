@@ -42,10 +42,10 @@ import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
 
-// The FE ships ONE code context — the base donor. Every campaign (sandbox,
-// malgovia, creator-built) resolves as DB rows: CharScreen synthesizes its card
-// over this donor from the /game/contexts summary, and the in-game theme rides
-// in via the seed. The donor is hidden, so it never appears in the picker.
+// The FE ships ONE code context — the base donor. Every campaign (creator-built)
+// resolves as DB rows: CharScreen synthesizes its card over this donor from the
+// /game/contexts summary, and the in-game theme rides in via the seed. The donor
+// is hidden, so it never appears in the picker.
 const CONTEXTS: Record<string, FrontendContext> = {
   __base__: baseContext,
 };

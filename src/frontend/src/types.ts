@@ -102,8 +102,8 @@ export interface FeatSummary {
 
 export interface FrontendContext {
   id: string;
-  // Internal-testing campaign (e.g. sandbox): excluded from the player-facing
-  // campaign picker. Still launchable via the `?campaign=<id>` URL override.
+  // Internal-testing campaign: excluded from the player-facing campaign picker.
+  // Still launchable via the `?campaign=<id>` URL override.
   hidden?: boolean;
   displayName: string;
   tagline: string;

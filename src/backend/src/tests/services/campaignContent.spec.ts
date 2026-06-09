@@ -308,8 +308,8 @@ const G = (w: number, h: number, t = 'plains'): CampaignRegionCell[][] =>
   Array.from({ length: h }, () => Array.from({ length: w }, () => ({ t })));
 
 const REGION_A: CampaignRegion = {
-  id: 'malgovia',
-  name: 'Malgovia',
+  id: 'demo_campaign',
+  name: 'Demo Campaign',
   isStartingRegion: true,
   desc: 'A mist-shrouded vale.',
   feetPerSquare: 5280,
@@ -432,7 +432,7 @@ const ROOM_B: CampaignRoom = {
 
 describe('mergeContextWithOverlay', () => {
   const code = codeCtx({
-    id: 'malgovia',
+    id: 'demo_campaign',
     displayNoun: 'vale',
     classHitDie: { fighter: 10 },
     narratives: { genericArrival: ['from code'] } as never,
@@ -455,7 +455,7 @@ describe('mergeContextWithOverlay', () => {
 
   it('never overrides protected fields and skips null values', () => {
     const merged = mergeContextWithOverlay(code, { id: 'evil-rename', displayNoun: null });
-    expect(merged.id).toBe('malgovia');
+    expect(merged.id).toBe('demo_campaign');
     expect(merged.displayNoun).toBe('vale');
   });
 
@@ -538,8 +538,8 @@ describe('editable sections registry', () => {
   // A minimal valid region — tests tweak single fields off this base.
   // (12x10 dense plains grid; dimensions derive from the array shape.)
   const region = (over: Record<string, unknown> = {}) => ({
-    id: 'malgovia',
-    name: 'Malgovia',
+    id: 'demo_campaign',
+    name: 'Demo Campaign',
     isStartingRegion: true,
     feetPerSquare: 5280,
     grid: G(12, 10),
@@ -1036,7 +1036,7 @@ describe('editable sections registry', () => {
     );
   });
 
-  it('dialogue consequences: the Malgovia-parity arms validate with bounds', () => {
+  it('dialogue consequences: the Demo Campaign-parity arms validate with bounds', () => {
     const quests = CAMPAIGN_SECTION_SCHEMAS.quests;
     const quest = (rewards: unknown[]) => [
       {
@@ -1185,7 +1185,7 @@ describe('editable sections registry', () => {
     // …that exists in the payload…
     expect(regions.safeParse(pair(gate({ regionId: 'nowhere' }))).success).toBe(false);
     // …and isn't its own region.
-    expect(regions.safeParse(pair(gate({ regionId: 'malgovia' }))).success).toBe(false);
+    expect(regions.safeParse(pair(gate({ regionId: 'demo_campaign' }))).success).toBe(false);
     // entryPos must fit the TARGET region's grid (12x10).
     expect(regions.safeParse(pair(gate({ entryPos: { x: 12, y: 0 } }))).success).toBe(false);
   });
@@ -1284,7 +1284,7 @@ describe('editable sections registry', () => {
     expect(
       regions.safeParse([region(), region({ name: 'B', isStartingRegion: false })]).success
     ).toBe(false);
-    expect(regions.safeParse([region({ id: 'Malgovia!' })]).success).toBe(false);
+    expect(regions.safeParse([region({ id: 'Demo Campaign!' })]).success).toBe(false);
     expect(regions.safeParse([region({ isStartingRegion: false })]).success).toBe(false);
     expect(regions.safeParse([region(), region({ id: 'b' })]).success).toBe(false);
     expect(regions.safeParse([]).success).toBe(false);
@@ -1357,11 +1357,11 @@ describe('editable sections registry', () => {
 
 describe('regions table store', () => {
   it('round-trips the JSON shape through rows, preserving order + optionals', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    expect(await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A, REGION_B])).toBe(
-      true
-    );
-    const back = await getCampaignRegions(db.pool, 'malgovia');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    expect(
+      await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A, REGION_B])
+    ).toBe(true);
+    const back = await getCampaignRegions(db.pool, 'demo_campaign');
     expect(back).toEqual([REGION_A, REGION_B]);
     // Optional fields absent (not null) on the lean region.
     expect('desc' in back[1]).toBe(false);
@@ -1369,29 +1369,29 @@ describe('regions table store', () => {
   });
 
   it('put is replace-all, not append', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A, REGION_B]);
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A, REGION_B]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [
       { ...REGION_B, isStartingRegion: true },
     ]);
-    const back = await getCampaignRegions(db.pool, 'malgovia');
+    const back = await getCampaignRegions(db.pool, 'demo_campaign');
     expect(back.map((r) => r.id)).toEqual(['frost-reach']);
   });
 
   it('rejects writes to a missing campaign; delete reverts to empty', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     expect(await putCampaignSection(db.pool, 'nope', 'regions', [REGION_A])).toBe(false);
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'regions')).toBe(true);
-    expect(await getCampaignRegions(db.pool, 'malgovia')).toEqual([]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A]);
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'regions')).toBe(true);
+    expect(await getCampaignRegions(db.pool, 'demo_campaign')).toEqual([]);
     expect(await deleteCampaignSection(db.pool, 'nope', 'regions')).toBe(false);
   });
 
   it('getDbSection reports presence from the table, not the JSONB', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    expect((await getDbSection(db.pool, 'malgovia', 'regions')).present).toBe(false);
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
-    const after = await getDbSection(db.pool, 'malgovia', 'regions');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    expect((await getDbSection(db.pool, 'demo_campaign', 'regions')).present).toBe(false);
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A]);
+    const after = await getDbSection(db.pool, 'demo_campaign', 'regions');
     expect(after.present).toBe(true);
     expect(after.value).toEqual([REGION_A]);
   });
@@ -1399,9 +1399,11 @@ describe('regions table store', () => {
 
 describe('towns table store', () => {
   it('round-trips towns with their venues in order, preserving optionals', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    expect(await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A, TOWN_B])).toBe(true);
-    const back = await getCampaignTowns(db.pool, 'malgovia');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_A, TOWN_B])).toBe(
+      true
+    );
+    const back = await getCampaignTowns(db.pool, 'demo_campaign');
     expect(back).toEqual([TOWN_A, TOWN_B]);
     // Optional fields absent (not null): the gate venue has no
     // entryRoomId/desc, and the lean town carries no venues/floor keys.
@@ -1412,30 +1414,30 @@ describe('towns table store', () => {
   });
 
   it('put is replace-all and cascades venue rows', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A, TOWN_B]);
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_B]);
-    const back = await getCampaignTowns(db.pool, 'malgovia');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_A, TOWN_B]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_B]);
+    const back = await getCampaignTowns(db.pool, 'demo_campaign');
     expect(back).toEqual([TOWN_B]);
     // TOWN_A's venues went with it — a re-add of the bare town stays bare.
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [{ ...TOWN_A, venues: undefined }]);
-    expect('venues' in (await getCampaignTowns(db.pool, 'malgovia'))[0]).toBe(false);
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [{ ...TOWN_A, venues: undefined }]);
+    expect('venues' in (await getCampaignTowns(db.pool, 'demo_campaign'))[0]).toBe(false);
   });
 
   it('rejects writes to a missing campaign; delete reverts to empty', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     expect(await putCampaignSection(db.pool, 'nope', 'towns', [TOWN_A])).toBe(false);
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'towns')).toBe(true);
-    expect(await getCampaignTowns(db.pool, 'malgovia')).toEqual([]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_A]);
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'towns')).toBe(true);
+    expect(await getCampaignTowns(db.pool, 'demo_campaign')).toEqual([]);
     expect(await deleteCampaignSection(db.pool, 'nope', 'towns')).toBe(false);
   });
 
   it('getDbSection reports presence from the towns table', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    expect((await getDbSection(db.pool, 'malgovia', 'towns')).present).toBe(false);
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
-    const after = await getDbSection(db.pool, 'malgovia', 'towns');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    expect((await getDbSection(db.pool, 'demo_campaign', 'towns')).present).toBe(false);
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_A]);
+    const after = await getDbSection(db.pool, 'demo_campaign', 'towns');
     expect(after.present).toBe(true);
     expect(after.value).toEqual([TOWN_A]);
   });
@@ -1443,9 +1445,11 @@ describe('towns table store', () => {
 
 describe('rooms table store', () => {
   it('round-trips rooms with exits/lighting/floor, preserving order + optionals', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B])).toBe(true);
-    const back = await getCampaignRooms(db.pool, 'malgovia');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_A, ROOM_B])).toBe(
+      true
+    );
+    const back = await getCampaignRooms(db.pool, 'demo_campaign');
     expect(back).toEqual([ROOM_A, ROOM_B]);
     // The lean room carries no optional keys (absent, not null/false).
     expect('exits' in back[1]).toBe(false);
@@ -1456,7 +1460,7 @@ describe('rooms table store', () => {
   });
 
   it('hooks round-trip as campaign_narratives rows: a pool stays an array, one variant collapses to a string', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     // A multi-variant pool persists as ordered rows and reads back as an array;
     // a single variant collapses to a plain string on read.
     const pooled: CampaignRoom = {
@@ -1465,8 +1469,10 @@ describe('rooms table store', () => {
       onExit: ['You leave.'],
     };
     const single: CampaignRoom = { ...ROOM_A, onEnter: 'Just the one line.' };
-    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [pooled, single])).toBe(true);
-    const back = await getCampaignRooms(db.pool, 'malgovia');
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [pooled, single])).toBe(
+      true
+    );
+    const back = await getCampaignRooms(db.pool, 'demo_campaign');
     const cellar = back.find((r) => r.id === 'cellar')!;
     expect(cellar.onEnter).toEqual(['Line one.', 'Line two.']); // order preserved
     expect(cellar.onExit).toBe('You leave.'); // 1 variant → string
@@ -1474,29 +1480,33 @@ describe('rooms table store', () => {
   });
 
   it('replace-all of rooms leaves region/town narratives intact (owner-kind scoped)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [
       { ...REGION_A, onEnter: 'Region flavor.' },
     ]);
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_A]);
     // Re-save rooms — the region's hooks must survive (different owner_kind).
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_B]);
-    const regions = await getCampaignRegions(db.pool, 'malgovia');
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_B]);
+    const regions = await getCampaignRegions(db.pool, 'demo_campaign');
     expect(regions[0].onEnter).toBe('Region flavor.');
   });
 
   it('reverting the rooms section clears its narratives (no orphan rows)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [{ ...ROOM_A, onEnter: ['A.', 'B.'] }]);
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'rooms')).toBe(true);
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
+      { ...ROOM_A, onEnter: ['A.', 'B.'] },
+    ]);
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'rooms')).toBe(true);
     // Re-create the same room with NO hooks — if the old narrative rows lingered
     // they'd reappear; they don't.
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [{ ...ROOM_A, onEnter: undefined }]);
-    expect('onEnter' in (await getCampaignRooms(db.pool, 'malgovia'))[0]).toBe(false);
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
+      { ...ROOM_A, onEnter: undefined },
+    ]);
+    expect('onEnter' in (await getCampaignRooms(db.pool, 'demo_campaign'))[0]).toBe(false);
   });
 
   it('object + trap narrative round-trip as campaign_narratives rows (pool stays array, one collapses)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const room: CampaignRoom = {
       ...ROOM_B,
       objects: [
@@ -1519,8 +1529,8 @@ describe('rooms table store', () => {
         detectNarrative: 'A seam in the wall.',
       },
     };
-    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [room])).toBe(true);
-    const [back] = await getCampaignRooms(db.pool, 'malgovia');
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [room])).toBe(true);
+    const [back] = await getCampaignRooms(db.pool, 'demo_campaign');
     expect(back.objects![0].foundText).toEqual(['Gold gleams.', 'A false bottom!']); // pool
     expect(back.objects![0].interactText).toBe('The lid resists.'); // 1 variant → string
     expect(back.trap!.triggerNarrative).toEqual(['Darts hiss out.', 'A volley of needles!']);
@@ -1531,7 +1541,7 @@ describe('rooms table store', () => {
   });
 
   it('NPC greeting/goodbye round-trip as rows; dialogue replies stay inline', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const room: CampaignRoom = {
       ...ROOM_B,
       npcs: [
@@ -1546,8 +1556,8 @@ describe('rooms table store', () => {
         },
       ],
     };
-    expect(await putCampaignSection(db.pool, 'malgovia', 'rooms', [room])).toBe(true);
-    const npc = (await getCampaignRooms(db.pool, 'malgovia'))[0].npcs![0];
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [room])).toBe(true);
+    const npc = (await getCampaignRooms(db.pool, 'demo_campaign'))[0].npcs![0];
     expect(npc.greeting).toEqual(['Evening.', 'You again.']); // pool preserved + ordered
     expect(npc.goodbye).toBe('Mind the step.'); // 1 variant → string
     expect('firstGreeting' in npc).toBe(false); // unset hook absent
@@ -1557,21 +1567,21 @@ describe('rooms table store', () => {
   });
 
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_B]);
-    expect((await getCampaignRooms(db.pool, 'malgovia')).map((r) => r.id)).toEqual(['cellar']);
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'rooms')).toBe(true);
-    expect(await getCampaignRooms(db.pool, 'malgovia')).toEqual([]);
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_A, ROOM_B]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_B]);
+    expect((await getCampaignRooms(db.pool, 'demo_campaign')).map((r) => r.id)).toEqual(['cellar']);
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'rooms')).toBe(true);
+    expect(await getCampaignRooms(db.pool, 'demo_campaign')).toEqual([]);
     expect(await putCampaignSection(db.pool, 'nope', 'rooms', [ROOM_B])).toBe(false);
     expect(await deleteCampaignSection(db.pool, 'nope', 'rooms')).toBe(false);
   });
 
   it('getDbSection reports presence from the rooms table', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    expect((await getDbSection(db.pool, 'malgovia', 'rooms')).present).toBe(false);
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);
-    const after = await getDbSection(db.pool, 'malgovia', 'rooms');
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    expect((await getDbSection(db.pool, 'demo_campaign', 'rooms')).present).toBe(false);
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_A, ROOM_B]);
+    const after = await getDbSection(db.pool, 'demo_campaign', 'rooms');
     expect(after.present).toBe(true);
     expect(after.value).toEqual([ROOM_A, ROOM_B]);
   });
@@ -1616,69 +1626,69 @@ describe('dbRoomsToEngine', () => {
 
 describe('section CRUD + live refresh', () => {
   it('put → refresh serves the DB version; delete → refresh restores code', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       narratives: { genericArrival: ['from code'] } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    const codeContexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    const codeContexts: Record<string, Context> = { demo_campaign: code };
 
     expect(
-      await putCampaignSection(db.pool, 'malgovia', 'narratives', {
+      await putCampaignSection(db.pool, 'demo_campaign', 'narratives', {
         genericArrival: ['from db'],
       })
     ).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, codeContexts, 'malgovia');
-    expect(contexts.malgovia.narratives.genericArrival).toEqual(['from db']);
+    await refreshCampaignOverlay(db.pool, contexts, codeContexts, 'demo_campaign');
+    expect(contexts.demo_campaign.narratives.genericArrival).toEqual(['from db']);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'narratives')).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, codeContexts, 'malgovia');
-    expect(contexts.malgovia.narratives.genericArrival).toEqual(['from code']);
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'narratives')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, codeContexts, 'demo_campaign');
+    expect(contexts.demo_campaign.narratives.genericArrival).toEqual(['from code']);
   });
 
   it('refresh folds CONVERTED table regions into the campaign block, keeping its rooms', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       displayNoun: 'vale',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
         regions: [{ id: 'old-code-region' } as never],
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const campaign = contexts.malgovia.campaign!;
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A]);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const campaign = contexts.demo_campaign.campaign!;
     // Code rooms preserved; DB regions replace the code regions, in engine form.
     expect(campaign.rooms.map((r) => r.id)).toEqual(['square']);
-    expect(campaign.regions?.map((r) => r.id)).toEqual(['malgovia']);
+    expect(campaign.regions?.map((r) => r.id)).toEqual(['demo_campaign']);
     expect(campaign.regions?.[0].gridWidth).toBe(12);
     expect(campaign.regions?.[0].gridHeight).toBe(10);
     expect(campaign.regions?.[0].startPos).toEqual({ x: 3, y: 4 });
   });
 
   it('refresh folds DB towns into the campaign block beside the regions', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
         towns: [{ id: 'old-code-town' } as never],
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const campaign = contexts.malgovia.campaign!;
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_A]);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const campaign = contexts.demo_campaign.campaign!;
     expect(campaign.rooms.map((r) => r.id)).toEqual(['square']);
-    expect(campaign.regions?.map((r) => r.id)).toEqual(['malgovia']);
+    expect(campaign.regions?.map((r) => r.id)).toEqual(['demo_campaign']);
     // DB towns replace the code towns, converted to engine form.
     expect(campaign.towns?.map((t) => t.id)).toEqual(['oakvale']);
     expect(campaign.towns?.[0].gridWidth).toBe(10);
@@ -1686,34 +1696,34 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('gameStart folds into campaign.intro, never the top level; delete restores code', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'The code opening.',
         rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
 
     expect(
-      await putCampaignSection(db.pool, 'malgovia', 'gameStart', 'A new dawn over the vale.')
+      await putCampaignSection(db.pool, 'demo_campaign', 'gameStart', 'A new dawn over the vale.')
     ).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.intro).toBe('A new dawn over the vale.');
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.intro).toBe('A new dawn over the vale.');
     // The hook lands inside the campaign block — no stray top-level field —
     // and the rest of the block survives.
-    expect('gameStart' in contexts.malgovia).toBe(false);
-    expect(contexts.malgovia.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
+    expect('gameStart' in contexts.demo_campaign).toBe(false);
+    expect(contexts.demo_campaign.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'gameStart')).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.intro).toBe('The code opening.');
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'gameStart')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.intro).toBe('The code opening.');
   });
 
   it('quests + factions fold into the campaign block wholesale; delete restores code', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const codeQuest = {
       id: 'code-quest',
       title: 'Old Business',
@@ -1722,15 +1732,15 @@ describe('section CRUD + live refresh', () => {
       rewards: [],
     };
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [{ id: 'square', name: 'Square', desc: 'd' }],
         quests: [codeQuest],
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const dbQuest = {
       id: 'rat-problem',
       title: 'The Rat Problem',
@@ -1752,89 +1762,89 @@ describe('section CRUD + live refresh', () => {
       thresholds: { hostile: -20, unfriendly: -5, neutral: 0, friendly: 20, exalted: 50 },
       shopPriceModifiers: { friendly: 0.9 },
     };
-    await putCampaignSection(db.pool, 'malgovia', 'quests', [dbQuest]);
-    await putCampaignSection(db.pool, 'malgovia', 'factions', [faction]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    await putCampaignSection(db.pool, 'demo_campaign', 'quests', [dbQuest]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'factions', [faction]);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
     // Wholesale replace — the code quest is gone, the DB one serves; no
     // stray top-level keys; the rest of the block survives.
-    expect(contexts.malgovia.campaign?.quests).toEqual([dbQuest]);
-    expect(contexts.malgovia.campaign?.factions).toEqual([faction]);
-    expect('quests' in contexts.malgovia).toBe(false);
-    expect('factions' in contexts.malgovia).toBe(false);
-    expect(contexts.malgovia.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
+    expect(contexts.demo_campaign.campaign?.quests).toEqual([dbQuest]);
+    expect(contexts.demo_campaign.campaign?.factions).toEqual([faction]);
+    expect('quests' in contexts.demo_campaign).toBe(false);
+    expect('factions' in contexts.demo_campaign).toBe(false);
+    expect(contexts.demo_campaign.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
     // Delete reverts to the code lists.
-    await deleteCampaignSection(db.pool, 'malgovia', 'quests');
-    await deleteCampaignSection(db.pool, 'malgovia', 'factions');
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.quests?.map((q) => q.id)).toEqual(['code-quest']);
-    expect(contexts.malgovia.campaign?.factions).toBeUndefined();
+    await deleteCampaignSection(db.pool, 'demo_campaign', 'quests');
+    await deleteCampaignSection(db.pool, 'demo_campaign', 'factions');
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.quests?.map((q) => q.id)).toEqual(['code-quest']);
+    expect(contexts.demo_campaign.campaign?.factions).toBeUndefined();
   });
 
   it('worldName folds into campaign.world_name; tagline/previewArt overlay top-level', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: { world_name: 'Old Name', intro: 'x', rooms: [] } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    await putCampaignSection(db.pool, 'malgovia', 'worldName', 'Auria');
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    await putCampaignSection(db.pool, 'demo_campaign', 'worldName', 'Auria');
     await putCampaignSection(
       db.pool,
-      'malgovia',
+      'demo_campaign',
       'tagline',
       'The sky has fallen. Walk the shards.'
     );
-    await putCampaignSection(db.pool, 'malgovia', 'previewArt', '  /\\\n /  \\\n/____\\');
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.world_name).toBe('Auria');
-    expect('worldName' in contexts.malgovia).toBe(false); // folded, not top-level
-    expect(contexts.malgovia.tagline).toBe('The sky has fallen. Walk the shards.');
-    expect(contexts.malgovia.previewArt).toContain('/____');
+    await putCampaignSection(db.pool, 'demo_campaign', 'previewArt', '  /\\\n /  \\\n/____\\');
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.world_name).toBe('Auria');
+    expect('worldName' in contexts.demo_campaign).toBe(false); // folded, not top-level
+    expect(contexts.demo_campaign.tagline).toBe('The sky has fallen. Walk the shards.');
+    expect(contexts.demo_campaign.previewArt).toContain('/____');
     // Delete reverts the world name to code.
-    await deleteCampaignSection(db.pool, 'malgovia', 'worldName');
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.world_name).toBe('Old Name');
+    await deleteCampaignSection(db.pool, 'demo_campaign', 'worldName');
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.world_name).toBe('Old Name');
   });
 
   it('terrainArt overlays the context top-level and reverts to none on delete', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    const code = codeCtx({ id: 'malgovia' });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const code = codeCtx({ id: 'demo_campaign' });
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const art = { plains: 'plains-ash', forest: 'forest-dead' };
 
-    expect(await putCampaignSection(db.pool, 'malgovia', 'terrainArt', art)).toBe(true);
-    expect((await getDbSection(db.pool, 'malgovia', 'terrainArt')).value).toEqual(art);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.terrainArt).toEqual(art);
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'terrainArt', art)).toBe(true);
+    expect((await getDbSection(db.pool, 'demo_campaign', 'terrainArt')).value).toEqual(art);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.terrainArt).toEqual(art);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'terrainArt')).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.terrainArt).toBeUndefined();
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'terrainArt')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.terrainArt).toBeUndefined();
   });
 
   it('recommendedParty folds into the campaign block (size + composition)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    const code = codeCtx({ id: 'malgovia' });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const code = codeCtx({ id: 'demo_campaign' });
+    const contexts: Record<string, Context> = { demo_campaign: code };
 
     expect(
-      await putCampaignSection(db.pool, 'malgovia', 'recommendedParty', {
+      await putCampaignSection(db.pool, 'demo_campaign', 'recommendedParty', {
         size: 3,
         composition: ['Fighter', 'Cleric', 'Wizard'],
       })
     ).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.recommendedPartySize).toBe(3);
-    expect(contexts.malgovia.campaign?.recommendedComposition).toEqual([
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.recommendedPartySize).toBe(3);
+    expect(contexts.demo_campaign.campaign?.recommendedComposition).toEqual([
       'Fighter',
       'Cleric',
       'Wizard',
     ]);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'recommendedParty')).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'recommendedParty')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
     // Reverts to the code campaign's value (the base template has none).
-    expect(contexts.malgovia.campaign?.recommendedPartySize).toBeUndefined();
+    expect(contexts.demo_campaign.campaign?.recommendedPartySize).toBeUndefined();
   });
 
   it('recommendedParty schema: bounded size + SRD-class composition', () => {
@@ -1848,9 +1858,9 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('rules overlay the context top level (engine reads context.rules)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    const code = codeCtx({ id: 'malgovia' });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const code = codeCtx({ id: 'demo_campaign' });
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const rules = [
       {
         name: 'ledger_found',
@@ -1865,13 +1875,13 @@ describe('section CRUD + live refresh', () => {
         ],
       },
     ];
-    expect(await putCampaignSection(db.pool, 'malgovia', 'rules', rules)).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.rules).toEqual(rules);
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'rules', rules)).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.rules).toEqual(rules);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'rules')).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.rules).toBeUndefined();
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'rules')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.rules).toBeUndefined();
   });
 
   it('rules schema: condition facts + consequence subset, duplicate names rejected', () => {
@@ -1900,18 +1910,18 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('theme overlays the context top-level (the FE merges it over the base)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
-    const code = codeCtx({ id: 'malgovia' });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const code = codeCtx({ id: 'demo_campaign' });
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const theme = { pageBg: '#101418', title: 'EMBERFALL' };
 
-    expect(await putCampaignSection(db.pool, 'malgovia', 'theme', theme)).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.theme).toEqual(theme);
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'theme', theme)).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.theme).toEqual(theme);
 
-    expect(await deleteCampaignSection(db.pool, 'malgovia', 'theme')).toBe(true);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.theme).toBeUndefined();
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'theme')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.theme).toBeUndefined();
   });
 
   it('gameStart overlays the base template intro for DB-born campaigns', async () => {
@@ -1924,21 +1934,21 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('room NPCs build the campaign.npcs map with Commoner defaults on refresh', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const rope = { id: 'rope', name: 'Rope (50 ft)', type: 'gear' };
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       lootTable: [rope] as never,
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [],
         npcs: { 'code-npc': { id: 'code-npc', roomId: 'code-room', name: 'Old Code Friend' } },
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
       {
         ...ROOM_B,
         npcs: [
@@ -1959,8 +1969,8 @@ describe('section CRUD + live refresh', () => {
         ],
       },
     ]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const npcs = contexts.malgovia.campaign?.npcs ?? {};
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const npcs = contexts.demo_campaign.campaign?.npcs ?? {};
     const hob = npcs['old-hob']!;
     // Stamped into its room, social surface intact, SRD Commoner-style
     // stat-block defaults, dialogue defaults to an empty tree.
@@ -1989,12 +1999,12 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('gated dialogue (condition/once/consequences) passes through to the engine NPC', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
-      campaign: { world_name: 'Malgovia', intro: 'x', rooms: [], npcs: {} } as never,
+      id: 'demo_campaign',
+      campaign: { world_name: 'Demo Campaign', intro: 'x', rooms: [], npcs: {} } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const gated = {
       label: 'About that job…',
       reply: 'Bring the ledger.',
@@ -2006,7 +2016,7 @@ describe('section CRUD + live refresh', () => {
       once: true,
       consequences: [{ type: 'set_flag', key: 'knows_password', value: true }],
     };
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
       {
         ...ROOM_B,
         npcs: [
@@ -2020,24 +2030,24 @@ describe('section CRUD + live refresh', () => {
         ],
       },
     ]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const smuggler = contexts.malgovia.campaign?.npcs?.['smuggler'];
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const smuggler = contexts.demo_campaign.campaign?.npcs?.['smuggler'];
     // The dialogue tree reaches the engine verbatim — gates and all.
     expect(smuggler?.responses).toEqual([gated, oneShot]);
   });
 
   it('zone encounter tables warn-skip unknown creatures on refresh', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       enemyTemplates: [{ name: 'Wolf', hp: 11, ac: 13, damage: '2d4', toHit: 4, xp: 50 }] as never,
-      campaign: { world_name: 'Malgovia', intro: 'x', rooms: [] } as never,
+      campaign: { world_name: 'Demo Campaign', intro: 'x', rooms: [] } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const grid = G(12, 10);
     grid[0][0] = { t: 'plains', ez: 'wilds' };
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [
       {
         ...REGION_A,
         grid,
@@ -2052,38 +2062,38 @@ describe('section CRUD + live refresh', () => {
         ],
       },
     ]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
     // The known creature survives; the unknown one is dropped with a warning.
-    expect(contexts.malgovia.campaign?.regions?.[0].encounterZones?.[0].encounterTable).toEqual([
-      'Wolf',
-    ]);
+    expect(
+      contexts.demo_campaign.campaign?.regions?.[0].encounterZones?.[0].encounterTable
+    ).toEqual(['Wolf']);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Vanished Horror'));
     warn.mockRestore();
   });
 
   it('room loot placements materialize against the composed loot table on refresh', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const dagger = { id: 'dagger', name: 'Dagger', type: 'weapon', damage: '1d4' };
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       lootTable: [dagger] as never,
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [],
         loot: { 'code-room': [{ id: 'old', name: 'Old Thing' }] },
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
       {
         ...ROOM_B,
         loot: [{ itemId: 'dagger', pos: { x: 2, y: 1 } }, { itemId: 'vanished-relic' }],
       },
     ]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const campaign = contexts.malgovia.campaign!;
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const campaign = contexts.demo_campaign.campaign!;
     // The placement is the FULL item + the placement pos; key stays
     // engine-derived. The unknown item id was skipped with a warning.
     expect(campaign.loot?.cellar).toEqual([{ ...dagger, pos: { x: 2, y: 1 } }]);
@@ -2094,7 +2104,7 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('room enemy placements materialize against the composed bestiary on refresh', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const goblin = {
       name: 'Goblin',
       cr: 0.25,
@@ -2106,22 +2116,22 @@ describe('section CRUD + live refresh', () => {
       creatureType: 'humanoid' as const,
     };
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       enemyTemplates: [goblin] as never,
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [{ id: 'code-room', name: 'Code Room', desc: 'd' }],
         enemies: { 'code-room': [{ id: 'code-room#0', name: 'Old Foe' }] },
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
+    const contexts: Record<string, Context> = { demo_campaign: code };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
       { ...ROOM_B, enemies: [{ name: 'Goblin', count: 2 }, { name: 'Vanished Horror' }] },
     ]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const campaign = contexts.malgovia.campaign!;
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const campaign = contexts.demo_campaign.campaign!;
     // Two goblins, instance ids in the code convention, template stats +
     // creatureType carried, base HP (party scaling stays seed-time).
     const placed = campaign.enemies?.cellar ?? [];
@@ -2139,37 +2149,37 @@ describe('section CRUD + live refresh', () => {
   });
 
   it('DB rooms with no placements still replace the code enemy map (empty)', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [],
         enemies: { 'code-room': [{ id: 'code-room#0', name: 'Old Foe' }] },
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_B]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.enemies).toEqual({});
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_B]);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.enemies).toEqual({});
   });
 
   it('DB rooms replace the campaign rooms wholesale on refresh', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [{ id: 'code-room', name: 'Code Room', desc: 'd' }],
         regions: [{ id: 'code-region' } as never],
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    await putCampaignSection(db.pool, 'malgovia', 'rooms', [ROOM_A, ROOM_B]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const campaign = contexts.malgovia.campaign!;
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [ROOM_A, ROOM_B]);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const campaign = contexts.demo_campaign.campaign!;
     // DB rooms in engine form; the code rooms are gone (wholesale replace);
     // untouched sections (regions) stay code-supplied.
     expect(campaign.rooms.map((r) => r.id)).toEqual(['taproom', 'cellar']);
@@ -2177,32 +2187,32 @@ describe('section CRUD + live refresh', () => {
     expect(campaign.regions?.map((r) => r.id)).toEqual(['code-region']);
 
     // Delete → refresh restores the code rooms.
-    await deleteCampaignSection(db.pool, 'malgovia', 'rooms');
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    expect(contexts.malgovia.campaign?.rooms.map((r) => r.id)).toEqual(['code-room']);
+    await deleteCampaignSection(db.pool, 'demo_campaign', 'rooms');
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.rooms.map((r) => r.id)).toEqual(['code-room']);
   });
 
   it('DB towns without DB regions still fold in, keeping the code regions', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
-      id: 'malgovia',
+      id: 'demo_campaign',
       campaign: {
-        world_name: 'Malgovia',
+        world_name: 'Demo Campaign',
         intro: 'x',
         rooms: [],
         regions: [{ id: 'code-region' } as never],
       } as never,
     });
-    const contexts: Record<string, Context> = { malgovia: code };
-    await putCampaignSection(db.pool, 'malgovia', 'towns', [TOWN_A]);
-    await refreshCampaignOverlay(db.pool, contexts, { malgovia: code }, 'malgovia');
-    const campaign = contexts.malgovia.campaign!;
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    await putCampaignSection(db.pool, 'demo_campaign', 'towns', [TOWN_A]);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    const campaign = contexts.demo_campaign.campaign!;
     expect(campaign.towns?.map((t) => t.id)).toEqual(['oakvale']);
     expect(campaign.regions?.map((r) => r.id)).toEqual(['code-region']);
   });
 
   it('regions round-trip their sites (child rows) in order; replace-all cascades them', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: {} } });
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const withSites: CampaignRegion = {
       ...REGION_A,
       onEnter: 'The mists part as you crest the ridge.',
@@ -2228,23 +2238,23 @@ describe('section CRUD + live refresh', () => {
         },
       ],
     };
-    expect(await putCampaignSection(db.pool, 'malgovia', 'regions', [withSites, REGION_B])).toBe(
-      true
-    );
-    const back = await getCampaignRegions(db.pool, 'malgovia');
+    expect(
+      await putCampaignSection(db.pool, 'demo_campaign', 'regions', [withSites, REGION_B])
+    ).toBe(true);
+    const back = await getCampaignRegions(db.pool, 'demo_campaign');
     expect(back).toEqual([withSites, REGION_B]);
     // Optional fields absent (not null) and siteless regions carry no key.
     expect('townId' in back[0].sites![1]).toBe(false);
     expect('sites' in back[1]).toBe(false);
 
     // Replace-all with a siteless list drops the child rows too.
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
-    expect(await getCampaignRegions(db.pool, 'malgovia')).toEqual([REGION_A]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A]);
+    expect(await getCampaignRegions(db.pool, 'demo_campaign')).toEqual([REGION_A]);
   });
 
   it('reports a missing campaign and reads back stored data', async () => {
-    const db = makeContentDb({ campaigns: { malgovia: { gameStart: 'A new dawn.' } } });
-    expect(await getCampaignData(db.pool, 'malgovia')).toEqual({ gameStart: 'A new dawn.' });
+    const db = makeContentDb({ campaigns: { demo_campaign: { gameStart: 'A new dawn.' } } });
+    expect(await getCampaignData(db.pool, 'demo_campaign')).toEqual({ gameStart: 'A new dawn.' });
     expect(await getCampaignData(db.pool, 'nope')).toBeNull();
     expect(await putCampaignSection(db.pool, 'nope', 'gameStart', 'x')).toBe(false);
     expect(await deleteCampaignSection(db.pool, 'nope', 'gameStart')).toBe(false);
@@ -2309,7 +2319,7 @@ describe('dbRegionsToEngine', () => {
 
   it('puts the starting region first (initMapState opens at regions[0])', () => {
     const converted = dbRegionsToEngine([REGION_B, REGION_A]); // A is the starter
-    expect(converted.map((r) => r.id)).toEqual(['malgovia', 'frost-reach']);
+    expect(converted.map((r) => r.id)).toEqual(['demo_campaign', 'frost-reach']);
   });
 
   it('passes sites and scalars through untouched', () => {
@@ -2368,24 +2378,24 @@ describe('dbTownsToEngine', () => {
 describe('applyCampaignOverlays', () => {
   it('replaces code contexts in place and bases DB-born rows on the template', async () => {
     const contexts: Record<string, Context> = {
-      malgovia: codeCtx({ id: 'malgovia', displayNoun: 'vale' }),
+      demo_campaign: codeCtx({ id: 'demo_campaign', displayNoun: 'vale' }),
       sandbox: codeCtx({ id: 'sandbox', displayNoun: 'sandbox' }),
     };
     const db = makeContentDb({
       campaigns: {
-        malgovia: { displayNoun: 'db-vale' },
+        demo_campaign: { displayNoun: 'db-vale' },
         sandbox: {},
         ghost: { displayNoun: 'boo' }, // DB-born — no code context
       },
     });
-    await putCampaignSection(db.pool, 'malgovia', 'regions', [REGION_A]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [REGION_A]);
     await applyCampaignOverlays(db.pool, contexts);
-    expect(contexts.malgovia.displayNoun).toBe('db-vale');
+    expect(contexts.demo_campaign.displayNoun).toBe('db-vale');
     // DB regions land in the campaign block, converted to engine form.
-    expect(contexts.malgovia.campaign?.regions?.map((r) => r.id)).toEqual(['malgovia']);
+    expect(contexts.demo_campaign.campaign?.regions?.map((r) => r.id)).toEqual(['demo_campaign']);
     expect(contexts.sandbox.displayNoun).toBe('sandbox');
     // The DB-born campaign joined the live map, based on the template.
-    expect(Object.keys(contexts).sort()).toEqual(['ghost', 'malgovia', 'sandbox']);
+    expect(Object.keys(contexts).sort()).toEqual(['demo_campaign', 'ghost', 'sandbox']);
     expect(contexts.ghost.id).toBe('ghost');
     expect(contexts.ghost.displayNoun).toBe('boo');
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);

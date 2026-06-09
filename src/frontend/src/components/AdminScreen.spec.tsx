@@ -60,7 +60,7 @@ function mockCampaigns(
   visibility: 'global' | 'private' = 'global'
 ) {
   mocked.listCampaigns.mockResolvedValue([
-    { id: 'malgovia', name: 'Malgovia', visibility, my_role: myRole },
+    { id: 'demo_campaign', name: 'Demo Campaign', visibility, my_role: myRole },
     { id: 'sandbox', name: 'Dev Sandbox', visibility: 'global', my_role: null },
   ]);
   mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
@@ -82,10 +82,10 @@ describe('AdminScreen', () => {
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
     // The campaign name also appears in the breadcrumb once selected, so pick
     // the occurrence inside a card button.
-    const malgoviaCard = (await screen.findAllByText('Malgovia'))
+    const demoCard = (await screen.findAllByText('Demo Campaign'))
       .map((el) => el.closest('button'))
       .find(Boolean)!;
-    expect(within(malgoviaCard).getByText('OWNER')).toBeTruthy();
+    expect(within(demoCard).getByText('OWNER')).toBeTruthy();
     // No-access campaigns are filtered off the creator surface.
     expect(screen.queryByText('Dev Sandbox')).toBeNull();
   });
@@ -93,8 +93,8 @@ describe('AdminScreen', () => {
   it('auto-selects the first manageable campaign and shows its members', async () => {
     mockCampaigns('owner');
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
-    expect(await screen.findByText('MEMBERS — MALGOVIA')).toBeTruthy();
-    expect(mocked.listCampaignMembers).toHaveBeenCalledWith('malgovia');
+    expect(await screen.findByText('MEMBERS — DEMO CAMPAIGN')).toBeTruthy();
+    expect(mocked.listCampaignMembers).toHaveBeenCalledWith('demo_campaign');
     expect(await screen.findByText('Bob')).toBeTruthy();
     expect(screen.getByText('(YOU)')).toBeTruthy();
   });
@@ -108,7 +108,7 @@ describe('AdminScreen', () => {
     fireEvent.click(screen.getByText('ADD'));
     // 'player' is the add-form default — inviting friends to play.
     await waitFor(() =>
-      expect(mocked.addCampaignMember).toHaveBeenCalledWith('malgovia', 'carol@test', 'player')
+      expect(mocked.addCampaignMember).toHaveBeenCalledWith('demo_campaign', 'carol@test', 'player')
     );
     // Initial load + reload after the add.
     await waitFor(() => expect(mocked.listCampaignMembers).toHaveBeenCalledTimes(2));
@@ -144,7 +144,7 @@ describe('AdminScreen', () => {
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
     fireEvent.click(await screen.findByLabelText('Remove Bob'));
     await waitFor(() =>
-      expect(mocked.removeCampaignMember).toHaveBeenCalledWith('malgovia', 'u-bob')
+      expect(mocked.removeCampaignMember).toHaveBeenCalledWith('demo_campaign', 'u-bob')
     );
     expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();
@@ -162,20 +162,20 @@ describe('AdminScreen', () => {
     // Player (and no-access) campaigns aren't workable here → empty state, no
     // members panel.
     expect(await screen.findByText('NO CAMPAIGNS YET')).toBeTruthy();
-    expect(screen.queryByText('Malgovia')).toBeNull();
+    expect(screen.queryByText('Demo Campaign')).toBeNull();
     expect(screen.queryByText(/^MEMBERS — /)).toBeNull();
   });
 
   it('creator mode shows only owner/editor campaigns with its own title', async () => {
     mocked.listCampaigns.mockResolvedValue([
-      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'owner' },
+      { id: 'demo_campaign', name: 'Demo Campaign', visibility: 'global', my_role: 'owner' },
       { id: 'sandbox', name: 'Dev Sandbox', visibility: 'global', my_role: null },
       { id: 'secret', name: 'Secret Realm', visibility: 'private', my_role: 'player' },
     ]);
     mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
     expect(await screen.findByText('CREATOR')).toBeTruthy();
-    expect((await screen.findAllByText('Malgovia')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Demo Campaign')).length).toBeGreaterThan(0);
     // No-access and player-only campaigns don't belong on the creator surface.
     expect(screen.queryByText('Dev Sandbox')).toBeNull();
     expect(screen.queryByText('Secret Realm')).toBeNull();
@@ -183,7 +183,7 @@ describe('AdminScreen', () => {
 
   it('creator mode creates a campaign: name → derived slug id, selected on success', async () => {
     mocked.listCampaigns.mockResolvedValue([
-      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'owner' },
+      { id: 'demo_campaign', name: 'Demo Campaign', visibility: 'global', my_role: 'owner' },
     ]);
     mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
     mocked.createCampaign.mockResolvedValue({
@@ -211,14 +211,16 @@ describe('AdminScreen', () => {
     mocked.createCampaign.mockRejectedValue({ error: 'campaign_exists' });
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
     fireEvent.click(await screen.findByTestId('new-campaign-btn'));
-    fireEvent.change(screen.getByLabelText('CAMPAIGN NAME'), { target: { value: 'Malgovia' } });
+    fireEvent.change(screen.getByLabelText('CAMPAIGN NAME'), {
+      target: { value: 'Demo Campaign' },
+    });
     fireEvent.click(screen.getByTestId('create-campaign-btn'));
-    expect(await screen.findByText(/"malgovia" is taken/)).toBeTruthy();
+    expect(await screen.findByText(/"demo-campaign" is taken/)).toBeTruthy();
   });
 
   it('deep-links select the initial campaign and report selection changes', async () => {
     mocked.listCampaigns.mockResolvedValue([
-      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'owner' },
+      { id: 'demo_campaign', name: 'Demo Campaign', visibility: 'global', my_role: 'owner' },
       { id: 'sandbox', name: 'Dev Sandbox', visibility: 'global', my_role: 'owner' },
     ]);
     mocked.listCampaignMembers.mockResolvedValue(MEMBERS);
@@ -236,8 +238,8 @@ describe('AdminScreen', () => {
     expect(await screen.findByText('MEMBERS — DEV SANDBOX')).toBeTruthy();
     await waitFor(() => expect(onSelectCampaign).toHaveBeenLastCalledWith('sandbox'));
     // …and clicking another campaign reports the new selection.
-    fireEvent.click(screen.getByText('Malgovia'));
-    await waitFor(() => expect(onSelectCampaign).toHaveBeenLastCalledWith('malgovia'));
+    fireEvent.click(screen.getByText('Demo Campaign'));
+    await waitFor(() => expect(onSelectCampaign).toHaveBeenLastCalledWith('demo_campaign'));
   });
 
   it('falls back to the first workable campaign when the deep link is unknown', async () => {
@@ -245,16 +247,16 @@ describe('AdminScreen', () => {
     render(
       <AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" initialCampaignId="nope" />
     );
-    expect(await screen.findByText('MEMBERS — MALGOVIA')).toBeTruthy();
+    expect(await screen.findByText('MEMBERS — DEMO CAMPAIGN')).toBeTruthy();
   });
 
   it('creator mode shows an empty state when the user works on nothing', async () => {
     mocked.listCampaigns.mockResolvedValue([
-      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: null },
+      { id: 'demo_campaign', name: 'Demo Campaign', visibility: 'global', my_role: null },
     ]);
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} mode="creator" />);
     expect(await screen.findByText('NO CAMPAIGNS YET')).toBeTruthy();
-    expect(screen.queryByText('Malgovia')).toBeNull();
+    expect(screen.queryByText('Demo Campaign')).toBeNull();
   });
 
   it('shows the visibility badge and an admin-only promote/demote toggle', async () => {
@@ -262,11 +264,11 @@ describe('AdminScreen', () => {
     mocked.setCampaignVisibility.mockResolvedValue({ ok: true, visibility: 'global' });
     const { unmount } = render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
     // Non-admin owner: badge yes, toggle no.
-    const card = (await screen.findAllByText('Malgovia'))
+    const card = (await screen.findAllByText('Demo Campaign'))
       .map((el) => el.closest('button'))
       .find(Boolean)!;
     expect(within(card).getByText('PRIVATE')).toBeTruthy();
-    await screen.findByText('MEMBERS — MALGOVIA');
+    await screen.findByText('MEMBERS — DEMO CAMPAIGN');
     expect(screen.queryByText('MAKE GLOBAL')).toBeNull();
     unmount();
 
@@ -274,7 +276,7 @@ describe('AdminScreen', () => {
     render(<AdminScreen user={{ ...OWNER_USER, is_admin: true }} onBack={vi.fn()} />);
     fireEvent.click(await screen.findByText('MAKE GLOBAL'));
     await waitFor(() =>
-      expect(mocked.setCampaignVisibility).toHaveBeenCalledWith('malgovia', 'global')
+      expect(mocked.setCampaignVisibility).toHaveBeenCalledWith('demo_campaign', 'global')
     );
     // Local state flips without a refetch — button now offers the demote.
     expect(await screen.findByText('MAKE PRIVATE')).toBeTruthy();
@@ -284,15 +286,15 @@ describe('AdminScreen', () => {
     mockCampaigns('owner');
     mocked.renameCampaign.mockResolvedValue({ ok: true, name: 'Vale of Mists' });
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
-    await screen.findByText('MEMBERS — MALGOVIA');
+    await screen.findByText('MEMBERS — DEMO CAMPAIGN');
     fireEvent.click(screen.getByTestId('rename-campaign-btn'));
     // Pre-filled with the current name.
     const input = screen.getByLabelText('CAMPAIGN NAME') as HTMLInputElement;
-    expect(input.value).toBe('Malgovia');
+    expect(input.value).toBe('Demo Campaign');
     fireEvent.change(input, { target: { value: 'Vale of Mists' } });
     fireEvent.click(screen.getByTestId('save-rename-btn'));
     await waitFor(() =>
-      expect(mocked.renameCampaign).toHaveBeenCalledWith('malgovia', 'Vale of Mists')
+      expect(mocked.renameCampaign).toHaveBeenCalledWith('demo_campaign', 'Vale of Mists')
     );
     // Local state updates without a refetch — header + campaign card.
     expect(await screen.findByText('MEMBERS — VALE OF MISTS')).toBeTruthy();
@@ -303,7 +305,7 @@ describe('AdminScreen', () => {
   it('editors do not get the rename button', async () => {
     mockCampaigns('editor');
     render(<AdminScreen user={{ ...OWNER_USER, id: 'u-bob' }} onBack={vi.fn()} />);
-    await screen.findByText('MEMBERS — MALGOVIA');
+    await screen.findByText('MEMBERS — DEMO CAMPAIGN');
     expect(screen.queryByTestId('rename-campaign-btn')).toBeNull();
   });
 
@@ -327,21 +329,21 @@ describe('AdminScreen', () => {
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} onEditMap={onEditMap} />);
     fireEvent.click(await screen.findByTestId('region-card-vale'));
     // The campaign name rides along for the painter breadcrumb.
-    expect(onEditMap).toHaveBeenCalledWith('malgovia', 'region', 'vale', 'Malgovia');
+    expect(onEditMap).toHaveBeenCalledWith('demo_campaign', 'region', 'vale', 'Demo Campaign');
   });
 
   it('site-admin mode is blank — no campaign management surface', async () => {
     mockCampaigns('owner');
     render(<AdminScreen user={{ ...OWNER_USER, is_admin: true }} onBack={vi.fn()} mode="admin" />);
     expect(await screen.findByText('NO ADMIN TOOLS YET')).toBeTruthy();
-    expect(screen.queryByText('Malgovia')).toBeNull();
+    expect(screen.queryByText('Demo Campaign')).toBeNull();
     expect(screen.queryByText(/^MEMBERS — /)).toBeNull();
   });
 
   it('an owner cannot change their OWN role, but can change others', async () => {
     mockCampaigns('owner');
     render(<AdminScreen user={OWNER_USER} onBack={vi.fn()} />);
-    await screen.findByText('MEMBERS — MALGOVIA');
+    await screen.findByText('MEMBERS — DEMO CAMPAIGN');
     // Alice (the owner) views her own row → read-only, no role select.
     expect(screen.queryByLabelText('Role for Alice')).toBeNull();
     // Bob (another member) stays editable.
@@ -351,7 +353,7 @@ describe('AdminScreen', () => {
   it('a site admin CAN change their own role (the recovery path)', async () => {
     mockCampaigns('owner');
     render(<AdminScreen user={{ ...OWNER_USER, is_admin: true }} onBack={vi.fn()} />);
-    await screen.findByText('MEMBERS — MALGOVIA');
+    await screen.findByText('MEMBERS — DEMO CAMPAIGN');
     expect(screen.getByLabelText('Role for Alice')).toBeTruthy();
   });
 });

@@ -349,7 +349,7 @@ function CharScreen({
   availableContexts: FrontendContext[];
   user: AuthUser | null;
 }) {
-  // Player-facing campaigns (sandbox + other test campaigns are `hidden`). The
+  // Player-facing campaigns (internal/test campaigns are `hidden`). The
   // picker only renders when there's a real choice (>1 visible); with a single
   // campaign we drop the selector and use it directly. Once the BE context
   // list loads it also constrains the picker: the server only returns
@@ -359,7 +359,7 @@ function CharScreen({
   const visibleContexts = availableContexts.filter((c) => !c.hidden);
   const [contextId, setContextId] = useState(() => {
     // `?campaign=<id>` is the internal-testing escape hatch — it can select a
-    // hidden campaign (e.g. sandbox) that the picker doesn't list.
+    // hidden campaign that the picker doesn't list.
     const override = new URLSearchParams(window.location.search).get('campaign');
     if (override && availableContexts.some((c) => c.id === override)) return override;
     const last = localStorage.getItem('last_context_id');
@@ -394,8 +394,8 @@ function CharScreen({
           theme: { ...donorCtx.theme, ...(b.theme ?? {}) },
           hidden: false,
           // The campaign's OWN class roster (from the summary) — not the
-          // donor's, which could be a subset (e.g. sandbox's 5) and would
-          // make auto-fill fall back for any missing class.
+          // donor's, which could be a subset and would make auto-fill fall
+          // back for any missing class.
           classes: (b.classes ?? donorCtx.classes.map((c) => c.id)).map(
             (id) => donorCtx.classes.find((c) => c.id === id) ?? { id, desc: '' }
           ),

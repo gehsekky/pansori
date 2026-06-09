@@ -166,15 +166,19 @@ history (the history was scrubbed once already; don't undo that).
   pushed, and let me watch it — I'll flag any failure. (The local
   gate is what you're responsible for; CI is mine to monitor.)
 - **The local pre-push gate** is lint + tsc + the full unit suites
-  + **the e2e smoke**: run `npx playwright test` against the
-  running dev stack (`npm run dev`; the backend needs
-  `E2E_TEST_LOGIN_ENABLED=true`, already set in dev) before
-  pushing. It's ~10s and it's the only local check that exercises
-  login → creation → BEGIN ADVENTURE → combat for real — unit
-  suites alone have let CI-only breakage through (the auto-fill /
-  Divine Order incident, 2026-06-06). Check exit codes explicitly;
-  don't pipe test output through grep/tail in a way that can mask
-  a failure.
+  + **the e2e smoke**: run `npm run test:e2e:stack`, which brings up
+  an isolated, ephemeral Docker stack (`docker-compose.e2e.yml`),
+  self-seeds a throwaway campaign via the gated
+  `POST /api/test/seed-campaign`, runs Playwright, and tears the
+  stack down (`down -v`). Nothing is left in any database, and no
+  built-in campaign is required. (For a quick run against an
+  already-up stack, `npx playwright test` still works with
+  `E2E_BASE_URL`/`E2E_BACKEND_URL` pointing at it.) It's the only
+  local check that exercises login → creation → BEGIN ADVENTURE →
+  combat for real — unit suites alone have let CI-only breakage
+  through (the auto-fill / Divine Order incident, 2026-06-06). Check
+  exit codes explicitly; don't pipe test output through grep/tail in
+  a way that can mask a failure.
 - **Migration changes add `npm run check-migrations`** to that
   gate: it double-applies every migration file to a scratch DB,
   catching fresh-environment breakage (CI initdb + runner re-run)

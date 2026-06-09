@@ -86,7 +86,7 @@ describe('requireCampaignRole', () => {
   it('lets an owner through an editor gate (owner ⊃ editor)', async () => {
     const next = vi.fn();
     const res = makeRes();
-    const req = makeReq({ campaignId: 'malgovia' });
+    const req = makeReq({ campaignId: 'demo_campaign' });
     memberRole('owner');
     await requireCampaignRole('editor')(req, res as never, next);
     expect(next).toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe('requireCampaignRole', () => {
   it('lets an editor through an editor gate', async () => {
     const next = vi.fn();
     const res = makeRes();
-    const req = makeReq({ campaignId: 'malgovia' });
+    const req = makeReq({ campaignId: 'demo_campaign' });
     memberRole('editor');
     await requireCampaignRole('editor')(req, res as never, next);
     expect(next).toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe('requireCampaignRole', () => {
   it('lets a player through a player gate but not an editor gate', async () => {
     const next = vi.fn();
     const res = makeRes();
-    const req = makeReq({ campaignId: 'malgovia' });
+    const req = makeReq({ campaignId: 'demo_campaign' });
     memberRole('player');
     await requireCampaignRole('player')(req, res as never, next);
     expect(next).toHaveBeenCalled();
@@ -115,7 +115,7 @@ describe('requireCampaignRole', () => {
     const blocked = makeRes();
     memberRole('player');
     await requireCampaignRole('editor')(
-      makeReq({ campaignId: 'malgovia' }),
+      makeReq({ campaignId: 'demo_campaign' }),
       blocked as never,
       vi.fn()
     );
@@ -126,7 +126,11 @@ describe('requireCampaignRole', () => {
     const next = vi.fn();
     const res = makeRes();
     memberRole('editor');
-    await requireCampaignRole('owner')(makeReq({ campaignId: 'malgovia' }), res as never, next);
+    await requireCampaignRole('owner')(
+      makeReq({ campaignId: 'demo_campaign' }),
+      res as never,
+      next
+    );
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(403);
   });
@@ -135,7 +139,11 @@ describe('requireCampaignRole', () => {
     const next = vi.fn();
     const res = makeRes();
     memberRole(null);
-    await requireCampaignRole('editor')(makeReq({ campaignId: 'malgovia' }), res as never, next);
+    await requireCampaignRole('editor')(
+      makeReq({ campaignId: 'demo_campaign' }),
+      res as never,
+      next
+    );
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(403);
   });
@@ -143,7 +151,7 @@ describe('requireCampaignRole', () => {
   it('bypasses membership for site admins (no query) and resolves role owner', async () => {
     const next = vi.fn();
     const res = makeRes();
-    const req = makeReq({ isAdmin: true, campaignId: 'malgovia' });
+    const req = makeReq({ isAdmin: true, campaignId: 'demo_campaign' });
     await requireCampaignRole('owner')(req, res as never, next);
     expect(next).toHaveBeenCalled();
     expect(queryMock).not.toHaveBeenCalled();
@@ -164,7 +172,11 @@ describe('requireCampaignRole', () => {
     const next = vi.fn();
     const res = makeRes();
     queryMock.mockRejectedValueOnce(new Error('db down'));
-    await requireCampaignRole('editor')(makeReq({ campaignId: 'malgovia' }), res as never, next);
+    await requireCampaignRole('editor')(
+      makeReq({ campaignId: 'demo_campaign' }),
+      res as never,
+      next
+    );
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(500);
   });

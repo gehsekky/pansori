@@ -1,0 +1,71 @@
+# Ephemeral end-to-end stack — fully isolated from the dev stack
+# (docker-compose.yml). Brought up by scripts/run-e2e-stack.sh, which runs the
+# Playwright suite against it and then tears it down with `down -v`. Nothing
+# here persists: the database is anonymous (no named volume) and the e2e seeds
+# its own throwaway campaign at test time via POST /api/test/seed-campaign.
+#
+# Internal service DNS names match the dev stack (postgres / backend) so the
+# frontend's vite proxy target (http://backend:3001) and the backend's
+# DATABASE_URL resolve unchanged. Only the Compose project name, container
+# names, and host-published ports differ, so this can run alongside the dev
+# stack without colliding.
+name: pansori-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pansori-e2e-postgres
+    environment:
+      POSTGRES_USER: pansori
+      POSTGRES_PASSWORD: pansori
+      POSTGRES_DB: pansori_db
+    ports:
+      - '5433:5432'
+    # No volume: the database lives in the container layer and is discarded on
+    # `down`. tmpfs keeps it in memory for speed.
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./src/backend/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pansori -d pansori_db']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile.dev
+    container_name: pansori-e2e-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgres://pansori:pansori@postgres:5432/pansori_db
+      FRONTEND_URL: http://localhost:5174
+      SESSION_SECRET: e2e-secret
+      # Gates BOTH the /api/auth/test-login bypass and the /api/test/seed-campaign
+      # endpoint (each also requires NODE_ENV != production).
+      E2E_TEST_LOGIN_ENABLED: 'true'
+    ports:
+      - '3002:3001'
+    volumes:
+      - ./src/backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile.dev
+    container_name: pansori-e2e-frontend
+    depends_on:
+      - backend
+    ports:
+      - '5174:5173'
+    # Free art tier (no VITE_PAINTED_ART): the e2e needs no licensed assets, and
+    # the suite asserts no painted art is required.
+    command: npm run dev -- --host

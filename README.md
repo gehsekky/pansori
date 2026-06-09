@@ -53,7 +53,7 @@ open http://localhost:5173
     │   └── src/
     │       ├── types.ts        ← shared interfaces (GameState, Seed, Context, …)
     │       ├── auth/           ← Google OAuth + session middleware
-    │       ├── contexts/       ← sandbox.ts, vale_of_shadows.ts, whispering_pines.ts, grove_of_thorns.ts
+    │       ├── campaignData/   ← the SRD base template; campaigns themselves are DB/creator-authored
     │       │   └── srd/        ← classes, spells, monsters, species, beast_forms, items, backgrounds
     │       ├── db/             ← pool.ts
     │       ├── routes/         ← game.ts (REST API) + schemas.ts (Zod)
@@ -62,7 +62,7 @@ open http://localhost:5173
         └── src/
             ├── App.tsx         ← 3-zone game UI shell
             ├── components/     ← PartyRail, ContextPanel, InitiativeStrip, Dialog, …
-            ├── contexts/       ← sandbox.tsx, vale_of_shadows.tsx, whispering_pines.tsx, grove_of_thorns.tsx
+            ├── contexts/       ← base.tsx (the donor context; campaigns resolve as DB rows)
             ├── data/           ← species, items mirror
             ├── hooks/          ← reusable hooks
             ├── lib/            ← typed API client
@@ -115,7 +115,7 @@ Highlights of what's implemented:
 - **Backend**: `npm run test:be` — Vitest, ~1570 tests across 184 files spanning the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
 - **Frontend**: `npm run test:fe` — Vitest in jsdom (~110 tests across component + integration specs).
 - **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. CI gate; `npm run sync-types` regenerates locally.
-- **E2E**: `npm run test:e2e` — Playwright (`tests/e2e/`) covers login → BEGIN ADVENTURE, session resume, and a sandbox combat loop. Gates production deploys in CI.
+- **E2E**: `npm run test:e2e:stack` — brings up an isolated, ephemeral Docker stack, self-seeds a throwaway campaign via a gated test endpoint, runs Playwright (`tests/e2e/`) covering login → BEGIN ADVENTURE, session resume, and a combat loop, then tears the stack down. Gates production deploys in CI. (`npm run test:e2e` runs the bare Playwright suite against an already-running stack.)
 
 ## Credits
 

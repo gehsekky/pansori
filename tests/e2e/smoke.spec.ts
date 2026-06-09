@@ -1,35 +1,41 @@
 import { Page, expect, test } from '@playwright/test';
 
-// Malgovia smoke test — covers backend + frontend + DB integration
-// from auth through adventure start. Validates the path that unit tests can't:
+// End-to-end smoke — covers backend + frontend + DB integration from auth
+// through adventure start and combat. Validates the path unit tests can't:
 // real HTTP, real session cookies, real DB writes, real UI rendering.
 //
+// The campaign under test is NOT a built-in: the suite seeds a throwaway one
+// (`e2e-proving-grounds`, see src/backend/src/services/e2eCampaign.ts) at the
+// start of each test via the gated POST /api/test/seed-campaign endpoint. In
+// the ephemeral e2e stack the database is discarded after the run, so nothing
+// persists — and the project ships no campaign of its own.
+//
 // Prerequisites:
-//   - docker-compose dev stack running (npm run dev)
-//   - backend started with E2E_TEST_LOGIN_ENABLED=true
+//   - the e2e stack running (npm run test:e2e:stack brings it up + tears down)
+//   - backend started with E2E_TEST_LOGIN_ENABLED=true (gates BOTH test-login
+//     and seed-campaign; the e2e compose sets it)
 //
 // What this covers (the user-visible "happy path"):
 //   1. Test-login bypass produces a usable session.
-//   2. Sessions screen loads (empty state for fresh test user).
-//   3. + NEW ADVENTURE navigates to character creation.
-//   4. World picker selects Malgovia.
-//   5. Auto-fill recommended party populates the form.
+//   2. The throwaway campaign is seeded and resolves live.
+//   3. Sessions screen loads (empty state for fresh test user).
+//   4. + NEW ADVENTURE navigates to character creation.
+//   5. The (sole) campaign is auto-selected; auto-fill populates the party.
 //   6. BEGIN ADVENTURE POSTs and transitions to the game view.
-//   7. The game narrative panel renders text from Malgovia's intro/arrival.
-//
-// What this does NOT cover (intentional — defer until smoke proves stable):
-//   - Combat resolution end-to-end
-//   - Reactive spell windows
-//   - Session resume across reloads
-//   - Faction price modifiers in shops
-//   - Quest completion / escape
+//   7. The game narrative panel renders the campaign's intro/arrival text.
 
 const BACKEND_URL = process.env.E2E_BACKEND_URL ?? 'http://localhost:3001';
 // Unique email per test run avoids cross-run state contamination of sessions.
-// Use a stable seed if you want to inspect prod-like state in the DB after.
 const TEST_EMAIL = `e2e-${Date.now()}@pansori.local`;
 
-test('Malgovia: login → character creation → begin adventure', async ({ page, request }) => {
+// Plant (or refresh) the throwaway campaign. Idempotent (replace-all), gated to
+// non-production + E2E_TEST_LOGIN_ENABLED. No auth required.
+async function seedCampaign(request: import('@playwright/test').APIRequestContext): Promise<void> {
+  const res = await request.post(`${BACKEND_URL}/api/test/seed-campaign`);
+  expect(res.ok(), `seed-campaign failed: ${res.status()} ${await res.text()}`).toBe(true);
+}
+
+test('login → character creation → begin adventure', async ({ page, request }) => {
   // 1. Auth bypass: POST /api/auth/test-login sets the session cookie on the
   //    request context. We then attach it to the browser context so the
   //    frontend's /api/auth/me call returns the test user.
@@ -40,21 +46,22 @@ test('Malgovia: login → character creation → begin adventure', async ({ page
     true
   );
 
+  // 2. Seed the throwaway campaign so it resolves live before we play it.
+  await seedCampaign(request);
+
   // Carry the session cookie into the browser context.
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  // 2. Sessions screen — fresh test user has no adventures.
+  // 3. Sessions screen — fresh test user has no adventures.
   await page.goto('/');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
 
-  // 3. Click + NEW ADVENTURE.
+  // 4. Click + NEW ADVENTURE.
   await page.getByTestId('new-adventure-btn').click();
 
-  // 4. Character screen — Malgovia is the sole player-facing campaign, so the
-  // world picker is hidden and Malgovia is auto-selected.
-
-  // 5. Auto-fill recommended party.
+  // 5. Character screen — the seeded campaign is the sole player-facing one, so
+  // the world picker is hidden and it is auto-selected. Auto-fill the party.
   await page.getByTestId('auto-fill-party-btn').click();
 
   // 6. Begin adventure. The button is disabled while subclass picks are required
@@ -67,13 +74,12 @@ test('Malgovia: login → character creation → begin adventure', async ({ page
   // 7. Game view should render with the narrative panel populated.
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
-  // The Malgovia intro mentions the world. Soft assertion so any future flavour
-  // text change doesn't break the smoke test — the structure check above is
-  // the load-bearing assertion.
+  // Soft assertion so any future flavour text change doesn't break the smoke —
+  // the structure check above is the load-bearing assertion.
   await expect(narrative).not.toBeEmpty();
 
   // 8. Party composition — auto-fill seeded a 4-PC Fighter/Cleric/Rogue/Wizard
-  //    party (Malgovia's `recommendedComposition`). Verify the engine round-
+  //    party (the campaign's recommendedComposition). Verify the engine round-
   //    tripped all four through to the rail.
   const partyTiles = page.getByTestId('party-tile');
   await expect(partyTiles).toHaveCount(4);
@@ -89,7 +95,7 @@ test('Malgovia: login → character creation → begin adventure', async ({ page
   expect(partyText).toContain('[Wizard');
 
   // 9. Initiative is not active out of combat — the strip only renders during
-  //    combat, and Malgovia starts on the regional grid with no enemies.
+  //    combat, and the campaign starts on the regional grid with no enemies.
   await expect(page.getByTestId('initiative-strip')).toHaveCount(0);
 
   // 10. Exactly one tile is marked active (aria-current="true"). Out-of-
@@ -113,17 +119,12 @@ test('Malgovia: login → character creation → begin adventure', async ({ page
 
 // ── Combat coverage ─────────────────────────────────────────────────────────
 //
-// Drives the sandbox campaign (smaller than Malgovia, combat closer to start)
-// and clicks choices in priority order until a kill narrative appears. This
-// exercises:
+// Drives the throwaway campaign and clicks choices in priority order until a
+// kill narrative appears. This exercises:
 //   - Choice list rendering after each action.
 //   - Server-side initiative & turn advancement.
 //   - The grid_move + attack action handlers.
 //   - The post-action narrative pipeline.
-//
-// The exact path through sandbox is non-deterministic (procgen room layout,
-// d20 rolls). The test tolerates that by clicking the first viable choice
-// each tick and bounding the total iterations.
 
 interface CombatLoopResult {
   killed: boolean; // ever saw kill narrative
@@ -146,8 +147,6 @@ async function driveCombatLoop(page: Page, maxIterations = 80): Promise<CombatLo
     iterations: 0,
   };
   // Track recently-clicked Move labels so we don't bounce between two rooms.
-  // Sandbox connections often link both directions, so picking choice[0]
-  // every time can ping-pong forever.
   const recentMoveLabels: string[] = [];
   for (let i = 0; i < maxIterations; i++) {
     result.iterations = i + 1;
@@ -163,10 +162,9 @@ async function driveCombatLoop(page: Page, maxIterations = 80): Promise<CombatLo
 
     await page.waitForTimeout(150);
 
-    // Attack is now in the CombatActionBar (icon row) — check there
-    // first since it's the highest-priority pick. Enabled state means
-    // the engine surfaced an attack against the currently-selected
-    // enemy.
+    // Attack is in the CombatActionBar (icon row) — check there first since
+    // it's the highest-priority pick. Enabled state means the engine surfaced
+    // an attack against the currently-selected enemy.
     const combatAttack = page.getByTestId('combat-attack');
     if ((await combatAttack.count()) > 0 && (await combatAttack.isEnabled())) {
       result.sawAttackChoice = true;
@@ -220,14 +218,12 @@ test('session resume: state survives a page reload', async ({ page, request }) =
     data: { email, displayName: 'E2E Resume User' },
   });
   expect(loginRes.ok()).toBe(true);
+  await seedCampaign(request);
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  // Start a fresh sandbox adventure. Sandbox is a hidden internal-testing
-  // campaign, reachable only via the ?campaign= escape hatch (the param
-  // survives the client-side new-adventure transition since it doesn't touch
-  // the URL).
-  await page.goto('/?campaign=sandbox');
+  // Start a fresh adventure in the seeded campaign.
+  await page.goto('/');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
   await page.getByTestId('auto-fill-party-btn').click();
@@ -289,23 +285,22 @@ test('session resume: state survives a page reload', async ({ page, request }) =
 
 // SKIPPED 2026-05-22: this combat-loop E2E has been ~50% flaky across many
 // commits with a consistent "click intercepted by parent layout" error from
-// Playwright. The deterministic checks (BE typecheck/lint/prettier + 890+
-// unit tests, FE typecheck/lint + 80+ unit tests) cover the combat path
-// extensively. Re-enable after debugging the underlying layout race —
-// likely the combat-attack button overlapping the grid card on certain
-// procgen layouts. Tracked in TODO.
-test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, request }) => {
+// Playwright. The deterministic checks (BE typecheck/lint/prettier + unit
+// tests, FE typecheck/lint + unit tests) cover the combat path extensively.
+// Re-enable after debugging the underlying layout race — likely the
+// combat-attack button overlapping the grid card on certain layouts.
+test.skip('combat: enter a fight and resolve an attack', async ({ page, request }) => {
   // Re-login as a fresh test user so this test is independent of the smoke.
   const email = `e2e-combat-${Date.now()}@pansori.local`;
   const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
     data: { email, displayName: 'E2E Combat User' },
   });
   expect(loginRes.ok()).toBe(true);
+  await seedCampaign(request);
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
 
-  // Sandbox is hidden — reach it via the ?campaign= escape hatch.
-  await page.goto('/?campaign=sandbox');
+  await page.goto('/');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
   await page.getByTestId('auto-fill-party-btn').click();
@@ -316,16 +311,13 @@ test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, 
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
 
-  // Drive the loop until a kill or the iteration cap. Bound generous enough
-  // to absorb procgen variance + d20 misses; the existing scripted Malgovia
-  // playthrough uses 300 — 80 is a middle ground for an E2E run.
+  // Travel to the practice ring (where the goblins wait) before driving combat.
+  await clickTravelTo(page, 'The Practice Ring');
+
+  // Drive the loop until a kill or the iteration cap.
   const result = await driveCombatLoop(page, 80);
 
   // Hard assertion: the loop must have surfaced at least one Attack action.
-  // That proves initiative ran, the party closed with an enemy, and the
-  // choice list reflected combat state. Narrative alone is unreliable
-  // because the panel shows only the current room — past combat scrolls
-  // away when the party moves on.
   expect(
     result.sawAttackChoice,
     `expected Attack action to surface during ${result.iterations} iterations; ` +
@@ -347,24 +339,25 @@ test.skip('sandbox combat: enter a fight and resolve an attack', async ({ page, 
 // Verifies the engine's class-aware choice generation under multi-PC play:
 //
 //   - Combat starts when a PC attacks an in-room enemy.
-//   - InitiativeStrip becomes visible with at least 4 entries (3 PCs + 1+ enemies).
+//   - InitiativeStrip becomes visible with all 6 entries (4 PCs + 2 enemies).
 //   - For each PC's turn observed, the choice list contains `cast_spell`
-//     options if and only if the active PC is the Cleric. Fighter and
-//     Rogue at level 1 have no spells known and must not see cast_spell
-//     buttons; the Cleric does (Sacred Flame cantrip is always available
-//     when an enemy is in range).
+//     options if and only if the active PC is a spellcaster (Cleric / Wizard).
+//     Fighter and Rogue at level 1 have no spells known and must not see
+//     cast_spell buttons; the Cleric/Wizard do.
 //
-// Navigation path (3-level grid map): the party starts on the regional
-// grid; "Enter The Old Road" is a marker_move onto that local site, where
-// two Bandit Ruffians wait — the first hostiles the party meets. The engine
-// blocks travelling on while a hostile is alive in the room, so the only
-// forward step from road_north is Attack — which trips combat initialization.
+// Navigation: the party starts on the regional grid; "The Practice Ring" is a
+// 'local' site one step east, whose entry room holds two Goblin Warriors — the
+// first hostiles the party meets. The engine blocks travelling on while a
+// hostile is alive in the room, so the only forward step is Attack — which
+// trips combat initialization.
 
 const CLASS_NAMES = ['Fighter', 'Cleric', 'Rogue', 'Wizard'] as const;
 type PartyClass = (typeof CLASS_NAMES)[number];
 // Spellcasters in the recommended party — they may surface cast_spell; the
 // martials (Fighter/Rogue) never do.
 const SPELLCASTERS = new Set<PartyClass>(['Cleric', 'Wizard']);
+// The SRD-catalog monster the practice ring is stocked with (×2).
+const ENEMY_NAME = 'Goblin Warrior';
 
 async function activeClass(page: Page): Promise<PartyClass | null> {
   const active = page.locator('[data-testid="party-tile"][aria-current="true"]');
@@ -374,8 +367,8 @@ async function activeClass(page: Page): Promise<PartyClass | null> {
 }
 
 // Strip the ▶ glyph and the trailing "(roll)" from an initiative entry's
-// text content so the bare creature name is left ("Fighter", "Bandit
-// Ruffian"). The ▶ is aria-hidden but still part of textContent.
+// text content so the bare creature name is left ("Fighter", "Goblin
+// Warrior"). The ▶ is aria-hidden but still part of textContent.
 function cleanInitiativeEntry(txt: string): string {
   return txt
     .replace(/^▶\s*/, '')
@@ -404,33 +397,30 @@ async function choiceActionTypes(page: Page): Promise<string[]> {
 async function clickTravelTo(page: Page, siteName: string): Promise<void> {
   // Travel is map-driven: GridMapView renders each transition cell as a
   // clickable, labelled square whose aria-label carries the destination name
-  // (e.g. "5,1, The Old Road"). Click that cell to dispatch the marker_move.
-  //
-  // Fog of war: a distant site (The Old Road sits far east of the start) begins
-  // undiscovered — hidden + non-travelable — until the party explores to it. So
-  // walk EAST along the southern road (row y=7): each step clicks the easternmost
-  // revealed road cell, pushing the fog frontier until the site is revealed, then
-  // clicks it. Random encounters are disabled under the e2e test-login backend,
-  // so the scripted journey arrives deterministically.
-  for (let step = 0; step < 12; step++) {
+  // (e.g. "1,1, The Practice Ring"). Click that cell to dispatch the
+  // marker_move. The site sits one cell east of the party's start (row y=1)
+  // and is revealed from the outset, so this resolves in a step or two.
+  // Random encounters are disabled under the e2e test-login backend, so the
+  // journey is deterministic.
+  for (let step = 0; step < 8; step++) {
     const site = page.locator(`[aria-label*="${siteName}"]`).first();
     if (await site.isVisible().catch(() => false)) {
       await site.click();
       await page.waitForTimeout(300);
       return;
     }
-    // Among the revealed, travelable map cells on the southern road (y=7), pick
-    // the easternmost and step onto it to advance toward the site.
+    // Among the revealed, travelable map cells on the start row (y=1), pick the
+    // easternmost and step onto it to advance toward the site.
     const labels = (await page
       .locator('[role="button"][aria-label]')
       .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))) as string[];
     let bestX = -1;
     for (const label of labels) {
-      const m = label.match(/^(\d+),7(?:,|$)/);
+      const m = label.match(/^(\d+),1(?:,|$)/);
       if (m && Number(m[1]) > bestX) bestX = Number(m[1]);
     }
     if (bestX < 0) break;
-    await page.locator(`[aria-label^="${bestX},7"]`).first().click();
+    await page.locator(`[aria-label^="${bestX},1"]`).first().click();
     await page.waitForTimeout(250);
   }
   const cellEl = page.locator(`[aria-label*="${siteName}"]`).first();
@@ -439,48 +429,46 @@ async function clickTravelTo(page: Page, siteName: string): Promise<void> {
   await page.waitForTimeout(300);
 }
 
-test('Malgovia combat: initiative live + class-specific choices respect class', async ({
+test('combat: initiative live + class-specific choices respect class', async ({
   page,
   request,
 }) => {
-  // 1. Fresh test user + Malgovia auto-fill (Fighter/Cleric/Rogue/Wizard).
-  const email = `e2e-vale-combat-${Date.now()}@pansori.local`;
+  // 1. Fresh test user + auto-fill (Fighter/Cleric/Rogue/Wizard).
+  const email = `e2e-combat-class-${Date.now()}@pansori.local`;
   const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
-    data: { email, displayName: 'E2E Malgovia Combat User' },
+    data: { email, displayName: 'E2E Combat Class User' },
   });
   expect(loginRes.ok()).toBe(true);
+  await seedCampaign(request);
   const cookies = await request.storageState();
   await page.context().addCookies(cookies.cookies);
   await page.goto('/');
   await expect(page.getByText(/NO ADVENTURES ON RECORD/i)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId('new-adventure-btn').click();
-  // Malgovia auto-selected (world picker hidden with a single campaign).
+  // Sole campaign auto-selected (world picker hidden).
   await page.getByTestId('auto-fill-party-btn').click();
   await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
   await page.getByTestId('begin-adventure-btn').click();
   await expect(page.getByTestId('game-narrative-panel')).toBeVisible({ timeout: 15_000 });
 
-  // 2. From the regional grid, enter The Old Road site — the party lands in a
-  //    Bandit-Ruffian-occupied room; the engine blocks travelling on while an
+  // 2. From the regional grid, enter the practice ring — the party lands in a
+  //    Goblin-Warrior-occupied room; the engine blocks travelling on while an
   //    enemy is alive, so Attack is the only forward path.
-  await clickTravelTo(page, 'The Old Road');
+  await clickTravelTo(page, 'The Practice Ring');
 
-  // 3. Trigger combat by attacking the first available enemy. The
-  //    Attack verb is iconized in the CombatActionBar — one button per
-  //    combat verb, with the target controlled by the EnemySelector.
+  // 3. Trigger combat by attacking the first available enemy. The Attack verb
+  //    is iconized in the CombatActionBar — one button per combat verb, with
+  //    the target controlled by the EnemySelector.
   const attackBtn = page.getByTestId('combat-attack');
   await expect(attackBtn).toBeVisible({ timeout: 5_000 });
   await expect(attackBtn).toBeEnabled();
   await attackBtn.click();
   await page.waitForTimeout(400);
 
-  // 4. The first attack ignites combat. InitiativeStrip appears with one
-  //    entry per PC (4) plus the bandits (2) = 6 total. Verify the full
-  //    roster: each PC class shows up exactly once and every bandit
-  //    enemy in the room is represented. A bug that left a PC out of
-  //    the order, doubled an entry, or rolled initiative for the wrong
-  //    creature would surface here rather than slipping past a count
-  //    check.
+  // 4. The first attack ignites combat. InitiativeStrip appears with one entry
+  //    per PC (4) plus the goblins (2) = 6 total. Verify the full roster: each
+  //    PC class shows up exactly once and every enemy in the room is
+  //    represented.
   const initStrip = page.getByTestId('initiative-strip');
   await expect(initStrip).toBeVisible({ timeout: 5_000 });
   const initialEntries = (await initStrip.locator('li').allTextContents()).map(
@@ -492,28 +480,26 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
       `expected exactly one initiative entry named ${cls}, got ${JSON.stringify(initialEntries)}`
     ).toHaveLength(1);
   }
-  // road_north hosts 2 Bandit Ruffians; both should be in the order.
+  // The practice ring hosts 2 Goblin Warriors; both should be in the order.
   expect(
-    initialEntries.filter((t) => t === 'Bandit Ruffian'),
-    `expected 2 Bandit Ruffian entries, got ${JSON.stringify(initialEntries)}`
+    initialEntries.filter((t) => t === ENEMY_NAME),
+    `expected 2 ${ENEMY_NAME} entries, got ${JSON.stringify(initialEntries)}`
   ).toHaveLength(2);
   expect(initialEntries).toHaveLength(6);
 
   // 5. Per-PC class invariant: cast_spell appears iff the active class is a
   //    spellcaster (Cleric / Wizard). Iterate observed PC turns; tolerate
   //    combat ending early.
-  let observed: PartyClass[] = [];
+  const observed: PartyClass[] = [];
   for (let turn = 0; turn < 8; turn++) {
-    // Combat may have ended (skeleton fell). If so, exit the loop.
+    // Combat may have ended. If so, exit the loop.
     if ((await initStrip.count()) === 0) break;
 
     // Strip ↔ PartyRail sync: the ▶-marked initiative entry and the PartyRail's
-    // active tile must name the same character — a drift would mean the engine
-    // and renderer disagree about whose turn it is. Both derive from the same
+    // active tile must name the same character. Both derive from the same
     // active character but can re-render a beat apart during a turn transition,
-    // so poll until they agree (a genuine, lasting drift makes this time out).
-    // Auto-fill sets `char.name === char.character_class`, so the strip entry
-    // name and the PartyRail class label coincide for our party.
+    // so poll until they agree. Auto-fill sets `char.name === char.character_class`,
+    // so the strip entry name and the PartyRail class label coincide.
     let cls: PartyClass | null = null;
     try {
       await expect
@@ -538,17 +524,14 @@ test('Malgovia combat: initiative live + class-specific choices respect class', 
     // In combat, single-target spells are surfaced as icon buttons in the
     // SpellBar (data-testid="spell-bar"), not in the generic choice-btn list —
     // so cast_spell presence must be read from BOTH surfaces. The SpellBar
-    // renders only when the active PC has at least one cast_spell choice, so its
-    // presence ⇔ a spell is offered (a spell-less Fighter/Rogue has none).
+    // renders only when the active PC has at least one cast_spell choice.
     const spellBarCount = await page.getByTestId('spell-bar').count();
     const hasCast = types.includes('cast_spell') || spellBarCount > 0;
     // Cast_spell is gated on action availability: a Cleric who already
-    // consumed their action this turn (e.g. they're the PC who
-    // initiated combat by attacking) won't see spell options until
-    // their next turn. The engine signals "action already used" by
-    // surfacing an `end_turn` choice (added only after action_used=true).
-    // Skip the cast-presence assertion in that case; the inverse
-    // assertion (Fighter/Rogue NEVER see cast_spell) still holds.
+    // consumed their action this turn won't see spell options until their
+    // next turn. The engine signals "action already used" by surfacing an
+    // `end_turn` choice. Skip the cast-presence assertion in that case; the
+    // inverse assertion (Fighter/Rogue NEVER see cast_spell) still holds.
     const actionAlreadyUsed = types.includes('end_turn');
     if (!SPELLCASTERS.has(cls)) {
       expect(

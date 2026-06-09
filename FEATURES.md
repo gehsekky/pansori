@@ -109,9 +109,10 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
 ## Campaign platform (content lives in the DB)
 
 - Campaigns are DB rows resolving over the shared SRD base template
-  (`campaignData/srd/baseCampaign.ts`) — one loading path for the shipped
-  campaigns (sandbox, Malgovia) and any user-authored one. The old per-campaign
-  code contexts are deleted; the DB is canonical.
+  (`campaignData/srd/baseCampaign.ts`) — one loading path for every campaign.
+  Nothing ships a built-in campaign; the per-campaign code contexts are deleted
+  and the DB is canonical. Campaigns are user-authored through the creator (and,
+  for the e2e suite, planted at test time into a throwaway database).
 - **Creator / editor**: visual region/town/room **painters** (terrain, tiers,
   mechanics, SIZE, markers, encounter zones, narration-hook cards), placed
   content in rooms (enemies/loot/NPCs/objects/traps), a structured dialogue-tree

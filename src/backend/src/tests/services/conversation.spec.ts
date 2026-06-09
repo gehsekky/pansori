@@ -535,7 +535,7 @@ describe('parley (hostile NPCs with dialogue)', () => {
   });
 });
 
-describe('promoted consequence arms (Malgovia parity) — the DB dialogue path', () => {
+describe('promoted consequence arms (Demo Campaign parity) — the DB dialogue path', () => {
   // An NPC wired with the four arms promoted into the DB-safe subset:
   // complete-a-step, heal, narrate, and take a quest item.
   const healer: PlacedNpc = {

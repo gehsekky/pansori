@@ -88,24 +88,24 @@ describe('syncItemCatalog', () => {
 
 describe('campaign custom items CRUD', () => {
   it('round-trips customs in authored order; put is replace-all', async () => {
-    const db = makeItemsDb({ campaigns: ['malgovia'] });
-    expect(await putCampaignCustomItems(db.pool, 'malgovia', [RELIC, DAGGER])).toBe(true);
-    expect((await getCampaignCustomItems(db.pool, 'malgovia')).map((i) => i.id)).toEqual([
+    const db = makeItemsDb({ campaigns: ['demo_campaign'] });
+    expect(await putCampaignCustomItems(db.pool, 'demo_campaign', [RELIC, DAGGER])).toBe(true);
+    expect((await getCampaignCustomItems(db.pool, 'demo_campaign')).map((i) => i.id)).toEqual([
       'sun-relic',
       'dagger',
     ]);
-    await putCampaignCustomItems(db.pool, 'malgovia', [RELIC]);
-    expect((await getCampaignCustomItems(db.pool, 'malgovia')).map((i) => i.id)).toEqual([
+    await putCampaignCustomItems(db.pool, 'demo_campaign', [RELIC]);
+    expect((await getCampaignCustomItems(db.pool, 'demo_campaign')).map((i) => i.id)).toEqual([
       'sun-relic',
     ]);
   });
 
   it('rejects writes to a missing campaign; delete clears the customs', async () => {
-    const db = makeItemsDb({ campaigns: ['malgovia'] });
+    const db = makeItemsDb({ campaigns: ['demo_campaign'] });
     expect(await putCampaignCustomItems(db.pool, 'nope', [RELIC])).toBe(false);
-    await putCampaignCustomItems(db.pool, 'malgovia', [RELIC]);
-    expect(await deleteCampaignCustomItems(db.pool, 'malgovia')).toBe(true);
-    expect(await getCampaignCustomItems(db.pool, 'malgovia')).toEqual([]);
+    await putCampaignCustomItems(db.pool, 'demo_campaign', [RELIC]);
+    expect(await deleteCampaignCustomItems(db.pool, 'demo_campaign')).toBe(true);
+    expect(await getCampaignCustomItems(db.pool, 'demo_campaign')).toEqual([]);
     expect(await deleteCampaignCustomItems(db.pool, 'nope')).toBe(false);
   });
 });

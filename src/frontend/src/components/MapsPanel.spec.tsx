@@ -62,7 +62,7 @@ beforeEach(() => {
 
 describe('MapsPanel — regions', () => {
   it('renders a card per region with dims, marker count, and the starting badge', async () => {
-    render(<MapsPanel campaignId="malgovia" kind="region" />);
+    render(<MapsPanel campaignId="demo_campaign" kind="region" />);
     expect(await screen.findByText('The Vale')).toBeTruthy();
     expect(screen.getByText('The Frost Reach')).toBeTruthy();
     expect(screen.getByText(/12×10 · 1 SITE/)).toBeTruthy();
@@ -73,14 +73,14 @@ describe('MapsPanel — regions', () => {
 
   it('clicking a card opens the painter for that region', async () => {
     const onOpenMap = vi.fn();
-    render(<MapsPanel campaignId="malgovia" kind="region" onOpenMap={onOpenMap} />);
+    render(<MapsPanel campaignId="demo_campaign" kind="region" onOpenMap={onOpenMap} />);
     fireEvent.click(await screen.findByTestId('region-card-frost-reach'));
     expect(onOpenMap).toHaveBeenCalledWith('frost-reach');
   });
 
   it('creates a region: name → slug id, appended to the list, painter opened', async () => {
     const onOpenMap = vi.fn();
-    render(<MapsPanel campaignId="malgovia" kind="region" onOpenMap={onOpenMap} />);
+    render(<MapsPanel campaignId="demo_campaign" kind="region" onOpenMap={onOpenMap} />);
     fireEvent.click(await screen.findByTestId('new-region-btn'));
     fireEvent.change(screen.getByLabelText('REGION NAME'), {
       target: { value: 'The Sunken Coast!' },
@@ -89,7 +89,7 @@ describe('MapsPanel — regions', () => {
     fireEvent.click(screen.getByTestId('create-region-btn'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const [cid, section, value] = mocked.putCampaignSection.mock.calls[0];
-    expect(cid).toBe('malgovia');
+    expect(cid).toBe('demo_campaign');
     expect(section).toBe('regions');
     const list = value as Array<typeof VALE>;
     expect(list.map((r) => r.id)).toEqual(['vale', 'frost-reach', 'the-sunken-coast']);
@@ -120,7 +120,7 @@ describe('MapsPanel — regions', () => {
   });
 
   it('rejects a taken id client-side without calling the api', async () => {
-    render(<MapsPanel campaignId="malgovia" kind="region" />);
+    render(<MapsPanel campaignId="demo_campaign" kind="region" />);
     fireEvent.click(await screen.findByTestId('new-region-btn'));
     // 'VALE' slugs to 'vale' — collides with the existing region id.
     fireEvent.change(screen.getByLabelText('REGION NAME'), { target: { value: 'VALE' } });
@@ -131,7 +131,7 @@ describe('MapsPanel — regions', () => {
 
   it('surfaces a load failure', async () => {
     mocked.getCampaignSection.mockRejectedValue(new Error('boom'));
-    render(<MapsPanel campaignId="malgovia" kind="region" />);
+    render(<MapsPanel campaignId="demo_campaign" kind="region" />);
     expect(await screen.findByText(/Could not load/)).toBeTruthy();
   });
 });
@@ -159,7 +159,7 @@ describe('MapsPanel — rooms', () => {
   });
 
   it('renders room cards with exit counts', async () => {
-    render(<MapsPanel campaignId="malgovia" kind="room" />);
+    render(<MapsPanel campaignId="demo_campaign" kind="room" />);
     expect(await screen.findByText('ROOMS')).toBeTruthy();
     expect(screen.getByText('The Taproom')).toBeTruthy();
     expect(screen.getByText(/2×2 · 1 EXIT/)).toBeTruthy();
@@ -167,7 +167,7 @@ describe('MapsPanel — rooms', () => {
 
   it('creates a room: bare-floor starter with a way out, painter opened', async () => {
     const onOpenMap = vi.fn();
-    render(<MapsPanel campaignId="malgovia" kind="room" onOpenMap={onOpenMap} />);
+    render(<MapsPanel campaignId="demo_campaign" kind="room" onOpenMap={onOpenMap} />);
     fireEvent.click(await screen.findByTestId('new-room-btn'));
     fireEvent.change(screen.getByLabelText('ROOM NAME'), { target: { value: 'The Cellar' } });
     expect(screen.getByText(/SHIPS WITH A WAY OUT/)).toBeTruthy();
@@ -188,7 +188,7 @@ describe('MapsPanel — rooms', () => {
 
 describe('MapsPanel — towns', () => {
   it('renders town cards with venue counts and no starting badge', async () => {
-    render(<MapsPanel campaignId="malgovia" kind="town" />);
+    render(<MapsPanel campaignId="demo_campaign" kind="town" />);
     expect(await screen.findByText('TOWNS')).toBeTruthy();
     expect(screen.getByText('Oakvale')).toBeTruthy();
     expect(screen.getByText(/10×8 · 2 VENUES/)).toBeTruthy();
@@ -197,21 +197,21 @@ describe('MapsPanel — towns', () => {
 
   it('clicking a town card opens the town painter', async () => {
     const onOpenMap = vi.fn();
-    render(<MapsPanel campaignId="malgovia" kind="town" onOpenMap={onOpenMap} />);
+    render(<MapsPanel campaignId="demo_campaign" kind="town" onOpenMap={onOpenMap} />);
     fireEvent.click(await screen.findByTestId('town-card-oakvale'));
     expect(onOpenMap).toHaveBeenCalledWith('oakvale');
   });
 
   it('creates a town: 25 ft scale, dirt floor, gate venue shipped', async () => {
     const onOpenMap = vi.fn();
-    render(<MapsPanel campaignId="malgovia" kind="town" onOpenMap={onOpenMap} />);
+    render(<MapsPanel campaignId="demo_campaign" kind="town" onOpenMap={onOpenMap} />);
     fireEvent.click(await screen.findByTestId('new-town-btn'));
     fireEvent.change(screen.getByLabelText('TOWN NAME'), { target: { value: 'Milldale' } });
     expect(screen.getByText(/SHIPS WITH A GATE VENUE/)).toBeTruthy();
     fireEvent.click(screen.getByTestId('create-town-btn'));
     await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
     const [cid, section, value] = mocked.putCampaignSection.mock.calls[0];
-    expect(cid).toBe('malgovia');
+    expect(cid).toBe('demo_campaign');
     expect(section).toBe('towns');
     const list = value as Array<typeof OAKVALE>;
     expect(list.map((t) => t.id)).toEqual(['oakvale', 'milldale']);

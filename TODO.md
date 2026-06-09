@@ -108,7 +108,7 @@ documented deferrals.
       `displayNoun`, default `gridWidth`/`gridHeight`.
 - [ ] **Room tactical extras** — `coverPositions` (half/three-quarter cover) isn't
       paintable in the DB room schema.
-- [ ] **Procgen** — sandbox's roguelike dungeon generator is code; DB campaigns are
+- [ ] **Procgen** — the roguelike dungeon generator is code-only; DB campaigns are
       authored-only. Likely permanent.
 
 ## Creator backlog (smaller)

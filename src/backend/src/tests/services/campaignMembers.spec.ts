@@ -159,18 +159,18 @@ describe('listCampaignsForUser', () => {
     makeDb({
       users: [ALICE],
       campaigns: [
-        { id: 'malgovia', name: 'Malgovia' },
+        { id: 'demo_campaign', name: 'Demo Campaign' },
         { id: 'sandbox', name: 'sandbox' },
         { id: 'secret', name: 'Secret Realm', visibility: 'private' },
       ],
-      members: [{ campaign_id: 'malgovia', user_id: 'a', role: 'editor' }],
+      members: [{ campaign_id: 'demo_campaign', user_id: 'a', role: 'editor' }],
     });
 
   it('returns membership roles, null where none — private non-member campaigns hidden', async () => {
     const db = setup();
     const list = await listCampaignsForUser(db.pool, appUser('a'));
     expect(list).toEqual([
-      { id: 'malgovia', name: 'Malgovia', visibility: 'global', my_role: 'editor' },
+      { id: 'demo_campaign', name: 'Demo Campaign', visibility: 'global', my_role: 'editor' },
       { id: 'sandbox', name: 'sandbox', visibility: 'global', my_role: null },
     ]);
   });
@@ -195,7 +195,7 @@ describe('listVisibleCampaignIds', () => {
     makeDb({
       users: [ALICE],
       campaigns: [
-        { id: 'malgovia', name: 'Malgovia' },
+        { id: 'demo_campaign', name: 'Demo Campaign' },
         { id: 'secret', name: 'Secret Realm', visibility: 'private' },
       ],
       members: [{ campaign_id: 'secret', user_id: 'a', role: 'player' }],
@@ -203,30 +203,30 @@ describe('listVisibleCampaignIds', () => {
 
   it('non-members see only global campaigns', async () => {
     const db = setup();
-    expect(await listVisibleCampaignIds(db.pool, appUser('z'))).toEqual(new Set(['malgovia']));
+    expect(await listVisibleCampaignIds(db.pool, appUser('z'))).toEqual(new Set(['demo_campaign']));
   });
 
   it('members (any role, incl. player) see their private campaigns', async () => {
     const db = setup();
     expect(await listVisibleCampaignIds(db.pool, appUser('a'))).toEqual(
-      new Set(['malgovia', 'secret'])
+      new Set(['demo_campaign', 'secret'])
     );
   });
 
   it('admins see everything', async () => {
     const db = setup();
     expect(await listVisibleCampaignIds(db.pool, appUser('z', true))).toEqual(
-      new Set(['malgovia', 'secret'])
+      new Set(['demo_campaign', 'secret'])
     );
   });
 });
 
 describe('setCampaignVisibility', () => {
   it('updates visibility and reports a missing campaign', async () => {
-    const db = makeDb({ campaigns: [{ id: 'malgovia', name: 'Malgovia' }] });
-    expect(await setCampaignVisibility(db.pool, 'malgovia', 'private')).toBe(true);
+    const db = makeDb({ campaigns: [{ id: 'demo_campaign', name: 'Demo Campaign' }] });
+    expect(await setCampaignVisibility(db.pool, 'demo_campaign', 'private')).toBe(true);
     const ids = await listVisibleCampaignIds(db.pool, appUser('z'));
-    expect(ids.has('malgovia')).toBe(false);
+    expect(ids.has('demo_campaign')).toBe(false);
     expect(await setCampaignVisibility(db.pool, 'nope', 'global')).toBe(false);
   });
 });
@@ -234,13 +234,13 @@ describe('setCampaignVisibility', () => {
 describe('addMemberByEmail', () => {
   it('404-reasons an unknown email', async () => {
     const db = makeDb({ users: [ALICE] });
-    const result = await addMemberByEmail(db.pool, 'malgovia', 'nobody@test', 'editor');
+    const result = await addMemberByEmail(db.pool, 'demo_campaign', 'nobody@test', 'editor');
     expect(result).toEqual({ ok: false, reason: 'user_not_found' });
   });
 
   it('adds a new member and returns the joined row', async () => {
     const db = makeDb({ users: [ALICE] });
-    const result = await addMemberByEmail(db.pool, 'malgovia', 'alice@test', 'owner');
+    const result = await addMemberByEmail(db.pool, 'demo_campaign', 'alice@test', 'owner');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.member).toMatchObject({ user_id: 'a', role: 'owner', display_name: 'Alice' });
@@ -251,11 +251,11 @@ describe('addMemberByEmail', () => {
     const db = makeDb({
       users: [ALICE, BOB],
       members: [
-        { campaign_id: 'malgovia', user_id: 'a', role: 'owner' },
-        { campaign_id: 'malgovia', user_id: 'b', role: 'editor' },
+        { campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'b', role: 'editor' },
       ],
     });
-    const result = await addMemberByEmail(db.pool, 'malgovia', 'bob@test', 'owner');
+    const result = await addMemberByEmail(db.pool, 'demo_campaign', 'bob@test', 'owner');
     expect(result.ok).toBe(true);
     expect(db.members.find((m) => m.user_id === 'b')?.role).toBe('owner');
   });
@@ -263,9 +263,9 @@ describe('addMemberByEmail', () => {
   it('refuses to demote the sole owner via re-add', async () => {
     const db = makeDb({
       users: [ALICE],
-      members: [{ campaign_id: 'malgovia', user_id: 'a', role: 'owner' }],
+      members: [{ campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' }],
     });
-    const result = await addMemberByEmail(db.pool, 'malgovia', 'alice@test', 'editor');
+    const result = await addMemberByEmail(db.pool, 'demo_campaign', 'alice@test', 'editor');
     expect(result).toEqual({ ok: false, reason: 'last_owner' });
     expect(db.members.find((m) => m.user_id === 'a')?.role).toBe('owner');
   });
@@ -274,20 +274,20 @@ describe('addMemberByEmail', () => {
 describe('setMemberRole', () => {
   it('reports a non-member', async () => {
     const db = makeDb({ users: [ALICE] });
-    const result = await setMemberRole(db.pool, 'malgovia', 'a', 'editor');
+    const result = await setMemberRole(db.pool, 'demo_campaign', 'a', 'editor');
     expect(result).toEqual({ ok: false, reason: 'not_a_member' });
   });
 
   it('refuses to demote the sole owner (to editor or player)', async () => {
     const db = makeDb({
       users: [ALICE],
-      members: [{ campaign_id: 'malgovia', user_id: 'a', role: 'owner' }],
+      members: [{ campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' }],
     });
-    expect(await setMemberRole(db.pool, 'malgovia', 'a', 'editor')).toEqual({
+    expect(await setMemberRole(db.pool, 'demo_campaign', 'a', 'editor')).toEqual({
       ok: false,
       reason: 'last_owner',
     });
-    expect(await setMemberRole(db.pool, 'malgovia', 'a', 'player')).toEqual({
+    expect(await setMemberRole(db.pool, 'demo_campaign', 'a', 'player')).toEqual({
       ok: false,
       reason: 'last_owner',
     });
@@ -297,11 +297,11 @@ describe('setMemberRole', () => {
     const db = makeDb({
       users: [ALICE, BOB],
       members: [
-        { campaign_id: 'malgovia', user_id: 'a', role: 'owner' },
-        { campaign_id: 'malgovia', user_id: 'b', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'b', role: 'owner' },
       ],
     });
-    const result = await setMemberRole(db.pool, 'malgovia', 'a', 'editor');
+    const result = await setMemberRole(db.pool, 'demo_campaign', 'a', 'editor');
     expect(result.ok).toBe(true);
     expect(db.members.find((m) => m.user_id === 'a')?.role).toBe('editor');
   });
@@ -310,11 +310,11 @@ describe('setMemberRole', () => {
     const db = makeDb({
       users: [ALICE, BOB],
       members: [
-        { campaign_id: 'malgovia', user_id: 'a', role: 'owner' },
-        { campaign_id: 'malgovia', user_id: 'b', role: 'editor' },
+        { campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'b', role: 'editor' },
       ],
     });
-    const result = await setMemberRole(db.pool, 'malgovia', 'b', 'owner');
+    const result = await setMemberRole(db.pool, 'demo_campaign', 'b', 'owner');
     expect(result.ok).toBe(true);
     expect(db.members.find((m) => m.user_id === 'b')?.role).toBe('owner');
   });
@@ -323,7 +323,7 @@ describe('setMemberRole', () => {
 describe('removeMember', () => {
   it('reports a non-member', async () => {
     const db = makeDb({ users: [ALICE] });
-    expect(await removeMember(db.pool, 'malgovia', 'a')).toEqual({
+    expect(await removeMember(db.pool, 'demo_campaign', 'a')).toEqual({
       ok: false,
       reason: 'not_a_member',
     });
@@ -332,9 +332,9 @@ describe('removeMember', () => {
   it('refuses to remove the sole owner', async () => {
     const db = makeDb({
       users: [ALICE],
-      members: [{ campaign_id: 'malgovia', user_id: 'a', role: 'owner' }],
+      members: [{ campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' }],
     });
-    expect(await removeMember(db.pool, 'malgovia', 'a')).toEqual({
+    expect(await removeMember(db.pool, 'demo_campaign', 'a')).toEqual({
       ok: false,
       reason: 'last_owner',
     });
@@ -345,18 +345,21 @@ describe('removeMember', () => {
     const db = makeDb({
       users: [ALICE, BOB],
       members: [
-        { campaign_id: 'malgovia', user_id: 'a', role: 'owner' },
-        { campaign_id: 'malgovia', user_id: 'b', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'b', role: 'owner' },
       ],
     });
-    expect(await removeMember(db.pool, 'malgovia', 'a')).toEqual({ ok: true });
+    expect(await removeMember(db.pool, 'demo_campaign', 'a')).toEqual({ ok: true });
     expect(db.members).toHaveLength(1);
   });
 });
 
 describe('createCampaign', () => {
   it('creates a private campaign with the creator as owner', async () => {
-    const db = makeDb({ users: [ALICE], campaigns: [{ id: 'malgovia', name: 'Malgovia' }] });
+    const db = makeDb({
+      users: [ALICE],
+      campaigns: [{ id: 'demo_campaign', name: 'Demo Campaign' }],
+    });
     const result = await createCampaign(db.pool, appUser('a'), 'mistwood', 'The Mistwood');
     expect(result).toEqual({
       id: 'mistwood',
@@ -378,8 +381,11 @@ describe('createCampaign', () => {
   });
 
   it('rejects a taken id (including the code built-ins)', async () => {
-    const db = makeDb({ users: [ALICE], campaigns: [{ id: 'malgovia', name: 'Malgovia' }] });
-    expect(await createCampaign(db.pool, appUser('a'), 'malgovia', 'Imposter')).toBe('exists');
+    const db = makeDb({
+      users: [ALICE],
+      campaigns: [{ id: 'demo_campaign', name: 'Demo Campaign' }],
+    });
+    expect(await createCampaign(db.pool, appUser('a'), 'demo_campaign', 'Imposter')).toBe('exists');
     expect(db.members).toHaveLength(0);
   });
 });
@@ -389,11 +395,11 @@ describe('listMembers', () => {
     const db = makeDb({
       users: [ALICE, BOB],
       members: [
-        { campaign_id: 'malgovia', user_id: 'a', role: 'owner' },
+        { campaign_id: 'demo_campaign', user_id: 'a', role: 'owner' },
         { campaign_id: 'other', user_id: 'b', role: 'editor' },
       ],
     });
-    const rows = await listMembers(db.pool, 'malgovia');
+    const rows = await listMembers(db.pool, 'demo_campaign');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ user_id: 'a', role: 'owner', email: 'alice@test' });
   });

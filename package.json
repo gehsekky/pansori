@@ -25,6 +25,7 @@
     "db": "docker compose --profile tools up -d",
     "fresh": "docker compose down -v && docker compose up --build -d",
     "test:e2e": "playwright test",
+    "test:e2e:stack": "bash scripts/run-e2e-stack.sh",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:install": "playwright install --with-deps chromium",
     "prepare": "husky || true"

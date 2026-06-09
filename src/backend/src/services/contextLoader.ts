@@ -23,8 +23,8 @@ function isContextModule(mod: unknown): mod is ContextModule {
 
 /**
  * Discover campaign modules. Two layouts are supported:
- *   - a single top-level file, e.g. `campaignData/sandbox.ts`
- *   - a campaign folder with an entry point, e.g. `campaignData/malgovia/index.ts`
+ *   - a single top-level file, e.g. `campaignData/<id>.ts`
+ *   - a campaign folder with an entry point, e.g. `campaignData/<id>/index.ts`
  *     (the preferred layout — the campaign's data is split across sibling files
  *     and assembled in index.ts).
  * Library subfolders like `campaignData/srd/` are scanned too but harmlessly

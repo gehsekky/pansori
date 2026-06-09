@@ -993,8 +993,8 @@ const DialogueConditionSchema = conditionSchema(DIALOGUE_FACTS);
 
 // The consequence subset DB dialogue may fire — the world-state setters
 // (flags for cross-NPC threads, attitude shifts for parley outcomes), the
-// simple grants, and the Malgovia-parity arms (advance_quest /
-// add_narrative / modify_hp / consume_item — everything its hand-authored
+// simple grants, and the quest/narrative arms (advance_quest /
+// add_narrative / modify_hp / consume_item — everything hand-authored
 // dialogue uses). The remaining GameConsequence arms (spawn_enemy,
 // unlock_room, set_escape, travel_to, set_faction_rep) stay code-side
 // until the systems they script are DB-authored too.

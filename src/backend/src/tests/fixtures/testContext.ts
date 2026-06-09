@@ -1,20 +1,18 @@
-// The base TEST context — a self-contained, code-independent stand-in for the
-// old `campaignData/sandbox.ts` Context that ~220 specs imported as `ctx`.
+// The base TEST context — a self-contained, code-independent `ctx` that ~220
+// specs import. It is a generic test scaffold, not a shippable campaign:
+// campaigns themselves are DB/creator-authored and carry no code context.
 //
-// As sandbox + malgovia move to pure DB campaigns (and their campaignData/
-// folders get deleted), the specs can't keep importing a code campaign. This
-// fixture gives them a stable `ctx` that survives that deletion: it spreads the
-// SRD base template (`baseCampaignContext` — the same class/spell/feat/
-// background machinery every campaign resolves over, which STAYS) and re-keys
-// it to `id: 'sandbox'`, then overlays the handful of fields the old sandbox
-// context populated that the base leaves empty/stubbed and that specs read:
-// the compact dungeon (`campaign`), its bestiary (`enemyTemplates`), the loot
-// table (incl. the attunement +1 Longsword), the fuller class spell lists, and
-// the dungeon-flavored narrative pools.
+// The fixture spreads the SRD base template (`baseCampaignContext` — the same
+// class/spell/feat/background machinery every campaign resolves over, which
+// STAYS), re-keys it to `id: 'sandbox'`, then overlays the handful of fields the
+// base leaves empty/stubbed and that specs read: a compact dungeon (`campaign`),
+// its bestiary (`enemyTemplates`), the loot table (incl. the attunement +1
+// Longsword), the fuller class spell lists, and the dungeon-flavored narrative
+// pools.
 //
 // baseCampaignContext supplies identical class machinery (both are built from
-// the same SRD_* constants), so spreading it is byte-equivalent to the old
-// sandbox context for those fields.
+// the same SRD_* constants), so spreading it is byte-equivalent for those
+// fields.
 
 import { SRD_MONSTERS, srdItems } from '../../campaignData/srd/index.js';
 import type { Context } from '../../types.js';

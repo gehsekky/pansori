@@ -28,7 +28,7 @@ beforeEach(() => {
 
 describe('CampaignContentEditor', () => {
   it('lists sections with their source badges', async () => {
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     expect(await screen.findByText('GAMESTART')).toBeTruthy();
     expect(screen.getByText('NARRATIVES')).toBeTruthy();
     expect(screen.getByText('CUSTOMITEMS')).toBeTruthy();
@@ -44,7 +44,7 @@ describe('CampaignContentEditor', () => {
       source: 'code',
       value: 'A fresh world, waiting to be written.',
     });
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('GAMESTART'));
     const textarea = (await screen.findByLabelText(
       /GAMESTART — SERVING FROM TEMPLATE · PLAIN TEXT/
@@ -61,7 +61,7 @@ describe('CampaignContentEditor', () => {
       source: 'code',
       value: codeCustoms,
     });
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('CUSTOMITEMS'));
     const textarea = (await screen.findByLabelText(
       /CUSTOMITEMS — SERVING FROM TEMPLATE/
@@ -76,7 +76,7 @@ describe('CampaignContentEditor', () => {
       value: 'A fresh world.',
     });
     mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'gameStart', source: 'db' });
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('GAMESTART'));
     const textarea = await screen.findByLabelText(/GAMESTART/);
     const raw = 'The caravan stops — "end of the line," the driver mutters.\nYou climb down.';
@@ -84,7 +84,7 @@ describe('CampaignContentEditor', () => {
     fireEvent.click(screen.getByText('SAVE TO DATABASE'));
     // The textarea content IS the value — stored verbatim, never JSON-parsed.
     await waitFor(() =>
-      expect(mocked.putCampaignSection).toHaveBeenCalledWith('malgovia', 'gameStart', raw)
+      expect(mocked.putCampaignSection).toHaveBeenCalledWith('demo_campaign', 'gameStart', raw)
     );
     expect(await screen.findByText('SAVED — LIVE NOW')).toBeTruthy();
   });
@@ -95,7 +95,7 @@ describe('CampaignContentEditor', () => {
       source: 'db',
       value: {},
     });
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('NARRATIVES'));
     const textarea = await screen.findByLabelText(/NARRATIVES/);
     fireEvent.change(textarea, { target: { value: '{not json' } });
@@ -149,7 +149,7 @@ describe('CampaignContentEditor', () => {
       error: 'invalid_section_value',
       issues: [{ path: 'genericArrival', message: 'Required' }],
     });
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('NARRATIVES'));
     const textarea = await screen.findByLabelText(/NARRATIVES/);
     fireEvent.change(textarea, { target: { value: '{}' } });
@@ -167,7 +167,7 @@ describe('CampaignContentEditor', () => {
       source: 'db',
       value: [{ id: 'vale', name: 'The Vale', isStartingRegion: true }],
     });
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('REGIONS'));
     const textarea = (await screen.findByLabelText(
       /REGIONS — SERVING FROM DATABASE/
@@ -192,11 +192,11 @@ describe('CampaignContentEditor', () => {
       source: 'code',
     });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<CampaignContentEditor campaignId="malgovia" />);
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('NARRATIVES'));
     fireEvent.click(await screen.findByText('RESET TO TEMPLATE'));
     await waitFor(() =>
-      expect(mocked.deleteCampaignSection).toHaveBeenCalledWith('malgovia', 'narratives')
+      expect(mocked.deleteCampaignSection).toHaveBeenCalledWith('demo_campaign', 'narratives')
     );
     // Reloaded as the base-template fallback.
     expect(await screen.findByLabelText(/NARRATIVES — SERVING FROM TEMPLATE/)).toBeTruthy();

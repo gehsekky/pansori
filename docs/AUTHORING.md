@@ -4,7 +4,7 @@ This is the reference for authoring a campaign module. A campaign is a
 TypeScript file in `src/backend/src/contexts/` that exports a `Context`.
 The engine auto-discovers it on backend startup.
 
-Pansori ships with one authored campaign (Duskenvale) + one procgen sandbox:
+Reference campaigns:
 
 - `vale_of_shadows.ts` — **Duskenvale** (internal id `vale_of_shadows`): a
   multi-area campaign with town hubs, faction reputation, and several boss
@@ -17,9 +17,6 @@ Pansori ships with one authored campaign (Duskenvale) + one procgen sandbox:
   live in the `folded/` subdir so the context loader (top-level scan only)
   doesn't register them as separate selectable campaigns. Good references for
   a different thematic flavor on the same format.
-- `sandbox.ts` — a roguelike-mode context that procedurally generates
-  rooms. Best reference for the minimal field set; campaigns can
-  ignore the procgen-specific fields.
 
 Read them alongside this doc.
 
@@ -96,7 +93,7 @@ export const context: Context = {
 | `id`         | yes      | URL-safe identifier (`'my_campaign'`); becomes `seed.context_id`    |
 | `worldNoun`  | yes      | Short flavor noun: 'kingdom', 'pass', 'dungeon'                     |
 | `worldNames` | yes      | Possible display names; engine picks one at session start           |
-| `mapType`    | yes      | `'campaign'` for authored worlds, `'roguelike'` for procgen sandbox |
+| `mapType`    | yes      | `'campaign'` for authored worlds, `'roguelike'` for procgen mode    |
 
 ### Entry / exit
 
@@ -179,7 +176,7 @@ These vary per campaign — write them inline:
 - Spell-casting: `spells`, `castChance`, `spellSaveDC`, `spellAttackBonus`
   (see Vale's Frost Acolyte or any caster boss for an example)
 
-The procgen sandbox picks templates randomly per room. Campaigns
+Procgen (roguelike) mode picks templates randomly per room. Campaigns
 typically don't use `enemyTemplates` directly — they place specific
 enemy instances via `campaign.enemies[roomId]`.
 

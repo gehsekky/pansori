@@ -855,7 +855,7 @@ describe('composeNow', () => {
 });
 
 describe('buildCombatHitNarrative — prose seams', () => {
-  // A context whose pools mirror the live malgovia phrasing that surfaced the
+  // A context whose pools mirror the live demo_campaign phrasing that surfaced the
   // bugs: a sentence-ending combatHit lead-in, a weapon, and a class style.
   const styledContext = (): Context =>
     ({

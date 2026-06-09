@@ -21,6 +21,7 @@ import { setIO } from './services/broadcast.js';
 import { syncCampaignRegistry } from './services/campaignRegistry.js';
 import { syncItemCatalog } from './services/itemCatalog.js';
 import { syncMonsterCatalog } from './services/monsterCatalog.js';
+import { testSeedRouter } from './routes/testSeed.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -115,6 +116,13 @@ app.use('/api/game', requireAuth, gameLimiter, gameRouter);
 // Campaign membership / future admin section. Shares the game limiter —
 // low-traffic admin surface, same abuse profile.
 app.use('/api/campaigns', requireAuth, gameLimiter, campaignsRouter);
+
+// Test-only campaign seeding — same gate as the test-login bypass (non-prod +
+// explicit opt-in). Lets the e2e plant its throwaway campaign into an ephemeral
+// database. Never mounted in production.
+if (process.env.NODE_ENV !== 'production' && process.env.E2E_TEST_LOGIN_ENABLED === 'true') {
+  app.use('/api/test', gameLimiter, testSeedRouter);
+}
 
 app.get('/api/health', async (_req, res) => {
   try {

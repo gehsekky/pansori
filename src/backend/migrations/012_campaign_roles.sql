@@ -14,9 +14,9 @@
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
--- 2. Campaign registry. `id` is the context id ('malgovia', 'sandbox') —
---    campaigns are keyed by that string everywhere in the engine, so the
---    registry uses it directly rather than minting a synthetic UUID.
+-- 2. Campaign registry. `id` is the context id (a short slug) — campaigns are
+--    keyed by that string everywhere in the engine, so the registry uses it
+--    directly rather than minting a synthetic UUID.
 CREATE TABLE IF NOT EXISTS campaigns (
   id         TEXT         PRIMARY KEY,
   name       TEXT         NOT NULL,
