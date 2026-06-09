@@ -93,8 +93,13 @@ documented deferrals.
 - [ ] **Weighted creature entries** (`{name, weight}`) — selection is uniform today.
 - [ ] **Mixed-group entries** — spawn a small group (e.g. "2 wolves + 1 bandit")
       instead of N of a single creature.
-- [ ] **Per-terrain weighting within a zone** (optional) — terrain only modulates
-      encounter *frequency* now, not which creature.
+- [ ] **Per-terrain weighting within a zone** (optional) — terrain selects the
+      arena battleground (done) and modulates encounter *frequency*, but not yet
+      *which creature*.
+- [ ] **Arena-room size in the picker** — the zone's arena-room dropdown lists
+      room ids only; show each room's grid size (e.g. `clearing (8×8)`). Needs the
+      hosted ROOMS panel's `onMaps` to pass `gridWidth`/`gridHeight` through to the
+      RegionEditor (currently `{id, name}` only).
 
 ## Campaign platform — DB authoring-model gaps
 

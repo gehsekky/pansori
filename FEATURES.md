@@ -59,6 +59,9 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
   opportunity attacks (reach), Chebyshev distance, line-of-sight blocking, and a
   room-grained **lighting/vision model** (dark/dim/bright/sunlight, darkvision,
   magical Darkness, light sources, Sunlight Sensitivity) with FE grid-fog + LoS reveal.
+- **Per-room grid size** — each fight uses its room's `gridWidth`/`gridHeight`
+  (clamped 6–16), falling back to the campaign default; one shared clamp keeps the
+  drawn grid and the server's movement bounds in lockstep.
 - **Surprise** = Disadvantage on the Initiative roll (SRD 5.2.1; Alert immune).
 - All 8 SRD **weapon masteries** (Cleave makes its own attack roll; Graze, Topple,
   Vex, Slow, …); resistance/vulnerability/immunity; massive-damage instant death.
@@ -92,6 +95,10 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
   self-contained pool: a difficulty **tier (1–4)**, a per-square chance, and a
   creature table. One region can span multiple tiers; a square outside every zone
   never rolls. The sole source of random wilderness encounters.
+- **Encounter arenas** — a zone can map each terrain type to a pool of room ids;
+  a rolled encounter on that terrain is fought on a random one of those rooms'
+  battlegrounds (floor, obstacles, terrain, cover, lighting, size), else a default
+  bare arena. Edited in the zone's creator panel.
 - **Party-size scaling** the SRD way — by creature COUNT (not inflated stat
   blocks), relative to `recommendedPartySize`, floored to the XP budget; bosses
   (count-1 placements) never cloned.
@@ -132,6 +139,10 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
   recommendedParty, backgrounds, classSpells, classStarting{Loot,Equipment}.
   Custom monsters/items carry the full template surface (phases, legendary/lair
   actions, wornEffects, curses, attunement, masteries).
+- **Live edits reach running games** — a session's seed is re-resolved against
+  the live campaign on refresh (presentation/map/room text/NPC dialogue + not-yet-
+  reached encounters update; engaged rooms keep their combat/cleared state). A
+  `campaign-updated` socket event nudges open sessions to refresh automatically.
 - **Membership & visibility** — `users.is_admin`; campaigns registry with
   visibility (private-by-default; admin-only promote to global); `campaign_members`
   with **owner ⊃ editor ⊃ player** + last-owner guard; role middleware +
