@@ -293,6 +293,22 @@ const LOCAL_TERRAINS = ['cobblestone', 'garden', 'town_wall'].filter((t) =>
   TERRAIN_TYPES.includes(t as TerrainType)
 ) as TerrainType[];
 const REGIONAL_TERRAINS = TERRAIN_TYPES.filter((t) => !LOCAL_TERRAINS.includes(t));
+// Terrain types an encounter can actually trigger on (impassable squares are
+// never crossed) — the arena-rooms editor only offers these.
+const ARENA_TERRAINS = REGIONAL_TERRAINS.filter((t) => TERRAIN[t].passable);
+
+// Drop terrain keys whose room list is empty (an empty list behaves like "no
+// entry" — the default arena), so the saved arenaRooms map stays clean.
+// Returns undefined when nothing is left.
+function pruneArenaRooms(
+  arenaRooms: Record<string, string[]> | undefined
+): Record<string, string[]> | undefined {
+  if (!arenaRooms) return undefined;
+  const cleaned = Object.fromEntries(
+    Object.entries(arenaRooms).filter(([, ids]) => ids.length > 0)
+  );
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
 
 type Tool = 'terrain' | 'start' | 'site' | 'mech' | 'size' | 'zone';
 
@@ -931,18 +947,19 @@ function RegionEditorScreen({
       // Encounter zones are the SOLE encounter source (tier + chance + table;
       // the cells' `ez` tags carry the geometry).
       if (zones.length > 0) {
-        next.encounterZones = zones.map((z) => ({
-          id: z.id,
-          name: z.name,
-          tier: z.tier,
-          encounterChance: z.encounterChance,
-          ...(z.encounterTable.length > 0 ? { encounterTable: z.encounterTable } : {}),
-          // Pass through battleground arena rooms (no editor UI yet) so saving a
-          // region doesn't drop an API-set value.
-          ...(z.arenaRooms && Object.keys(z.arenaRooms).length > 0
-            ? { arenaRooms: z.arenaRooms }
-            : {}),
-        })) as EditorEncounterZone[];
+        next.encounterZones = zones.map((z) => {
+          const arenaRooms = pruneArenaRooms(z.arenaRooms);
+          return {
+            id: z.id,
+            name: z.name,
+            tier: z.tier,
+            encounterChance: z.encounterChance,
+            ...(z.encounterTable.length > 0 ? { encounterTable: z.encounterTable } : {}),
+            // Battleground arena rooms per triggering-square terrain (empty
+            // lists pruned away — they behave like the default arena).
+            ...(arenaRooms ? { arenaRooms } : {}),
+          };
+        }) as EditorEncounterZone[];
       } else {
         delete next.encounterZones;
       }
@@ -1513,6 +1530,153 @@ function RegionEditorScreen({
                                 ))}
                             </select>
                           </div>
+                        </div>
+                        <div style={{ marginTop: 8 }}>
+                          <p className={styles.formLbl}>
+                            ENCOUNTER ARENAS (battleground per terrain)
+                          </p>
+                          <p
+                            className={styles.formLbl}
+                            style={{ color: 'var(--t-dim)', fontSize: '0.65rem', marginTop: 0 }}
+                          >
+                            Fight a rolled encounter on a chosen room’s map, by the terrain it
+                            triggers on. No rooms for a terrain ⇒ the default bare arena.
+                          </p>
+                          {(() => {
+                            const arenaRooms = activeZone.arenaRooms ?? {};
+                            const keyed = Object.keys(arenaRooms);
+                            const setArena = (next: Record<string, string[]>) => {
+                              setZones((prev) =>
+                                prev.map((z) =>
+                                  z.id === activeZone.id ? { ...z, arenaRooms: next } : z
+                                )
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            };
+                            return (
+                              <>
+                                {keyed.map((terrain) => {
+                                  const ids = arenaRooms[terrain] ?? [];
+                                  return (
+                                    <div key={terrain} style={{ marginBottom: 6 }}>
+                                      <div
+                                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                                      >
+                                        <span
+                                          className={styles.formLbl}
+                                          style={{ minWidth: 70, textTransform: 'uppercase' }}
+                                        >
+                                          {terrain}
+                                        </span>
+                                        <button
+                                          className={styles.ghostBtn}
+                                          style={{
+                                            padding: '0.15rem 0.4rem',
+                                            fontSize: '0.65rem',
+                                            color: 'var(--t-hp-low)',
+                                          }}
+                                          title={`Remove the ${terrain} arena mapping`}
+                                          aria-label={`Remove ${terrain} arena`}
+                                          onClick={() => {
+                                            const next = { ...arenaRooms };
+                                            delete next[terrain];
+                                            setArena(next);
+                                          }}
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: 6,
+                                          alignItems: 'center',
+                                          flexWrap: 'wrap',
+                                          marginTop: 2,
+                                        }}
+                                      >
+                                        {ids.map((rid) => (
+                                          <button
+                                            key={rid}
+                                            className={styles.ghostBtn}
+                                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                                            title="Remove this room from the arena pool"
+                                            onClick={() =>
+                                              setArena({
+                                                ...arenaRooms,
+                                                [terrain]: ids.filter((r) => r !== rid),
+                                              })
+                                            }
+                                          >
+                                            {rid} ✕
+                                          </button>
+                                        ))}
+                                        <select
+                                          className={styles.formInp}
+                                          style={{
+                                            width: 'auto',
+                                            cursor: 'pointer',
+                                            fontSize: '0.7rem',
+                                          }}
+                                          aria-label={`Add ${terrain} arena room`}
+                                          value=""
+                                          onChange={(ev) => {
+                                            const rid = ev.target.value;
+                                            if (!rid || ids.includes(rid)) return;
+                                            setArena({ ...arenaRooms, [terrain]: [...ids, rid] });
+                                          }}
+                                        >
+                                          <option value="">+ ADD ROOM…</option>
+                                          {roomOptions
+                                            .filter((r) => !ids.includes(r))
+                                            .map((r) => (
+                                              <option key={r} value={r}>
+                                                {r}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {ARENA_TERRAINS.some((t) => !keyed.includes(t)) && (
+                                  <select
+                                    className={styles.formInp}
+                                    style={{
+                                      width: 'auto',
+                                      cursor: 'pointer',
+                                      fontSize: '0.7rem',
+                                      marginTop: 4,
+                                    }}
+                                    aria-label="Add arena terrain"
+                                    value=""
+                                    onChange={(ev) => {
+                                      const t = ev.target.value;
+                                      if (!t || keyed.includes(t)) return;
+                                      setArena({ ...arenaRooms, [t]: [] });
+                                    }}
+                                  >
+                                    <option value="">+ ARENA FOR TERRAIN…</option>
+                                    {ARENA_TERRAINS.filter((t) => !keyed.includes(t)).map((t) => (
+                                      <option key={t} value={t}>
+                                        {t.toUpperCase()}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                                {roomOptions.length === 0 && (
+                                  <p
+                                    className={styles.formLbl}
+                                    style={{ color: 'var(--t-dim)', fontSize: '0.65rem' }}
+                                  >
+                                    No rooms in this campaign yet — author rooms to use them as
+                                    arenas.
+                                  </p>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     )}

@@ -191,6 +191,60 @@ describe('RegionEditorScreen', () => {
     expect(zones[0].arenaRooms).toEqual({ forest: ['forest_clearing'] });
   });
 
+  it('edits arena rooms per terrain through the zone UI', async () => {
+    const withZone = {
+      ...REGION,
+      grid: [
+        [{ t: 'forest', ez: 'zone-1' }, { t: 'plains' }, { t: 'road' }],
+        [{ t: 'plains' }, { t: 'forest' }, { t: 'road' }],
+      ],
+      encounterZones: [
+        { id: 'zone-1', name: 'Wood', tier: 1, encounterChance: 0.1, encounterTable: ['Wolf'] },
+      ],
+    };
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'regions'
+        ? { section, source: 'db', value: [withZone, OTHER] }
+        : section === 'rooms'
+          ? {
+              section,
+              source: 'db',
+              value: [
+                {
+                  id: 'forest_clearing',
+                  name: 'Clearing',
+                  desc: 'd',
+                  grid: [[{ t: 'grass' }]],
+                  entryPos: { x: 0, y: 0 },
+                },
+              ],
+            }
+          : { section, source: 'db', value: [] }
+    );
+    render(
+      <RegionEditorScreen
+        campaignId="camp"
+        regionId="proving-grounds"
+        kind="region"
+        onBack={vi.fn()}
+        onOpenMap={vi.fn()}
+      />
+    );
+    // Wait for the hosted ROOMS panel (it feeds the arena room picker).
+    await screen.findByText('+ NEW ROOM');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    // Add a forest arena mapping, then add the room to its pool.
+    fireEvent.change(screen.getByLabelText('Add arena terrain'), { target: { value: 'forest' } });
+    fireEvent.change(await screen.findByLabelText('Add forest arena room'), {
+      target: { value: 'forest_clearing' },
+    });
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    const zones = saved[0].encounterZones as Array<{ arenaRooms?: Record<string, string[]> }>;
+    expect(zones[0].arenaRooms).toEqual({ forest: ['forest_clearing'] });
+  });
+
   it('start tool relocates the marker', async () => {
     renderEditor();
     await screen.findByTestId('cell-0-0');
