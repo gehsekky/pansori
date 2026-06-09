@@ -106,6 +106,20 @@ export function useGame(): UseGameReturn {
     socket.on('participants', () => {
       setParticipantsVersion((v) => v + 1);
     });
+    // The campaign was edited in the creator. The server has already
+    // re-resolved this session's seed against the live campaign, so re-fetch
+    // and adopt ONLY the seed + campaign meta (the live map, theme, room text,
+    // and not-yet-reached encounters) — the game state is unchanged, so we
+    // leave it (and the player's in-progress turn) untouched.
+    socket.on('campaign-updated', async () => {
+      try {
+        const s = await api.getSessionById(session.id);
+        setSeed(s.seed);
+        setCampaignMeta(s.campaignMeta ?? null);
+      } catch (e) {
+        console.error('campaign-updated refresh failed', e);
+      }
+    });
     return () => {
       socket.disconnect();
       socketRef.current = null;

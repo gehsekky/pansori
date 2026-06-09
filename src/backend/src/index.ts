@@ -153,20 +153,30 @@ io.on('connection', (socket) => {
       console.log(`Socket ${socket.id} rejected join (no session)`);
       return;
     }
+    let contextId: string | null = null;
     try {
-      const { rowCount } = await pool.query(
-        'SELECT 1 FROM session_participants WHERE session_id = $1 AND user_id = $2',
+      // One query does both: confirm participation AND grab the session's
+      // campaign id (so we can also subscribe to campaign-content updates).
+      const { rows } = await pool.query<{ context_id: string | null }>(
+        `SELECT gs.seed->>'context_id' AS context_id
+           FROM game_sessions gs
+           JOIN session_participants sp ON sp.session_id = gs.id AND sp.user_id = $2
+          WHERE gs.id = $1`,
         [sessionId, userId]
       );
-      if (!rowCount) {
+      if (rows.length === 0) {
         console.log(`Socket ${socket.id} rejected join (not a participant)`);
         return;
       }
+      contextId = rows[0].context_id;
     } catch (err) {
       console.error('[socket] join-session participant check failed:', err);
       return;
     }
     socket.join(`session:${sessionId}`);
+    // Also join the campaign room so a creator edit (broadcastCampaignUpdated)
+    // reaches this session live.
+    if (contextId) socket.join(`campaign:${contextId}`);
     console.log(`Socket ${socket.id} joined session:${sessionId}`);
   });
   socket.on('disconnect', () => console.log('Socket disconnected:', socket.id));

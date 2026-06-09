@@ -41,6 +41,7 @@ import {
 } from '../services/campaignMembers.js';
 import { requireAdmin, requireCampaignRole } from '../auth/middleware.js';
 import type { AuthedRequest } from '../auth/middleware.js';
+import { broadcastCampaignUpdated } from '../services/broadcast.js';
 import { getItemCatalog } from '../services/itemCatalog.js';
 import { getMonsterCatalog } from '../services/monsterCatalog.js';
 import { pool } from '../db/pool.js';
@@ -404,6 +405,8 @@ campaignsRouter.put(
       }
       // Re-resolve the live context so the edit serves immediately.
       await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, campaignId);
+      // Nudge any open sessions of this campaign to re-fetch (live map/theme/text).
+      broadcastCampaignUpdated(campaignId);
       res.json({ ok: true, section, source: 'db' });
     } catch (err) {
       console.error('[campaigns] section write failed:', err);
@@ -432,6 +435,7 @@ campaignsRouter.delete(
         return;
       }
       await refreshCampaignOverlay(pool, CONTEXTS, CODE_CONTEXTS, campaignId);
+      broadcastCampaignUpdated(campaignId);
       const fallback = await sectionCodeFallback(campaignId, section);
       res.json({ ok: true, section, source: fallback !== null ? 'code' : 'none' });
     } catch (err) {

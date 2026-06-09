@@ -37,3 +37,13 @@ export function broadcastParticipantChange(
     .to(`session:${sessionId}`)
     .emit('participants', { kind, ...((payload as object) ?? {}) });
 }
+
+// Tell every open session of a campaign that its content was edited in the
+// creator. Sockets join a `campaign:<id>` room when they join a session of that
+// campaign (index.ts); the FE re-fetches the session on receipt so the live map,
+// theme, room text, and not-yet-reached encounters update without a manual
+// reload. (The server has already re-resolved the seed by the time this fires.)
+export function broadcastCampaignUpdated(campaignId: string): void {
+  if (!ioInstance) return;
+  ioInstance.to(`campaign:${campaignId}`).emit('campaign-updated', { campaignId });
+}
