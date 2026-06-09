@@ -3,7 +3,7 @@
 // painted onto squares. A square outside every zone never rolls. Covers the
 // resolution (dbRegionsToEngine), the runtime roll, and the save-time schema.
 
-import type { CampaignData, GameState } from '../../types.js';
+import type { CampaignData, EncounterEntry, GameState } from '../../types.js';
 import {
   type CampaignRegion,
   type CampaignRegionCell,
@@ -101,11 +101,16 @@ const start = (): GameState =>
     visited_rooms: [],
   }) as unknown as GameState;
 
+// pickWeightedEncounter returns the chosen entry's MEMBER LIST; for a singleton
+// pick the headline name is members[0].name.
+const picked = (table: EncounterEntry[], rnd: number): string =>
+  pickWeightedEncounter(table, rnd)[0].name;
+
 describe('resolveMarkerMove — encounters come only from zones', () => {
   it('a square inside a zone rolls from the zone’s table', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // 0 < chance → encounter on the first cell
     const r = resolveMarkerMove(valeCampaign(), [], start(), { x: 1, y: 0 });
-    expect(r.encounter).toBe('Frost Wolf'); // (1,0) is in the "north" zone
+    expect(r.encounter).toEqual([{ name: 'Frost Wolf', count: 1 }]); // (1,0) is in "north"
   });
 
   it('a square outside every zone never rolls (no region fallback)', () => {
@@ -125,40 +130,88 @@ describe('resolveMarkerMove — encounters come only from zones', () => {
     };
     // selection draw 0.5 → 0.5*4 = 2.0 → past Goblin's weight 1 → Orc.
     vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.5);
-    expect(resolveMarkerMove(weighted(), [], start(), { x: 1, y: 0 }).encounter).toBe('Orc');
+    expect(resolveMarkerMove(weighted(), [], start(), { x: 1, y: 0 }).encounter).toEqual([
+      { name: 'Orc', count: 1 },
+    ]);
     // selection draw 0.1 → 0.4 → within Goblin's weight 1 → Goblin.
     vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.1);
-    expect(resolveMarkerMove(weighted(), [], start(), { x: 1, y: 0 }).encounter).toBe('Goblin');
+    expect(resolveMarkerMove(weighted(), [], start(), { x: 1, y: 0 }).encounter).toEqual([
+      { name: 'Goblin', count: 1 },
+    ]);
+  });
+
+  it('rolls a {group} entry as its whole member list', () => {
+    const grouped = () => {
+      const c = valeCampaign();
+      c.regions![0].encounterZones![0].encounterTable = [
+        {
+          group: [
+            { name: 'Goblin', count: 2 },
+            { name: 'Orc', count: 1 },
+          ],
+        },
+      ];
+      return c;
+    };
+    vi.spyOn(Math, 'random').mockReturnValue(0); // trigger + pick the only entry
+    expect(
+      grouped() && resolveMarkerMove(grouped(), [], start(), { x: 1, y: 0 }).encounter
+    ).toEqual([
+      { name: 'Goblin', count: 2 },
+      { name: 'Orc', count: 1 },
+    ]);
   });
 });
 
 describe('pickWeightedEncounter', () => {
-  it('a bare string weighs 1; an explicit weight floors at 1', () => {
+  it('a bare string weighs 1; an explicit weight floors at 1; a group defaults to 1', () => {
     expect(encounterEntryWeight('Goblin')).toBe(1);
     expect(encounterEntryWeight({ name: 'Orc', weight: 5 })).toBe(5);
-    // Defensive: 0 / negative / non-finite never zero out a creature.
+    expect(encounterEntryWeight({ group: [{ name: 'Orc', count: 2 }] })).toBe(1);
+    expect(encounterEntryWeight({ group: [{ name: 'Orc', count: 2 }], weight: 4 })).toBe(4);
+    // Defensive: 0 / negative / non-finite never zero out an entry.
     expect(encounterEntryWeight({ name: 'X', weight: 0 })).toBe(1);
     expect(encounterEntryWeight({ name: 'X', weight: -4 })).toBe(1);
     expect(encounterEntryWeight({ name: 'X', weight: NaN })).toBe(1);
   });
 
+  it('a singleton entry resolves to one member at count 1', () => {
+    expect(pickWeightedEncounter(['Goblin'], 0)).toEqual([{ name: 'Goblin', count: 1 }]);
+    expect(pickWeightedEncounter([{ name: 'Orc', weight: 2 }], 0)).toEqual([
+      { name: 'Orc', count: 1 },
+    ]);
+  });
+
+  it('a group entry resolves to its full member list', () => {
+    const group = {
+      group: [
+        { name: 'Wolf', count: 2 },
+        { name: 'Bandit', count: 1 },
+      ],
+    };
+    expect(pickWeightedEncounter([group], 0)).toEqual([
+      { name: 'Wolf', count: 2 },
+      { name: 'Bandit', count: 1 },
+    ]);
+  });
+
   it('an all-string table reduces to a uniform pick', () => {
     const table = ['A', 'B', 'C'];
-    expect(pickWeightedEncounter(table, 0)).toBe('A'); // [0, 1) → A
-    expect(pickWeightedEncounter(table, 0.5)).toBe('B'); // [1, 2) → B
-    expect(pickWeightedEncounter(table, 0.9)).toBe('C'); // [2, 3) → C
+    expect(picked(table, 0)).toBe('A'); // [0, 1) → A
+    expect(picked(table, 0.5)).toBe('B'); // [1, 2) → B
+    expect(picked(table, 0.9)).toBe('C'); // [2, 3) → C
   });
 
   it('walks the weight bands in order (total weight scales the draw)', () => {
     const table = ['A', { name: 'B', weight: 3 }]; // bands: A=[0,1), B=[1,4), total 4
-    expect(pickWeightedEncounter(table, 0)).toBe('A'); // 0.0
-    expect(pickWeightedEncounter(table, 0.2)).toBe('A'); // 0.8 < 1 → A
-    expect(pickWeightedEncounter(table, 0.25)).toBe('B'); // 1.0 → B
-    expect(pickWeightedEncounter(table, 0.99)).toBe('B'); // ~3.96 → B
+    expect(picked(table, 0)).toBe('A'); // 0.0
+    expect(picked(table, 0.2)).toBe('A'); // 0.8 < 1 → A
+    expect(picked(table, 0.25)).toBe('B'); // 1.0 → B
+    expect(picked(table, 0.99)).toBe('B'); // ~3.96 → B
   });
 
   it('returns the last entry when the draw rounds to the total (fp guard)', () => {
-    expect(pickWeightedEncounter(['A', 'B'], 1)).toBe('B'); // rnd=1 → r never < 0 mid-loop
+    expect(picked(['A', 'B'], 1)).toBe('B'); // rnd=1 → r never < 0 mid-loop
   });
 });
 
@@ -223,6 +276,29 @@ describe('RegionsSchema — encounter zones', () => {
     expect(schema.safeParse([bad(0)]).success).toBe(false);
     expect(schema.safeParse([bad(1.5)]).success).toBe(false);
     expect(schema.safeParse([bad(100)]).success).toBe(false);
+  });
+
+  it('accepts a {group} mixed-group entry (optional weight)', () => {
+    const zone = (table: unknown) =>
+      baseRegion({
+        encounterZones: [
+          { id: 'north', name: 'A', tier: 1, encounterChance: 0.1, encounterTable: table },
+        ],
+      });
+    const ok = zone([
+      {
+        group: [
+          { name: 'Wolf', count: 2 },
+          { name: 'Bandit', count: 1 },
+        ],
+        weight: 2,
+      },
+      { group: [{ name: 'Goblin', count: 3 }] }, // weight omitted ⇒ defaults to 1
+    ]);
+    expect(schema.safeParse([ok]).success).toBe(true);
+    // An empty group, a zero count, and an over-large group are all rejected.
+    expect(schema.safeParse([zone([{ group: [] }])]).success).toBe(false);
+    expect(schema.safeParse([zone([{ group: [{ name: 'Wolf', count: 0 }] }])]).success).toBe(false);
   });
 
   it('rejects a cell `ez` that points at an unknown zone', () => {

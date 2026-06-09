@@ -94,8 +94,10 @@ documented deferrals.
       now accepts bare names (weight 1) or `{name, weight}` pairs; selection is
       weight-proportional (`pickWeightedEncounter`). The creator's zone picker has
       a per-creature weight input (weight 1 stays a bare string on save).
-- [ ] **Mixed-group entries** — spawn a small group (e.g. "2 wolves + 1 bandit")
-      instead of N of a single creature.
+- [x] **Mixed-group entries** — an encounter-table entry can be a `{group, weight?}`
+      fixed mixed group (e.g. 2 Wolves + 1 Bandit) that spawns ALL its members at
+      once; each member's count scales to party size like the single-creature path.
+      Authored in the zone picker (+ NEW GROUP → add members + counts + group weight).
 - [ ] **Per-terrain weighting within a zone** (optional) — terrain selects the
       arena battleground (done) and modulates encounter *frequency*, but not yet
       *which creature*.

@@ -75,15 +75,34 @@ interface Cell {
 
 // A painted intra-region encounter zone (metadata; geometry is the cells' `ez`).
 // The sole source of random encounters: tier + chance + table all live here.
-// An encounter-table entry: a bare creature name (weight 1) or a {name, weight}
-// pair. Mirrors the engine's EncounterEntry; weight-1 entries stay bare strings
+// An encounter-table entry — mirrors the engine's EncounterEntry: a bare
+// creature name (weight 1), a {name, weight} pair, or a {group, weight?} fixed
+// mixed group (e.g. 2 Wolves + 1 Bandit). Weight-1 singletons stay bare strings
 // so all-default tables round-trip unchanged.
-type EncounterEntry = string | { name: string; weight: number };
-const entryName = (e: EncounterEntry): string => (typeof e === 'string' ? e : e.name);
-const entryWeight = (e: EncounterEntry): number => (typeof e === 'string' ? 1 : e.weight);
-// Re-wrap a creature as a bare string (weight 1) or a {name, weight} pair.
+interface EncounterGroupMember {
+  name: string;
+  count: number;
+}
+type EncounterEntry =
+  | string
+  | { name: string; weight: number }
+  | { group: EncounterGroupMember[]; weight?: number };
+const isGroup = (e: EncounterEntry): e is { group: EncounterGroupMember[]; weight?: number } =>
+  typeof e === 'object' && 'group' in e;
+// A singleton entry's creature name ('' for a group, which has many).
+const entryName = (e: EncounterEntry): string =>
+  typeof e === 'string' ? e : isGroup(e) ? '' : e.name;
+const entryWeight = (e: EncounterEntry): number =>
+  typeof e === 'string' ? 1 : isGroup(e) ? (e.weight ?? 1) : e.weight;
+// Re-wrap a single creature as a bare string (weight 1) or a {name, weight} pair.
 const makeEntry = (name: string, weight: number): EncounterEntry =>
   weight <= 1 ? name : { name, weight };
+// Re-wrap a group with its members + weight (weight 1 omitted to stay minimal).
+const makeGroup = (group: EncounterGroupMember[], weight: number): EncounterEntry =>
+  weight <= 1 ? { group } : { group, weight };
+// A stable key for an entry in the table (group entries list their members).
+const entryKey = (e: EncounterEntry): string =>
+  isGroup(e) ? `group:${e.group.map((m) => `${m.name}×${m.count}`).join('+')}` : entryName(e);
 
 interface EditorEncounterZone {
   id: string;
@@ -964,12 +983,15 @@ function RegionEditorScreen({
       if (zones.length > 0) {
         next.encounterZones = zones.map((z) => {
           const arenaRooms = pruneArenaRooms(z.arenaRooms);
+          // Defensive: a group must carry ≥1 member (the schema enforces it);
+          // drop any that emptied out via member removal.
+          const table = z.encounterTable.filter((e) => !isGroup(e) || e.group.length > 0);
           return {
             id: z.id,
             name: z.name,
             tier: z.tier,
             encounterChance: z.encounterChance,
-            ...(z.encounterTable.length > 0 ? { encounterTable: z.encounterTable } : {}),
+            ...(table.length > 0 ? { encounterTable: table } : {}),
             // Battleground arena rooms per triggering-square terrain (empty
             // lists pruned away — they behave like the default arena).
             ...(arenaRooms ? { arenaRooms } : {}),
@@ -1488,117 +1510,273 @@ function RegionEditorScreen({
                           <p className={styles.formLbl}>
                             ENCOUNTER TABLE (blank = use the region table) · ×N = ROLL WEIGHT
                           </p>
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: 6,
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            {activeZone.encounterTable.map((entry) => {
-                              const name = entryName(entry);
-                              const weight = entryWeight(entry);
-                              // Replace the matching entry across the active zone's
-                              // table (used by both the weight input and removal).
-                              const editTable = (fn: (t: EncounterEntry[]) => EncounterEntry[]) => {
-                                setZones((prev) =>
-                                  prev.map((z) =>
-                                    z.id === activeZone.id
-                                      ? { ...z, encounterTable: fn(z.encounterTable) }
-                                      : z
+                          {(() => {
+                            // Edit the active zone's table in place; every entry/add
+                            // control routes through here. Entries are addressed by
+                            // INDEX (a group's key changes as its members change).
+                            const editTable = (fn: (t: EncounterEntry[]) => EncounterEntry[]) => {
+                              setZones((prev) =>
+                                prev.map((z) =>
+                                  z.id === activeZone.id
+                                    ? { ...z, encounterTable: fn(z.encounterTable) }
+                                    : z
+                                )
+                              );
+                              setDirty(true);
+                              setSaved(false);
+                            };
+                            const setAt = (i: number, e: EncounterEntry) =>
+                              editTable((t) => t.map((cur, j) => (j === i ? e : cur)));
+                            const removeAt = (i: number) =>
+                              editTable((t) => t.filter((_, j) => j !== i));
+                            const tierCreatures = monsterNames.filter((n) =>
+                              crInTier(monsterCr[n] ?? 0, activeZone.tier)
+                            );
+                            const clampW = (v: string) =>
+                              Math.max(1, Math.min(99, Math.floor(Number(v) || 1)));
+                            const clampCount = (v: string) =>
+                              Math.max(1, Math.min(20, Math.floor(Number(v) || 1)));
+                            return (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: 6,
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                {activeZone.encounterTable.map((entry, ei) =>
+                                  isGroup(entry) ? (
+                                    // ── Mixed-group entry ──
+                                    <span
+                                      key={`${entryKey(entry)}#${ei}`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        border: '1px solid var(--t-border)',
+                                        borderRadius: 4,
+                                        padding: '0.2rem 0.35rem',
+                                        fontSize: '0.7rem',
+                                        background: 'var(--t-line)',
+                                      }}
+                                    >
+                                      <span style={{ color: 'var(--t-dim)' }}>GROUP</span>
+                                      <span style={{ color: 'var(--t-dim)' }} aria-hidden="true">
+                                        w
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={99}
+                                        value={entryWeight(entry)}
+                                        aria-label="group weight"
+                                        title="Roll weight for this whole group, relative to the other entries"
+                                        className={styles.formInp}
+                                        style={{
+                                          width: '2.8rem',
+                                          fontSize: '0.7rem',
+                                          padding: '0.1rem 0.2rem',
+                                        }}
+                                        onChange={(ev) =>
+                                          setAt(ei, makeGroup(entry.group, clampW(ev.target.value)))
+                                        }
+                                      />
+                                      <span style={{ color: 'var(--t-dim)' }} aria-hidden="true">
+                                        |
+                                      </span>
+                                      {entry.group.map((m, mi) => (
+                                        <span
+                                          key={`${m.name}#${mi}`}
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 3,
+                                          }}
+                                        >
+                                          <span>{m.name}</span>
+                                          <span
+                                            style={{ color: 'var(--t-dim)' }}
+                                            aria-hidden="true"
+                                          >
+                                            ×
+                                          </span>
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            max={20}
+                                            value={m.count}
+                                            aria-label={`${m.name} count`}
+                                            title="How many of this creature spawn (before party-size scaling)"
+                                            className={styles.formInp}
+                                            style={{
+                                              width: '2.6rem',
+                                              fontSize: '0.7rem',
+                                              padding: '0.1rem 0.2rem',
+                                            }}
+                                            onChange={(ev) => {
+                                              const count = clampCount(ev.target.value);
+                                              setAt(ei, {
+                                                ...entry,
+                                                group: entry.group.map((g, gj) =>
+                                                  gj === mi ? { ...g, count } : g
+                                                ),
+                                              });
+                                            }}
+                                          />
+                                          <button
+                                            className={styles.ghostBtn}
+                                            style={{ padding: '0 0.25rem', fontSize: '0.7rem' }}
+                                            title="Remove this member"
+                                            aria-label={`Remove ${m.name} from group`}
+                                            onClick={() => {
+                                              const group = entry.group.filter(
+                                                (_, gj) => gj !== mi
+                                              );
+                                              // Last member gone ⇒ drop the whole group entry.
+                                              if (group.length === 0) removeAt(ei);
+                                              else setAt(ei, { ...entry, group });
+                                            }}
+                                          >
+                                            ✕
+                                          </button>
+                                        </span>
+                                      ))}
+                                      <select
+                                        className={styles.formInp}
+                                        style={{
+                                          width: 'auto',
+                                          cursor: 'pointer',
+                                          fontSize: '0.7rem',
+                                        }}
+                                        aria-label="Add group member"
+                                        value=""
+                                        onChange={(ev) => {
+                                          const name = ev.target.value;
+                                          if (!name || entry.group.some((m) => m.name === name))
+                                            return;
+                                          setAt(ei, {
+                                            ...entry,
+                                            group: [...entry.group, { name, count: 1 }],
+                                          });
+                                        }}
+                                      >
+                                        <option value="">+ MEMBER…</option>
+                                        {tierCreatures
+                                          .filter((n) => !entry.group.some((m) => m.name === n))
+                                          .map((n) => (
+                                            <option key={n} value={n}>
+                                              {n}
+                                            </option>
+                                          ))}
+                                      </select>
+                                      <button
+                                        className={styles.ghostBtn}
+                                        style={{ padding: '0 0.3rem', fontSize: '0.7rem' }}
+                                        title="Remove this group from the table"
+                                        aria-label="Remove group"
+                                        onClick={() => removeAt(ei)}
+                                      >
+                                        ✕ GROUP
+                                      </button>
+                                    </span>
+                                  ) : (
+                                    // ── Single-creature entry ──
+                                    <span
+                                      key={`${entryName(entry)}#${ei}`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        border: '1px solid var(--t-border)',
+                                        borderRadius: 4,
+                                        padding: '0.15rem 0.3rem',
+                                        fontSize: '0.7rem',
+                                      }}
+                                    >
+                                      <span>{entryName(entry)}</span>
+                                      <span style={{ color: 'var(--t-dim)' }} aria-hidden="true">
+                                        ×
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={99}
+                                        value={entryWeight(entry)}
+                                        aria-label={`${entryName(entry)} weight`}
+                                        title="Roll weight — higher spawns more often, relative to the other entries in this zone"
+                                        className={styles.formInp}
+                                        style={{
+                                          width: '2.8rem',
+                                          fontSize: '0.7rem',
+                                          padding: '0.1rem 0.2rem',
+                                        }}
+                                        onChange={(ev) =>
+                                          setAt(
+                                            ei,
+                                            makeEntry(entryName(entry), clampW(ev.target.value))
+                                          )
+                                        }
+                                      />
+                                      <button
+                                        className={styles.ghostBtn}
+                                        style={{ padding: '0 0.3rem', fontSize: '0.7rem' }}
+                                        title="Remove from this zone's table"
+                                        aria-label={`Remove ${entryName(entry)}`}
+                                        onClick={() => removeAt(ei)}
+                                      >
+                                        ✕
+                                      </button>
+                                    </span>
                                   )
-                                );
-                                setDirty(true);
-                                setSaved(false);
-                              };
-                              return (
-                                <span
-                                  key={name}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    border: '1px solid var(--t-border)',
-                                    borderRadius: 4,
-                                    padding: '0.15rem 0.3rem',
-                                    fontSize: '0.7rem',
+                                )}
+                                <select
+                                  className={styles.formInp}
+                                  style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
+                                  aria-label="Add zone creature"
+                                  value=""
+                                  onChange={(ev) => {
+                                    const name = ev.target.value;
+                                    if (!name) return;
+                                    // Skip a duplicate SINGLETON (a group member with the
+                                    // same name is independent and allowed).
+                                    editTable((t) =>
+                                      t.some((e) => !isGroup(e) && entryName(e) === name)
+                                        ? t
+                                        : [...t, name]
+                                    );
                                   }}
                                 >
-                                  <span>{name}</span>
-                                  <span style={{ color: 'var(--t-dim)' }} aria-hidden="true">
-                                    ×
-                                  </span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={99}
-                                    value={weight}
-                                    aria-label={`${name} weight`}
-                                    title="Roll weight — higher spawns more often, relative to the other creatures in this zone"
-                                    className={styles.formInp}
-                                    style={{
-                                      width: '2.8rem',
-                                      fontSize: '0.7rem',
-                                      padding: '0.1rem 0.2rem',
-                                    }}
-                                    onChange={(ev) => {
-                                      const w = Math.max(
-                                        1,
-                                        Math.min(99, Math.floor(Number(ev.target.value) || 1))
-                                      );
-                                      editTable((t) =>
-                                        t.map((e) =>
-                                          entryName(e) === name ? makeEntry(name, w) : e
-                                        )
-                                      );
-                                    }}
-                                  />
-                                  <button
-                                    className={styles.ghostBtn}
-                                    style={{ padding: '0 0.3rem', fontSize: '0.7rem' }}
-                                    title="Remove from this zone's table"
-                                    aria-label={`Remove ${name}`}
-                                    onClick={() =>
-                                      editTable((t) => t.filter((e) => entryName(e) !== name))
-                                    }
-                                  >
-                                    ✕
-                                  </button>
-                                </span>
-                              );
-                            })}
-                            <select
-                              className={styles.formInp}
-                              style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
-                              aria-label="Add zone creature"
-                              value=""
-                              onChange={(ev) => {
-                                const name = ev.target.value;
-                                if (!name) return;
-                                setZones((prev) =>
-                                  prev.map((z) =>
-                                    z.id === activeZone.id
-                                      ? z.encounterTable.some((e) => entryName(e) === name)
-                                        ? z
-                                        : { ...z, encounterTable: [...z.encounterTable, name] }
-                                      : z
-                                  )
-                                );
-                                setDirty(true);
-                                setSaved(false);
-                              }}
-                            >
-                              <option value="">+ ADD CREATURE (TIER {activeZone.tier})…</option>
-                              {monsterNames
-                                .filter((n) => crInTier(monsterCr[n] ?? 0, activeZone.tier))
-                                .map((n) => (
-                                  <option key={n} value={n}>
-                                    {n}
-                                  </option>
-                                ))}
-                            </select>
-                          </div>
+                                  <option value="">+ ADD CREATURE (TIER {activeZone.tier})…</option>
+                                  {tierCreatures.map((n) => (
+                                    <option key={n} value={n}>
+                                      {n}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  className={styles.formInp}
+                                  style={{ width: 'auto', cursor: 'pointer', fontSize: '0.7rem' }}
+                                  aria-label="Add zone group"
+                                  value=""
+                                  onChange={(ev) => {
+                                    const name = ev.target.value;
+                                    if (!name) return;
+                                    // Start a new mixed group with this first member; more
+                                    // members + counts are added on the group chip.
+                                    editTable((t) => [...t, { group: [{ name, count: 1 }] }]);
+                                  }}
+                                >
+                                  <option value="">+ NEW GROUP (FIRST MEMBER)…</option>
+                                  {tierCreatures.map((n) => (
+                                    <option key={n} value={n}>
+                                      {n}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div style={{ marginTop: 8 }}>
                           <p className={styles.formLbl}>

@@ -180,6 +180,54 @@ describe('RegionEditorScreen', () => {
     expect(zones[0].encounterTable).toEqual([{ name: 'Wolf', weight: 3 }, 'Goblin']);
   });
 
+  it('authors a mixed group ({group, weight?}) and saves it', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    // Start a group with Wolf as the first member, then add Goblin to it.
+    fireEvent.change(screen.getByLabelText('Add zone group'), { target: { value: 'Wolf' } });
+    fireEvent.change(screen.getByLabelText('Add group member'), { target: { value: 'Goblin' } });
+    // Wolf ×2, leave Goblin ×1; group weight 3.
+    fireEvent.change(screen.getByLabelText('Wolf count'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('group weight'), { target: { value: '3' } });
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const [, , value] = mocked.putCampaignSection.mock.calls[0];
+    const saved = (value as Array<Record<string, unknown>>)[0];
+    const zones = saved.encounterZones as Array<{ encounterTable?: unknown[] }>;
+    expect(zones[0].encounterTable).toEqual([
+      {
+        group: [
+          { name: 'Wolf', count: 2 },
+          { name: 'Goblin', count: 1 },
+        ],
+        weight: 3,
+      },
+    ]);
+  });
+
+  it('drops a group from the table when its last member is removed', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    // A one-member group, then remove that member → the whole group goes away.
+    fireEvent.change(screen.getByLabelText('Add zone group'), { target: { value: 'Wolf' } });
+    fireEvent.click(screen.getByLabelText('Remove Wolf from group'));
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const [, , value] = mocked.putCampaignSection.mock.calls[0];
+    const saved = (value as Array<Record<string, unknown>>)[0];
+    const zones = saved.encounterZones as Array<{ encounterTable?: unknown[] }>;
+    // No entries left ⇒ encounterTable omitted entirely.
+    expect(zones[0].encounterTable).toBeUndefined();
+  });
+
   it('preserves a zone’s arenaRooms (no editor UI yet) through a save round-trip', async () => {
     // A region whose zone already carries arenaRooms (set via the API). The
     // editor can't edit it yet, but a save must not silently drop it.

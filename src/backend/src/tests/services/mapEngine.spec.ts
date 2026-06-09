@@ -613,7 +613,7 @@ describe('regional encounters', () => {
       visited_rooms: [],
     } as unknown as GameState;
     const r = resolveMarkerMove(encounterCampaign, rooms, st, { x: 3, y: 0 }); // would enter the town
-    expect(r.encounter).toBe('Bandit Ruffian');
+    expect(r.encounter).toEqual([{ name: 'Bandit Ruffian', count: 1 }]);
     expect(r.transitioned).toBe(false); // interrupted en route — didn't enter the town
     expect(r.st.map_level).toBe('regional');
   });
@@ -777,13 +777,13 @@ describe('typed overland terrain (unified model)', () => {
     ).toBeUndefined();
     // …but a low roll (0.1 < 0.25) can still trigger on a road — roads aren't safe.
     vi.spyOn(Math, 'random').mockReturnValue(0.1);
-    expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 2 }).encounter).toBe(
-      'Bandit Ruffian'
+    expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 2 }).encounter).toEqual(
+      [{ name: 'Bandit Ruffian', count: 1 }]
     );
     // Forest: road squares (0.25) miss at 0.6 but the forest cell hits.
     vi.spyOn(Math, 'random').mockReturnValue(0.6);
-    expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 3 }).encounter).toBe(
-      'Bandit Ruffian'
+    expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 3 }).encounter).toEqual(
+      [{ name: 'Bandit Ruffian', count: 1 }]
     );
   });
 });

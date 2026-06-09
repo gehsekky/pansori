@@ -8,6 +8,7 @@
 import {
   type CampaignData,
   type EncounterEntry,
+  type EncounterGroupMember,
   type EncounterZone,
   type FloorType,
   type GameState,
@@ -50,35 +51,45 @@ function encounterZoneAt(region: Region | undefined, pos: GridPos): EncounterZon
   return region?.encounterZones?.find((z) => z.cells.some((c) => posEqual(c, pos)));
 }
 
-/** The creature name of an encounter entry (a bare string is its own name). */
-export function encounterEntryName(e: EncounterEntry): string {
-  return typeof e === 'string' ? e : e.name;
+/**
+ * The creatures an encounter entry spawns: a singleton (string / {name, weight})
+ * resolves to one member at count 1; a {group} entry resolves to its member list.
+ */
+export function encounterEntryMembers(e: EncounterEntry): EncounterGroupMember[] {
+  if (typeof e === 'string') return [{ name: e, count: 1 }];
+  if ('group' in e) return e.group;
+  return [{ name: e.name, count: 1 }];
 }
 
 /**
- * The roll weight of an encounter entry — bare strings weigh 1, and an explicit
- * weight floors at 1 so a stray 0 / negative / non-finite value can't silently
- * drop a creature from the pool (it just becomes the minimum-likelihood entry).
+ * The roll weight of an encounter entry — bare strings weigh 1, a group's weight
+ * defaults to 1, and any explicit weight floors at 1 so a stray 0 / negative /
+ * non-finite value can't silently drop an entry from the pool (it just becomes
+ * the minimum-likelihood entry).
  */
 export function encounterEntryWeight(e: EncounterEntry): number {
-  const w = typeof e === 'string' ? 1 : e.weight;
+  const w = typeof e === 'string' ? 1 : 'group' in e ? (e.weight ?? 1) : e.weight;
   return Number.isFinite(w) && w >= 1 ? Math.floor(w) : 1;
 }
 
 /**
- * Weight-proportional pick of a creature name from a NON-EMPTY encounter table.
- * `rnd` is a uniform [0, 1) draw (i.e. `Math.random()`); the table's total
- * weight scales it, then we walk entries subtracting weights. Equal weights
- * reduce to the old uniform pick. The final return guards floating-point drift.
+ * Weight-proportional pick from a NON-EMPTY encounter table, returning the
+ * chosen entry's member list (one creature, or a whole mixed group). `rnd` is a
+ * uniform [0, 1) draw (i.e. `Math.random()`); the table's total weight scales it,
+ * then we walk entries subtracting weights. Equal weights reduce to the old
+ * uniform pick. The final return guards floating-point drift.
  */
-export function pickWeightedEncounter(table: EncounterEntry[], rnd: number): string {
+export function pickWeightedEncounter(
+  table: EncounterEntry[],
+  rnd: number
+): EncounterGroupMember[] {
   const total = table.reduce((s, e) => s + encounterEntryWeight(e), 0);
   let r = rnd * total;
   for (const e of table) {
     r -= encounterEntryWeight(e);
-    if (r < 0) return encounterEntryName(e);
+    if (r < 0) return encounterEntryMembers(e);
   }
-  return encounterEntryName(table[table.length - 1]);
+  return encounterEntryMembers(table[table.length - 1]);
 }
 
 const DEFAULT_LOCAL_GRID = 10;
@@ -382,9 +393,10 @@ export interface MarkerMoveResult {
   transitioned: boolean;
   /** Travel time the (possibly-interrupted) leg cost in hours (regional only). */
   elapsedHours: number;
-  /** A random encounter triggered en route — the rolled enemy template name. The
-   *  marker is left ON the encounter cell; the caller drops into combat there. */
-  encounter?: string;
+  /** A random encounter triggered en route — the rolled group (one or more
+   *  {name, count} members). The marker is left ON the encounter cell; the caller
+   *  materializes each member and drops into combat there. Undefined ⇒ none. */
+  encounter?: EncounterGroupMember[];
   /** The room id whose layout should be the encounter's battleground, picked
    *  from the zone's `arenaRooms` for the triggering square's terrain. Undefined
    *  ⇒ the default bare arena. */
@@ -449,7 +461,7 @@ export function resolveMarkerMove(
   let next: GameState = { ...st, marker_pos: to };
   let squaresMoved = path.length;
   let elapsedHours = 0;
-  let encounter: string | undefined;
+  let encounter: EncounterGroupMember[] | undefined;
   let encounterArenaRoomId: string | undefined;
   let fatigueNote: string | undefined;
   let narrative = '';

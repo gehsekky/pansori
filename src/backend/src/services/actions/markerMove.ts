@@ -1,4 +1,4 @@
-import type { Context, GameState, GridPos } from '../../types.js';
+import type { Context, Enemy, GameState, GridPos } from '../../types.js';
 import {
   ENCOUNTER_ROOM_ID,
   applyEncounterArena,
@@ -156,20 +156,31 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   // the campaign bestiary (scaled to party size, like authored room enemies);
   // `endCombatState` marches the party back to this cell once the fight ends.
   if (res.encounter) {
-    const template = ctx.context.enemyTemplates.find((t) => t.name === res.encounter);
-    if (template) {
-      const partySize = Math.max(1, ctx.st.characters.filter((c) => !c.dead).length);
-      // Count-scale the ambush to party size (SRD way) relative to the campaign's
-      // recommended size; bestiary HP is left intact. A rolled ambusher is a mook,
-      // so it scales freely (min 1) — no boss-singleton guard here.
-      const recommendedSize = ctx.context.campaign?.recommendedPartySize ?? 1;
-      const count = Math.max(1, scaledEnemyCount(1, partySize, recommendedSize));
-      // Unique id per encounter so a repeat of the same creature isn't treated
-      // as already-killed (enemies_killed tracks ids).
-      const stamp = Date.now();
-      const enemies = Array.from({ length: count }, (_, k) =>
-        materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${stamp}-${k}`, template.hp)
-      );
+    const partySize = Math.max(1, ctx.st.characters.filter((c) => !c.dead).length);
+    // Count-scale the ambush to party size (SRD way) relative to the campaign's
+    // recommended size; bestiary HP is left intact. A rolled ambusher is a mook,
+    // so each member scales freely (min 1) — no boss-singleton guard here. A
+    // lone creature is just a one-member group at count 1 (unchanged scaling).
+    const recommendedSize = ctx.context.campaign?.recommendedPartySize ?? 1;
+    // Unique id per encounter so a repeat of the same creature isn't treated as
+    // already-killed (enemies_killed tracks ids); one stamp + running index keeps
+    // every member of a mixed group distinct.
+    const stamp = Date.now();
+    let idx = 0;
+    const enemies: Enemy[] = [];
+    const labelParts: string[] = []; // "2 Wolves", "a Bandit" — for the ambush line
+    for (const member of res.encounter) {
+      const template = ctx.context.enemyTemplates.find((t) => t.name === member.name);
+      if (!template) continue; // a member absent from the bestiary is skipped
+      const count = Math.max(1, scaledEnemyCount(member.count, partySize, recommendedSize));
+      for (let k = 0; k < count; k++) {
+        enemies.push(
+          materializeEnemy(template, `${ENCOUNTER_ROOM_ID}#${stamp}-${idx++}`, template.hp)
+        );
+      }
+      labelParts.push(count > 1 ? `${count} ${member.name}s` : `a ${member.name}`);
+    }
+    if (enemies.length > 0) {
       ctx.seed.enemies = { ...(ctx.seed.enemies ?? {}), [ENCOUNTER_ROOM_ID]: enemies };
       // Borrow the chosen room's layout as the battleground (else the default
       // bare arena). The roll picked it from the zone's arenaRooms by terrain.
@@ -180,10 +191,13 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
       // so refresh the ctx's room-enemy list (it was the pre-move room) and
       // start combat now — runCombatStart deploys tokens + rolls initiative and
       // puts the active PC on the clock so the player acts immediately.
-      const ambushLine =
-        count > 1
-          ? ` ⚔️ Ambush! ${count} ${res.encounter}s fall upon the party.`
-          : ` ⚔️ Ambush! A ${res.encounter} falls upon the party.`;
+      // Subject reads naturally: "A Wolf", "2 Wolves", "2 Wolves and a Bandit".
+      const subject =
+        labelParts.length === 1
+          ? labelParts[0]
+          : `${labelParts.slice(0, -1).join(', ')} and ${labelParts[labelParts.length - 1]}`;
+      const verb = enemies.length === 1 ? 'falls' : 'fall';
+      const ambushLine = ` ⚔️ Ambush! ${subject[0].toUpperCase()}${subject.slice(1)} ${verb} upon the party.`;
       // runCombatStart reads `livingEnemiesInRoom` (read-only on the dispatched
       // ctx, and stale for the pre-move room). Hand it the just-materialized
       // encounter enemies via a shallow ctx copy; the actor is shared by
@@ -194,8 +208,8 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
       ctx.st = combatCtx.st;
       ctx.narrative = preCombatNarrative + ambushLine + ' ' + combatCtx.narrative;
     } else {
-      // The encounter table named a creature absent from the bestiary — skip the
-      // drop rather than crash; the party simply presses on.
+      // The entry named only creatures absent from the bestiary — skip the drop
+      // rather than crash; the party simply presses on.
       ctx.narrative += ` You sense danger nearby, but the way stays clear.`;
     }
   }

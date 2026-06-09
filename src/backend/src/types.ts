@@ -2150,11 +2150,27 @@ export interface Region extends LevelNarrationHooks {
   encounterZones?: EncounterZone[];
 }
 
-// An encounter-table entry: a bare creature name, or a {name, weight} pair so
-// some creatures roll more often than others. Selection is weight-proportional;
-// a bare string is sugar for weight 1 (and stays the stored form for weight-1
-// entries, so existing all-string tables are unchanged). See pickWeightedEncounter.
-export type EncounterEntry = string | { name: string; weight: number };
+// One creature in a mixed-group encounter entry: a bestiary name and how many
+// spawn (before party-size scaling). See EncounterEntry.
+export interface EncounterGroupMember {
+  name: string;
+  count: number;
+}
+
+// An encounter-table entry — one of three forms, all weight-proportional when a
+// square rolls:
+//   • a bare string — one creature, weight 1 (the stored form for weight-1
+//     singletons, so existing all-string tables are unchanged);
+//   • `{name, weight}` — one creature that rolls more / less often;
+//   • `{group, weight?}` — a fixed mixed group (e.g. 2 Wolves + 1 Bandit) that
+//     spawns ALL its members at once when the entry is picked (weight ?? 1).
+// A picked entry resolves to its member list via encounterEntryMembers, then the
+// caller materializes each member (count-scaled to the party). See
+// pickWeightedEncounter / encounterEntryWeight.
+export type EncounterEntry =
+  | string
+  | { name: string; weight: number }
+  | { group: EncounterGroupMember[]; weight?: number };
 
 // A painted intra-region encounter zone — an arbitrary set of squares (`cells`)
 // that share a self-contained wilderness encounter pool: a difficulty `tier`

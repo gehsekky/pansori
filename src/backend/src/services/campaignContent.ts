@@ -1515,27 +1515,53 @@ function filterEncounterTables(
   templates: EnemyTemplate[]
 ): CampaignRegion[] {
   const isKnown = (name: string) => templates.some((t) => t.name === name);
-  // Drop entries (bare names OR {name, weight} pairs) whose creature isn't in
-  // the composed bestiary, warning per drop. The weight rides along untouched.
-  const filterNames = (entries: EncounterEntry[], where: string): EncounterEntry[] =>
-    entries.filter((e) => {
-      const name = typeof e === 'string' ? e : e.name;
-      if (isKnown(name)) return true;
-      console.warn(
-        `[campaignContent] ${campaignId}/${where}: no enemy template named "${name}" — encounter entry dropped`
-      );
-      return false;
-    });
+  const warnDrop = (name: string, where: string) =>
+    console.warn(
+      `[campaignContent] ${campaignId}/${where}: no enemy template named "${name}" — encounter entry dropped`
+    );
+  // Clean an encounter table against the composed bestiary: drop unknown
+  // singletons (bare name / {name, weight}), and prune unknown MEMBERS from a
+  // {group} entry (dropping the whole group if it empties out). Weights ride
+  // along untouched. Returns the cleaned table + whether anything changed.
+  const filterTable = (
+    entries: EncounterEntry[],
+    where: string
+  ): { table: EncounterEntry[]; changed: boolean } => {
+    let changed = false;
+    const out: EncounterEntry[] = [];
+    for (const e of entries) {
+      if (typeof e === 'string' || !('group' in e)) {
+        const name = typeof e === 'string' ? e : e.name;
+        if (isKnown(name)) out.push(e);
+        else {
+          warnDrop(name, where);
+          changed = true;
+        }
+        continue;
+      }
+      const members = e.group.filter((m) => {
+        if (isKnown(m.name)) return true;
+        warnDrop(m.name, where);
+        return false;
+      });
+      if (members.length === e.group.length) out.push(e);
+      else {
+        changed = true;
+        if (members.length > 0) out.push({ ...e, group: members });
+      }
+    }
+    return { table: out, changed };
+  };
   return regions.map((r) => {
     // Each painted zone's creature table (the only encounter source).
     if (!r.encounterZones || r.encounterZones.length === 0) return r;
     let zonesChanged = false;
     const zones = r.encounterZones.map((z) => {
       if (!z.encounterTable || z.encounterTable.length === 0) return z;
-      const kept = filterNames(z.encounterTable, `${r.id}/zone:${z.id}`);
-      if (kept.length === z.encounterTable.length) return z;
+      const { table, changed } = filterTable(z.encounterTable, `${r.id}/zone:${z.id}`);
+      if (!changed) return z;
       zonesChanged = true;
-      return { ...z, encounterTable: kept };
+      return { ...z, encounterTable: table };
     });
     return zonesChanged ? { ...r, encounterZones: zones } : r;
   });

@@ -94,10 +94,11 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
 - **Encounter zones** — paintable, non-overlapping region sub-areas, each a
   self-contained pool: a difficulty **tier (1–4)**, a per-square chance, and a
   creature table. Table entries are **weighted** — a bare name rolls at weight 1,
-  or a `{name, weight}` pair makes a creature spawn proportionally more often
-  (set per-creature in the zone's creator panel). One region can span multiple
-  tiers; a square outside every zone never rolls. The sole source of random
-  wilderness encounters.
+  a `{name, weight}` pair makes a creature spawn proportionally more often, or a
+  `{group}` entry spawns a **fixed mixed group** (e.g. 2 Wolves + 1 Bandit) all at
+  once (each member's count scales to party size). Authored per-entry in the zone's
+  creator panel. One region can span multiple tiers; a square outside every zone
+  never rolls. The sole source of random wilderness encounters.
 - **Encounter arenas** — a zone can map each terrain type to a pool of room ids;
   a rolled encounter on that terrain is fought on a random one of those rooms'
   battlegrounds (floor, obstacles, terrain, cover, lighting, size), else a default

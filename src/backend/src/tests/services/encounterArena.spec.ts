@@ -62,7 +62,7 @@ describe('resolveMarkerMove — encounter arena selection', () => {
       x: 1,
       y: 0,
     });
-    expect(r.encounter).toBe('Goblin Warrior');
+    expect(r.encounter).toEqual([{ name: 'Goblin Warrior', count: 1 }]);
     expect(r.encounterArenaRoomId).toBe('forest_clearing');
   });
 
@@ -72,7 +72,7 @@ describe('resolveMarkerMove — encounter arena selection', () => {
       x: 1,
       y: 0,
     });
-    expect(r.encounter).toBe('Goblin Warrior');
+    expect(r.encounter).toEqual([{ name: 'Goblin Warrior', count: 1 }]);
     expect(r.encounterArenaRoomId).toBeUndefined();
   });
 
@@ -85,7 +85,7 @@ describe('resolveMarkerMove — encounter arena selection', () => {
   it('falls back when the zone defines no arenaRooms at all', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const r = resolveMarkerMove(campaignWith(undefined), [], start(), { x: 1, y: 0 });
-    expect(r.encounter).toBe('Goblin Warrior');
+    expect(r.encounter).toEqual([{ name: 'Goblin Warrior', count: 1 }]);
     expect(r.encounterArenaRoomId).toBeUndefined();
   });
 });

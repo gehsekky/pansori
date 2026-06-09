@@ -171,7 +171,7 @@ describe('handleMarkerMove — forced-march wiring', () => {
       travel_minutes_today: 0,
     } as unknown as GameState;
     const r = resolveMarkerMove(campEnc, [], st, { x: 6, y: 0 });
-    expect(r.encounter).toBe('Goblin');
+    expect(r.encounter).toEqual([{ name: 'Goblin', count: 1 }]);
     expect(r.st.marker_pos).toEqual({ x: 1, y: 0 }); // stopped on the first crossed square
     expect(r.squaresMoved).toBe(1);
     expect(r.transitioned).toBe(false);

@@ -51,7 +51,10 @@ const campaign: CampaignData = {
   ],
 };
 
-function ctxFor(): ActionContext {
+function ctxFor(
+  camp: CampaignData = campaign,
+  templates: EnemyTemplate[] = [bandit]
+): ActionContext {
   const char = makeChar({ id: 'pc-1' });
   const st = {
     map_level: 'regional',
@@ -66,7 +69,7 @@ function ctxFor(): ActionContext {
     actor: pcActor(char, 0),
     st,
     seed,
-    context: { campaign, enemyTemplates: [bandit], narratives: {} },
+    context: { campaign: camp, enemyTemplates: templates, narratives: {} },
     narrative: '',
   } as unknown as ActionContext;
 }
@@ -98,6 +101,56 @@ describe('handleMarkerMove — wilderness encounter drop', () => {
 
     expect(ctx.narrative).toContain('Ambush');
     expect(ctx.narrative).toContain('Initiative');
+  });
+
+  it('spawns a whole mixed group and names it in the ambush line', () => {
+    const goblin: EnemyTemplate = {
+      name: 'Goblin Scout',
+      cr: 0.25,
+      hp: 7,
+      ac: 13,
+      damage: '1d6',
+      toHit: 4,
+      xp: 50,
+    };
+    // A zone whose only entry is a fixed group: 2 Bandit Ruffians + 1 Goblin Scout.
+    const groupCampaign: CampaignData = {
+      ...campaign,
+      regions: [
+        {
+          ...campaign.regions![0],
+          encounterZones: [
+            {
+              ...campaign.regions![0].encounterZones![0],
+              encounterTable: [
+                {
+                  group: [
+                    { name: 'Bandit Ruffian', count: 2 },
+                    { name: 'Goblin Scout', count: 1 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(Math, 'random').mockReturnValue(0); // trigger + pick the only entry
+    const ctx = ctxFor(groupCampaign, [bandit, goblin]);
+
+    handleMarkerMove(ctx, { type: 'marker_move', to: { x: 3, y: 0 } });
+
+    // Party at recommended size (1 PC / default recommended 1) → authored counts.
+    const enemies = ctx.seed.enemies[ENCOUNTER_ROOM_ID];
+    expect(enemies.map((e) => e.name).sort()).toEqual([
+      'Bandit Ruffian',
+      'Bandit Ruffian',
+      'Goblin Scout',
+    ]);
+    // Every group member gets a distinct id (so a repeat fight isn't pre-killed).
+    expect(new Set(enemies.map((e) => e.id)).size).toBe(3);
+    // The ambush line reads the whole group grammatically.
+    expect(ctx.narrative).toContain('2 Bandit Ruffians and a Goblin Scout fall upon the party');
   });
 
   it('rejects a non-PC actor', () => {
