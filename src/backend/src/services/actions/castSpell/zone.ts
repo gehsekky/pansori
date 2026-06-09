@@ -8,7 +8,7 @@
 // The zone is removed by `breakConcentration` when concentration ends.
 
 import type { Spell, SpellZone } from '../../../types.js';
-import { applyZoneTick, zoneCells } from '../../gameEngine.js';
+import { applyZoneTick, combatGridDims, zoneCells } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { concentrationRoundsFor } from './utils.js';
 import { randomUUID } from 'crypto';
@@ -38,8 +38,7 @@ export function runZoneSpell(
     center = targetEnt.pos;
   }
 
-  const gridW = ctx.context.gridWidth ?? 8;
-  const gridH = ctx.context.gridHeight ?? 8;
+  const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
   const radiusFt = spell.blastRadius ?? 5;
   const cells = zoneCells(center, radiusFt, gridW, gridH);
   const zone: SpellZone = {

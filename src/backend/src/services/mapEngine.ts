@@ -792,8 +792,9 @@ export function stageEncounter(st: GameState): GameState {
  * of the default bare arena. Copies ONLY the tactical + cosmetic layout (floor,
  * lighting, obstacles, difficult/climb/swim terrain, cover, cosmetic paint) — the
  * room's own enemies/loot/NPCs/exits/objects do NOT come along; it's borrowed as
- * a battleground only. The combat grid stays the standard size (neither engine
- * nor FE keys combat off a room's `gridWidth`), so authored arenas should fit it.
+ * a battleground only. The borrowed room's combat grid SIZE comes along too
+ * (`gridWidth`/`gridHeight`, when set), so a fight staged on an authored arena
+ * uses that arena's dimensions (clamped at read time via `combatGridDims`).
  *
  * Pass `undefined` (or an id with no matching room) to clear any borrowed arena
  * left from a previous encounter so the default bare grid is used. Mutates
@@ -815,6 +816,8 @@ export function applyEncounterArena(seed: Seed, arenaRoomId: string | undefined)
       ...(src.swimTerrain ? { swimTerrain: src.swimTerrain } : {}),
       ...(src.coverPositions ? { coverPositions: src.coverPositions } : {}),
       ...(src.terrain ? { terrain: src.terrain } : {}),
+      ...(src.gridWidth !== undefined ? { gridWidth: src.gridWidth } : {}),
+      ...(src.gridHeight !== undefined ? { gridHeight: src.gridHeight } : {}),
     });
   }
   seed.rooms = rooms;

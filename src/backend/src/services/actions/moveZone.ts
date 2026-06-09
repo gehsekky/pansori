@@ -1,4 +1,4 @@
-import { applyZoneTick, zoneCells } from '../gameEngine.js';
+import { applyZoneTick, combatGridDims, zoneCells } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import type { GridPos } from '../../types.js';
 import { distanceFeet } from '../gridEngine.js';
@@ -43,8 +43,7 @@ export const handleMoveZone: ActionHandler<{ type: 'move_zone'; zoneId: string; 
   }
 
   // Range + grid-bounds check.
-  const gridW = ctx.context.gridWidth ?? 8;
-  const gridH = ctx.context.gridHeight ?? 8;
+  const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
   const { to } = action;
   if (to.x < 0 || to.x >= gridW || to.y < 0 || to.y >= gridH) {
     return { rejected: 'That cell is off the grid.' };

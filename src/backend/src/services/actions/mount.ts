@@ -1,7 +1,7 @@
 import type { GameState, GridPos } from '../../types.js';
 import { abilityMod, rollDice } from '../rulesEngine.js';
+import { combatGridDims, effectiveSpeed } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
-import { effectiveSpeed } from '../gameEngine.js';
 
 /**
  * SRD 5.2.1 Mounted Combat.
@@ -113,8 +113,7 @@ export const handleDismount: ActionHandler<{ type: 'dismount' }> = (ctx) => {
     ctx.narrative = `Not enough movement to dismount. (${speedFt - usedFt} ft left, ${cost} ft needed)`;
     return;
   }
-  const gridW = ctx.context.gridWidth ?? 10;
-  const gridH = ctx.context.gridHeight ?? 10;
+  const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
   // The mount steps aside into an open square; the rider keeps the space.
   const mountCell = freeAdjacentCell(ctx.st, riderEnt.pos, gridW, gridH);
   ctx.st = {

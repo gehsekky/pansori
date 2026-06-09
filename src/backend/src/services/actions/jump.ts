@@ -10,8 +10,8 @@
 // (services/jump.ts) is modeled, not a grid action.
 
 import { SQUARE_SIZE, chebyshev, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
+import { combatGridDims, effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import { d20TestPenalty, resolveEnemyAttack, skillCheck } from '../rulesEngine.js';
-import { effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { hasEscapeTheHorde } from '../multiclass.js';
@@ -33,8 +33,7 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
     ctx.narrative = 'You are not on the battle grid.';
     return;
   }
-  const gridW = ctx.context.gridWidth ?? 8;
-  const gridH = ctx.context.gridHeight ?? 8;
+  const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
   const { to } = action;
   if (to.x < 0 || to.x >= gridW || to.y < 0 || to.y >= gridH) {
     ctx.narrative = 'You cannot jump off the battlefield.';

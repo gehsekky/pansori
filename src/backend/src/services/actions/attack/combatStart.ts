@@ -1,6 +1,11 @@
 import type { CombatEntity, Enemy, LootItem } from '../../../types.js';
 import { FRESH_TURN, abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
-import { buildInitiativeOrder, pick, seedSummonedAllies } from '../../gameEngine.js';
+import {
+  buildInitiativeOrder,
+  combatGridDims,
+  pick,
+  seedSummonedAllies,
+} from '../../gameEngine.js';
 import {
   heroicWarriorTopUp,
   perfectFocusRefresh,
@@ -107,8 +112,7 @@ export function runCombatStart(
 
   // ── Initialize grid entities at combat start ────────────────────────
   if (!ctx.st.entities) {
-    const gw = ctx.context.gridWidth ?? 8;
-    const gh = ctx.context.gridHeight ?? 8;
+    const { w: gw, h: gh } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
     const pcEntities: CombatEntity[] = ctx.st.characters.map((c, ci) => {
       // SRD Vision & Light — a worn light source (e.g. a Torch) makes its bearer
       // emit light, negating the darkness penalty around them. Mundane, so no

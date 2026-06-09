@@ -115,6 +115,14 @@ describe('reconcileSeedWithContext', () => {
     expect(merged.enemies[ENCOUNTER_ROOM_ID]?.[0]?.hp).toBe(3);
   });
 
+  it('snapshots the campaign default grid size onto the seed (FE fallback parity)', () => {
+    // The FE has no Context, so combatGridDims' context.gridWidth fallback is
+    // mirrored onto the seed for the bare-arena (no-room) case.
+    const s = generateSeed(baseCtx, 1);
+    expect(s.gridWidth).toBe(baseCtx.gridWidth);
+    expect(s.gridHeight).toBe(baseCtx.gridHeight);
+  });
+
   it('returns the seed untouched when the context has no campaign data', () => {
     const existing = generateSeed(baseCtx, 1);
     const noCampaign = { ...baseCtx, campaign: undefined } as Context;

@@ -377,6 +377,7 @@ export function runSaveSpell(
         casterEntPush.pos,
         spell.pushFt,
         ctx.context,
+        ctx.seed,
         ctx.roomId,
         ctx.roomObstacleCells
       );

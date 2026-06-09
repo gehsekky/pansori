@@ -1,5 +1,5 @@
 import type { Spell, SpellZone } from '../../../types.js';
-import { effectiveSpeed, zoneCells } from '../../gameEngine.js';
+import { combatGridDims, effectiveSpeed, zoneCells } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { concentrationRoundsFor } from './utils.js';
@@ -168,8 +168,7 @@ export function runUtilitySpell(
       : undefined;
     const center = (targetEnt ?? casterEnt)?.pos;
     if (center) {
-      const gridW = ctx.context.gridWidth ?? 8;
-      const gridH = ctx.context.gridHeight ?? 8;
+      const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
       const radiusFt = spell.blastRadius ?? 15;
       const zone: SpellZone = {
         id: randomUUID(),
@@ -227,8 +226,7 @@ export function runUtilitySpell(
       : undefined;
     const center = (targetEnt ?? casterEnt)?.pos;
     if (center) {
-      const gridW = ctx.context.gridWidth ?? 8;
-      const gridH = ctx.context.gridHeight ?? 8;
+      const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
       const radiusFt = spell.blastRadius ?? 20;
       const zone: SpellZone = {
         id: randomUUID(),
@@ -262,8 +260,7 @@ export function runUtilitySpell(
   if (spell.magicSuppression && ctx.st.entities) {
     const casterEnt = ctx.st.entities.find((e) => e.id === char.id);
     if (casterEnt) {
-      const gridW = ctx.context.gridWidth ?? 8;
-      const gridH = ctx.context.gridHeight ?? 8;
+      const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
       const radiusFt = 10;
       const zone: SpellZone = {
         id: randomUUID(),
@@ -422,8 +419,7 @@ export function runUtilitySpell(
   // capped to that radius; Dimension Door has no range cap. Willing-creature
   // passenger deferred. No-op when the grid isn't populated.
   if ((spell.id === 'dimension_door' || spell.id === 'misty_step') && ctx.st.entities) {
-    const gridW = ctx.context.gridWidth ?? 10;
-    const gridH = ctx.context.gridHeight ?? 10;
+    const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
     const currentRoomForDD = ctx.seed.rooms.find((r) => r.id === ctx.roomId);
     const roomObstacles = currentRoomForDD?.obstacles ?? [];
     const occupied = new Set(

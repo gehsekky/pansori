@@ -27,6 +27,7 @@ export const handleEnemyMove: ActionHandler<{
     enemyId: enemy.id,
     target,
     st: ctx.st,
+    seed: ctx.seed,
     resumeMi: action.resumeMi,
     context: ctx.context,
     roomObstacleCells,

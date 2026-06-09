@@ -493,6 +493,12 @@ export interface Seed {
   terrain_art?: TerrainArtMap;
   // Campaign visual theme (partial; FE merges over the base theme).
   theme?: CampaignTheme;
+  // Campaign-wide DEFAULT combat grid size (Context.gridWidth/Height), snapshotted
+  // so the FE — which never sees the Context — can fall back to the same default
+  // the backend's combatGridDims uses for a room that carries no size of its own
+  // (e.g. the bare wilderness-encounter arena). Keeps FE drawing == BE bounds.
+  gridWidth?: number;
+  gridHeight?: number;
 }
 
 // ─── Game state ───────────────────────────────────────────────────────────────

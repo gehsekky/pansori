@@ -247,6 +247,23 @@ export function crInTier(cr: number, tier: number): boolean {
   return cr >= band[0] && cr <= band[1];
 }
 
+// ─── Combat grid sizing ───────────────────────────────────────────────
+//
+// The combat grid's cell COUNT comes from the current room's
+// `gridWidth`/`gridHeight` (falling back to the campaign-wide `Context`
+// default, then a hardcoded default), clamped to a safe range so a fight
+// always has room to seat 4 PCs + enemies but never sprawls past what the
+// FE can sensibly render. SQUARE_SIZE (5 ft per cell) is independent — only
+// the cell count changes. Shared so the backend bounds and the FE renderer
+// clamp identically.
+export const COMBAT_GRID_MIN = 6;
+export const COMBAT_GRID_MAX = 16;
+export const COMBAT_GRID_DEFAULT = 10;
+
+export function clampCombatDim(n?: number): number {
+  return Math.max(COMBAT_GRID_MIN, Math.min(COMBAT_GRID_MAX, Math.floor(n ?? COMBAT_GRID_DEFAULT)));
+}
+
 // ─── Campaign THEME (the DB-editable visual identity) ─────────────────
 //
 // A PARTIAL set of the FE theme knobs (CSS custom properties + the donor

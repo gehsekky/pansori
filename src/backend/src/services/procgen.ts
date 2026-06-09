@@ -41,6 +41,10 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     towns: c.towns,
     terrain_art: context.terrainArt,
     theme: context.theme,
+    // Campaign-wide default combat grid size — the FE's fallback for rooms that
+    // carry no size (matches combatGridDims, which reads context.gridWidth).
+    gridWidth: context.gridWidth,
+    gridHeight: context.gridHeight,
   };
 }
 

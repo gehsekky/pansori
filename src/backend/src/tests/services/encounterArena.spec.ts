@@ -2,14 +2,14 @@
 // to a list of room ids; a random encounter there is fought on a random one of
 // those rooms' layouts (else the default bare arena).
 
-import type { CampaignData, CampaignRegion, GameState, Room, Seed } from '../../types.js';
+import type { CampaignData, GameState, Room, Seed } from '../../types.js';
+import { type CampaignRegion, dbRegionsToEngine } from '../../services/campaignContent.js';
 import {
   ENCOUNTER_ROOM_ID,
   applyEncounterArena,
   resolveMarkerMove,
 } from '../../services/mapEngine.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dbRegionsToEngine } from '../../services/campaignContent.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -99,6 +99,8 @@ describe('applyEncounterArena', () => {
     lighting: 'dim',
     obstacles: [{ x: 2, y: 2 }],
     difficultTerrain: [{ x: 3, y: 3 }],
+    gridWidth: 14,
+    gridHeight: 12,
     exits: [{ pos: { x: 0, y: 0 }, ascends: true }],
   };
   const seedWith = (): Seed => ({ rooms: [arenaRoom], enemies: {}, loot: {} }) as unknown as Seed;
@@ -114,6 +116,26 @@ describe('applyEncounterArena', () => {
     expect(enc!.difficultTerrain).toEqual([{ x: 3, y: 3 }]);
     // Content (exits/objects/etc.) is NOT borrowed — it's a battleground only.
     expect(enc!.exits).toBeUndefined();
+  });
+
+  it('carries the borrowed room’s combat grid size into __encounter__', () => {
+    const seed = seedWith();
+    applyEncounterArena(seed, 'forest_clearing');
+    const enc = seed.rooms.find((r) => r.id === ENCOUNTER_ROOM_ID);
+    expect(enc!.gridWidth).toBe(14);
+    expect(enc!.gridHeight).toBe(12);
+  });
+
+  it('omits grid size when the source room defines none', () => {
+    const seed: Seed = {
+      rooms: [{ id: 'forest_clearing', name: 'Forest Clearing', desc: 'Bare.' }],
+      enemies: {},
+      loot: {},
+    } as unknown as Seed;
+    applyEncounterArena(seed, 'forest_clearing');
+    const enc = seed.rooms.find((r) => r.id === ENCOUNTER_ROOM_ID);
+    expect(enc!.gridWidth).toBeUndefined();
+    expect(enc!.gridHeight).toBeUndefined();
   });
 
   it('clears any prior arena when passed undefined', () => {

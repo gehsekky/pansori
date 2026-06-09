@@ -1,5 +1,5 @@
 import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
-import { effectiveSpeed, getEnemyById, wallObstacleCells } from '../gameEngine.js';
+import { combatGridDims, effectiveSpeed, getEnemyById, wallObstacleCells } from '../gameEngine.js';
 import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
@@ -70,8 +70,7 @@ export const handleGridMove: ActionHandler<{
     }
   }
 
-  const gridW = ctx.context.gridWidth ?? 10;
-  const gridH = ctx.context.gridHeight ?? 10;
+  const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
   // SRD Mounted Combat — a controlled mount moves on its rider's turn, carrying
   // the rider with it. The pair shares a square, so the mount never blocks the
   // rider's path, and the mount's Speed (not the rider's) sets the budget.

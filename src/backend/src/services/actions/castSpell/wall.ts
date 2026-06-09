@@ -10,6 +10,7 @@
 
 import type { GridPos, Spell, SpellWall } from '../../../types.js';
 import type { ActionContext } from '../types.js';
+import { combatGridDims } from '../../gameEngine.js';
 import { concentrationRoundsFor } from './utils.js';
 import { randomUUID } from 'crypto';
 import { runAoeSpell } from './aoe.js';
@@ -77,8 +78,7 @@ export function runWallSpell(
     runAoeSpell(ctx, spell, slotLevel, dc, spellDmg);
   }
 
-  const gridW = ctx.context.gridWidth ?? 8;
-  const gridH = ctx.context.gridHeight ?? 8;
+  const { w: gridW, h: gridH } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
   const cells = perpendicularWallCells(
     casterEnt.pos,
     targetEnt.pos,

@@ -279,6 +279,7 @@ export function runAoeSpell(
           casterPos ?? epicenter,
           spell.pushFt,
           ctx.context,
+          ctx.seed,
           ctx.roomId,
           ctx.roomObstacleCells
         );

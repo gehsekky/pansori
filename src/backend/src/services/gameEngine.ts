@@ -58,6 +58,7 @@ import {
   masterableWeapons,
   weaponMasterySlotsForLevel,
 } from '../campaignData/srd/index.js';
+import { COMBAT_LOG_MAX, clampCombatDim } from '../types.js';
 import {
   DEFAULT_SPEED_FEET,
   SQUARE_SIZE,
@@ -137,7 +138,6 @@ import {
 } from './equipment.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { pickHookText, returnFromEncounter } from './mapEngine.js';
-import { COMBAT_LOG_MAX } from '../types.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
@@ -2923,6 +2923,23 @@ export function zoneCells(
   return cells;
 }
 
+// Resolve the combat grid's cell count for a given room: the room's own
+// `gridWidth`/`gridHeight` win, falling back to the campaign-wide `Context`
+// default, then the shared default — all run through `clampCombatDim` so the
+// backend bounds and the FE renderer agree on a safe range. Only the cell
+// COUNT is per-room; the 5-ft scale is unchanged.
+export function combatGridDims(
+  roomId: string | undefined,
+  seed: Seed,
+  context: Context
+): { w: number; h: number } {
+  const room = seed.rooms?.find((r) => r.id === roomId);
+  return {
+    w: clampCombatDim(room?.gridWidth ?? context.gridWidth),
+    h: clampCombatDim(room?.gridHeight ?? context.gridHeight),
+  };
+}
+
 // RE-4 — apply one tick of a persistent damage zone to every hostile standing
 // in its cells: roll `damage` (save-for-half if `savingThrow`), apply
 // resistance, and resolve kills (XP split + room-clear). Shared by the on-cast
@@ -2943,12 +2960,8 @@ export function applyZoneTick(
   if (zone.followsCaster) {
     const casterEnt = st.entities.find((e) => e.id === zone.casterId);
     if (casterEnt) {
-      cells = zoneCells(
-        casterEnt.pos,
-        zone.radiusFt ?? 15,
-        context.gridWidth ?? 8,
-        context.gridHeight ?? 8
-      );
+      const zoneDims = combatGridDims(st.current_room, seed, context);
+      cells = zoneCells(casterEnt.pos, zone.radiusFt ?? 15, zoneDims.w, zoneDims.h);
     }
   }
   const cellSet = new Set(cells.map((c) => `${c.x},${c.y}`));
@@ -6807,8 +6820,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const speedFt = effectiveSpeed(char, context.lootTable);
       const usedFt = (state.movement_used ?? {})[char.id] ?? 0;
       const remaining = speedFt - usedFt;
-      const gw = context.gridWidth ?? 10;
-      const gh = context.gridHeight ?? 10;
+      const { w: gw, h: gh } = combatGridDims(state.current_room, seed, context);
       // Dead entities (corpses) don't block movement — walk over them.
       const occupied = new Set(
         state.entities
@@ -7321,6 +7333,7 @@ interface EnemyTurnResult {
 // in by allies).
 function planEnemyApproach(args: {
   st: GameState;
+  seed: Seed;
   enemyId: string;
   enemyPos: GridPos;
   targetPos: GridPos;
@@ -7330,8 +7343,7 @@ function planEnemyApproach(args: {
   roomId: string;
   roomObstacles?: GridPos[];
 }): { newPos: GridPos; pathSquares: GridPos[]; reached: boolean } | null {
-  const gridW = args.context.gridWidth ?? 10;
-  const gridH = args.context.gridHeight ?? 10;
+  const { w: gridW, h: gridH } = combatGridDims(args.roomId, args.seed, args.context);
   const blocked = [
     ...(args.st.entities ?? []).filter((e) => e.id !== args.enemyId && e.hp > 0).map((e) => e.pos),
     ...(args.roomObstacles ?? []),
@@ -8044,6 +8056,7 @@ export function attemptEnemyApproach(args: {
   enemyId: string;
   target: Character;
   st: GameState;
+  seed: Seed;
   resumeMi: number;
   context: Context;
   roomObstacleCells: GridPos[];
@@ -8051,7 +8064,7 @@ export function attemptEnemyApproach(args: {
 }):
   | { kind: 'proceed-to-attack'; st: GameState; narrative: string; movementHeaderPrinted: boolean }
   | { kind: 'skip-turn'; st: GameState; narrative: string } {
-  const { enemy, enemyId, target, st, resumeMi, context, roomObstacleCells } = args;
+  const { enemy, enemyId, target, st, seed, resumeMi, context, roomObstacleCells } = args;
   let narrative = args.narrative;
   const reachFt = enemy.attackReachFt ?? 5;
   const baseSpeedFt = enemy.speedFt ?? DEFAULT_SPEED_FEET;
@@ -8084,6 +8097,7 @@ export function attemptEnemyApproach(args: {
   narrative += `\n\n[${enemy.name}'s turn]`;
   const plan = planEnemyApproach({
     st,
+    seed,
     enemyId,
     enemyPos: enemyEntPreMove.pos,
     targetPos: targetEntPreMove.pos,
@@ -8729,14 +8743,14 @@ export function pushEntityAway(
   fromPos: GridPos,
   pushFt: number,
   context: Context,
+  seed: Seed,
   roomId: string,
   roomObstacles: GridPos[] = []
 ): { st: GameState; pushedFt: number } {
   const ent = st.entities?.find((e) => e.id === entityId);
   if (!ent || pushFt <= 0) return { st, pushedFt: 0 };
   const epos = ent.pos;
-  const gw = context.gridWidth ?? 10;
-  const gh = context.gridHeight ?? 10;
+  const { w: gw, h: gh } = combatGridDims(roomId, seed, context);
   const dy = Math.sign(epos.y - fromPos.y);
   let dx = Math.sign(epos.x - fromPos.x);
   if (dx === 0 && dy === 0) dx = 1; // overlapping — pick a direction
@@ -8746,6 +8760,7 @@ export function pushEntityAway(
   };
   const plan = planEnemyApproach({
     st,
+    seed,
     enemyId: entityId,
     enemyPos: epos,
     targetPos: awayTarget,
@@ -8979,6 +8994,7 @@ export function runAllyTurn(args: {
   if (distanceFeet(moverPos, targetEnt.pos) > 5) {
     const plan = planEnemyApproach({
       st,
+      seed,
       enemyId: allyEnt.id,
       enemyPos: moverPos,
       targetPos: targetEnt.pos,
@@ -9578,8 +9594,7 @@ export async function runEnemyTurns(args: {
           // toward it, so the creature moves as far from the caster as its speed
           // allows. The target must stay on-grid or the pathfinder finds no
           // destination cell.
-          const gw = args.context.gridWidth ?? 10;
-          const gh = args.context.gridHeight ?? 10;
+          const { w: gw, h: gh } = combatGridDims(st.current_room, args.seed, args.context);
           const vx = epos.x - casterEnt.pos.x;
           const vy = epos.y - casterEnt.pos.y;
           const awayTarget = {
@@ -9588,6 +9603,7 @@ export async function runEnemyTurns(args: {
           };
           const plan = planEnemyApproach({
             st,
+            seed: args.seed,
             enemyId: eEntry.id,
             enemyPos: epos,
             targetPos: awayTarget,
@@ -9665,6 +9681,7 @@ export async function runEnemyTurns(args: {
           if (distanceFeet(pos, victim.pos) > 5) {
             const plan = planEnemyApproach({
               st,
+              seed: args.seed,
               enemyId: eEntry.id,
               enemyPos: pos,
               targetPos: victim.pos,

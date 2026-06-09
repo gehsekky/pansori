@@ -38,6 +38,7 @@ import { applyTheme } from './lib/theme.ts';
 import artManifest from './art-manifest.json';
 import { availableLootIn } from './lib/placedLoot.ts';
 import { context as baseContext } from './contexts/base.tsx';
+import { clampCombatDim } from './types.ts';
 import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
@@ -815,10 +816,18 @@ export default function App() {
                       // The battlefield stays up through the post-combat gate
                       // (so a wilderness fight doesn't snap back to the overworld
                       // map). Read-only there: withhold onMove when combat's over.
+                      // Grid SIZE comes from the current room (clamped to the
+                      // shared safe range), matching the backend's combatGridDims.
+                      // Falls back to the seed's campaign default (== the backend's
+                      // context.gridWidth) so a bare arena room with no size of its
+                      // own draws at the same size the server bounds it to.
+                      const combatRoom = seed.rooms.find((r) => r.id === gameState.current_room);
                       return (
                         <GridCombatView
                           state={gameState}
                           seed={seed}
+                          gridWidth={clampCombatDim(combatRoom?.gridWidth ?? seed.gridWidth)}
+                          gridHeight={clampCombatDim(combatRoom?.gridHeight ?? seed.gridHeight)}
                           aoePreview={hoveredChoice?.aoePreview}
                           onMove={
                             gameState.combat_active

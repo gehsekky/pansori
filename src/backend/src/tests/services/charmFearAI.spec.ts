@@ -6,7 +6,7 @@
 // present. A Frightened enemy (e.g. Fear) attacks with Disadvantage and can't
 // advance on the source of its fear (`attemptEnemyApproach` holds it in place).
 
-import type { CombatEntity, Enemy, GameState } from '../../types.js';
+import type { CombatEntity, Enemy, GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { attemptEnemyApproach, selectTarget } from '../../services/gameEngine.js';
 import { makeChar, mockRandom } from '../../test-fixtures.js';
@@ -164,6 +164,7 @@ describe('Frightened enemy — keeps distance from its fear source', () => {
       enemyId: 'e1',
       target: makeChar({ id: 'pc-1', hp: 30, max_hp: 30 }),
       st: approachState(true),
+      seed: { rooms: [] } as unknown as Seed,
       resumeMi: 0,
       context: ctx,
       roomObstacleCells: [],
@@ -179,6 +180,7 @@ describe('Frightened enemy — keeps distance from its fear source', () => {
       enemyId: 'e1',
       target: makeChar({ id: 'pc-1', hp: 30, max_hp: 30 }),
       st: approachState(false),
+      seed: { rooms: [] } as unknown as Seed,
       resumeMi: 0,
       context: ctx,
       roomObstacleCells: [],

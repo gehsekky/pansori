@@ -508,6 +508,11 @@ export interface Seed {
   // Campaign visual theme (PARTIAL — merged over the donor context's base
   // theme when the seed loads).
   theme?: CampaignTheme;
+  // Campaign-wide DEFAULT combat grid size (mirror of BE Context.gridWidth/Height,
+  // snapshotted into the seed) — the fallback GridCombatView uses for a room with
+  // no size of its own, so the drawn grid matches the server's combatGridDims.
+  gridWidth?: number;
+  gridHeight?: number;
 }
 
 export interface Session {
