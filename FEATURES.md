@@ -137,17 +137,20 @@ What's implemented and working. Strict SRD 5.2.1 scope throughout (see
   `/api/campaigns` API; the picker intersects with the server-visible set.
   Breadcrumb nav.
 
-## Art & assets (all commercial-licensed — the project is commercial-clean)
+## Art & assets (two tiers — the public repo ships only redistributable art)
 
-- **Inventory item icons** — painted, bucket-derived (silhouette → bucket → art),
-  per-item override: Baumgart "Medieval Arms & Armor" + Vivid Motion kit
-  (potions, food, tools, gear…); `firearm` is the lone glyph fallback.
-- **Overland terrain tiles** — Baumgart Basic Terrain Set (14 biomes × 4 painted
-  variants) + Medieval Fantasy Locations markers (29 families); `tile:<id>` site
-  icons. **Local/town floor tiles** — CC0 (SBS "Tiny Texture Pack") +
-  original procedurally-generated dirt/sand. Party sprite: Tiny Swords.
-- Monochrome glyphs (rpg-awesome / game-icons / Phosphor) for UI + uncovered
-  buckets. No asset carries a non-commercial restriction.
+- **Free tier (in this repo, default):** monochrome glyphs (game-icons CC BY 3.0 /
+  RPG Awesome OFL / Phosphor MIT) for UI, map markers, item buckets, and party/NPC
+  tokens; per-terrain color tints; CC0 floor tiles (SBS "Tiny Texture Pack") +
+  original procgen dirt/sand. Fully playable with zero licensed assets — see
+  [ASSETS.md](ASSETS.md). The renderer (`src/frontend/src/lib/art.ts`) falls back
+  to this whenever `VITE_PAINTED_ART` is off.
+- **Painted tier (separate private overlay, opt-in):** the richer raster packs —
+  Baumgart Basic Terrain Set + Medieval Fantasy Locations markers, Baumgart
+  "Medieval Arms & Armor" + Vivid Motion item icons, Tiny Swords party/NPC
+  sprites. Licensed for in-game use but not standalone redistribution, so they
+  live in the private `pansori-assets` repo and overlay at build/deploy
+  (`VITE_PAINTED_ART=1`, optional `VITE_ASSET_BASE_URL` CDN). See [LEGAL.md](LEGAL.md).
 
 ## Platform & ops
 
