@@ -105,6 +105,46 @@ SRD txt). Campaign flavor names are campaign-level clones —
 bestiary renames. Creatures the SRD dropped (e.g. the 2014 Orc
 stat block) live inline in the campaigns that use them.
 
+## Assets & licensing (public repo vs private overlay)
+
+pansori is **open-source / public**. The public repo must contain **only
+redistributable assets**. Anything with a licensing restriction goes in the
+**private overlay repo** `pansori-assets` (a sibling checkout, `../pansori-assets`),
+NOT in pansori — and must never be committed to pansori or reappear in its git
+history (the history was scrubbed once already; don't undo that).
+
+**Decision rule for any new art / audio / font / data file:**
+
+- **OK to commit to pansori** (redistributable): CC0, CC-BY / CC-BY-SA (with
+  attribution in [LEGAL.md](LEGAL.md)), MIT / SIL OFL (fonts), and **original
+  art we made** (incl. our own procgen / AI-generated-by-us). Examples already
+  in-repo: the game-icons.net font (CC BY 3.0), the CC0 floor tiles + procgen
+  dirt/sand, RPG Awesome, Phosphor.
+- **Goes in `pansori-assets` instead** (restricted): anything **purchased**, or
+  whose license says **non-commercial only**, **no redistribution / no
+  repackaging** (even if modified), or is **unclear**. When in doubt, treat it as
+  restricted → overlay. Current overlay contents: Baumgart terrain tiles +
+  location markers, Baumgart "Medieval Arms & Armor" + Vivid Motion item icons,
+  Tiny Swords sprites.
+
+**How the overlay works:**
+
+- The overlay mirrors the target path: `pansori-assets/art/<dir>` overlays into
+  `src/frontend/public/art/<dir>`. Those gated dirs (`tiles`, `markers`, `icons`,
+  `sprites`) are **gitignored in pansori** — extend `.gitignore` if you add a new
+  gated dir. `floors/` + per-campaign room art stay public.
+- `npm run sync-assets` copies the overlay in (no-ops to the free tier if it's
+  absent). Per-file provenance lives in each overlay folder's `CREDITS.txt`.
+- **The free tier must always work without the overlay.** Gate painted assets
+  behind `paintedArt()` and route every `/art/...` URL through `artUrl()` — both
+  in `src/frontend/src/lib/art.ts` — with a glyph (game-icons) / color-tint
+  fallback. A clone with no overlay must render and pass tests/e2e.
+- LEGAL.md credits only what the public repo ships; the restricted packs are
+  credited there under "Painted-art overlay" (pointing at `pansori-assets`), with
+  the real per-file terms in the overlay's `CREDITS.txt`. Keep `pansori-assets`
+  **private** — a private repo feeding your deploy isn't "redistribution"; making
+  it public would be.
+
 ## Workflow for new content
 
 1. **Confirm SRD coverage first.** `grep` the relevant header in
