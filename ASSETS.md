@@ -34,7 +34,9 @@ the painted tier you must have those files, then:
 Vite inlines `import.meta.env` at build time, so:
 
 - **Dev:** put `VITE_PAINTED_ART=1` in your `.env` (gitignored); the dev
-  `docker-compose` frontend passes it through. Unset ⇒ free tier.
+  `docker-compose` frontend passes it through. Unset ⇒ free tier. `npm run dev`
+  auto-runs `sync-assets` (via `predev`), so a sibling `../pansori-assets`
+  checkout is overlaid automatically; run `npm run sync-assets` manually otherwise.
 - **Production:** the image bakes the tier at build — pass
   `--build-arg VITE_PAINTED_ART=1` (and bundle the painted overlay into the
   image, or set `VITE_ASSET_BASE_URL` to a CDN) in your build/CI. The public

@@ -9,7 +9,7 @@
     "check-migrations": "bash scripts/check-migrations.sh",
     "sync-assets": "bash scripts/sync-assets.sh",
     "pretest": "npm run sync-types",
-    "predev": "npm run sync-types",
+    "predev": "npm run sync-types && npm run sync-assets",
     "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",
     "format": "npm run format --workspace=src/frontend --workspace=src/backend",
     "audit": "npm audit --audit-level=high",
