@@ -87,4 +87,5 @@ that repo's `CREDITS.txt` files. The packs and their creators, credited here:
 - **Party / NPC map sprites** —
   ["Tiny Swords"](https://pixelfrog-assets.itch.io/tiny-swords) by Pixel Frog.
   Usable in free or commercial projects and may be modified; the assets may not
-  be redistributed, resold, or repackaged on their own.
+  be redistributed, resold, or repackaged on their own (even if modified) —
+  which is why pansori's derived sprite crops live in the private overlay, not here.
