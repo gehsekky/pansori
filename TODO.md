@@ -165,12 +165,17 @@ documented deferrals.
       inline JSONB: **factions** (the last campaign-block script holdout) and
       **NPC dialogue replies** (index-addressed, no stable node ids — needs its
       own table + an id-keyed dispatcher first).
-- [ ] **Cross-section reference lint** — quest ids (dialogue `start_quest`/
-      `advance_quest`, step conditions), `factionId`, room/npc ids are FK-like
-      references across independently-saved sections; a hard FK isn't feasible
-      (order-dependent saves). A non-blocking `validate` pass over a campaign
-      would surface dangling references (today they only `console.warn` at
-      runtime). The quests table makes the quest side authoritative for it.
+- [x] **Cross-section reference lint** — `lintCampaign` (services/campaignLint.ts)
+      + `GET /campaigns/:id/validate` (editor-gated, non-blocking) walk the FK-like
+      references — consequences (dialogue incl. `check`, quest rewards, rules:
+      start_quest/advance_quest→quest/step, give/consume_item→item, set_npc_attitude
+      →npc, set_faction_rep→faction, unlock_room/spawn_enemy→room, travel_to→site/
+      venue), condition id-facts (quests_active/completed, steps_done, faction_*,
+      party_items, room/town/npc), and structural refs (site townId/entryRoomId,
+      venue entryRoomId, quest giverNpcId/factionId). Surfaced in
+      CampaignContentEditor (auto-run on load + after save). Remaining: surface in
+      the RegionEditorScreen creator too; item refs are unvalidated in unit tests
+      (mock catalog is empty) but live in prod.
 - [ ] **Dialogue follow-ups** — `say` field (menu label vs spoken line),
       `goto`/node-ids for hub-and-spoke trees (the node-id work also unblocks
       moving dialogue replies into `campaign_narratives`), mid-combat surrender,

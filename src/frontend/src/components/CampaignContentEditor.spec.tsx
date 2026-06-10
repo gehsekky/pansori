@@ -9,6 +9,7 @@ vi.mock('../lib/api.ts', () => ({
     getCampaignSection: vi.fn(),
     putCampaignSection: vi.fn(),
     deleteCampaignSection: vi.fn(),
+    validateCampaign: vi.fn(),
   },
 }));
 
@@ -18,6 +19,7 @@ const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 beforeEach(() => {
   for (const fn of Object.values(mocked)) fn.mockReset();
+  mocked.validateCampaign.mockResolvedValue({ issues: [] });
   mocked.listCampaignSections.mockResolvedValue([
     { section: 'gameStart', source: 'code' },
     { section: 'narratives', source: 'db' },
@@ -36,6 +38,28 @@ describe('CampaignContentEditor', () => {
     expect(screen.getAllByText('TEMPLATE').length).toBeGreaterThan(0);
     expect(screen.getByText('DATABASE')).toBeTruthy();
     expect(screen.getByText('EMPTY')).toBeTruthy();
+  });
+
+  it('shows the clean-references banner when validate finds nothing', async () => {
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
+    expect(await screen.findByTestId('lint-clean')).toBeTruthy();
+  });
+
+  it('lists dangling cross-section references from the validate lint', async () => {
+    mocked.validateCampaign.mockResolvedValue({
+      issues: [
+        {
+          severity: 'warning',
+          category: 'quest',
+          location: 'room "cellar" NPC "hob" → reply 0',
+          message: 'start_quest → unknown quest "rats"',
+        },
+      ],
+    });
+    render(<CampaignContentEditor campaignId="demo_campaign" />);
+    expect(await screen.findByTestId('lint-issues')).toBeTruthy();
+    expect(screen.getByText(/start_quest → unknown quest "rats"/)).toBeTruthy();
+    expect(screen.getByText(/room "cellar" NPC "hob"/)).toBeTruthy();
   });
 
   it('opens a plain-text section raw — no JSON quoting', async () => {

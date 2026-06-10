@@ -1,4 +1,9 @@
-import { type CampaignSectionInfo, type CampaignSectionSource, api } from '../lib/api.ts';
+import {
+  type CampaignLintIssue,
+  type CampaignSectionInfo,
+  type CampaignSectionSource,
+  api,
+} from '../lib/api.ts';
 import { MARKER_TILES, TERRAIN_TILES, type TerrainArtMap } from '../types.ts';
 import { useCallback, useEffect, useState } from 'react';
 import styles from '../styles.module.css';
@@ -82,16 +87,28 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // Cross-section reference lint (advisory). Refreshed on load + after each save
+  // /delete, since a fixed/broken reference changes the picture.
+  const [issues, setIssues] = useState<CampaignLintIssue[] | null>(null);
+
+  const refreshIssues = useCallback(() => {
+    api
+      .validateCampaign(campaignId)
+      .then((r) => setIssues(r.issues))
+      .catch(() => setIssues(null));
+  }, [campaignId]);
 
   useEffect(() => {
     setActive(null);
     setSections([]);
     setSectionsErr(null);
+    setIssues(null);
     api
       .listCampaignSections(campaignId)
       .then(setSections)
       .catch(() => setSectionsErr('Could not load content sections.'));
-  }, [campaignId]);
+    refreshIssues();
+  }, [campaignId, refreshIssues]);
 
   const openSection = useCallback(
     (section: string) => {
@@ -137,6 +154,7 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
       setActiveSource('db');
       setSections((prev) => prev.map((s) => (s.section === active ? { ...s, source: 'db' } : s)));
       setSaved(true);
+      refreshIssues();
     } catch (err) {
       setError(describeError(err));
     } finally {
@@ -162,6 +180,7 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
       );
       // Reload what the engine now serves (the base-template fallback, or empty).
       openSection(active);
+      refreshIssues();
     } catch (err) {
       setError(describeError(err));
       setBusy(false);
@@ -188,6 +207,31 @@ function CampaignContentEditor({ campaignId }: { campaignId: string }) {
           {sectionsErr}
         </p>
       )}
+
+      {/* Cross-section reference lint — advisory, never blocks saving. */}
+      {issues !== null &&
+        (issues.length === 0 ? (
+          <p
+            data-testid="lint-clean"
+            style={{ color: 'var(--t-hp-high)', fontSize: '0.75rem', marginBottom: '0.75rem' }}
+          >
+            ✓ No dangling references.
+          </p>
+        ) : (
+          <details data-testid="lint-issues" open style={{ marginBottom: '0.75rem' }}>
+            <summary style={{ color: 'var(--t-hp-mid)', fontSize: '0.8rem', cursor: 'pointer' }}>
+              ⚠ {issues.length} reference{issues.length === 1 ? '' : 's'} point at content that
+              doesn’t exist
+            </summary>
+            <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem', fontSize: '0.75rem' }}>
+              {issues.map((iss, i) => (
+                <li key={i} style={{ color: 'var(--t-mid)', marginBottom: '0.2rem' }}>
+                  <span style={{ color: 'var(--t-dim)' }}>{iss.location}:</span> {iss.message}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
 
       {/* Section tabs with source badges */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>

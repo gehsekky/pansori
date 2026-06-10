@@ -32,6 +32,7 @@ import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
 import type { Context } from '../../types.js';
 import type { Pool } from 'pg';
 import { generateSeed } from '../../services/procgen.js';
+import { lintCampaign } from '../../services/campaignLint.js';
 import { context as shippedCtx } from '../fixtures/testContext.js';
 
 function codeCtx(partial: Partial<Context> & { id: string }): Context {
@@ -2527,5 +2528,126 @@ describe('applyCampaignOverlays', () => {
     expect(contexts.ghost.id).toBe('ghost');
     expect(contexts.ghost.displayNoun).toBe('boo');
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
+  });
+});
+
+describe('lintCampaign — cross-section reference lint', () => {
+  // A campaign whose references all resolve: quest → existing faction + NPC,
+  // dialogue start_quest → existing quest, step condition → existing quest,
+  // sites/venues → existing rooms.
+  async function seedResolving(db: ReturnType<typeof makeContentDb>) {
+    await putCampaignSection(db.pool, 'demo_campaign', 'factions', [
+      { id: 'guild', name: 'Guild', thresholds: { neutral: 0 } },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
+      {
+        id: 'r1',
+        name: 'R1',
+        desc: 'd',
+        grid: [[{ t: 'grass' }]],
+        entryPos: { x: 0, y: 0 },
+        npcs: [
+          {
+            id: 'hob',
+            name: 'Hob',
+            responses: [{ label: 'go', consequences: [{ type: 'start_quest', questId: 'q1' }] }],
+          },
+        ],
+      },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'quests', [
+      {
+        id: 'q1',
+        title: 'Q1',
+        desc: 'd',
+        giverNpcId: 'hob',
+        factionId: 'guild',
+        steps: [
+          {
+            id: 's1',
+            desc: 'x',
+            condition: { fact: 'quests_active', operator: 'contains', value: 'q1' },
+          },
+        ],
+        rewards: [],
+      },
+    ]);
+  }
+
+  it('reports no issues when every reference resolves', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await seedResolving(db);
+    expect(await lintCampaign(db.pool, 'demo_campaign')).toEqual([]);
+  });
+
+  it('flags dangling quest / NPC / room references across sections', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'factions', [
+      { id: 'guild', name: 'Guild', thresholds: { neutral: 0 } },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
+      {
+        id: 'r1',
+        name: 'R1',
+        desc: 'd',
+        grid: [[{ t: 'grass' }]],
+        entryPos: { x: 0, y: 0 },
+        npcs: [
+          {
+            id: 'hob',
+            name: 'Hob',
+            responses: [
+              { label: 'ok', consequences: [{ type: 'start_quest', questId: 'q1' }] }, // ok
+              {
+                label: 'bad',
+                consequences: [{ type: 'set_npc_attitude', npcId: 'ghost', attitude: 'hostile' }],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'quests', [
+      {
+        id: 'q1',
+        title: 'Q1',
+        desc: 'd',
+        giverNpcId: 'nobody', // dangling NPC
+        factionId: 'guild', // ok
+        steps: [
+          {
+            id: 's1',
+            desc: 'x',
+            condition: { fact: 'quests_active', operator: 'contains', value: 'phantom' },
+          }, // dangling quest
+        ],
+        rewards: [{ type: 'start_quest', questId: 'q2' }], // dangling quest
+      },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [
+      {
+        id: 'reg1',
+        name: 'Reg',
+        isStartingRegion: true,
+        feetPerSquare: 5280,
+        grid: [[{ t: 'plains' }]],
+        startPos: { x: 0, y: 0 },
+        sites: [
+          { id: 'site1', name: 'S1', pos: { x: 0, y: 0 }, kind: 'local', entryRoomId: 'r1' }, // ok
+          { id: 'site2', name: 'S2', pos: { x: 0, y: 0 }, kind: 'local', entryRoomId: 'nowhere' }, // dangling room
+        ],
+      },
+    ]);
+
+    const issues = await lintCampaign(db.pool, 'demo_campaign');
+    const msgs = issues.map((i) => `${i.category}:${i.message}`);
+    expect(msgs).toContain('npc:giverNpcId → unknown NPC "nobody"');
+    expect(msgs).toContain('quest:start_quest → unknown quest "q2"');
+    expect(msgs).toContain('quest:condition → unknown quest "phantom"');
+    expect(msgs).toContain('npc:set_npc_attitude → unknown NPC "ghost"');
+    expect(msgs).toContain('room:entryRoomId → unknown room "nowhere"');
+    // The resolving references produced no false positives.
+    expect(msgs).not.toContain('faction:factionId → unknown faction "guild"');
+    expect(issues.every((i) => i.severity === 'warning')).toBe(true);
   });
 });

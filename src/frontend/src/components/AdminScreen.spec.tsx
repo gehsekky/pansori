@@ -19,6 +19,7 @@ vi.mock('../lib/api.ts', () => ({
     getCampaignSection: vi.fn(),
     putCampaignSection: vi.fn(),
     deleteCampaignSection: vi.fn(),
+    validateCampaign: vi.fn(),
     // Used by the nested QuestsPanel's item picker.
     getItemCatalog: vi.fn(),
   },
@@ -73,6 +74,7 @@ beforeEach(() => {
   // trip over them.
   mocked.listCampaignSections.mockResolvedValue([]);
   mocked.getCampaignSection.mockResolvedValue({ section: 'regions', source: 'none', value: null });
+  mocked.validateCampaign.mockResolvedValue({ issues: [] });
   mocked.getItemCatalog.mockResolvedValue([]);
 });
 

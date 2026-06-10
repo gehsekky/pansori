@@ -44,6 +44,7 @@ import type { AuthedRequest } from '../auth/middleware.js';
 import { broadcastCampaignUpdated } from '../services/broadcast.js';
 import { getItemCatalog } from '../services/itemCatalog.js';
 import { getMonsterCatalog } from '../services/monsterCatalog.js';
+import { lintCampaign } from '../services/campaignLint.js';
 import { pool } from '../db/pool.js';
 
 export const campaignsRouter = Router();
@@ -368,6 +369,28 @@ campaignsRouter.get(
     } catch (err) {
       console.error('[campaigns] section read failed:', err);
       res.status(500).json({ error: 'Failed to read section' });
+    }
+  }
+);
+
+// Cross-section reference lint — advisory, never blocks editing. Returns the
+// dangling FK-like references across the campaign's authored content (dialogue
+// → quest, quest → faction/NPC, conditions → ids, sites → rooms/towns, …).
+campaignsRouter.get(
+  '/:campaignId/validate',
+  requireCampaignRole('editor'),
+  async (req: Request, res: Response) => {
+    try {
+      const campaignId = param(req, 'campaignId');
+      if ((await getCampaignData(pool, campaignId)) === null) {
+        res.status(404).json({ error: 'campaign_not_found' });
+        return;
+      }
+      const issues = await lintCampaign(pool, campaignId);
+      res.json({ issues });
+    } catch (err) {
+      console.error('[campaigns] validate failed:', err);
+      res.status(500).json({ error: 'Failed to validate campaign' });
     }
   }
 );

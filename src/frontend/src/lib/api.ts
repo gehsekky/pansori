@@ -75,6 +75,14 @@ export interface CampaignSectionValue extends CampaignSectionInfo {
   value: unknown;
 }
 
+// A dangling cross-section reference found by the validate lint (advisory).
+export interface CampaignLintIssue {
+  severity: 'warning';
+  category: 'quest' | 'faction' | 'npc' | 'room' | 'town' | 'item' | 'location';
+  location: string;
+  message: string;
+}
+
 export interface ActionResult {
   narrative: string;
   choices: GameChoice[];
@@ -342,6 +350,9 @@ export const api = {
       `/campaigns/${campaignId}/data/${section}`,
       { method: 'DELETE' }
     ),
+
+  validateCampaign: (campaignId: string) =>
+    req<{ issues: CampaignLintIssue[] }>(`/campaigns/${campaignId}/validate`),
 
   listContexts: () => req<BackendContextSummary[]>('/game/contexts'),
 
