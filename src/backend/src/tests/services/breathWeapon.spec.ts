@@ -11,6 +11,7 @@ import {
   takeAction,
 } from '../../services/gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
+import { SRD_ITEMS } from '../../campaignData/srd/items.js';
 import { SRD_MONSTERS } from '../../campaignData/srd/monsters.js';
 import { context as ctx } from '../fixtures/testContext.js';
 
@@ -74,6 +75,32 @@ describe('applyAoeSaveToParty', () => {
     expect(r.st.characters[0].hp).toBe(56); // 60 − 4
     expect(r.st.characters[1].hp).toBe(56);
     expect(r.narrative).toContain('succeeds (half)');
+  });
+
+  it("a Cloak of Protection's +1 save halves an enemy-AoE hit a bare PC takes in full", () => {
+    // d20 = 13 (rnd 0.6). At dex 10 (+0), DC 14: bare 13 < 14 → fail (full 8);
+    // the cloak drops the effective DC to 13 → 13 ≥ 13 → made (half 4).
+    vi.spyOn(Math, 'random').mockReturnValue(0.6);
+    const cloaked = makeChar({
+      id: 'pc-1',
+      dex: 10,
+      hp: 60,
+      max_hp: 60,
+      inventory: [{ instance_id: 'cl', id: 'cloak_of_protection', name: 'Cloak of Protection' }],
+      equipment: { cloak: 'cl' },
+      attuned_items: ['cl'],
+    });
+    const bare = makeChar({ id: 'pc-2', dex: 10, hp: 60, max_hp: 60 });
+    const st = { ...makeState({ id: 'pc-1' }), characters: [cloaked, bare] };
+    const cloakCtx = { ...ctx, lootTable: [...ctx.lootTable, SRD_ITEMS.cloak_of_protection] };
+    const r = applyAoeSaveToParty(st, cloakCtx, {
+      dice: '8d1',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 14,
+    });
+    expect(r.st.characters[0].hp).toBe(56); // cloaked: made the save → half (4)
+    expect(r.st.characters[1].hp).toBe(52); // bare: failed the same roll → full (8)
   });
 });
 

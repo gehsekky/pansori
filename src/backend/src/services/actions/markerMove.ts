@@ -10,6 +10,7 @@ import { materializeEnemy, scaledEnemyCount } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
 import { rollConditionSave } from '../rulesEngine.js';
 import { runCombatStart } from './attack/combatStart.js';
+import { wornSaveBonus } from '../wornEffects.js';
 
 const MARCH_BUDGET_MIN = 8 * 60; // SRD: 8 hours of travel/day before fatigue risk
 
@@ -33,10 +34,13 @@ export function applyForcedMarch(
   let characters = st.characters;
   const notes: string[] = [];
   for (let h = pastBefore + 1; h <= pastAfter; h++) {
-    const dc = 10 + h; // 1st hour past 8 → DC 11, 2nd → DC 12, …
+    const baseDc = 10 + h; // 1st hour past 8 → DC 11, 2nd → DC 12, …
     characters = characters.map((c) => {
       if (c.dead) return c;
       const prof = hasSaveProficiency(c, 'con', context);
+      // Worn-gear save bonus (Cloak / Ring of Protection's +1 to all saves) —
+      // folded into the effective DC, same mechanism as conditionSavingThrow.
+      const dc = baseDc - wornSaveBonus(c, 'con', context.lootTable);
       const failed = rollConditionSave('con', c.con, dc, prof, c.level, 0, c.conditions ?? []);
       if (!failed) return c;
       // SRD 5.2.1 Exhaustion: cumulative, and "You die if your Exhaustion level
@@ -45,7 +49,7 @@ export function applyForcedMarch(
       // only checks the active PC, which would otherwise delay the death).
       const lvl = Math.min(6, (c.exhaustion_level ?? 0) + 1);
       if (lvl >= 6) {
-        notes.push(`${c.name} (DC ${dc} CON) collapses and dies of exhaustion`);
+        notes.push(`${c.name} (DC ${baseDc} CON) collapses and dies of exhaustion`);
         return {
           ...c,
           exhaustion_level: 6,
@@ -54,7 +58,7 @@ export function applyForcedMarch(
           conditions: (c.conditions ?? []).filter((x) => x !== 'unconscious'),
         };
       }
-      notes.push(`${c.name} (DC ${dc} CON) → Exhaustion ${lvl}`);
+      notes.push(`${c.name} (DC ${baseDc} CON) → Exhaustion ${lvl}`);
       return { ...c, exhaustion_level: lvl };
     });
   }

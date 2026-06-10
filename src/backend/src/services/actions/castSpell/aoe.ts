@@ -1,4 +1,4 @@
-import type { Character, Spell } from '../../../types.js';
+import type { AbilityKey, Character, Spell } from '../../../types.js';
 import {
   TURN_LOOP_MANAGED_CONDITIONS,
   applyPartyLevelUps,
@@ -33,6 +33,7 @@ import type { ActionContext } from '../types.js';
 import { concentrationRoundsFor } from './utils.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
+import { wornSaveBonus } from '../../wornEffects.js';
 
 /**
  * AOE-on-grid branch. Resolves area-of-effect spells against every
@@ -313,10 +314,16 @@ export function runAoeSpell(
           ];
           allyCover = coverBonus(epicenter, target.pos, obstaclesAllyAoe);
         }
+        // Worn-gear save bonus (Cloak / Ring of Protection's +1 to all saves) —
+        // the ally is a PC caught in the blast, so fold their bonus into the DC
+        // (same mechanism as conditionSavingThrow). The enemy branch above
+        // correctly gets no PC bonus.
+        const allyDc =
+          dc - wornSaveBonus(targetChar, spell.savingThrow as AbilityKey, ctx.context.lootTable);
         const allyFailed = rollConditionSave(
           spell.savingThrow,
           allyScore,
-          dc,
+          allyDc,
           false,
           char.level,
           allyCover,

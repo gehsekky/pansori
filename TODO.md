@@ -12,11 +12,12 @@ documented deferrals.
       **Ring of Protection** (a new `ac_bonus` worn-effect kind folded into the
       stored AC at every recompute site, plus `save_bonus` extended to
       `ability: 'all'`) and the **Greater/Superior/Supreme Healing Potion** ladder
-      (pure data). Remaining candidates: stat-set items (Amulet of Health,
-      Gauntlets of Ogre Power — needs an ability-score-override kind), +N magic
-      weapons/armor (attack/damage/AC riders), and broadening the worn save bonus
-      beyond the condition-save path (the existing extension point — applies at
-      `conditionSavingThrow` today, not at forced-march / direct breath saves).
+      (pure data). The worn save bonus now applies at **all PC save sites** —
+      `conditionSavingThrow` (conditions), forced-march CON saves, enemy-AoE/
+      breath/lair party saves, and the AoE friendly-fire ally branch (enemy
+      savers correctly excluded). Remaining candidates: stat-set items (Amulet
+      of Health, Gauntlets of Ogre Power — needs an ability-score-override kind)
+      and +N magic weapons/armor (attack/damage/AC riders).
 - [ ] **Per-campaign spell curation** — `spellTable` loads the whole SRD catalog
       everywhere; no `srdSpells(…)` selector (cf. `srdItems`) for low-magic settings.
 - [ ] **Mounts, vehicles, trade goods** — rest of the SRD equipment chapter; not modeled.

@@ -2769,10 +2769,13 @@ export function applyAoeSaveToParty(
     // etc.) and grant Barbarian Danger Sense Advantage on DEX saves.
     const proficient = hasSaveProficiency(origC, scoreKey, context);
     const dangerSenseAdv = scoreKey === 'dex' && hasDangerSense(origC);
+    // Worn-gear save bonus (Cloak / Ring of Protection's +1 to all saves) —
+    // folded into the effective DC, same mechanism as conditionSavingThrow.
+    const dc = opts.saveDC - wornSaveBonus(origC, scoreKey, context.lootTable);
     const saveFailed = rollConditionSave(
       scoreKey,
       score,
-      opts.saveDC,
+      dc,
       proficient,
       origC.level,
       0,

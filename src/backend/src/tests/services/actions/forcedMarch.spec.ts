@@ -4,6 +4,7 @@
 import type { CampaignData, Context, GameState, Seed } from '../../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionContext } from '../../../services/actions/types.js';
+import { SRD_ITEMS } from '../../../campaignData/srd/items.js';
 import { applyForcedMarch } from '../../../services/actions/markerMove.js';
 import { handleMarkerMove } from '../../../services/actions/markerMove.js';
 import { makeChar } from '../../../test-fixtures.js';
@@ -48,6 +49,28 @@ describe('applyForcedMarch — helper', () => {
     const st = stWith(470, makeChar({ id: 'a', con: 10 })); // +190 → 660 → 3 hrs past 8
     const r = applyForcedMarch(st, 190, ctx);
     expect(r.st.characters[0].exhaustion_level).toBe(3); // DC 11, 12, 13 all failed
+  });
+
+  it("a Cloak of Protection's +1 save turns a failed forced-march save into a success", () => {
+    // d20 = 10 (rnd 0.45 → floor(9)+1). At con 10 (+0), DC 11: a bare save is
+    // 10 < 11 → fail; the cloak's all-saves +1 drops the effective DC to 10 → 10
+    // ≥ 10 → made. Same roll, opposite outcome — proving the worn bonus applies.
+    vi.spyOn(Math, 'random').mockReturnValue(0.45);
+    const ctxCloak = {
+      classSavingThrows: {},
+      lootTable: [SRD_ITEMS.cloak_of_protection],
+    } as unknown as Context;
+    const cloaked = makeChar({
+      id: 'cloaked',
+      con: 10,
+      inventory: [{ instance_id: 'c1', id: 'cloak_of_protection', name: 'Cloak of Protection' }],
+      equipment: { cloak: 'c1' },
+      attuned_items: ['c1'],
+    });
+    const bare = makeChar({ id: 'bare', con: 10 });
+    const r = applyForcedMarch(stWith(470, cloaked, bare), 70, ctxCloak); // 1 hr past 8 → DC 11
+    expect(r.st.characters[0].exhaustion_level ?? 0).toBe(0); // cloaked made the save
+    expect(r.st.characters[1].exhaustion_level).toBe(1); // bare failed the same roll
   });
 
   it('skips dead characters', () => {
