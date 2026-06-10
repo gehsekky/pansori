@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import VariantListEditor from './VariantListEditor.tsx';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
+
+// string | string[] | null → an editable variant list for the game-start pool.
+const poolToVariants = (v: unknown): string[] =>
+  Array.isArray(v)
+    ? (v.filter((x) => typeof x === 'string') as string[])
+    : typeof v === 'string' && v
+      ? [v]
+      : [];
 
 // ─── NARRATIVE panel (campaign creator) ──────────────────────────────────────
 //
@@ -126,6 +135,9 @@ function asTiered(v: string[] | Tiered | undefined): Tiered {
 
 function NarrativesPanel({ campaignId }: { campaignId: string }) {
   const [nar, setNar] = useState<NarrativesShape | null>(null);
+  // The game-start opening — a separate `gameStart` section (campaign_narratives
+  // pool), edited here at the top since it's the campaign's first narrative.
+  const [gameStart, setGameStart] = useState<string[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -134,14 +146,19 @@ function NarrativesPanel({ campaignId }: { campaignId: string }) {
 
   useEffect(() => {
     setNar(null);
+    setGameStart([]);
     setLoadErr(null);
     setError(null);
     setSaved(false);
     setDirty(false);
-    api
-      .getCampaignSection(campaignId, 'narratives')
-      .then((s) => {
-        const v = (s.value && typeof s.value === 'object' ? s.value : {}) as NarrativesShape;
+    Promise.all([
+      api.getCampaignSection(campaignId, 'narratives'),
+      api.getCampaignSection(campaignId, 'gameStart'),
+    ])
+      .then(([nSec, gSec]) => {
+        const v = (
+          nSec.value && typeof nSec.value === 'object' ? nSec.value : {}
+        ) as NarrativesShape;
         // Normalize: every pool exists with its expected shape, so the UI
         // renders all of them even when the loaded value omits some.
         const next: NarrativesShape = {};
@@ -149,6 +166,7 @@ function NarrativesPanel({ campaignId }: { campaignId: string }) {
         for (const p of KEYED_POOLS) next[p.key] = asMap(v[p.key]);
         for (const p of TIERED_POOLS) next[p.key] = asTiered(v[p.key]);
         setNar(next);
+        setGameStart(poolToVariants(gSec.value));
       })
       .catch(() => setLoadErr('Could not load this campaign’s narrative pools.'));
   }, [campaignId]);
@@ -189,10 +207,21 @@ function NarrativesPanel({ campaignId }: { campaignId: string }) {
       }
       cleaned[p.key] = tiers; // required — emit even when empty ({} is a valid pool)
     }
+    // The game-start opening is its own section: one variant collapses to a
+    // string, several stay a pool; cleared entirely ⇒ delete it (fall back to
+    // the base template intro).
+    const openings = gameStart.map((v) => v.trim()).filter(Boolean);
     setBusy(true);
     setError(null);
     try {
       await api.putCampaignSection(campaignId, 'narratives', cleaned);
+      if (openings.length === 0) await api.deleteCampaignSection(campaignId, 'gameStart');
+      else
+        await api.putCampaignSection(
+          campaignId,
+          'gameStart',
+          openings.length === 1 ? openings[0] : openings
+        );
       setDirty(false);
       setSaved(true);
     } catch (err) {
@@ -257,6 +286,36 @@ function NarrativesPanel({ campaignId }: { campaignId: string }) {
             ONE LINE = ONE ENTRY. The engine picks a random line each time; blank lines are dropped
             on save. {'{tokens}'} are filled in at runtime.
           </p>
+
+          {/* Game-start opening — its own section (gameStart), a variant pool the
+              seed picks from once per new game. Each box is a full opening (may be
+              multi-paragraph), unlike the one-line-per-entry pools below. */}
+          <div style={{ marginBottom: '0.9rem' }}>
+            <p
+              style={{
+                fontSize: '0.7rem',
+                letterSpacing: '0.1em',
+                color: 'var(--t-dim)',
+                marginBottom: '0.4rem',
+              }}
+            >
+              GAME-START OPENING
+              <span style={{ textTransform: 'none', letterSpacing: 0 }}>
+                {' '}
+                · one is picked per new game · blank ⇒ the base template opening
+              </span>
+            </p>
+            <VariantListEditor
+              variants={gameStart}
+              ariaPrefix="Opening variant"
+              rows={4}
+              onChange={(next) => {
+                setGameStart(next);
+                setDirty(true);
+                setSaved(false);
+              }}
+            />
+          </div>
 
           {/* Flat pools, grouped. */}
           {FLAT_GROUPS.map((g) => (

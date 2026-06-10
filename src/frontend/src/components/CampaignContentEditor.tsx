@@ -45,11 +45,12 @@ const SOURCE_LABEL: Record<CampaignSectionSource, string> = {
   none: 'EMPTY',
 };
 
-// Sections whose value is a plain string (gameStart): edited as raw text —
-// no JSON quoting in the textarea. The API request body is JSON, so
-// escaping happens on the wire automatically; on load the string value
-// displays verbatim.
-const PLAIN_TEXT_SECTIONS = new Set(['gameStart', 'worldName', 'tagline', 'previewArt']);
+// Sections whose value is a plain string: edited as raw text — no JSON quoting
+// in the textarea. The API request body is JSON, so escaping happens on the wire
+// automatically; on load the string value displays verbatim. (The game-start
+// opening is NOT here — it's a string | string[] pool edited in the NARRATIVE
+// panel; under CONTENT it's the raw-JSON escape hatch like every other section.)
+const PLAIN_TEXT_SECTIONS = new Set(['worldName', 'tagline', 'previewArt']);
 
 // Curated terrain-art themes: each pre-fills the terrainArt JSON with a
 // per-type override map (the author can hand-tweak entries after). CLASSIC

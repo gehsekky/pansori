@@ -62,20 +62,18 @@ describe('CampaignContentEditor', () => {
     expect(screen.getByText(/room "cellar" NPC "hob"/)).toBeTruthy();
   });
 
-  it('opens a plain-text section raw — no JSON quoting', async () => {
+  it('opens gameStart as raw JSON under CONTENT (the escape hatch)', async () => {
+    // The friendly variant editor lives in the NARRATIVE panel; under CONTENT
+    // gameStart is just another raw-JSON section.
     mocked.getCampaignSection.mockResolvedValue({
       section: 'gameStart',
       source: 'code',
-      value: 'A fresh world, waiting to be written.',
+      value: 'A fresh world.',
     });
     render(<CampaignContentEditor campaignId="demo_campaign" />);
     fireEvent.click(await screen.findByText('GAMESTART'));
-    const textarea = (await screen.findByLabelText(
-      /GAMESTART — SERVING FROM TEMPLATE · PLAIN TEXT/
-    )) as HTMLTextAreaElement;
-    await waitFor(() => expect(textarea.value).toBe('A fresh world, waiting to be written.'));
-    // Template-sourced section has no DB version to reset.
-    expect(screen.queryByText('RESET TO TEMPLATE')).toBeNull();
+    const ta = (await screen.findByLabelText(/GAMESTART/)) as HTMLTextAreaElement;
+    await waitFor(() => expect(ta.value).toBe('"A fresh world."'));
   });
 
   it('loads code customs as a starting point for the customs sections', async () => {
@@ -91,26 +89,6 @@ describe('CampaignContentEditor', () => {
       /CUSTOMITEMS — SERVING FROM TEMPLATE/
     )) as HTMLTextAreaElement;
     await waitFor(() => expect(textarea.value).toContain('Moonstone Amulet'));
-  });
-
-  it('saves plain text verbatim — quotes and newlines need no escaping', async () => {
-    mocked.getCampaignSection.mockResolvedValue({
-      section: 'gameStart',
-      source: 'code',
-      value: 'A fresh world.',
-    });
-    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'gameStart', source: 'db' });
-    render(<CampaignContentEditor campaignId="demo_campaign" />);
-    fireEvent.click(await screen.findByText('GAMESTART'));
-    const textarea = await screen.findByLabelText(/GAMESTART/);
-    const raw = 'The caravan stops — "end of the line," the driver mutters.\nYou climb down.';
-    fireEvent.change(textarea, { target: { value: raw } });
-    fireEvent.click(screen.getByText('SAVE TO DATABASE'));
-    // The textarea content IS the value — stored verbatim, never JSON-parsed.
-    await waitFor(() =>
-      expect(mocked.putCampaignSection).toHaveBeenCalledWith('demo_campaign', 'gameStart', raw)
-    );
-    expect(await screen.findByText('SAVED — LIVE NOW')).toBeTruthy();
   });
 
   it('rejects invalid JSON client-side without calling the api (structured sections)', async () => {

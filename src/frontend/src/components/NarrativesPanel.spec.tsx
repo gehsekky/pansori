@@ -7,6 +7,7 @@ vi.mock('../lib/api.ts', () => ({
   api: {
     getCampaignSection: vi.fn(),
     putCampaignSection: vi.fn(),
+    deleteCampaignSection: vi.fn(),
   },
 }));
 
@@ -25,12 +26,18 @@ const SEED = {
 describe('NarrativesPanel', () => {
   beforeEach(() => {
     for (const fn of Object.values(mocked)) fn.mockReset();
-    mocked.getCampaignSection.mockResolvedValue({
-      section: 'narratives',
-      source: 'db',
-      value: SEED,
-    });
+    // Section-aware: the panel loads both `narratives` and the `gameStart` pool.
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'gameStart'
+        ? { section, source: 'none', value: null }
+        : { section: 'narratives', source: 'db', value: SEED }
+    );
     mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'narratives', source: 'db' });
+    mocked.deleteCampaignSection.mockResolvedValue({
+      ok: true,
+      section: 'gameStart',
+      source: 'none',
+    });
   });
 
   it('loads flat / tiered / keyed pools, one line per entry', async () => {
@@ -133,5 +140,42 @@ describe('NarrativesPanel', () => {
       'levelUp',
     ];
     for (const k of REQUIRED) expect(k in saved).toBe(true);
+  });
+
+  it('loads + saves the game-start opening as a pool (top of the panel)', async () => {
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'gameStart'
+        ? { section, source: 'db', value: ['Dawn breaks red over the vale.'] }
+        : { section: 'narratives', source: 'db', value: SEED }
+    );
+    render(<NarrativesPanel campaignId="sandbox" />);
+    const v1 = (await screen.findByLabelText('Opening variant 1')) as HTMLTextAreaElement;
+    expect(v1.value).toBe('Dawn breaks red over the vale.');
+    fireEvent.click(screen.getByText('+ ADD VARIANT'));
+    fireEvent.change(screen.getByLabelText('Opening variant 2'), {
+      target: { value: 'A cold mist clings to the road.' },
+    });
+    fireEvent.click(screen.getByTestId('save-narratives-btn'));
+    await waitFor(() =>
+      expect(mocked.putCampaignSection).toHaveBeenCalledWith('sandbox', 'gameStart', [
+        'Dawn breaks red over the vale.',
+        'A cold mist clings to the road.',
+      ])
+    );
+  });
+
+  it('deletes the game-start section when every opening is cleared', async () => {
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) =>
+      section === 'gameStart'
+        ? { section, source: 'db', value: 'A lone opening.' }
+        : { section: 'narratives', source: 'db', value: SEED }
+    );
+    render(<NarrativesPanel campaignId="sandbox" />);
+    const v1 = await screen.findByLabelText('Opening variant 1');
+    fireEvent.change(v1, { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('save-narratives-btn'));
+    await waitFor(() =>
+      expect(mocked.deleteCampaignSection).toHaveBeenCalledWith('sandbox', 'gameStart')
+    );
   });
 });
