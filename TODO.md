@@ -158,11 +158,19 @@ documented deferrals.
       structured in `campaign_narratives` (level/site, object, trap, NPC
       greetings/goodbyes, and the **campaign-scoped `gameStart` opening** — a
       `'campaign'` owner_kind pooled hook the seed random-picks per playthrough,
-      migrated out of the JSONB blob in migration 040). Still inline JSONB:
-      **quest** title/desc/step.desc (would make the quests section hybrid —
-      mechanics in JSONB, prose in rows) and **NPC dialogue replies**
-      (index-addressed, no stable node ids — needs its own table + an id-keyed
-      dispatcher first).
+      migrated out of the JSONB blob in migration 040). **Quests** are now a
+      first-class relational object too (`campaign_quests` + `campaign_quest_steps`,
+      migration 041) — though their prose stays plain columns, not pooled hooks
+      (quest text is persistent display, so the pool dimension is inert). Still
+      inline JSONB: **factions** (the last campaign-block script holdout) and
+      **NPC dialogue replies** (index-addressed, no stable node ids — needs its
+      own table + an id-keyed dispatcher first).
+- [ ] **Cross-section reference lint** — quest ids (dialogue `start_quest`/
+      `advance_quest`, step conditions), `factionId`, room/npc ids are FK-like
+      references across independently-saved sections; a hard FK isn't feasible
+      (order-dependent saves). A non-blocking `validate` pass over a campaign
+      would surface dangling references (today they only `console.warn` at
+      runtime). The quests table makes the quest side authoritative for it.
 - [ ] **Dialogue follow-ups** — `say` field (menu label vs spoken line),
       `goto`/node-ids for hub-and-spoke trees (the node-id work also unblocks
       moving dialogue replies into `campaign_narratives`), mid-combat surrender,

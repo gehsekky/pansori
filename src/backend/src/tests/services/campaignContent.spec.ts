@@ -70,6 +70,12 @@ function makeContentDb(initial: {
   // campaignId → narrative insert params after campaign_id:
   // [owner_kind, owner_id, hook, sort_order, text]
   const narratives = new Map<string, unknown[][]>();
+  // campaignId → quest insert params after campaign_id: [id, sort_order, title,
+  // description, giver_npc_id, faction_id, rep_gain, start_active, rewards]
+  const quests = new Map<string, unknown[][]>();
+  // campaignId → quest-step insert params after campaign_id: [quest_id, id,
+  // sort_order, description, condition]
+  const questSteps = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -293,6 +299,55 @@ function makeContentDb(initial: {
         list.filter((p) => !sql.includes(`'${p[0]}'`))
       );
       return { rows: [], rowCount: 0 };
+    }
+    if (sql.includes('INSERT INTO campaign_quests')) {
+      const [campaignId, ...rest] = params;
+      const list = quests.get(campaignId as string) ?? [];
+      list.push(rest);
+      quests.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_quests') && sql.includes('SELECT')) {
+      const list = [...(quests.get(params[0] as string) ?? [])].sort(
+        (a, b) => (a[1] as number) - (b[1] as number)
+      );
+      // pg returns JSONB columns parsed; the mock stored the stringified value.
+      const rows = list.map((p) => ({
+        id: p[0],
+        title: p[2],
+        description: p[3],
+        giver_npc_id: p[4],
+        faction_id: p[5],
+        rep_gain: p[6],
+        start_active: p[7],
+        rewards: typeof p[8] === 'string' ? JSON.parse(p[8] as string) : p[8],
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('DELETE FROM campaign_quests')) {
+      const prior = (quests.get(params[0] as string) ?? []).length;
+      quests.delete(params[0] as string);
+      questSteps.delete(params[0] as string); // FK cascade
+      return { rows: [], rowCount: prior };
+    }
+    if (sql.includes('INSERT INTO campaign_quest_steps')) {
+      const [campaignId, ...rest] = params;
+      const list = questSteps.get(campaignId as string) ?? [];
+      list.push(rest);
+      questSteps.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_quest_steps') && sql.includes('SELECT')) {
+      const list = [...(questSteps.get(params[0] as string) ?? [])].sort((a, b) =>
+        a[0] === b[0] ? (a[2] as number) - (b[2] as number) : String(a[0]) < String(b[0]) ? -1 : 1
+      );
+      const rows = list.map((p) => ({
+        quest_id: p[0],
+        id: p[1],
+        description: p[3],
+        condition: typeof p[4] === 'string' ? JSON.parse(p[4] as string) : p[4],
+      }));
+      return { rows, rowCount: rows.length };
     }
     throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
   });
@@ -1813,6 +1868,41 @@ describe('section CRUD + live refresh', () => {
     await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
     expect(contexts.demo_campaign.campaign?.quests?.map((q) => q.id)).toEqual(['code-quest']);
     expect(contexts.demo_campaign.campaign?.factions).toBeUndefined();
+  });
+
+  it('quests round-trip through the table preserving quest + step order and JSONB fields', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const quests = [
+      {
+        id: 'q_a',
+        title: 'Alpha',
+        desc: 'first',
+        steps: [
+          { id: 's1', desc: 'one', condition: { fact: 'gold', operator: 'greaterThan', value: 1 } },
+          { id: 's2', desc: 'two', condition: {} },
+          { id: 's3', desc: 'three', condition: {} },
+        ],
+        rewards: [{ type: 'give_gold', amount: 5 }],
+      },
+      {
+        id: 'q_b',
+        title: 'Beta',
+        desc: 'second',
+        steps: [{ id: 's1', desc: 'b', condition: {} }],
+        rewards: [],
+        factionId: 'guild',
+        repGain: 10,
+      },
+    ];
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'quests', quests)).toBe(true);
+    // getDbSection reconstructs the list straight from the table.
+    const back = (await getDbSection(db.pool, 'demo_campaign', 'quests')).value as typeof quests;
+    expect(back.map((q) => q.id)).toEqual(['q_a', 'q_b']); // quest order (sort_order)
+    expect(back[0].steps.map((s) => s.id)).toEqual(['s1', 's2', 's3']); // step order
+    // JSONB columns round-trip parsed.
+    expect(back[0].steps[0].condition).toEqual({ fact: 'gold', operator: 'greaterThan', value: 1 });
+    expect(back[0].rewards).toEqual([{ type: 'give_gold', amount: 5 }]);
+    expect(back[1]).toMatchObject({ factionId: 'guild', repGain: 10 });
   });
 
   it('worldName folds into campaign.world_name; tagline/previewArt overlay top-level', async () => {

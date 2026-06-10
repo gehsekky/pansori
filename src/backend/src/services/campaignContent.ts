@@ -32,11 +32,13 @@ import type {
   EnemyTemplate,
   Faction,
   FloorType,
+  GameConsequence,
   GridPos,
   LootItem,
   PlacedLoot,
   PlacedNpc,
   Quest,
+  QuestStep,
   Region,
   Room,
   RoomExit,
@@ -1298,6 +1300,10 @@ export async function getDbSection(
     const value = collapseHook(nar.get('campaign', campaignId, 'gameStart'));
     return { present: value !== undefined, value };
   }
+  if (section === 'quests') {
+    const quests = await getCampaignQuests(pool, campaignId);
+    return { present: quests.length > 0, value: quests.length > 0 ? quests : undefined };
+  }
   if (section === 'regions') {
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
@@ -1327,6 +1333,125 @@ export async function getDbSection(
 // rest land as keys in campaigns.data (parameterized jsonb_set keeps the
 // write atomic per section). Section names are validated against
 // EDITABLE_SECTIONS by the route before this runs.
+// ─── Quests (first-class table + ordered child steps) ───────────────────────
+
+interface QuestRow {
+  id: string;
+  title: string;
+  description: string;
+  giver_npc_id: string | null;
+  faction_id: string | null;
+  rep_gain: number | null;
+  start_active: boolean;
+  rewards: GameConsequence[];
+}
+interface QuestStepRow {
+  quest_id: string;
+  id: string;
+  description: string;
+  condition: object;
+}
+
+// Reconstruct the JSON Quest list from the quest rows + their ordered steps.
+// Mechanics (condition / rewards) come straight from the JSONB columns; prose
+// (title / desc / step desc) from plain columns — no campaign_narratives.
+export async function getCampaignQuests(pool: Pool, campaignId: string): Promise<Quest[]> {
+  const { rows: qRows } = await pool.query<QuestRow>(
+    `SELECT id, title, description, giver_npc_id, faction_id, rep_gain, start_active, rewards
+       FROM campaign_quests WHERE campaign_id = $1 ORDER BY sort_order`,
+    [campaignId]
+  );
+  if (qRows.length === 0) return [];
+  const { rows: sRows } = await pool.query<QuestStepRow>(
+    `SELECT quest_id, id, description, condition
+       FROM campaign_quest_steps WHERE campaign_id = $1 ORDER BY quest_id, sort_order`,
+    [campaignId]
+  );
+  const stepsByQuest = new Map<string, QuestStep[]>();
+  for (const s of sRows) {
+    const list = stepsByQuest.get(s.quest_id) ?? [];
+    list.push({ id: s.id, desc: s.description, condition: s.condition });
+    stepsByQuest.set(s.quest_id, list);
+  }
+  return qRows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    desc: r.description,
+    ...(r.giver_npc_id !== null ? { giverNpcId: r.giver_npc_id } : {}),
+    steps: stepsByQuest.get(r.id) ?? [],
+    rewards: r.rewards ?? [],
+    ...(r.faction_id !== null ? { factionId: r.faction_id } : {}),
+    ...(r.rep_gain !== null ? { repGain: r.rep_gain } : {}),
+    ...(r.start_active ? { startActive: true } : {}),
+  }));
+}
+
+// Replace-all in a txn: clear the campaign's quests (steps cascade), re-insert
+// quests + ordered steps, and strip the now-stale JSONB key (the table is the
+// source of truth — mirrors the regions/gameStart discipline).
+export async function putCampaignQuests(
+  pool: Pool,
+  campaignId: string,
+  quests: Quest[]
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query('DELETE FROM campaign_quests WHERE campaign_id = $1', [campaignId]);
+    for (let i = 0; i < quests.length; i++) {
+      const q = quests[i];
+      await client.query(
+        `INSERT INTO campaign_quests
+           (campaign_id, id, sort_order, title, description, giver_npc_id, faction_id, rep_gain, start_active, rewards)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
+        [
+          campaignId,
+          q.id,
+          i,
+          q.title,
+          q.desc,
+          q.giverNpcId ?? null,
+          q.factionId ?? null,
+          q.repGain ?? null,
+          q.startActive ?? false,
+          JSON.stringify(q.rewards ?? []),
+        ]
+      );
+      for (let j = 0; j < q.steps.length; j++) {
+        const s = q.steps[j];
+        await client.query(
+          `INSERT INTO campaign_quest_steps (campaign_id, quest_id, id, sort_order, description, condition)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+          [campaignId, q.id, s.id, j, s.desc, JSON.stringify(s.condition ?? {})]
+        );
+      }
+    }
+    await client.query(`UPDATE campaigns SET data = data - $2 WHERE id = $1`, [
+      campaignId,
+      'quests',
+    ]);
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCampaignQuests(pool: Pool, campaignId: string): Promise<boolean> {
+  const { rowCount } = await pool.query('DELETE FROM campaign_quests WHERE campaign_id = $1', [
+    campaignId,
+  ]);
+  return (rowCount ?? 0) > 0;
+}
+
 // The campaign-level game-start opening, stored as a campaign-scoped POOLED
 // hook (owner_kind 'campaign', owner_id = the campaign id, hook 'gameStart') —
 // the normalized successor to the campaigns.data 'gameStart' string. Replace-all
@@ -1381,6 +1506,9 @@ export async function putCampaignSection(
   if (section === 'gameStart') {
     return putCampaignGameStart(pool, campaignId, value as string | string[]);
   }
+  if (section === 'quests') {
+    return putCampaignQuests(pool, campaignId, value as Quest[]);
+  }
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
   }
@@ -1414,6 +1542,9 @@ export async function deleteCampaignSection(
 ): Promise<boolean> {
   if (section === 'gameStart') {
     return deleteCampaignGameStart(pool, campaignId);
+  }
+  if (section === 'quests') {
+    return deleteCampaignQuests(pool, campaignId);
   }
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
@@ -1496,13 +1627,11 @@ async function loadOverlay(
       : undefined;
   delete overlay.recommendedParty;
 
-  // Quests + factions are campaign-block fields too — extracted here and
-  // folded below (wholesale replace), never left as top-level keys.
-  const dbQuests =
-    Array.isArray(overlay.quests) && overlay.quests.length > 0
-      ? (overlay.quests as Quest[])
-      : undefined;
+  // Quests are now a first-class table (campaign_quests + steps). Drop the
+  // legacy JSONB key (inert post-migration) and read the table; factions are
+  // still a campaign-block JSONB field folded wholesale below.
   delete overlay.quests;
+  const dbQuests = await getCampaignQuests(pool, campaignId);
   const dbFactions =
     Array.isArray(overlay.factions) && overlay.factions.length > 0
       ? (overlay.factions as Faction[])
@@ -1539,7 +1668,7 @@ async function loadOverlay(
     gameStartPool !== undefined ||
     worldName !== undefined ||
     recParty !== undefined ||
-    dbQuests !== undefined ||
+    dbQuests.length > 0 ||
     dbFactions !== undefined
   ) {
     overlay.campaign = {
@@ -1552,7 +1681,7 @@ async function loadOverlay(
       ...(Array.isArray(recParty?.composition)
         ? { recommendedComposition: recParty.composition }
         : {}),
-      ...(dbQuests !== undefined ? { quests: dbQuests } : {}),
+      ...(dbQuests.length > 0 ? { quests: dbQuests } : {}),
       ...(dbFactions !== undefined ? { factions: dbFactions } : {}),
       ...(dbRegions.length > 0
         ? {
