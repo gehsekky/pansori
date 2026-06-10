@@ -199,10 +199,20 @@ export const FRESH_TURN: TurnActions = {
 export function applyDamageMultiplier(
   raw: number,
   damageType: string | undefined,
-  enemy: { resistances?: string[]; vulnerabilities?: string[]; immunities?: string[] },
-  // SRD Boon of Irresistible Offense (Overcome Defenses) sets this for B/P/S
-  // damage — Resistance is ignored, but Immunity and Vulnerability still apply.
-  opts?: { ignoreResistance?: boolean }
+  enemy: {
+    resistances?: string[];
+    vulnerabilities?: string[];
+    immunities?: string[];
+    // Damage types resisted ONLY from nonmagical attacks (e.g. an elemental's
+    // B/P/S resistance). A magical attack — `opts.magical` — bypasses these.
+    nonmagical_resistances?: string[];
+  },
+  // SRD Boon of Irresistible Offense (Overcome Defenses) sets `ignoreResistance`
+  // for B/P/S damage — Resistance is ignored, but Immunity and Vulnerability
+  // still apply. `magical` marks the source as magical (a +N weapon, the Magic
+  // Weapon spell, a spell, monk Empowered Strikes) so it bypasses
+  // `nonmagical_resistances`.
+  opts?: { ignoreResistance?: boolean; magical?: boolean }
 ): { damage: number; note: string } {
   if (!damageType) return { damage: raw, note: '' };
   if (enemy.immunities?.includes(damageType))
@@ -210,7 +220,11 @@ export function applyDamageMultiplier(
   // SRD 5.2.1 — order is: adjustments → resistance → vulnerability.
   // If a creature has both (rare), resistance halves first then vulnerability
   // doubles → net unchanged.
-  const hasResist = (enemy.resistances?.includes(damageType) ?? false) && !opts?.ignoreResistance;
+  const flatResist = enemy.resistances?.includes(damageType) ?? false;
+  // Nonmagical-only resistance applies only to a nonmagical attack.
+  const nonmagicalResist =
+    !opts?.magical && (enemy.nonmagical_resistances?.includes(damageType) ?? false);
+  const hasResist = (flatResist || nonmagicalResist) && !opts?.ignoreResistance;
   const hasVuln = enemy.vulnerabilities?.includes(damageType) ?? false;
   let dmg = raw;
   const notes: string[] = [];
@@ -355,7 +369,10 @@ export function resolveOffHandAttack(
   disadvantage = false,
   advantage = false,
   weaponProficient = true,
-  ranged = false
+  ranged = false,
+  // Flat +N from a magic off-hand weapon — added to the attack roll (the
+  // matching +N to damage is applied by the caller).
+  attackBonus = 0
 ): AttackResult {
   const strMod = abilityMod(player.str);
   const dexMod = abilityMod(player.dex);
@@ -366,7 +383,7 @@ export function resolveOffHandAttack(
   const netAdv = advantage && !disadvantage;
   const netDisadv = disadvantage && !advantage;
   const roll = netDisadv ? Math.min(roll1, d(20)) : netAdv ? Math.max(roll1, d(20)) : roll1;
-  const total = roll + atkMod + prof;
+  const total = roll + atkMod + prof + attackBonus;
   // Off-hand damage: NO ability modifier added (SRD)
   if (roll === 1)
     return {
@@ -555,12 +572,15 @@ export function computeTotalAc(
   let ac: number;
   if (armor?.armorAcBase !== undefined) {
     const cap = armor.dexCapToAc ?? Infinity;
-    ac = armor.armorAcBase + Math.min(dexMod, cap);
+    // +N magic armor adds its bonus to the worn AC.
+    ac = armor.armorAcBase + Math.min(dexMod, cap) + (armor.magicBonus ?? 0);
   } else {
     // Unarmored. Mage Armor bumps base from 10 to 13.
     ac = (mageArmorActive ? 13 : 10) + dexMod;
   }
+  // A shield adds its normal AC bonus plus any +N magic bonus.
   if (shield?.ac_bonus) ac += shield.ac_bonus;
+  if (shield?.magicBonus) ac += shield.magicBonus;
   if (shieldOfFaithActive) ac += 2;
   if (hastedActive) ac += 2;
   if (barkskinActive) ac = Math.max(ac, 17);

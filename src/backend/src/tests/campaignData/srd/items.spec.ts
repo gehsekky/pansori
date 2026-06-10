@@ -17,21 +17,21 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (38 weapons + 13 armor + 49 gear)', () => {
+  it('has the expected catalog size (45 weapons + 20 armor + 49 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
     // plus consumable/misc gear, tools, foci, light sources, thrown splash
     // weapons, ammunition (arrows / bolts / bullets / needles), and magic items
-    // (Cloak / Ring of Protection, the Healing Potion ladder, and the stat-set
-    // wondrous items: Amulet of Health, Gauntlets of Ogre Power, Headband of
-    // Intellect, and the five Belts of Giant Strength).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(100);
+    // (Cloak / Ring of Protection, the Healing Potion ladder, the stat-set
+    // wondrous items, and the +N magic weapons/armor/shields). Counts include
+    // the 7 magic weapons (weapon type) and 7 magic armor/shields (armor type).
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(114);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
     const gear = Object.values(SRD_ITEMS).filter(
       (i) => i.type === 'misc' || i.type === 'consumable'
     );
-    expect(weapons).toHaveLength(38);
-    expect(armor).toHaveLength(13);
+    expect(weapons).toHaveLength(45); // 38 base + 7 magic
+    expect(armor).toHaveLength(20); // 13 base + 7 magic (incl. shields)
     expect(gear).toHaveLength(49);
   });
 
@@ -112,6 +112,27 @@ describe('SRD_ITEMS catalog integrity', () => {
         { kind: 'set_ability', ability, value },
       ]);
     }
+  });
+
+  it('+N magic weapons clone the base weapon and stamp magicBonus', () => {
+    const ls2 = SRD_ITEMS.longsword_plus_2;
+    expect(ls2.magicBonus).toBe(2);
+    expect(ls2.type).toBe('weapon');
+    // Base stats carry through unchanged (no drift).
+    expect(ls2.damage).toBe(SRD_ITEMS.longsword.damage);
+    expect(ls2.mastery).toBe(SRD_ITEMS.longsword.mastery);
+    expect(ls2.versatileDamage).toBe(SRD_ITEMS.longsword.versatileDamage);
+    expect(ls2.requiresAttunement).toBeUndefined(); // generic +N: no attunement
+    expect(SRD_ITEMS.dagger_plus_1.magicBonus).toBe(1);
+  });
+
+  it('+N magic armor / shields carry the AC bonus on top of the base', () => {
+    expect(SRD_ITEMS.plate_armor_plus_1.magicBonus).toBe(1);
+    expect(SRD_ITEMS.plate_armor_plus_1.armorAcBase).toBe(SRD_ITEMS.plate_armor.armorAcBase);
+    // A magic shield keeps its normal +2 ac_bonus AND adds magicBonus.
+    expect(SRD_ITEMS.shield_plus_1.ac_bonus).toBe(2);
+    expect(SRD_ITEMS.shield_plus_1.magicBonus).toBe(1);
+    expect(SRD_ITEMS.shield_plus_3.magicBonus).toBe(3);
   });
 
   it('the Healing Potion ladder carries the SRD heal dice', () => {

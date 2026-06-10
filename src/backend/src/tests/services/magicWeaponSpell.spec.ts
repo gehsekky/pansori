@@ -121,7 +121,7 @@ describe('Magic Weapon — attack bonus', () => {
       seed,
       context: ctx,
     });
-    expect(r.narrative).toMatch(/\+2 \(Magic Weapon\)/);
+    expect(r.narrative).toMatch(/\+2 \(magic\)/);
   });
 });
 

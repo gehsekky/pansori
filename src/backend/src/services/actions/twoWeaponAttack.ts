@@ -87,6 +87,7 @@ export const handleTwoWeaponAttack: ActionHandler<{
     armorLootItem?.armorCategory
   );
   const disadv = condDisadv || !armorProf;
+  const offhandMagicBonus = offhandLoot.magicBonus ?? 0;
   const atk = resolveOffHandAttack(
     { str: pc.char.str, dex: pc.char.dex, level: pc.char.level },
     offhandLoot.damage,
@@ -95,7 +96,8 @@ export const handleTwoWeaponAttack: ActionHandler<{
     disadv,
     false,
     offhandProficient,
-    offhandLoot.range === 'ranged'
+    offhandLoot.range === 'ranged',
+    offhandMagicBonus
   );
 
   let nextChar = pc.char;
@@ -127,9 +129,10 @@ export const handleTwoWeaponAttack: ActionHandler<{
   // the off-hand attack's damage (off-hand normally adds none).
   const twfBonus = hasFightingStyle(pc.char, 'two_weapon') ? atk.atkMod : 0;
   const { damage: effDmg, note: dmgNote } = applyDamageMultiplier(
-    Math.max(0, atk.damage + twfBonus),
+    Math.max(0, atk.damage + twfBonus + offhandMagicBonus),
     offhandLoot.damageType,
-    enemyInRoom
+    enemyInRoom,
+    { magical: offhandMagicBonus > 0 }
   );
   const newHp = curHp - effDmg;
   let nextSt: GameState = {

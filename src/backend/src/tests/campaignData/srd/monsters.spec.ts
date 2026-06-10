@@ -439,14 +439,17 @@ describe('SRD bestiary additions — effect fields', () => {
 
   it('Wraith carries Life Drain with the full incorporeal resistance suite', () => {
     expect(SRD_MONSTERS.wraith.lifeDrain).toBe(true);
-    expect(SRD_MONSTERS.wraith.resistances).toContain('slashing');
+    // B/P/S is nonmagical-only (magic weapons bypass); elemental resist stays.
+    expect(SRD_MONSTERS.wraith.nonmagical_resistances).toContain('slashing');
+    expect(SRD_MONSTERS.wraith.resistances).toEqual(['acid', 'cold', 'fire']);
     expect(SRD_MONSTERS.wraith.immunities).toEqual(['necrotic', 'poison']);
     expect(SRD_MONSTERS.wraith.condition_immunities).toContain('grappled');
   });
 
   it('Fire Elemental is fire/poison-immune with a 10-ft fire aura', () => {
     expect(SRD_MONSTERS.fire_elemental.immunities).toEqual(['fire', 'poison']);
-    expect(SRD_MONSTERS.fire_elemental.resistances).toEqual([
+    // B/P/S resistance is from nonmagical attacks (magic weapons bypass it).
+    expect(SRD_MONSTERS.fire_elemental.nonmagical_resistances).toEqual([
       'bludgeoning',
       'piercing',
       'slashing',
@@ -525,7 +528,8 @@ describe('SRD bestiary additions — effect fields', () => {
 
   it('Air Elemental resists physical + lightning and is thunder-immune at 10-ft reach', () => {
     const a = SRD_MONSTERS.air_elemental;
-    expect(a.resistances).toEqual(['bludgeoning', 'lightning', 'piercing', 'slashing']);
+    expect(a.resistances).toEqual(['lightning']);
+    expect(a.nonmagical_resistances).toEqual(['bludgeoning', 'piercing', 'slashing']);
     expect(a.immunities).toEqual(['poison', 'thunder']);
     expect(a.damageType).toBe('thunder');
     expect(a.attackReachFt).toBe(10);
@@ -926,7 +930,7 @@ describe('Dungeon classics batch — effect fields', () => {
 
   it('the undead kit: ghost incorporeality, skeleton vulnerability, Ogre Zombie fortitude', () => {
     expect(SRD_MONSTERS.ghost.creatureType).toBe('undead');
-    expect(SRD_MONSTERS.ghost.resistances).toContain('bludgeoning');
+    expect(SRD_MONSTERS.ghost.nonmagical_resistances).toContain('bludgeoning');
     expect(SRD_MONSTERS.ghost.immunities).toEqual(['necrotic', 'poison']);
     expect(SRD_MONSTERS.warhorse_skeleton.vulnerabilities).toEqual(['bludgeoning']);
     expect(SRD_MONSTERS.minotaur_skeleton.vulnerabilities).toEqual(['bludgeoning']);
@@ -1153,7 +1157,9 @@ describe('Planar + top-end batch — effect fields', () => {
     expect(t.hp).toBe(697);
     expect(t.ac).toBe(25);
     expect(t.multiattack).toBe(4);
-    expect(t.resistances).toEqual(['bludgeoning', 'piercing', 'slashing']);
+    // Nonmagical-only B/P/S — a magic weapon bypasses it (SRD: immunity, modeled
+    // here as nonmagical resistance).
+    expect(t.nonmagical_resistances).toEqual(['bludgeoning', 'piercing', 'slashing']);
     expect(t.onHitEffect).toMatchObject({ condition: 'grappled', escapeDc: 20 });
   });
 

@@ -638,6 +638,9 @@ const LootItemSchema = z
     curseDesc: z.string().max(2000).optional(),
     armorAcBase: z.number().int().min(8).max(25).optional(),
     dexCapToAc: z.number().int().min(0).max(10).optional(),
+    // SRD +1/+2/+3 magic bonus (weapon: attack + damage + counts as magical;
+    // armor/shield: AC). Capped at the SRD's +3.
+    magicBonus: z.number().int().min(1).max(3).optional(),
     versatileDamage: DICE.optional(),
     damageType: z.string().min(1).max(20).optional(),
     thrown: z
@@ -812,6 +815,8 @@ const EnemyTemplateSchema = z
     onHitEffect: OnHitEffectSchema.optional(),
     multiattack: z.number().int().min(1).max(8).optional(),
     resistances: z.array(z.string().min(1).max(20)).optional(),
+    // Resisted only from nonmagical attacks (a magical attack bypasses these).
+    nonmagical_resistances: z.array(z.string().min(1).max(20)).optional(),
     vulnerabilities: z.array(z.string().min(1).max(20)).optional(),
     immunities: z.array(z.string().min(1).max(20)).optional(),
     condition_immunities: z.array(z.string().min(1).max(30)).optional(),

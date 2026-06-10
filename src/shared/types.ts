@@ -1850,6 +1850,11 @@ export interface LootItem {
   curseDesc?: string;
   armorAcBase?: number; // base AC of armor when worn (e.g. leather=11, chain mail=16)
   dexCapToAc?: number; // max DEX bonus added to AC (2=medium, 0=heavy; undefined=full DEX)
+  // SRD +1/+2/+3 magic items. On a WEAPON: a bonus to attack + damage rolls, and
+  // the attack counts as magical (bypasses nonmagical-only resistance). On ARMOR
+  // or a SHIELD: a bonus to AC (folded into computeTotalAc, on top of a shield's
+  // normal ac_bonus). Absent / 0 ⇒ a mundane item.
+  magicBonus?: number;
   versatileDamage?: string; // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
   damageType?: string; // piercing / slashing / bludgeoning / fire / etc.
   thrown?: { normalRange: number; longRange: number }; // melee weapon usable as ranged

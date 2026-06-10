@@ -272,6 +272,10 @@ export interface EnemyTemplate {
   onHitEffect?: OnHitEffect;
   multiattack?: number; // number of attacks per turn (default 1)
   resistances?: string[]; // damage types dealt at half damage
+  // Damage types resisted ONLY from nonmagical attacks (e.g. an elemental's
+  // B/P/S). A magical attack — a +N weapon, the Magic Weapon spell, a spell,
+  // monk Empowered Strikes — bypasses these and deals full damage.
+  nonmagical_resistances?: string[];
   vulnerabilities?: string[]; // damage types dealt at double damage
   immunities?: string[]; // damage types that deal no damage
   condition_immunities?: string[]; // conditions that cannot be applied
@@ -395,6 +399,7 @@ export interface Enemy {
   onHitEffect?: OnHitEffect;
   multiattack?: number;
   resistances?: string[];
+  nonmagical_resistances?: string[]; // resisted only from nonmagical attacks (see Enemy)
   vulnerabilities?: string[];
   immunities?: string[];
   condition_immunities?: string[];

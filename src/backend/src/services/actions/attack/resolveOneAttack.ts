@@ -377,12 +377,17 @@ export function resolveOneAttack(
       enlargeReduceNote = ` -${penalty} (Reduced)`;
     }
   }
-  // SRD Magic Weapon — flat +N to weapon damage on a hit (the matching +N to the
-  // attack roll is folded into totalAttackBonus in toHit.ts). Weapon attacks only.
+  // Magic weapons — flat +N to weapon damage on a hit (the matching +N to the
+  // attack roll is folded into totalAttackBonus in toHit.ts). Weapon attacks
+  // only. Combines a magic weapon's intrinsic `magicBonus` with the Magic Weapon
+  // spell's temporary `weapon_enhancement`.
   let magicWeaponNote = '';
-  if (atk.hit && weaponItem && (pc.char.weapon_enhancement ?? 0) > 0) {
-    baseHit += pc.char.weapon_enhancement!;
-    magicWeaponNote = ` +${pc.char.weapon_enhancement} (Magic Weapon)`;
+  const weaponMagicBonus = weaponItem
+    ? (pc.char.weapon_enhancement ?? 0) + (weaponItem.magicBonus ?? 0)
+    : 0;
+  if (atk.hit && weaponMagicBonus > 0) {
+    baseHit += weaponMagicBonus;
+    magicWeaponNote = ` +${weaponMagicBonus} (magic)`;
   }
   const versatileNote = isVersatile ? ' (versatile)' : '';
   const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
@@ -632,11 +637,14 @@ export function resolveOneAttack(
   // SRD Boon of Irresistible Offense — Overcome Defenses: B/P/S damage ignores
   // Resistance (Immunity / Vulnerability still apply).
   const overcomeResist = overcomeDefensesApplies(pc.char, effectiveDamageType);
+  // The attack counts as magical — bypassing nonmagical-only resistance — when it
+  // comes from a +N / Magic Weapon-buffed weapon or monk Empowered Strikes.
+  const magicalAttack = weaponMagicBonus > 0 || empoweredStrikes;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     effectiveDamageType,
     target,
-    { ignoreResistance: overcomeResist }
+    { ignoreResistance: overcomeResist, magical: magicalAttack }
   );
   // Radiant damage rides on top of the weapon multiplier (a creature
   // resistant to the weapon's damage type still takes full radiant).

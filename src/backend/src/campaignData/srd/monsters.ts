@@ -1154,7 +1154,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 60, // fly (hover)
     damageType: 'necrotic',
     // SRD: incorporeal — resists physical + several elements, full undead suite.
-    resistances: ['acid', 'bludgeoning', 'cold', 'fire', 'piercing', 'slashing'],
+    // The B/P/S resistance is from nonmagical attacks (magic weapons bypass it).
+    resistances: ['acid', 'cold', 'fire'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'],
     immunities: ['necrotic', 'poison'],
     condition_immunities: [
       'charmed',
@@ -1190,7 +1192,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 2, // two Burn attacks
     speedFt: 50,
     damageType: 'fire',
-    resistances: ['bludgeoning', 'piercing', 'slashing'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     immunities: ['fire', 'poison'],
     condition_immunities: [
       'exhaustion',
@@ -1228,7 +1230,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 90, // fly (hover)
     attackReachFt: 10,
     damageType: 'thunder',
-    resistances: ['bludgeoning', 'lightning', 'piercing', 'slashing'],
+    resistances: ['lightning'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     immunities: ['poison', 'thunder'],
     condition_immunities: [
       'exhaustion',
@@ -4734,7 +4737,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 50, // fly
     darkvision_ft: 120,
     immunities: ['lightning', 'poison'],
-    resistances: ['acid', 'bludgeoning', 'cold', 'fire', 'necrotic', 'piercing', 'slashing'],
+    resistances: ['acid', 'cold', 'fire', 'necrotic'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     condition_immunities: [
       'exhaustion',
       'grappled',
@@ -4998,7 +5002,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 2,
     speedFt: 40, // fly
     immunities: ['necrotic', 'poison'],
-    resistances: ['acid', 'bludgeoning', 'cold', 'fire', 'lightning', 'piercing', 'slashing'],
+    resistances: ['acid', 'cold', 'fire', 'lightning'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     condition_immunities: [
       'charmed',
       'exhaustion',
@@ -5363,7 +5368,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 3,
     speedFt: 50,
     immunities: ['poison'],
-    resistances: ['bludgeoning', 'piercing', 'slashing'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     condition_immunities: [
       'exhaustion',
       'grappled',
@@ -7127,7 +7132,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     darkvision_ft: 120, // truesight 120 ft modeled as darkvision
     onHitEffect: { condition: 'poisoned' },
     immunities: ['psychic', 'radiant'],
-    resistances: ['bludgeoning', 'piercing', 'slashing'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     // Simplification: Poisoned until end of next turn modeled as the plain condition; Constrict + spellcasting + shape-shift deferred.
   },
 
@@ -7389,7 +7394,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     attackReachFt: 10,
     onHitEffect: { condition: 'grappled', escapeDc: 14 },
     immunities: ['fire', 'poison'],
-    resistances: ['bludgeoning', 'cold', 'piercing', 'slashing'],
+    resistances: ['cold'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     condition_immunities: ['poisoned'],
     // Simplification: the grappled target is also Restrained RAW; Conjure Animated Chains deferred.
   },
@@ -7470,7 +7476,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamage: '1d12',
     bonusDamageType: 'acid',
     immunities: ['acid', 'poison', 'psychic'],
-    resistances: ['bludgeoning', 'piercing', 'slashing'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     condition_immunities: [
       'charmed',
       'exhaustion',
@@ -8316,7 +8322,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       rechargeMin: 5,
     },
     immunities: ['fire', 'poison'],
-    resistances: ['bludgeoning', 'piercing', 'slashing'],
+    nonmagical_resistances: ['bludgeoning', 'piercing', 'slashing'], // SRD: from nonmagical attacks
     condition_immunities: ['charmed', 'deafened', 'frightened', 'paralyzed', 'poisoned'],
     // SRD legendary action: Onslaught — one extra Claw or Tail.
     legendary_actions: [{ id: 'onslaught', name: 'Onslaught', cost: 1, kind: 'extra_attack' }],
