@@ -98,9 +98,13 @@ documented deferrals.
       fixed mixed group (e.g. 2 Wolves + 1 Bandit) that spawns ALL its members at
       once; each member's count scales to party size like the single-creature path.
       Authored in the zone picker (+ NEW GROUP → add members + counts + group weight).
-- [ ] **Per-terrain weighting within a zone** (optional) — terrain selects the
-      arena battleground (done) and modulates encounter *frequency*, but not yet
-      *which creature*.
+- [x] **Per-terrain creature tables within a zone** — a zone now carries
+      `terrainTables?: Record<terrain, EncounterEntry[]>` (mirrors `arenaRooms`).
+      When an encounter triggers, the triggering square's terrain table is used
+      if non-empty, else the base `encounterTable` (`zoneTableFor` in mapEngine;
+      `hasZonePool` counts terrain tables). Authored in the zone picker's
+      PER-TERRAIN TABLES section (reuses the extracted `EncounterTableEditor`);
+      empty terrain tables prune away on save.
 - [x] **Arena-room size in the picker** — the zone's arena-room dropdown + chips
       now show each room's clamped combat-grid size (e.g. `clearing (8×6)`). The
       hosted ROOMS panel's `onMaps` carries `gridWidth`/`gridHeight` (derived from

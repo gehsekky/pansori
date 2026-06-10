@@ -52,6 +52,24 @@ function encounterZoneAt(region: Region | undefined, pos: GridPos): EncounterZon
 }
 
 /**
+ * The encounter table a zone rolls on a given terrain: a non-empty terrain-
+ * specific override (`terrainTables[terrain]`) if one exists, else the zone's
+ * base `encounterTable`. Empty / absent on both ⇒ no roll.
+ */
+function zoneTableFor(zone: EncounterZone, terrain: TerrainType): EncounterEntry[] {
+  const specific = zone.terrainTables?.[terrain];
+  return specific && specific.length > 0 ? specific : (zone.encounterTable ?? []);
+}
+
+/** Does a zone roll anything anywhere — a base table OR any terrain override? */
+function zoneHasAnyTable(zone: EncounterZone): boolean {
+  return (
+    (zone.encounterTable ?? []).length > 0 ||
+    Object.values(zone.terrainTables ?? {}).some((t) => t.length > 0)
+  );
+}
+
+/**
  * The creatures an encounter entry spawns: a singleton (string / {name, weight})
  * resolves to one member at count 1; a {group} entry resolves to its member list.
  */
@@ -484,7 +502,7 @@ export function resolveMarkerMove(
     // a zone (or in a zone with an empty creature list) never rolls. The region
     // itself has no chance/table.
     const hasZonePool = (region?.encounterZones ?? []).some(
-      (z) => z.encounterChance > 0 && (z.encounterTable ?? []).length > 0
+      (z) => z.encounterChance > 0 && zoneHasAnyTable(z)
     );
     // E2E determinism: the test-login backend (E2E_TEST_LOGIN_ENABLED, never
     // production) suppresses random wilderness encounters so a scripted journey
@@ -499,7 +517,8 @@ export function resolveMarkerMove(
     let elapsedMin = 0;
     let hourSpent = false;
     for (const cell of path) {
-      const spec = TERRAIN[terrainTypeAt(region?.terrain, cell)];
+      const terrain = terrainTypeAt(region?.terrain, cell);
+      const spec = TERRAIN[terrain];
       // SRD: Travel Pace — minutes to cross this (terrain-weighted) square at
       // the party's chosen pace.
       const cellMin = Math.round((spec.travelMult * milesPerSquare * 60) / mph);
@@ -528,9 +547,10 @@ export function resolveMarkerMove(
         crossed.push(cell);
       }
       // This square's random encounter — only if the square is painted into a
-      // zone with a non-empty creature list. Fires combat right here.
+      // zone whose effective table (terrain override, else base) is non-empty.
+      // Fires combat right here.
       const zone = encounterZoneAt(region, cell);
-      const cellTable = zone?.encounterTable ?? [];
+      const cellTable = zone ? zoneTableFor(zone, terrain) : [];
       if (
         rollEncounters &&
         zone &&
@@ -541,7 +561,7 @@ export function resolveMarkerMove(
         // Pick the battleground: a room listed for THIS square's terrain type in
         // the zone's arenaRooms. No entry / empty list ⇒ leave undefined (the
         // caller uses the default bare arena).
-        const arena = zone.arenaRooms?.[terrainTypeAt(region?.terrain, cell)] ?? [];
+        const arena = zone.arenaRooms?.[terrain] ?? [];
         if (arena.length > 0)
           encounterArenaRoomId = arena[Math.floor(Math.random() * arena.length)];
         stopCell = cell;

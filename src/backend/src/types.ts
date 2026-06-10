@@ -2181,8 +2181,16 @@ export interface EncounterZone {
   name?: string;
   tier: number; // 1–4 (SRD tiers of play) — gates which CRs the table may hold
   encounterChance: number; // 0–1 per square crossed
-  encounterTable?: EncounterEntry[]; // creatures (weighted); empty / absent ⇒ the zone never rolls
+  encounterTable?: EncounterEntry[]; // base creatures (weighted); empty / absent ⇒ the zone rolls only where a terrainTables override applies
   cells: GridPos[]; // squares painted into this zone (materialized from grid `ez`)
+  // Per-terrain creature overrides, keyed by the terrain type of the square the
+  // ambush triggers on (e.g. 'forest', 'hills'). When the triggering square's
+  // terrain has a non-empty table here, the roll uses IT instead of
+  // `encounterTable` — so one zone can spawn wolves in its forest squares and
+  // bandits on its road squares. A terrain with no entry, or an empty table,
+  // falls back to the base `encounterTable`. Same entry shape + weighting as the
+  // base table. See zoneTableFor in mapEngine.
+  terrainTables?: Record<string, EncounterEntry[]>;
   // Battleground rooms to fight a rolled encounter in, keyed by the terrain type
   // of the square the ambush triggers on (e.g. 'forest', 'hills'). When the
   // triggering square's terrain has a non-empty list, a room id is picked at

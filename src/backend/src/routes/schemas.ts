@@ -335,6 +335,37 @@ const RegionSiteSchema = z
   })
   .strict();
 
+// One encounter-table entry: a bare creature name (weight 1); a {name, weight}
+// pair so a creature rolls more / less often; or a {group, weight?} fixed mixed
+// group (e.g. 2 Wolves + 1 Bandit) that spawns ALL its members at once. Weight
+// is a small integer (1–99); selection is weight-proportional.
+const EncounterEntrySchema = z.union([
+  z.string().min(1).max(80),
+  z
+    .object({
+      name: z.string().min(1).max(80),
+      weight: z.number().int().min(1).max(99),
+    })
+    .strict(),
+  z
+    .object({
+      group: z
+        .array(
+          z
+            .object({
+              name: z.string().min(1).max(80),
+              count: z.number().int().min(1).max(20),
+            })
+            .strict()
+        )
+        .min(1)
+        .max(10),
+      weight: z.number().int().min(1).max(99).optional(),
+    })
+    .strict(),
+]);
+const EncounterTableSchema = z.array(EncounterEntrySchema).max(20);
+
 const RegionsSchema = z
   .array(
     z
@@ -364,41 +395,15 @@ const RegionsSchema = z
                 name: z.string().min(1).max(80),
                 tier: z.number().int().min(1).max(4),
                 encounterChance: z.number().min(0).max(1),
-                // Each entry is one of: a bare creature name (weight 1); a
-                // {name, weight} pair so a creature rolls more / less often; or a
-                // {group, weight?} fixed mixed group (e.g. 2 Wolves + 1 Bandit)
-                // that spawns ALL its members at once. Weight is a small integer
-                // (1–99); selection is weight-proportional.
-                encounterTable: z
-                  .array(
-                    z.union([
-                      z.string().min(1).max(80),
-                      z
-                        .object({
-                          name: z.string().min(1).max(80),
-                          weight: z.number().int().min(1).max(99),
-                        })
-                        .strict(),
-                      z
-                        .object({
-                          group: z
-                            .array(
-                              z
-                                .object({
-                                  name: z.string().min(1).max(80),
-                                  count: z.number().int().min(1).max(20),
-                                })
-                                .strict()
-                            )
-                            .min(1)
-                            .max(10),
-                          weight: z.number().int().min(1).max(99).optional(),
-                        })
-                        .strict(),
-                    ])
-                  )
-                  .max(20)
-                  .optional(),
+                // The base creature table (entry shape documented on
+                // EncounterEntrySchema). Used wherever no terrainTables override
+                // applies.
+                encounterTable: EncounterTableSchema.optional(),
+                // Per-terrain creature overrides: a map of terrain (e.g.
+                // 'forest') → an encounter table the roll uses instead of the
+                // base when the ambush triggers on that terrain. Missing / empty
+                // ⇒ fall back to encounterTable.
+                terrainTables: z.record(z.string().min(1).max(40), EncounterTableSchema).optional(),
                 // Battleground rooms per triggering-square terrain type: a map
                 // of terrain (e.g. 'forest') → room ids the encounter may use as
                 // its map. Missing / empty list ⇒ the default bare arena.

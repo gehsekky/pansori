@@ -318,6 +318,48 @@ describe('RegionEditorScreen', () => {
     expect(zones[0].arenaRooms).toEqual({ forest: ['forest_clearing'] });
   });
 
+  it('authors a per-terrain override table and saves it under terrainTables', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    // Base table: a Goblin. Add a FOREST override that spawns a Wolf instead.
+    fireEvent.change(screen.getByLabelText('Add zone creature'), { target: { value: 'Goblin' } });
+    fireEvent.change(screen.getByLabelText('Add terrain table'), { target: { value: 'forest' } });
+    // The forest table's add-control is disambiguated by terrain (labelContext).
+    fireEvent.change(await screen.findByLabelText('Add forest creature'), {
+      target: { value: 'Wolf' },
+    });
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    const zones = saved[0].encounterZones as Array<{
+      encounterTable?: unknown[];
+      terrainTables?: Record<string, unknown[]>;
+    }>;
+    expect(zones[0].encounterTable).toEqual(['Goblin']);
+    expect(zones[0].terrainTables).toEqual({ forest: ['Wolf'] });
+  });
+
+  it('prunes an empty per-terrain table on save (falls back to the base table)', async () => {
+    renderEditor();
+    await screen.findByTestId('cell-0-0');
+    fireEvent.click(screen.getByRole('button', { name: 'ENC. ZONES' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ NEW ZONE' }));
+    fireEvent.mouseDown(screen.getByTestId('cell-0-0'));
+    fireEvent.change(screen.getByLabelText('Add zone creature'), { target: { value: 'Goblin' } });
+    // Add a forest override key but leave its table empty → must not persist.
+    fireEvent.change(screen.getByLabelText('Add terrain table'), { target: { value: 'forest' } });
+
+    fireEvent.click(screen.getByText('SAVE'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    const zones = saved[0].encounterZones as Array<{ terrainTables?: unknown }>;
+    expect(zones[0].terrainTables).toBeUndefined();
+  });
+
   it('shows each room’s combat-grid size in the arena picker', async () => {
     const withZone = {
       ...REGION,

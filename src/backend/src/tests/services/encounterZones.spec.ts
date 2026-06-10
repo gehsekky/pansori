@@ -61,6 +61,34 @@ describe('dbRegionsToEngine — encounter zones', () => {
       { x: 1, y: 0 },
     ]);
   });
+
+  it('carries terrainTables through, pruning empty-terrain tables and the whole map when bare', () => {
+    const mk = (terrainTables: Record<string, EncounterEntry[]>): CampaignRegion => ({
+      id: 'vale',
+      name: 'V',
+      isStartingRegion: true,
+      feetPerSquare: 5280,
+      grid: [[cell('forest', 'z'), cell('plains', 'z')]],
+      startPos: { x: 0, y: 0 },
+      encounterZones: [
+        {
+          id: 'z',
+          name: 'Z',
+          tier: 1,
+          encounterChance: 0.3,
+          encounterTable: ['Goblin'],
+          terrainTables,
+        },
+      ],
+    });
+    // A non-empty forest table survives; an empty hills table is pruned away
+    // (it would behave like "no override" ⇒ the base table).
+    const kept = dbRegionsToEngine([mk({ forest: ['Wolf'], hills: [] })])[0].encounterZones![0];
+    expect(kept.terrainTables).toEqual({ forest: ['Wolf'] });
+    // All-empty ⇒ the terrainTables key is dropped entirely.
+    const bare = dbRegionsToEngine([mk({ hills: [] })])[0].encounterZones![0];
+    expect(bare.terrainTables).toBeUndefined();
+  });
 });
 
 // ── Runtime roll ────────────────────────────────────────────────────────────
@@ -159,6 +187,45 @@ describe('resolveMarkerMove — encounters come only from zones', () => {
     ).toEqual([
       { name: 'Goblin', count: 2 },
       { name: 'Orc', count: 1 },
+    ]);
+  });
+});
+
+describe('resolveMarkerMove — per-terrain tables', () => {
+  // (1,0) is the only zoned square; mark it FOREST so a forest override applies
+  // there. Each test sets the zone's base table / overrides via the patch.
+  const forestAt10 = (patch: Record<string, unknown>): CampaignData => {
+    const c = valeCampaign();
+    const zone = c.regions![0].encounterZones![0] as unknown as Record<string, unknown>;
+    delete zone.encounterTable; // start bare; the patch supplies what it wants
+    Object.assign(zone, patch);
+    (c.regions![0] as unknown as Record<string, unknown>).terrain = [
+      { pos: { x: 1, y: 0 }, type: 'forest' },
+    ];
+    return c;
+  };
+
+  it('a terrain override replaces the base table on that terrain', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const c = forestAt10({ encounterTable: ['Goblin'], terrainTables: { forest: ['Frost Wolf'] } });
+    expect(resolveMarkerMove(c, [], start(), { x: 1, y: 0 }).encounter).toEqual([
+      { name: 'Frost Wolf', count: 1 }, // forest table wins over the base Goblin
+    ]);
+  });
+
+  it('falls back to the base table when the terrain has no override', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const c = forestAt10({ encounterTable: ['Goblin'], terrainTables: { hills: ['Wraith'] } });
+    expect(resolveMarkerMove(c, [], start(), { x: 1, y: 0 }).encounter).toEqual([
+      { name: 'Goblin', count: 1 }, // forest isn't keyed ⇒ base table
+    ]);
+  });
+
+  it('rolls from a terrain override even with no base table', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const c = forestAt10({ terrainTables: { forest: ['Frost Wolf'] } }); // no encounterTable
+    expect(resolveMarkerMove(c, [], start(), { x: 1, y: 0 }).encounter).toEqual([
+      { name: 'Frost Wolf', count: 1 }, // hasZonePool sees the terrain table
     ]);
   });
 });
@@ -306,6 +373,40 @@ describe('RegionsSchema — encounter zones', () => {
       grid: [
         [{ t: 'plains', ez: 'nowhere' }, { t: 'plains' }],
         [{ t: 'plains' }, { t: 'plains' }],
+      ],
+    });
+    expect(schema.safeParse([bad]).success).toBe(false);
+  });
+
+  it('accepts per-terrain override tables (same entry shapes as the base table)', () => {
+    const ok = baseRegion({
+      encounterZones: [
+        {
+          id: 'north',
+          name: 'A',
+          tier: 1,
+          encounterChance: 0.1,
+          encounterTable: ['Goblin'],
+          terrainTables: {
+            forest: ['Wolf', { name: 'Bear', weight: 2 }],
+            road: [{ group: [{ name: 'Bandit', count: 3 }] }],
+          },
+        },
+      ],
+    });
+    expect(schema.safeParse([ok]).success).toBe(true);
+  });
+
+  it('rejects a bad entry inside a terrain override table', () => {
+    const bad = baseRegion({
+      encounterZones: [
+        {
+          id: 'north',
+          name: 'A',
+          tier: 1,
+          encounterChance: 0.1,
+          terrainTables: { forest: [{ name: 'Wolf', weight: 0 }] }, // weight floors at 1
+        },
       ],
     });
     expect(schema.safeParse([bad]).success).toBe(false);

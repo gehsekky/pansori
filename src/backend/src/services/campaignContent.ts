@@ -195,7 +195,10 @@ export interface CampaignEncounterZone {
   name: string;
   tier: number;
   encounterChance: number;
-  encounterTable?: EncounterEntry[]; // creatures (weighted); see EncounterEntry in types.ts
+  encounterTable?: EncounterEntry[]; // base creatures (weighted); see EncounterEntry in types.ts
+  // Per-terrain creature overrides (see EncounterZone in types.ts). Stored as-is
+  // in the encounter_zones JSONB.
+  terrainTables?: Record<string, EncounterEntry[]>;
   // Battleground rooms per triggering-square terrain type (see EncounterZone in
   // types.ts). Stored as-is in the encounter_zones JSONB.
   arenaRooms?: Record<string, string[]>;
@@ -1232,6 +1235,15 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
         ...(z.encounterTable && z.encounterTable.length > 0
           ? { encounterTable: z.encounterTable }
           : {}),
+        // Per-terrain overrides — drop any terrain whose table is empty (it
+        // behaves like "no override" ⇒ the base table), and the whole map if
+        // nothing is left, so the engine zone stays minimal.
+        ...((): { terrainTables?: Record<string, EncounterEntry[]> } => {
+          const cleaned = Object.fromEntries(
+            Object.entries(z.terrainTables ?? {}).filter(([, t]) => t.length > 0)
+          );
+          return Object.keys(cleaned).length > 0 ? { terrainTables: cleaned } : {};
+        })(),
         ...(z.arenaRooms && Object.keys(z.arenaRooms).length > 0
           ? { arenaRooms: z.arenaRooms }
           : {}),
