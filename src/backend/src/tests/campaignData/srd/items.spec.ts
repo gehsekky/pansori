@@ -17,11 +17,12 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (38 weapons + 13 armor + 36 gear)', () => {
+  it('has the expected catalog size (38 weapons + 13 armor + 41 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
     // plus consumable/misc gear, tools, foci, light sources, thrown splash
-    // weapons, and ammunition (arrows / bolts / bullets / needles).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(87);
+    // weapons, ammunition (arrows / bolts / bullets / needles), and magic items
+    // (Cloak / Ring of Protection + the greater/superior/supreme Healing Potions).
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(92);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
     const gear = Object.values(SRD_ITEMS).filter(
@@ -29,7 +30,7 @@ describe('SRD_ITEMS catalog integrity', () => {
     );
     expect(weapons).toHaveLength(38);
     expect(armor).toHaveLength(13);
-    expect(gear).toHaveLength(36);
+    expect(gear).toHaveLength(41);
   });
 
   it('covers the full SRD 5.2.1 weapon + armor tables', () => {
@@ -75,6 +76,27 @@ describe('SRD_ITEMS catalog integrity', () => {
         expect(item.armorCategory, `${item.id} armorCategory`).toBeTruthy();
       }
     }
+  });
+
+  it('Cloak / Ring of Protection are attuned wondrous items with +1 AC and +1 all-saves', () => {
+    for (const id of ['cloak_of_protection', 'ring_of_protection'] as const) {
+      const item = SRD_ITEMS[id];
+      expect(item.requiresAttunement, `${id} requiresAttunement`).toBe(true);
+      expect(item.wornEffects).toEqual([
+        { kind: 'ac_bonus', bonus: 1 },
+        { kind: 'save_bonus', ability: 'all', bonus: 1 },
+      ]);
+    }
+    // Different body slots, so the two stack.
+    expect(SRD_ITEMS.cloak_of_protection.slot).toBe('cloak');
+    expect(SRD_ITEMS.ring_of_protection.slot).toBe('ring');
+  });
+
+  it('the Healing Potion ladder carries the SRD heal dice', () => {
+    expect(SRD_ITEMS.healing_potion.heal).toBe('2d4+2');
+    expect(SRD_ITEMS.greater_healing_potion.heal).toBe('4d4+4');
+    expect(SRD_ITEMS.superior_healing_potion.heal).toBe('8d4+8');
+    expect(SRD_ITEMS.supreme_healing_potion.heal).toBe('10d4+20');
   });
 });
 

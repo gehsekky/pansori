@@ -1,5 +1,7 @@
+import { clearInstance, equippedArmorId, equippedShieldId } from '../equipment.js';
 import { commitCharacter, getItemData } from '../gameEngine.js';
 import {
+  computeTotalAc,
   profBonus,
   resolveMysteryConsumable,
   resolveSaveWithAdvantage,
@@ -7,10 +9,11 @@ import {
 } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
-import { clearInstance } from '../equipment.js';
+import { defenseAcBonus } from '../fightingStyle.js';
 import { fmt } from '../narrativeFmt.js';
 import { maxAttunement } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
+import { wornAcBonus } from '../wornEffects.js';
 
 /**
  * `attune`: SRD — bind to a magic item that requires
@@ -99,6 +102,24 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
   if (lootItem?.requiresAttunement) {
     next = { ...next, equipment: clearInstance(next.equipment, action.instanceId) };
   }
+  // Ending attunement drops the item's worn effects. If it carried an AC bonus
+  // (Cloak / Ring of Protection), recompute the stored AC so it falls off now
+  // rather than waiting for the next combat-start / rest recompute.
+  next = {
+    ...next,
+    ac:
+      computeTotalAc(
+        next.dex,
+        equippedArmorId(next),
+        equippedShieldId(next),
+        next.inventory ?? [],
+        ctx.context.lootTable,
+        next.mage_armor_active ?? false,
+        next.shield_of_faith_active ?? false
+      ) +
+      defenseAcBonus(next, ctx.context.lootTable) +
+      wornAcBonus(next, ctx.context.lootTable),
+  };
   updatePcActor(ctx, next);
   ctx.narrative = `You release your attunement to the ${invItem?.name ?? 'item'}.`;
 };

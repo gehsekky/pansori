@@ -20,10 +20,29 @@ export function activeWornEffects(char: Character, lootTable: LootItem[]): WornE
   return out;
 }
 
-/** Total flat bonus to saving throws of `ability` from worn gear (e.g. +1 WIS). */
+/**
+ * Total flat bonus to saving throws of `ability` from worn gear. Counts both
+ * ability-specific bonuses (e.g. Moonstone Amulet +1 WIS) and all-saves bonuses
+ * (`ability: 'all'` — Cloak / Ring of Protection's +1 to every save).
+ */
 export function wornSaveBonus(char: Character, ability: AbilityKey, lootTable: LootItem[]): number {
   return activeWornEffects(char, lootTable).reduce(
-    (sum, e) => (e.kind === 'save_bonus' && e.ability === ability ? sum + e.bonus : sum),
+    (sum, e) =>
+      e.kind === 'save_bonus' && (e.ability === ability || e.ability === 'all')
+        ? sum + e.bonus
+        : sum,
+    0
+  );
+}
+
+/**
+ * Total flat AC bonus from worn gear (Cloak / Ring of Protection's +1). Folded
+ * into the stored `ac` at every AC-recompute site, alongside `defenseAcBonus`,
+ * so it stacks with armor and a shield.
+ */
+export function wornAcBonus(char: Character, lootTable: LootItem[]): number {
+  return activeWornEffects(char, lootTable).reduce(
+    (sum, e) => (e.kind === 'ac_bonus' ? sum + e.bonus : sum),
     0
   );
 }

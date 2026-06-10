@@ -4,6 +4,7 @@
 import type { Context, LootItem, Seed } from '../../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeChar, makeState } from '../../../test-fixtures.js';
+import { SRD_ITEMS } from '../../../campaignData/srd/items.js';
 import { context as ctx } from '../../fixtures/testContext.js';
 import { takeAction } from '../../../services/gameEngine.js';
 
@@ -47,7 +48,7 @@ const ringItem: LootItem = {
 
 const testCtx: Context = {
   ...ctx,
-  lootTable: [...ctx.lootTable, cursedItem, ringItem],
+  lootTable: [...ctx.lootTable, cursedItem, ringItem, SRD_ITEMS.cloak_of_protection],
 };
 
 const testSeed: Seed = {
@@ -166,6 +167,32 @@ describe('de_attune — voluntary unbind', () => {
     });
     expect(result.narrative).toMatch(/cannot end attunement during combat/);
     expect(result.newState.characters[0].attuned_items).toContain('ring-1');
+  });
+
+  it("drops a Cloak of Protection's +1 AC when de-attuning (and unequips it)", async () => {
+    // Worn + attuned cloak: stored AC already includes its +1.
+    const char = makeChar({
+      id: 'pc-1',
+      dex: 10, // mod 0 → unarmored base AC is exactly 10
+      ac: 11, // base 10 + the cloak's worn +1
+      inventory: [
+        { instance_id: 'cloak-1', id: 'cloak_of_protection', name: 'Cloak of Protection' },
+      ],
+      equipment: { cloak: 'cloak-1' },
+      attuned_items: ['cloak-1'],
+    });
+    const state = { ...makeState(), characters: [char], active_character_id: 'pc-1' };
+    const result = await takeAction({
+      action: { type: 'de_attune', instanceId: 'cloak-1' },
+      history: [],
+      state,
+      seed: testSeed,
+      context: testCtx,
+    });
+    const updated = result.newState.characters[0];
+    expect(updated.attuned_items).not.toContain('cloak-1');
+    expect(updated.equipment.cloak).toBeUndefined(); // implicitly unequipped
+    expect(updated.ac).toBe(10); // the worn +1 fell off
   });
 
   it('rejects de-attunement of an item not attuned', async () => {

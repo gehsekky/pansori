@@ -6,8 +6,17 @@ documented deferrals.
 
 ## Content breadth
 
-- [ ] **Magic items** — content; the body-slot + attunement + curse + worn-effect
+- [~] **Magic items** — content; the body-slot + attunement + curse + worn-effect
       infra is shipped, so new wondrous items are largely data + an effect kind.
+      Shipped: the first attuned wondrous items — **Cloak of Protection** &
+      **Ring of Protection** (a new `ac_bonus` worn-effect kind folded into the
+      stored AC at every recompute site, plus `save_bonus` extended to
+      `ability: 'all'`) and the **Greater/Superior/Supreme Healing Potion** ladder
+      (pure data). Remaining candidates: stat-set items (Amulet of Health,
+      Gauntlets of Ogre Power — needs an ability-score-override kind), +N magic
+      weapons/armor (attack/damage/AC riders), and broadening the worn save bonus
+      beyond the condition-save path (the existing extension point — applies at
+      `conditionSavingThrow` today, not at forced-march / direct breath saves).
 - [ ] **Per-campaign spell curation** — `spellTable` loads the whole SRD catalog
       everywhere; no `srdSpells(…)` selector (cf. `srdItems`) for low-magic settings.
 - [ ] **Mounts, vehicles, trade goods** — rest of the SRD equipment chapter; not modeled.

@@ -1618,7 +1618,11 @@ export type ItemSlot =
 /**
  * A passive effect an item confers while WORN in its body slot (and attuned, if
  * the item requires attunement). A small discriminated union:
- *   - `save_bonus`: flat bonus to saves of an ability (e.g. Moonstone Amulet +1 WIS).
+ *   - `save_bonus`: flat bonus to saves of an ability (e.g. Moonstone Amulet +1 WIS),
+ *     or `ability: 'all'` for a bonus to every save (Cloak / Ring of Protection).
+ *   - `ac_bonus`: flat bonus to Armor Class while worn + attuned (Cloak / Ring of
+ *     Protection's +1 AC). Folded into the stored `ac` alongside the Defense
+ *     fighting style, so it stacks with armor and recomputes on equip / attune.
  *   - `light`: the item sheds light — its bearer emits a `radiusFt` bright-light
  *     radius (dim to 2×) in combat, negating the darkness penalty around them.
  *     Mundane (no spell level), so magical Darkness can't dispel it. Synced onto
@@ -1626,7 +1630,8 @@ export type ItemSlot =
  * Extend the union as new worn-item mechanics land.
  */
 export type WornEffect =
-  | { kind: 'save_bonus'; ability: AbilityKey; bonus: number }
+  | { kind: 'save_bonus'; ability: AbilityKey | 'all'; bonus: number }
+  | { kind: 'ac_bonus'; bonus: number }
   | { kind: 'light'; radiusFt: number };
 
 // The 12 SRD classes (ids as used by Character.character_class + the keys

@@ -10,6 +10,7 @@ import { equippedArmorId, equippedShieldId, equippedWeaponId } from '../../equip
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { defenseAcBonus } from '../../fightingStyle.js';
+import { wornAcBonus } from '../../wornEffects.js';
 
 /**
  * Self / ally / self_or_ally buff branch. Handles spells where the
@@ -202,7 +203,9 @@ export function runBuffSpell(
         spell.id === 'haste' || (c.conditions ?? []).includes('hasted'),
         // SRD Barkskin — floor the AC at 17 (this cast OR an existing barkskin).
         spell.id === 'barkskin' ? true : (c.barkskin_active ?? false)
-      ) + defenseAcBonus(c, ctx.context.lootTable);
+      ) +
+      defenseAcBonus(c, ctx.context.lootTable) +
+      wornAcBonus(c, ctx.context.lootTable);
     if (isCasterTarget) {
       if (spell.id === 'mage_armor') char.mage_armor_active = true;
       if (spell.id === 'shield_of_faith') char.shield_of_faith_active = true;

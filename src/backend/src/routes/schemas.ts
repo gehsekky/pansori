@@ -570,10 +570,13 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('save_bonus'),
-      ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+      // 'all' = a bonus to every saving throw (Cloak / Ring of Protection).
+      ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha', 'all']),
       bonus: z.number().int().min(-5).max(5),
     })
     .strict(),
+  // Flat AC bonus while worn + attuned (Cloak / Ring of Protection's +1 AC).
+  z.object({ kind: z.literal('ac_bonus'), bonus: z.number().int().min(-5).max(5) }).strict(),
   z.object({ kind: z.literal('light'), radiusFt: z.number().positive() }).strict(),
 ]);
 

@@ -12,6 +12,7 @@ import type { ActionHandler } from './types.js';
 import { defenseAcBonus } from '../fightingStyle.js';
 import { resetFeatLongRestResources } from '../feats.js';
 import { updatePcActor } from './actor.js';
+import { wornAcBonus } from '../wornEffects.js';
 
 /**
  * `short_rest`: SRD — spend Hit Dice to recover HP, refresh
@@ -276,7 +277,9 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
         ctx.context.lootTable,
         false,
         false
-      ) + defenseAcBonus(refreshed, ctx.context.lootTable);
+      ) +
+      defenseAcBonus(refreshed, ctx.context.lootTable) +
+      wornAcBonus(refreshed, ctx.context.lootTable);
     return refreshed;
   });
   // SRD: a long rest is 8 hours. Advance the clock and stamp the completion

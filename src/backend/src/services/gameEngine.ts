@@ -138,6 +138,7 @@ import {
 } from './equipment.js';
 import { fmt, stripForLlm } from './narrativeFmt.js';
 import { pickHookText, returnFromEncounter } from './mapEngine.js';
+import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
@@ -148,7 +149,6 @@ import { fillEnemyTokens } from './narrative/enemyName.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 import { visibleResponses } from './dialogueGating.js';
-import { wornSaveBonus } from './wornEffects.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -746,7 +746,9 @@ export function breakConcentration(
           next.shield_of_faith_active ?? false,
           false,
           next.barkskin_active ?? false
-        ) + defenseAcBonus(next, context.lootTable);
+        ) +
+        defenseAcBonus(next, context.lootTable) +
+        wornAcBonus(next, context.lootTable);
       return next;
     };
     newSt = {
@@ -782,7 +784,9 @@ export function breakConcentration(
           false,
           false,
           cleared.barkskin_active ?? false
-        ) + defenseAcBonus(cleared, context.lootTable);
+        ) +
+        defenseAcBonus(cleared, context.lootTable) +
+        wornAcBonus(cleared, context.lootTable);
       return cleared;
     };
     newSt = { ...newSt, characters: newSt.characters.map(recomputeFor) };

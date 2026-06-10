@@ -1,4 +1,9 @@
-import { activeWornEffects, wornLightRadius, wornSaveBonus } from '../../services/wornEffects.js';
+import {
+  activeWornEffects,
+  wornAcBonus,
+  wornLightRadius,
+  wornSaveBonus,
+} from '../../services/wornEffects.js';
 import { describe, expect, it } from 'vitest';
 import type { LootItem } from '../../types.js';
 import { SRD_ITEMS } from '../../campaignData/srd/items.js';
@@ -99,5 +104,72 @@ describe('worn light sources (Torch / Hooded Lantern)', () => {
 
   it('no light source ⇒ 0', () => {
     expect(wornLightRadius(makeChar({ equipment: {} }), torchLoot)).toBe(0);
+  });
+});
+
+describe('worn AC + all-saves — Cloak / Ring of Protection', () => {
+  const loot = [SRD_ITEMS.cloak_of_protection, SRD_ITEMS.ring_of_protection];
+  const cloakInv = { instance_id: 'cl-1', id: 'cloak_of_protection', name: 'Cloak of Protection' };
+  const ringInv = { instance_id: 'rg-1', id: 'ring_of_protection', name: 'Ring of Protection' };
+
+  it('a worn + attuned Cloak grants +1 AC and +1 to every save', () => {
+    const char = makeChar({
+      inventory: [cloakInv],
+      equipment: { cloak: 'cl-1' },
+      attuned_items: ['cl-1'],
+    });
+    expect(wornAcBonus(char, loot)).toBe(1);
+    for (const ab of ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const) {
+      expect(wornSaveBonus(char, ab, loot)).toBe(1);
+    }
+  });
+
+  it('gives nothing while worn but not attuned (attunement gate)', () => {
+    const char = makeChar({
+      inventory: [cloakInv],
+      equipment: { cloak: 'cl-1' },
+      attuned_items: [],
+    });
+    expect(wornAcBonus(char, loot)).toBe(0);
+    expect(wornSaveBonus(char, 'dex', loot)).toBe(0);
+  });
+
+  it('Cloak + Ring (different slots) stack to +2 AC and +2 saves', () => {
+    const char = makeChar({
+      inventory: [cloakInv, ringInv],
+      equipment: { cloak: 'cl-1', ring_1: 'rg-1' },
+      attuned_items: ['cl-1', 'rg-1'],
+    });
+    expect(wornAcBonus(char, loot)).toBe(2);
+    expect(wornSaveBonus(char, 'wis', loot)).toBe(2);
+  });
+
+  it("an 'all' bonus stacks with an ability-specific one", () => {
+    const amulet: LootItem = {
+      id: 'moonstone_amulet',
+      name: 'Moonstone Amulet',
+      desc: '+1 WIS.',
+      weight: 1,
+      type: 'misc',
+      slot: 'neck',
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      aliases: [],
+      requiresAttunement: false,
+      wornEffects: [{ kind: 'save_bonus', ability: 'wis', bonus: 1 }],
+    };
+    const char = makeChar({
+      inventory: [
+        cloakInv,
+        { instance_id: 'am-1', id: 'moonstone_amulet', name: 'Moonstone Amulet' },
+      ],
+      equipment: { cloak: 'cl-1', neck: 'am-1' },
+      attuned_items: ['cl-1'],
+    });
+    // WIS gets Cloak's all-saves +1 AND the amulet's +1; STR gets only the all +1.
+    expect(wornSaveBonus(char, 'wis', [...loot, amulet])).toBe(2);
+    expect(wornSaveBonus(char, 'str', [...loot, amulet])).toBe(1);
   });
 });

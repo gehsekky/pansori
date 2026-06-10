@@ -93,6 +93,7 @@ import { derivedProgressFacts } from '../services/dialogueGating.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
+import { wornAcBonus } from '../services/wornEffects.js';
 
 // Resolved lazily (not a const) because startup applies DB content overlays
 // onto CONTEXTS after migrations (services/campaignContent.ts) — a captured
@@ -895,6 +896,23 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     }
     const iid = item_id!;
 
+    // The character's full AC from the current equipment: the base armor/shield/
+    // dex formula + the persistent buff flags + the Defense fighting style + worn-
+    // gear AC bonuses (Cloak / Ring of Protection). Recomputed after any equip
+    // change so the stored `ac` reflects worn magic items too.
+    const fullAc = (c: typeof char): number =>
+      computeTotalAc(
+        c.dex,
+        equippedArmorId(c),
+        equippedShieldId(c),
+        c.inventory,
+        ctx.lootTable,
+        c.mage_armor_active ?? false,
+        c.shield_of_faith_active ?? false
+      ) +
+      defenseAcBonus(c, ctx.lootTable) +
+      wornAcBonus(c, ctx.lootTable);
+
     // Attunement check: magic items that require attunement cannot be equipped until attuned
     if (loot.requiresAttunement && !(char.attuned_items ?? []).includes(iid)) {
       res
@@ -910,16 +928,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       }
       const toggling = equippedShieldId(char) === iid;
       char.equipment = setSlot(char.equipment, 'shield', toggling ? null : iid);
-      char.ac =
-        computeTotalAc(
-          char.dex,
-          equippedArmorId(char),
-          equippedShieldId(char),
-          char.inventory,
-          ctx.lootTable,
-          char.mage_armor_active ?? false,
-          char.shield_of_faith_active ?? false
-        ) + defenseAcBonus(char, ctx.lootTable);
+      char.ac = fullAc(char);
     } else if (loot.slot === 'armor') {
       const toggling = equippedArmorId(char) === iid;
       const check = canDonArmor(combatActive, loot.armorCategory ?? 'light');
@@ -928,16 +937,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         return;
       }
       char.equipment = setSlot(char.equipment, 'armor', toggling ? null : iid);
-      char.ac =
-        computeTotalAc(
-          char.dex,
-          equippedArmorId(char),
-          equippedShieldId(char),
-          char.inventory,
-          ctx.lootTable,
-          char.mage_armor_active ?? false,
-          char.shield_of_faith_active ?? false
-        ) + defenseAcBonus(char, ctx.lootTable);
+      char.ac = fullAc(char);
     } else if (loot.damage) {
       const toggling = equippedWeaponId(char) === iid;
       const check = canEquipWeapon(combatActive, turnActions);
@@ -963,6 +963,9 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         return;
       }
       char.equipment = result.equipment;
+      // Worn magic items can carry an AC bonus (Cloak / Ring of Protection), so
+      // recompute the stored AC after equipping / unequipping one.
+      char.ac = fullAc(char);
     } else {
       res.status(400).json({ error: 'Item is not equippable' });
       return;

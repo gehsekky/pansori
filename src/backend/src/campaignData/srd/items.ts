@@ -1541,6 +1541,102 @@ export const SRD_ITEMS: Record<string, LootItem> = {
     aliases: ['firearm bullets', 'firearm bullet', 'gun bullets'],
     count: 20,
   },
+
+  // ─── Magic items ─────────────────────────────────────────────────────────────
+  // The first attuned wondrous items in the catalog — they exercise the worn-
+  // effect + attunement infra (worn AND attuned to take effect). Their AC bonus
+  // is a `wornEffects` ac_bonus (folded into the stored `ac` on equip / attune);
+  // the all-saves bonus rides `wornSaveBonus` (applied at condition saves, the
+  // wired save path). Both stack with armor, a shield, and each other.
+  cloak_of_protection: {
+    // SRD Cloak of Protection — Wondrous Item, Uncommon (Requires Attunement).
+    id: 'cloak_of_protection',
+    value: 500,
+    name: 'Cloak of Protection',
+    desc: 'While worn and attuned, you gain a +1 bonus to Armor Class and to all saving throws. (Uncommon; requires attunement.)',
+    weight: 1,
+    type: 'misc',
+    slot: 'cloak',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['cloak of protection', 'protective cloak'],
+    requiresAttunement: true,
+    wornEffects: [
+      { kind: 'ac_bonus', bonus: 1 },
+      { kind: 'save_bonus', ability: 'all', bonus: 1 },
+    ],
+  },
+  ring_of_protection: {
+    // SRD Ring of Protection — Ring, Rare (Requires Attunement). Mechanically
+    // identical to the Cloak; a different body slot, so the two stack.
+    id: 'ring_of_protection',
+    value: 3500,
+    name: 'Ring of Protection',
+    desc: 'While worn and attuned, you gain a +1 bonus to Armor Class and to all saving throws. (Rare; requires attunement.)',
+    weight: 0,
+    type: 'misc',
+    slot: 'ring',
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['ring of protection', 'protection ring'],
+    requiresAttunement: true,
+    wornEffects: [
+      { kind: 'ac_bonus', bonus: 1 },
+      { kind: 'save_bonus', ability: 'all', bonus: 1 },
+    ],
+  },
+
+  // ─── Healing potions (the SRD rarity ladder above the base 2d4+2) ────────────
+  greater_healing_potion: {
+    // SRD Potion of Healing (greater) — Uncommon. Drunk/administered as a Bonus
+    // Action like the base potion (handleUse `heal`).
+    id: 'greater_healing_potion',
+    value: 150,
+    name: 'Greater Healing Potion',
+    desc: 'Restores 4d4+4 HP when consumed. (Uncommon.)',
+    weight: 2,
+    type: 'consumable',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: '4d4+4',
+    effect: null,
+    aliases: ['greater healing potion', 'potion of healing greater', 'greater potion'],
+  },
+  superior_healing_potion: {
+    // SRD Potion of Healing (superior) — Rare.
+    id: 'superior_healing_potion',
+    value: 500,
+    name: 'Superior Healing Potion',
+    desc: 'Restores 8d4+8 HP when consumed. (Rare.)',
+    weight: 2,
+    type: 'consumable',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: '8d4+8',
+    effect: null,
+    aliases: ['superior healing potion', 'potion of healing superior', 'superior potion'],
+  },
+  supreme_healing_potion: {
+    // SRD Potion of Healing (supreme) — Very Rare.
+    id: 'supreme_healing_potion',
+    value: 1350,
+    name: 'Supreme Healing Potion',
+    desc: 'Restores 10d4+20 HP when consumed. (Very Rare.)',
+    weight: 2,
+    type: 'consumable',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: '10d4+20',
+    effect: null,
+    aliases: ['supreme healing potion', 'potion of healing supreme', 'supreme potion'],
+  },
 };
 
 /** Every SRD item id, for contexts that want the full catalog. */
