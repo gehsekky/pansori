@@ -1648,6 +1648,9 @@ const FactionSchema = z
   .object({
     id: SLUG,
     name: z.string().min(1).max(80),
+    // Author-facing flavor (not yet read at runtime). Optional for back-compat
+    // with factions authored before the column existed.
+    description: z.string().max(2000).optional(),
     // Rep floor per tier — must ascend (factionAttitude resolves top-down).
     thresholds: z
       .object({

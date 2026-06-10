@@ -1532,6 +1532,9 @@ export interface QuestProgress {
 export interface Faction {
   id: string;
   name: string;
+  // Author-facing flavor — what the faction is / wants. Not yet wired into
+  // play (no narration / dialogue surface reads it); authored now for later.
+  description?: string;
   thresholds: FactionThresholds;
   shopPriceModifiers: Record<string, number>; // attitude tier → price multiplier
 }

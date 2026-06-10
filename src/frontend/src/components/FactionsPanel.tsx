@@ -13,6 +13,7 @@ import styles from '../styles.module.css';
 interface EditorFaction {
   id: string;
   name: string;
+  description?: string;
   thresholds: Record<string, number>;
   shopPriceModifiers: Record<string, number>;
   [key: string]: unknown;
@@ -218,6 +219,28 @@ function FactionsPanel({ campaignId }: { campaignId: string }) {
             >
               <span aria-hidden="true">✕</span>
             </button>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <label className={styles.formLbl} htmlFor={`faction-desc-${i}`}>
+              DESCRIPTION
+              <span style={{ color: 'var(--t-dim)', fontWeight: 'normal' }}>
+                {' '}
+                · flavor (not yet shown in play)
+              </span>
+            </label>
+            <textarea
+              id={`faction-desc-${i}`}
+              aria-label={`Faction ${i + 1} description`}
+              className={styles.formInp}
+              rows={2}
+              style={{ fontFamily: 'inherit', fontSize: '0.75rem', resize: 'vertical' }}
+              value={f.description ?? ''}
+              onChange={(ev) =>
+                touch(
+                  factions!.map((p, j) => (j === i ? { ...p, description: ev.target.value } : p))
+                )
+              }
+            />
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: 6 }}>
             {TIERS.map((tier) => (

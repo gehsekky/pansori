@@ -161,10 +161,12 @@ documented deferrals.
       migrated out of the JSONB blob in migration 040). **Quests** are now a
       first-class relational object too (`campaign_quests` + `campaign_quest_steps`,
       migration 041) — though their prose stays plain columns, not pooled hooks
-      (quest text is persistent display, so the pool dimension is inert). Still
-      inline JSONB: **factions** (the last campaign-block script holdout) and
-      **NPC dialogue replies** (index-addressed, no stable node ids — needs its
-      own table + an id-keyed dispatcher first).
+      (quest text is persistent display, so the pool dimension is inert).
+      **Factions** are now a first-class table too (`campaign_factions`, migration
+      042; thresholds + shopPriceModifiers stay JSONB columns, name + a new
+      `description` are plain columns) — which drains the campaign-block script
+      JSONB entirely. Still inline JSONB: **NPC dialogue replies** (index-addressed,
+      no stable node ids — needs its own table + an id-keyed dispatcher first).
 - [x] **Cross-section reference lint** — `lintCampaign` (services/campaignLint.ts)
       + `GET /campaigns/:id/validate` (editor-gated, non-blocking) walk the FK-like
       references — consequences (dialogue incl. `check`, quest rewards, rules:

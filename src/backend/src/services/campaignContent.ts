@@ -1304,6 +1304,10 @@ export async function getDbSection(
     const quests = await getCampaignQuests(pool, campaignId);
     return { present: quests.length > 0, value: quests.length > 0 ? quests : undefined };
   }
+  if (section === 'factions') {
+    const factions = await getCampaignFactions(pool, campaignId);
+    return { present: factions.length > 0, value: factions.length > 0 ? factions : undefined };
+  }
   if (section === 'regions') {
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
@@ -1452,6 +1456,88 @@ export async function deleteCampaignQuests(pool: Pool, campaignId: string): Prom
   return (rowCount ?? 0) > 0;
 }
 
+// ─── Factions (first-class table) ───────────────────────────────────────────
+// The last script content normalized out of the JSONB blob. thresholds +
+// shopPriceModifiers are irreducible mechanics maps → JSONB columns; name +
+// description are plain prose columns.
+interface FactionRow {
+  id: string;
+  name: string;
+  description: string;
+  thresholds: Faction['thresholds'];
+  shop_price_modifiers: Record<string, number>;
+}
+
+export async function getCampaignFactions(pool: Pool, campaignId: string): Promise<Faction[]> {
+  const { rows } = await pool.query<FactionRow>(
+    `SELECT id, name, description, thresholds, shop_price_modifiers
+       FROM campaign_factions WHERE campaign_id = $1 ORDER BY sort_order`,
+    [campaignId]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    ...(r.description ? { description: r.description } : {}),
+    thresholds: r.thresholds,
+    shopPriceModifiers: r.shop_price_modifiers ?? {},
+  }));
+}
+
+// Replace-all in a txn: clear the campaign's factions, re-insert in order, strip
+// the now-stale JSONB key (the table is the source of truth — the quests/regions
+// discipline).
+export async function putCampaignFactions(
+  pool: Pool,
+  campaignId: string,
+  factions: Faction[]
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query('DELETE FROM campaign_factions WHERE campaign_id = $1', [campaignId]);
+    for (let i = 0; i < factions.length; i++) {
+      const f = factions[i];
+      await client.query(
+        `INSERT INTO campaign_factions
+           (campaign_id, id, sort_order, name, description, thresholds, shop_price_modifiers)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+        [
+          campaignId,
+          f.id,
+          i,
+          f.name,
+          f.description ?? '',
+          JSON.stringify(f.thresholds ?? {}),
+          JSON.stringify(f.shopPriceModifiers ?? {}),
+        ]
+      );
+    }
+    await client.query(`UPDATE campaigns SET data = data - $2 WHERE id = $1`, [
+      campaignId,
+      'factions',
+    ]);
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCampaignFactions(pool: Pool, campaignId: string): Promise<boolean> {
+  const { rowCount } = await pool.query('DELETE FROM campaign_factions WHERE campaign_id = $1', [
+    campaignId,
+  ]);
+  return (rowCount ?? 0) > 0;
+}
+
 // The campaign-level game-start opening, stored as a campaign-scoped POOLED
 // hook (owner_kind 'campaign', owner_id = the campaign id, hook 'gameStart') —
 // the normalized successor to the campaigns.data 'gameStart' string. Replace-all
@@ -1509,6 +1595,9 @@ export async function putCampaignSection(
   if (section === 'quests') {
     return putCampaignQuests(pool, campaignId, value as Quest[]);
   }
+  if (section === 'factions') {
+    return putCampaignFactions(pool, campaignId, value as Faction[]);
+  }
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
   }
@@ -1545,6 +1634,9 @@ export async function deleteCampaignSection(
   }
   if (section === 'quests') {
     return deleteCampaignQuests(pool, campaignId);
+  }
+  if (section === 'factions') {
+    return deleteCampaignFactions(pool, campaignId);
   }
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
@@ -1636,11 +1728,10 @@ async function loadOverlay(
   // still a campaign-block JSONB field folded wholesale below.
   delete overlay.quests;
   const dbQuests = await getCampaignQuests(pool, campaignId);
-  const dbFactions =
-    Array.isArray(overlay.factions) && overlay.factions.length > 0
-      ? (overlay.factions as Faction[])
-      : undefined;
+  // Factions are now a first-class table too (campaign_factions). Drop the
+  // legacy JSONB key (inert post-migration) and read the table.
   delete overlay.factions;
+  const dbFactions = await getCampaignFactions(pool, campaignId);
 
   // The composed catalogs come first — room enemy placements resolve
   // against the composed bestiary below.
@@ -1673,7 +1764,7 @@ async function loadOverlay(
     worldName !== undefined ||
     recParty !== undefined ||
     dbQuests.length > 0 ||
-    dbFactions !== undefined
+    dbFactions.length > 0
   ) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
@@ -1689,7 +1780,7 @@ async function loadOverlay(
         ? { requiredMembers: recParty.requiredMembers }
         : {}),
       ...(dbQuests.length > 0 ? { quests: dbQuests } : {}),
-      ...(dbFactions !== undefined ? { factions: dbFactions } : {}),
+      ...(dbFactions.length > 0 ? { factions: dbFactions } : {}),
       ...(dbRegions.length > 0
         ? {
             regions: dbRegionsToEngine(

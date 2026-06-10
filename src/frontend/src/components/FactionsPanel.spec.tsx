@@ -73,4 +73,21 @@ describe('FactionsPanel', () => {
       shopPriceModifiers: {},
     });
   });
+
+  it('loads + edits the faction description and includes it in the save', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'factions',
+      source: 'db',
+      value: [{ ...MILLERS, description: 'Grain and bread.' }],
+    });
+    mocked.putCampaignSection.mockResolvedValue({ ok: true, section: 'factions', source: 'db' });
+    render(<FactionsPanel campaignId="sandbox" />);
+    const desc = (await screen.findByLabelText('Faction 1 description')) as HTMLTextAreaElement;
+    expect(desc.value).toBe('Grain and bread.');
+    fireEvent.change(desc, { target: { value: 'Grain, bread, and quiet leverage.' } });
+    fireEvent.click(screen.getByTestId('save-factions-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    expect(saved[0].description).toBe('Grain, bread, and quiet leverage.');
+  });
 });

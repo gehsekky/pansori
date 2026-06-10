@@ -77,6 +77,9 @@ function makeContentDb(initial: {
   // campaignId → quest-step insert params after campaign_id: [quest_id, id,
   // sort_order, description, condition]
   const questSteps = new Map<string, unknown[][]>();
+  // campaignId → faction insert params after campaign_id: [id, sort_order, name,
+  // description, thresholds, shop_price_modifiers]
+  const factions = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -349,6 +352,32 @@ function makeContentDb(initial: {
         condition: typeof p[4] === 'string' ? JSON.parse(p[4] as string) : p[4],
       }));
       return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('INSERT INTO campaign_factions')) {
+      const [campaignId, ...rest] = params;
+      const list = factions.get(campaignId as string) ?? [];
+      list.push(rest);
+      factions.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_factions') && sql.includes('SELECT')) {
+      const list = [...(factions.get(params[0] as string) ?? [])].sort(
+        (a, b) => (a[1] as number) - (b[1] as number)
+      );
+      const parse = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v);
+      const rows = list.map((p) => ({
+        id: p[0],
+        name: p[2],
+        description: p[3],
+        thresholds: parse(p[4]),
+        shop_price_modifiers: parse(p[5]),
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('DELETE FROM campaign_factions')) {
+      const prior = (factions.get(params[0] as string) ?? []).length;
+      factions.delete(params[0] as string);
+      return { rows: [], rowCount: prior };
     }
     throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
   });
@@ -1869,6 +1898,29 @@ describe('section CRUD + live refresh', () => {
     await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
     expect(contexts.demo_campaign.campaign?.quests?.map((q) => q.id)).toEqual(['code-quest']);
     expect(contexts.demo_campaign.campaign?.factions).toBeUndefined();
+  });
+
+  it('factions round-trip through the table preserving order, description + JSONB fields', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const f1 = {
+      id: 'millers',
+      name: "Millers' Guild",
+      description: 'Grain, bread, and quiet leverage.',
+      thresholds: { hostile: -20, unfriendly: -5, neutral: 0, friendly: 20, exalted: 50 },
+      shopPriceModifiers: { friendly: 0.9, exalted: 0.8 },
+    };
+    const f2 = {
+      id: 'wardens',
+      name: 'The Wardens',
+      description: 'Keepers of the old wood.',
+      thresholds: { hostile: -30, unfriendly: -10, neutral: 0, friendly: 15, exalted: 40 },
+      shopPriceModifiers: {},
+    };
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'factions', [f1, f2])).toBe(true);
+    // Read back from the table in authored order — description + JSONB intact.
+    const { present, value } = await getDbSection(db.pool, 'demo_campaign', 'factions');
+    expect(present).toBe(true);
+    expect(value).toEqual([f1, f2]);
   });
 
   it('quests round-trip through the table preserving quest + step order and JSONB fields', async () => {
