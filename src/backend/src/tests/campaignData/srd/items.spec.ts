@@ -17,12 +17,14 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (38 weapons + 13 armor + 41 gear)', () => {
+  it('has the expected catalog size (38 weapons + 13 armor + 49 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
     // plus consumable/misc gear, tools, foci, light sources, thrown splash
     // weapons, ammunition (arrows / bolts / bullets / needles), and magic items
-    // (Cloak / Ring of Protection + the greater/superior/supreme Healing Potions).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(92);
+    // (Cloak / Ring of Protection, the Healing Potion ladder, and the stat-set
+    // wondrous items: Amulet of Health, Gauntlets of Ogre Power, Headband of
+    // Intellect, and the five Belts of Giant Strength).
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(100);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
     const gear = Object.values(SRD_ITEMS).filter(
@@ -30,7 +32,7 @@ describe('SRD_ITEMS catalog integrity', () => {
     );
     expect(weapons).toHaveLength(38);
     expect(armor).toHaveLength(13);
-    expect(gear).toHaveLength(41);
+    expect(gear).toHaveLength(49);
   });
 
   it('covers the full SRD 5.2.1 weapon + armor tables', () => {
@@ -90,6 +92,26 @@ describe('SRD_ITEMS catalog integrity', () => {
     // Different body slots, so the two stack.
     expect(SRD_ITEMS.cloak_of_protection.slot).toBe('cloak');
     expect(SRD_ITEMS.ring_of_protection.slot).toBe('ring');
+  });
+
+  it('stat-set wondrous items are attuned and carry the right set_ability effect', () => {
+    const expected: Record<string, [string, number]> = {
+      amulet_of_health: ['con', 19],
+      gauntlets_of_ogre_power: ['str', 19],
+      headband_of_intellect: ['int', 19],
+      belt_of_hill_giant_strength: ['str', 21],
+      belt_of_stone_giant_strength: ['str', 23],
+      belt_of_fire_giant_strength: ['str', 25],
+      belt_of_cloud_giant_strength: ['str', 27],
+      belt_of_storm_giant_strength: ['str', 29],
+    };
+    for (const [id, [ability, value]] of Object.entries(expected)) {
+      const item = SRD_ITEMS[id];
+      expect(item.requiresAttunement, `${id} requiresAttunement`).toBe(true);
+      expect(item.wornEffects, `${id} wornEffects`).toEqual([
+        { kind: 'set_ability', ability, value },
+      ]);
+    }
   });
 
   it('the Healing Potion ladder carries the SRD heal dice', () => {

@@ -15,9 +15,13 @@ documented deferrals.
       (pure data). The worn save bonus now applies at **all PC save sites** —
       `conditionSavingThrow` (conditions), forced-march CON saves, enemy-AoE/
       breath/lair party saves, and the AoE friendly-fire ally branch (enemy
-      savers correctly excluded). Remaining candidates: stat-set items (Amulet
-      of Health, Gauntlets of Ogre Power — needs an ability-score-override kind)
-      and +N magic weapons/armor (attack/damage/AC riders).
+      savers correctly excluded). **Stat-set wondrous items** also shipped — a
+      `set_ability` worn-effect kind + `syncSetAbilities` (keeps the live score
+      effective, stashes the displaced base, ripples CON into max HP, idempotent;
+      ASIs apply to the base when overridden): Amulet of Health (CON 19),
+      Gauntlets of Ogre Power (STR 19), Headband of Intellect (INT 19), and the
+      five Belts of Giant Strength (STR 21–29). Remaining candidate: **+N magic
+      weapons/armor** (attack/damage/AC riders — the big treasure-table unlock).
 - [ ] **Per-campaign spell curation** — `spellTable` loads the whole SRD catalog
       everywhere; no `srdSpells(…)` selector (cf. `srdItems`) for low-magic settings.
 - [ ] **Mounts, vehicles, trade goods** — rest of the SRD equipment chapter; not modeled.

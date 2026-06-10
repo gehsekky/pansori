@@ -1,5 +1,6 @@
 import {
   activeWornEffects,
+  syncSetAbilities,
   wornAcBonus,
   wornLightRadius,
   wornSaveBonus,
@@ -171,5 +172,95 @@ describe('worn AC + all-saves — Cloak / Ring of Protection', () => {
     // WIS gets Cloak's all-saves +1 AND the amulet's +1; STR gets only the all +1.
     expect(wornSaveBonus(char, 'wis', [...loot, amulet])).toBe(2);
     expect(wornSaveBonus(char, 'str', [...loot, amulet])).toBe(1);
+  });
+});
+
+describe('syncSetAbilities — stat-set wondrous items', () => {
+  const healthLoot = [SRD_ITEMS.amulet_of_health];
+  const amuletInv = { instance_id: 'a1', id: 'amulet_of_health', name: 'Amulet of Health' };
+  // A level-5 PC wearing + attuned to the Amulet of Health.
+  const wornHealth = (con: number, hp = 30, max_hp = 30) =>
+    makeChar({
+      con,
+      hp,
+      max_hp,
+      level: 5,
+      inventory: [amuletInv],
+      equipment: { neck: 'a1' },
+      attuned_items: ['a1'],
+    });
+
+  it('sets the score, stashes the base, and raises max HP for a CON change', () => {
+    const c = wornHealth(14); // mod +2 → +4; Δ+2 × 5 levels = +10 HP
+    syncSetAbilities(c, healthLoot);
+    expect(c.con).toBe(19);
+    expect(c.ability_set_base).toEqual({ con: 14 });
+    expect(c.max_hp).toBe(40);
+    expect(c.hp).toBe(40);
+  });
+
+  it('has no effect when the base score is already ≥ the item value', () => {
+    const c = wornHealth(20);
+    syncSetAbilities(c, healthLoot);
+    expect(c.con).toBe(20);
+    expect(c.ability_set_base).toBeUndefined();
+    expect(c.max_hp).toBe(30);
+  });
+
+  it('does nothing while worn but not attuned (attunement gate)', () => {
+    const c = makeChar({
+      con: 14,
+      level: 5,
+      hp: 30,
+      max_hp: 30,
+      inventory: [amuletInv],
+      equipment: { neck: 'a1' },
+      attuned_items: [],
+    });
+    syncSetAbilities(c, healthLoot);
+    expect(c.con).toBe(14);
+    expect(c.ability_set_base).toBeUndefined();
+    expect(c.max_hp).toBe(30);
+  });
+
+  it('is idempotent — a second sync with the item still worn changes nothing', () => {
+    const c = wornHealth(14);
+    syncSetAbilities(c, healthLoot);
+    syncSetAbilities(c, healthLoot);
+    expect(c.con).toBe(19);
+    expect(c.max_hp).toBe(40);
+    expect(c.hp).toBe(40);
+    expect(c.ability_set_base).toEqual({ con: 14 });
+  });
+
+  it('restores the base score and unwinds the HP when the item comes off', () => {
+    const c = wornHealth(14);
+    syncSetAbilities(c, healthLoot); // con 19, max_hp 40, hp 40
+    c.equipment = {}; // take the amulet off
+    syncSetAbilities(c, healthLoot);
+    expect(c.con).toBe(14);
+    expect(c.ability_set_base).toBeUndefined();
+    expect(c.max_hp).toBe(30);
+    expect(c.hp).toBe(30);
+  });
+
+  it('takes the highest value when two items set the same ability (STR, no HP change)', () => {
+    const loot = [SRD_ITEMS.gauntlets_of_ogre_power, SRD_ITEMS.belt_of_stone_giant_strength];
+    const c = makeChar({
+      str: 10,
+      level: 5,
+      hp: 30,
+      max_hp: 30,
+      inventory: [
+        { instance_id: 'g', id: 'gauntlets_of_ogre_power', name: 'Gauntlets' },
+        { instance_id: 'b', id: 'belt_of_stone_giant_strength', name: 'Belt' },
+      ],
+      equipment: { hands: 'g', waist: 'b' },
+      attuned_items: ['g', 'b'],
+    });
+    syncSetAbilities(c, loot);
+    expect(c.str).toBe(23); // belt's 23 beats the gauntlets' 19
+    expect(c.ability_set_base).toEqual({ str: 10 });
+    expect(c.max_hp).toBe(30); // STR doesn't touch HP
   });
 });

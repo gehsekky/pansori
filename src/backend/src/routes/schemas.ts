@@ -577,6 +577,15 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
     .strict(),
   // Flat AC bonus while worn + attuned (Cloak / Ring of Protection's +1 AC).
   z.object({ kind: z.literal('ac_bonus'), bonus: z.number().int().min(-5).max(5) }).strict(),
+  // SET an ability score (Amulet of Health CON 19, Belt of Giant Strength STR
+  // 21–29). No effect if the base is already ≥ value (handled at apply time).
+  z
+    .object({
+      kind: z.literal('set_ability'),
+      ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+      value: z.number().int().min(3).max(30),
+    })
+    .strict(),
   z.object({ kind: z.literal('light'), radiusFt: z.number().positive() }).strict(),
 ]);
 

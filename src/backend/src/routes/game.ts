@@ -85,6 +85,7 @@ import {
 } from '../services/equipment.js';
 import { generateSeed, reconcileSeedWithContext } from '../services/procgen.js';
 import { initMapState, regionEnterNarration } from '../services/mapEngine.js';
+import { syncSetAbilities, wornAcBonus } from '../services/wornEffects.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
@@ -93,7 +94,6 @@ import { derivedProgressFacts } from '../services/dialogueGating.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
-import { wornAcBonus } from '../services/wornEffects.js';
 
 // Resolved lazily (not a const) because startup applies DB content overlays
 // onto CONTEXTS after migrations (services/campaignContent.ts) — a captured
@@ -963,8 +963,11 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         return;
       }
       char.equipment = result.equipment;
-      // Worn magic items can carry an AC bonus (Cloak / Ring of Protection), so
-      // recompute the stored AC after equipping / unequipping one.
+      // Worn magic items can SET an ability score (Amulet of Health, Gauntlets
+      // of Ogre Power, Belt of Giant Strength) — re-derive effective scores +
+      // CON-linked HP first, then recompute AC (which reads the live dex and any
+      // Cloak / Ring of Protection AC bonus).
+      syncSetAbilities(char, ctx.lootTable);
       char.ac = fullAc(char);
     } else {
       res.status(400).json({ error: 'Item is not equippable' });

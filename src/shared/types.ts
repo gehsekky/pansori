@@ -1618,6 +1618,12 @@ export type ItemSlot =
  *   - `ac_bonus`: flat bonus to Armor Class while worn + attuned (Cloak / Ring of
  *     Protection's +1 AC). Folded into the stored `ac` alongside the Defense
  *     fighting style, so it stacks with armor and recomputes on equip / attune.
+ *   - `set_ability`: SET an ability score to `value` while worn + attuned, with no
+ *     effect if the base is already that high (Amulet of Health CON 19, Gauntlets
+ *     of Ogre Power STR 19, Headband of Intellect INT 19, Belt of Giant Strength
+ *     STR 21–29). Re-derived by `syncSetAbilities`, which keeps the live
+ *     `char.<ability>` as the effective score and stashes the displaced base in
+ *     `ability_set_base` (and adjusts max HP for a CON change).
  *   - `light`: the item sheds light — its bearer emits a `radiusFt` bright-light
  *     radius (dim to 2×) in combat, negating the darkness penalty around them.
  *     Mundane (no spell level), so magical Darkness can't dispel it. Synced onto
@@ -1627,6 +1633,7 @@ export type ItemSlot =
 export type WornEffect =
   | { kind: 'save_bonus'; ability: AbilityKey | 'all'; bonus: number }
   | { kind: 'ac_bonus'; bonus: number }
+  | { kind: 'set_ability'; ability: AbilityKey; value: number }
   | { kind: 'light'; radiusFt: number };
 
 // The 12 SRD classes (ids as used by Character.character_class + the keys

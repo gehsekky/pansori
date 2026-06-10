@@ -1103,6 +1103,13 @@ export interface Character {
   int: number;
   wis: number;
   cha: number;
+  // For abilities currently SET by a worn `set_ability` item (Amulet of Health,
+  // Gauntlets of Ogre Power, Belt of Giant Strength, …): the TRUE base score the
+  // ability would have without the item. The live `str`/`con`/… above hold the
+  // EFFECTIVE score (so every read sees the boost), and this map records what to
+  // restore on removal. Managed solely by `syncSetAbilities`; absent/empty when
+  // no set-ability item is worn. ASIs apply to the base here when overridden.
+  ability_set_base?: Partial<Record<AbilityKey, number>>;
   xp: number;
   level: number;
   gold: number;

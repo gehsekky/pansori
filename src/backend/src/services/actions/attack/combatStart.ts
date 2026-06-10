@@ -13,12 +13,12 @@ import {
   superiorInspirationTopUp,
   uncannyMetabolismRefresh,
 } from '../../multiclass.js';
+import { syncSetAbilities, wornLightRadius } from '../../wornEffects.js';
 import type { ActionContext } from '../types.js';
 import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { improveFateRefresh } from '../../improveFate.js';
 import { inRange } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
-import { wornLightRadius } from '../../wornEffects.js';
 
 /**
  * Optional combat-start tuning. `openingBlow.weapon` is supplied by the Attack
@@ -100,8 +100,15 @@ export function runCombatStart(
         )
       )
     );
+    // Insurance: re-derive any `set_ability` item's effective scores (Amulet of
+    // Health, Belt of Giant Strength, …) at combat start. Idempotent for the
+    // normal equip/attune flow; corrects a state seeded with a pre-equipped item
+    // that never ran through the equip route. Copy first so the source array
+    // element isn't mutated in place.
+    const synced = { ...refreshed };
+    syncSetAbilities(synced, ctx.context.lootTable);
     const entry = order.find((e) => e.id === c.id);
-    return entry ? { ...refreshed, initiative_roll: entry.roll } : refreshed;
+    return entry ? { ...synced, initiative_roll: entry.roll } : synced;
   });
   ctx.st = { ...ctx.st, characters: updatedCharsForInit, initiative_order: order };
 

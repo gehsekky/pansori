@@ -48,7 +48,13 @@ const ringItem: LootItem = {
 
 const testCtx: Context = {
   ...ctx,
-  lootTable: [...ctx.lootTable, cursedItem, ringItem, SRD_ITEMS.cloak_of_protection],
+  lootTable: [
+    ...ctx.lootTable,
+    cursedItem,
+    ringItem,
+    SRD_ITEMS.cloak_of_protection,
+    SRD_ITEMS.amulet_of_health,
+  ],
 };
 
 const testSeed: Seed = {
@@ -193,6 +199,67 @@ describe('de_attune — voluntary unbind', () => {
     expect(updated.attuned_items).not.toContain('cloak-1');
     expect(updated.equipment.cloak).toBeUndefined(); // implicitly unequipped
     expect(updated.ac).toBe(10); // the worn +1 fell off
+  });
+
+  it('restores the base CON and unwinds max HP when de-attuning an Amulet of Health', async () => {
+    // Worn + attuned amulet: CON already SET to 19 (base 14), and the level-5
+    // HP boost (Δ+2 mod × 5 = +10) baked into max_hp/hp by syncSetAbilities.
+    const char = makeChar({
+      id: 'pc-1',
+      con: 19,
+      level: 5,
+      hp: 40,
+      max_hp: 40,
+      ability_set_base: { con: 14 },
+      inventory: [{ instance_id: 'am1', id: 'amulet_of_health', name: 'Amulet of Health' }],
+      equipment: { neck: 'am1' },
+      attuned_items: ['am1'],
+    });
+    const state = { ...makeState(), characters: [char], active_character_id: 'pc-1' };
+    const result = await takeAction({
+      action: { type: 'de_attune', instanceId: 'am1' },
+      history: [],
+      state,
+      seed: testSeed,
+      context: testCtx,
+    });
+    const updated = result.newState.characters[0];
+    expect(updated.attuned_items).not.toContain('am1');
+    expect(updated.equipment.neck).toBeUndefined();
+    expect(updated.con).toBe(14); // base restored
+    expect(updated.ability_set_base).toBeUndefined();
+    expect(updated.max_hp).toBe(30); // the +10 boost unwound
+    expect(updated.hp).toBe(30);
+  });
+
+  it('an ASI on a CON the Amulet of Health is setting raises the base, not the effective', async () => {
+    const char = makeChar({
+      id: 'pc-1',
+      con: 19,
+      level: 5,
+      hp: 40,
+      max_hp: 40,
+      asi_pending: true,
+      ability_set_base: { con: 14 },
+      inventory: [{ instance_id: 'am1', id: 'amulet_of_health', name: 'Amulet of Health' }],
+      equipment: { neck: 'am1' },
+      attuned_items: ['am1'],
+    });
+    const state = { ...makeState(), characters: [char], active_character_id: 'pc-1' };
+    const result = await takeAction({
+      action: { type: 'apply_asi', stat: 'con' },
+      history: [],
+      state,
+      seed: testSeed,
+      context: testCtx,
+    });
+    const updated = result.newState.characters[0];
+    // +2 lands on the base (14 → 16); effective stays 19 (amulet still wins), so
+    // no HP change — but removing the amulet would now leave CON 16, not 14.
+    expect(updated.ability_set_base).toEqual({ con: 16 });
+    expect(updated.con).toBe(19);
+    expect(updated.max_hp).toBe(40);
+    expect(updated.asi_pending).toBe(false);
   });
 
   it('rejects de-attunement of an item not attuned', async () => {

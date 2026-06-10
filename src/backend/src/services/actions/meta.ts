@@ -29,6 +29,7 @@ import {
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { masterableWeapons } from '../../campaignData/srd/index.js';
+import { syncSetAbilities } from '../wornEffects.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -49,15 +50,27 @@ export const handleApplyAsi: ActionHandler<{ type: 'apply_asi'; stat: AbilityKey
   }
   const stat = action.stat;
   const next = { ...char, asi_pending: false } as typeof char;
-  next[stat] = (char[stat] ?? 10) + 2;
   const statName = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }[stat];
-  let narrative = `${next.name} increases ${statName} by 2 (now ${next[stat]})!`;
-  if (stat === 'con') {
-    const bonus = Math.floor((next.con - 10) / 2) - Math.floor((next.con - 2 - 10) / 2);
-    next.max_hp = Math.max(1, next.max_hp + bonus * next.level);
-    next.hp = Math.min(next.max_hp, next.hp + bonus * next.level);
-    if (bonus > 0)
-      narrative += ` Max HP increased by ${bonus * next.level} (${bonus}/level × ${next.level} levels).`;
+  const overrideBase = next.ability_set_base?.[stat];
+  let narrative: string;
+  if (overrideBase !== undefined) {
+    // The stat is currently SET by a worn item (e.g. Gauntlets of Ogre Power,
+    // Belt of Giant Strength). Raise the TRUE base, then re-derive the effective
+    // score (and any CON-linked HP) — the +2 takes effect now only if it pushes
+    // the base above the item's value, but it's never lost on item removal.
+    next.ability_set_base = { ...next.ability_set_base, [stat]: overrideBase + 2 };
+    syncSetAbilities(next, ctx.context.lootTable);
+    narrative = `${next.name} increases ${statName} by 2 (base now ${overrideBase + 2}; effective ${next[stat]}).`;
+  } else {
+    next[stat] = (char[stat] ?? 10) + 2;
+    narrative = `${next.name} increases ${statName} by 2 (now ${next[stat]})!`;
+    if (stat === 'con') {
+      const bonus = Math.floor((next.con - 10) / 2) - Math.floor((next.con - 2 - 10) / 2);
+      next.max_hp = Math.max(1, next.max_hp + bonus * next.level);
+      next.hp = Math.min(next.max_hp, next.hp + bonus * next.level);
+      if (bonus > 0)
+        narrative += ` Max HP increased by ${bonus * next.level} (${bonus}/level × ${next.level} levels).`;
+    }
   }
   updatePcActor(ctx, next);
   ctx.narrative = narrative;

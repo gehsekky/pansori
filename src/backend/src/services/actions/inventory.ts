@@ -7,13 +7,13 @@ import {
   resolveSaveWithAdvantage,
   rollDice,
 } from '../rulesEngine.js';
+import { syncSetAbilities, wornAcBonus } from '../wornEffects.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { defenseAcBonus } from '../fightingStyle.js';
 import { fmt } from '../narrativeFmt.js';
 import { maxAttunement } from '../multiclass.js';
 import { updatePcActor } from './actor.js';
-import { wornAcBonus } from '../wornEffects.js';
 
 /**
  * `attune`: SRD — bind to a magic item that requires
@@ -102,9 +102,13 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
   if (lootItem?.requiresAttunement) {
     next = { ...next, equipment: clearInstance(next.equipment, action.instanceId) };
   }
-  // Ending attunement drops the item's worn effects. If it carried an AC bonus
-  // (Cloak / Ring of Protection), recompute the stored AC so it falls off now
-  // rather than waiting for the next combat-start / rest recompute.
+  // Ending attunement drops the item's worn effects. A `set_ability` item
+  // (Amulet of Health, Belt of Giant Strength, …) must restore the true base
+  // score (and unwind any CON-linked HP) — re-derive before the AC recompute,
+  // which reads the live dex.
+  syncSetAbilities(next, ctx.context.lootTable);
+  // If it carried an AC bonus (Cloak / Ring of Protection), recompute the stored
+  // AC so it falls off now rather than waiting for the next combat-start / rest.
   next = {
     ...next,
     ac:
