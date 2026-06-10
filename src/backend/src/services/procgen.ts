@@ -31,7 +31,12 @@ export function generateSeed(context: Context, partySize = 1): Seed {
     context_id: context.id,
     world_name: c.world_name,
     ship_name: c.world_name,
-    intro: c.intro,
+    // The opening: random-pick a variant from the campaign-scoped gameStart pool
+    // (per new game), falling back to the static intro when none is authored.
+    intro:
+      c.gameStart && c.gameStart.length > 0
+        ? c.gameStart[Math.floor(Math.random() * c.gameStart.length)]
+        : c.intro,
     rooms: c.rooms,
     enemies: scaledEnemies,
     loot: c.loot ?? {},

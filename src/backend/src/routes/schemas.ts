@@ -1781,9 +1781,13 @@ const RecommendedPartySchema = z
   .strict();
 
 export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
-  // Narration hook: the first narrative entry of a new game (overlays the
-  // code/template campaign.intro).
-  gameStart: z.string().min(1).max(4000),
+  // Narration hook: the opening of a new game, a campaign-scoped pooled hook in
+  // campaign_narratives. A single string (one variant) or an array (a pool the
+  // seed random-picks from per playthrough). Falls back to campaign.intro.
+  gameStart: z.union([
+    z.string().min(1).max(4000),
+    z.array(z.string().min(1).max(4000)).min(1).max(20),
+  ]),
   // The prose world name (campaign.world_name — distinct from campaigns.name,
   // the picker/header identity: "The Sky Has Fallen" can be set in "Auria").
   worldName: z.string().min(1).max(120),

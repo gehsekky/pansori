@@ -31,6 +31,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
 import type { Context } from '../../types.js';
 import type { Pool } from 'pg';
+import { generateSeed } from '../../services/procgen.js';
 import { context as shippedCtx } from '../fixtures/testContext.js';
 
 function codeCtx(partial: Partial<Context> & { id: string }): Context {
@@ -1146,12 +1147,15 @@ describe('editable sections registry', () => {
     );
   });
 
-  it('gameStart schema is a plain narration string', () => {
+  it('gameStart schema accepts a string or a non-empty variant pool', () => {
     const gameStart = CAMPAIGN_SECTION_SCHEMAS.gameStart;
     expect(gameStart.safeParse('The road south is long and the coin pouch light.').success).toBe(
       true
     );
+    // A pool (array of variants) is accepted too.
+    expect(gameStart.safeParse(['Dawn breaks.', 'A storm rolls in.']).success).toBe(true);
     expect(gameStart.safeParse('').success).toBe(false);
+    expect(gameStart.safeParse([]).success).toBe(false); // empty pool rejected
     expect(gameStart.safeParse({ text: 'nope' }).success).toBe(false);
   });
 
@@ -1695,7 +1699,7 @@ describe('section CRUD + live refresh', () => {
     expect(campaign.towns?.[0].venues.map((v) => v.id)).toEqual(['gate', 'tavern']);
   });
 
-  it('gameStart folds into campaign.intro, never the top level; delete restores code', async () => {
+  it('gameStart stores as a campaign-scoped pooled hook feeding the opening; delete reverts to code', async () => {
     const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const code = codeCtx({
       id: 'demo_campaign',
@@ -1710,16 +1714,47 @@ describe('section CRUD + live refresh', () => {
     expect(
       await putCampaignSection(db.pool, 'demo_campaign', 'gameStart', 'A new dawn over the vale.')
     ).toBe(true);
+    // Round-trips from campaign_narratives (one variant collapses to a string).
+    expect((await getDbSection(db.pool, 'demo_campaign', 'gameStart')).value).toBe(
+      'A new dawn over the vale.'
+    );
     await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
-    expect(contexts.demo_campaign.campaign?.intro).toBe('A new dawn over the vale.');
-    // The hook lands inside the campaign block — no stray top-level field —
-    // and the rest of the block survives.
+    // The opening is a pool on the campaign block (not a stray top-level field);
+    // the static intro stays the code fallback, and the seed picks the pool.
+    expect(contexts.demo_campaign.campaign?.gameStart).toEqual(['A new dawn over the vale.']);
+    expect(contexts.demo_campaign.campaign?.intro).toBe('The code opening.');
     expect('gameStart' in contexts.demo_campaign).toBe(false);
     expect(contexts.demo_campaign.campaign?.rooms.map((r) => r.id)).toEqual(['square']);
+    expect(generateSeed(contexts.demo_campaign, 1).intro).toBe('A new dawn over the vale.');
 
-    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'gameStart')).toBe(true);
+    // (The fake DB can't report a narratives-only DELETE rowCount, so assert the
+    // effect rather than the boolean: the pool is gone and the opening reverts.)
+    await deleteCampaignSection(db.pool, 'demo_campaign', 'gameStart');
     await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
-    expect(contexts.demo_campaign.campaign?.intro).toBe('The code opening.');
+    expect(contexts.demo_campaign.campaign?.gameStart).toBeUndefined();
+    expect(generateSeed(contexts.demo_campaign, 1).intro).toBe('The code opening.');
+  });
+
+  it('gameStart supports a multi-variant pool the seed random-picks from', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const code = codeCtx({
+      id: 'demo_campaign',
+      campaign: {
+        world_name: 'Demo',
+        intro: 'code',
+        rooms: [{ id: 'sq', name: 'Sq', desc: 'd' }],
+      } as never,
+    });
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    const variants = ['Dawn breaks red over the vale.', 'A cold mist clings to the road.'];
+
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'gameStart', variants)).toBe(true);
+    // A multi-variant pool round-trips as an array (not collapsed).
+    expect((await getDbSection(db.pool, 'demo_campaign', 'gameStart')).value).toEqual(variants);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.gameStart).toEqual(variants);
+    // Each new game's opening is one of the pool variants.
+    expect(variants).toContain(generateSeed(contexts.demo_campaign, 1).intro);
   });
 
   it('quests + factions fold into the campaign block wholesale; delete restores code', async () => {
@@ -1924,11 +1959,14 @@ describe('section CRUD + live refresh', () => {
     expect(contexts.demo_campaign.theme).toBeUndefined();
   });
 
-  it('gameStart overlays the base template intro for DB-born campaigns', async () => {
-    const db = makeContentDb({ campaigns: { ghost: { gameStart: 'Boo. The tale begins.' } } });
+  it('gameStart feeds the opening over the base template for DB-born campaigns', async () => {
+    const db = makeContentDb({ campaigns: { ghost: {} } });
     const contexts: Record<string, Context> = {};
+    await putCampaignSection(db.pool, 'ghost', 'gameStart', 'Boo. The tale begins.');
     await refreshCampaignOverlay(db.pool, contexts, {}, 'ghost');
-    expect(contexts.ghost.campaign?.intro).toBe('Boo. The tale begins.');
+    // Rides as a campaign-scoped pool; the seed picks it as the opening.
+    expect(contexts.ghost.campaign?.gameStart).toEqual(['Boo. The tale begins.']);
+    expect(generateSeed(contexts.ghost, 1).intro).toBe('Boo. The tale begins.');
     // Template machinery still present under the overridden opening.
     expect(contexts.ghost.campaign?.rooms.length).toBeGreaterThan(0);
   });

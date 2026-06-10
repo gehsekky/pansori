@@ -156,10 +156,13 @@ documented deferrals.
       (add a `venue` owner_kind alongside the other scopes).
 - [ ] **Narrative normalization — remaining scopes.** Entity hooks are now
       structured in `campaign_narratives` (level/site, object, trap, NPC
-      greetings/goodbyes as variant pools). Still inline JSONB: **quest**
-      title/desc/step.desc (would make the quests section hybrid — mechanics in
-      JSONB, prose in rows) and **NPC dialogue replies** (index-addressed, no
-      stable node ids — needs its own table + an id-keyed dispatcher first).
+      greetings/goodbyes, and the **campaign-scoped `gameStart` opening** — a
+      `'campaign'` owner_kind pooled hook the seed random-picks per playthrough,
+      migrated out of the JSONB blob in migration 040). Still inline JSONB:
+      **quest** title/desc/step.desc (would make the quests section hybrid —
+      mechanics in JSONB, prose in rows) and **NPC dialogue replies**
+      (index-addressed, no stable node ids — needs its own table + an id-keyed
+      dispatcher first).
 - [ ] **Dialogue follow-ups** — `say` field (menu label vs spoken line),
       `goto`/node-ids for hub-and-spoke trees (the node-id work also unblocks
       moving dialogue replies into `campaign_narratives`), mid-combat surrender,

@@ -1884,6 +1884,10 @@ export interface RuleFacts {
 export interface CampaignData {
   world_name: string;
   intro: string;
+  // The game-start opening as a variant pool (campaign-scoped 'gameStart' hook
+  // in campaign_narratives, folded in by loadOverlay). generateSeed random-picks
+  // one variant per new game into seed.intro; absent ⇒ fall back to `intro`.
+  gameStart?: string[];
   rooms: Room[];
   enemies?: Record<string, Enemy[]>;
   loot?: Record<string, PlacedLoot[]>;

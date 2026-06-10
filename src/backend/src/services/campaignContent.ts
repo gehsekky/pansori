@@ -1292,6 +1292,12 @@ export async function getDbSection(
   campaignId: string,
   section: EditableSection
 ): Promise<{ present: boolean; value: unknown }> {
+  if (section === 'gameStart') {
+    // The campaign opening now lives in campaign_narratives as a pooled hook.
+    const nar = await getCampaignNarratives(pool, campaignId);
+    const value = collapseHook(nar.get('campaign', campaignId, 'gameStart'));
+    return { present: value !== undefined, value };
+  }
   if (section === 'regions') {
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
@@ -1321,12 +1327,60 @@ export async function getDbSection(
 // rest land as keys in campaigns.data (parameterized jsonb_set keeps the
 // write atomic per section). Section names are validated against
 // EDITABLE_SECTIONS by the route before this runs.
+// The campaign-level game-start opening, stored as a campaign-scoped POOLED
+// hook (owner_kind 'campaign', owner_id = the campaign id, hook 'gameStart') —
+// the normalized successor to the campaigns.data 'gameStart' string. Replace-all
+// in a txn; also strips the now-stale JSONB key so it can't shadow the table on
+// a re-backfill (mirrors the earlier phases' inert-legacy discipline).
+export async function putCampaignGameStart(
+  pool: Pool,
+  campaignId: string,
+  value: string | string[]
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query(
+      `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'campaign' AND hook = 'gameStart'`,
+      [campaignId]
+    );
+    await insertNarratives(client, campaignId, 'campaign', campaignId, { gameStart: value });
+    await client.query(`UPDATE campaigns SET data = data - $2 WHERE id = $1`, [
+      campaignId,
+      'gameStart',
+    ]);
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCampaignGameStart(pool: Pool, campaignId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'campaign' AND hook = 'gameStart'`,
+    [campaignId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 export async function putCampaignSection(
   pool: Pool,
   campaignId: string,
   section: EditableSection,
   value: unknown
 ): Promise<boolean> {
+  if (section === 'gameStart') {
+    return putCampaignGameStart(pool, campaignId, value as string | string[]);
+  }
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
   }
@@ -1358,6 +1412,9 @@ export async function deleteCampaignSection(
   campaignId: string,
   section: EditableSection
 ): Promise<boolean> {
+  if (section === 'gameStart') {
+    return deleteCampaignGameStart(pool, campaignId);
+  }
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
   }
@@ -1418,11 +1475,15 @@ async function loadOverlay(
   const overlay: Record<string, unknown> =
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
 
-  // The gameStart narration hook lives in campaigns.data but lands inside
-  // the campaign block (it overlays campaign.intro — the game's first
-  // narrative entry), not as a top-level Context field.
-  const gameStart = typeof overlay.gameStart === 'string' ? overlay.gameStart : undefined;
+  // The game-start opening is now a campaign-scoped POOLED hook in
+  // campaign_narratives (the variant pool the seed picks from). Drop the legacy
+  // campaigns.data key (inert post-migration) and resolve the pool below.
   delete overlay.gameStart;
+  const gameStartPool = (await getCampaignNarratives(pool, campaignId)).get(
+    'campaign',
+    campaignId,
+    'gameStart'
+  );
   const worldName = typeof overlay.worldName === 'string' ? overlay.worldName : undefined;
   delete overlay.worldName;
 
@@ -1475,7 +1536,7 @@ async function loadOverlay(
     dbRegions.length > 0 ||
     dbTowns.length > 0 ||
     dbRooms.length > 0 ||
-    gameStart !== undefined ||
+    gameStartPool !== undefined ||
     worldName !== undefined ||
     recParty !== undefined ||
     dbQuests !== undefined ||
@@ -1483,7 +1544,9 @@ async function loadOverlay(
   ) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
-      ...(gameStart !== undefined ? { intro: gameStart } : {}),
+      // The opening pool — generateSeed picks one variant per new game (falling
+      // back to campaign.intro when no pool is authored).
+      ...(gameStartPool !== undefined ? { gameStart: gameStartPool } : {}),
       ...(worldName !== undefined ? { world_name: worldName } : {}),
       ...(typeof recParty?.size === 'number' ? { recommendedPartySize: recParty.size } : {}),
       ...(Array.isArray(recParty?.composition)
