@@ -1623,7 +1623,11 @@ async function loadOverlay(
   // screen's party-size hint + auto-fill composition).
   const recParty =
     overlay.recommendedParty && typeof overlay.recommendedParty === 'object'
-      ? (overlay.recommendedParty as { size?: number; composition?: string[] })
+      ? (overlay.recommendedParty as {
+          size?: number;
+          composition?: string[];
+          requiredMembers?: { name: string; cls: string }[];
+        })
       : undefined;
   delete overlay.recommendedParty;
 
@@ -1680,6 +1684,9 @@ async function loadOverlay(
       ...(typeof recParty?.size === 'number' ? { recommendedPartySize: recParty.size } : {}),
       ...(Array.isArray(recParty?.composition)
         ? { recommendedComposition: recParty.composition }
+        : {}),
+      ...(Array.isArray(recParty?.requiredMembers)
+        ? { requiredMembers: recParty.requiredMembers }
         : {}),
       ...(dbQuests.length > 0 ? { quests: dbQuests } : {}),
       ...(dbFactions !== undefined ? { factions: dbFactions } : {}),

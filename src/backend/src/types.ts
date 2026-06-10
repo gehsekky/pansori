@@ -1919,6 +1919,10 @@ export interface CampaignData {
   // button that builds this composition. Falls back to a generic size-based
   // template when unset.
   recommendedComposition?: string[];
+  // Fixed party members (name + class) auto-populated into every new game and
+  // locked — the player edits their stats but can't rename, reclass, or remove
+  // them. A subset of `recommendedPartySize`; the player fills the rest.
+  requiredMembers?: { name: string; cls: string }[];
 }
 
 export type TieredNarrative = string[] | Record<string, string[]>;

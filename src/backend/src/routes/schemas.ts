@@ -1769,14 +1769,25 @@ const ClassStartingEquipmentSchema = z.record(
 );
 
 const CLASS_ID = z.enum(SRD_CLASSES as unknown as [string, ...string[]]);
+// A required party member — a defined character (name + class) that's
+// auto-populated and locked at new-game start. The player edits its stats etc.
+// but can't rename it, change its class, or remove it (for now).
+const RequiredMemberSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    cls: CLASS_ID,
+  })
+  .strict();
 // The creation screen's party hint: a recommended size + an ideal class
 // composition the auto-fill button builds. Composition entries are SRD
 // class ids; length need not equal size (it falls back to a generic
-// template when shorter/empty).
+// template when shorter/empty). `requiredMembers` are fixed characters seeded
+// into every new party (a subset of the size).
 const RecommendedPartySchema = z
   .object({
     size: z.number().int().min(1).max(8),
     composition: z.array(CLASS_ID).max(8),
+    requiredMembers: z.array(RequiredMemberSchema).max(8).optional(),
   })
   .strict();
 

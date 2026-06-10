@@ -159,6 +159,59 @@ describe('CharScreen — Cleric Divine Order required at creation', () => {
   });
 });
 
+// Campaign-authored required party members: auto-seeded + locked at creation.
+const requiredCtx: FrontendContext = {
+  ...ctx,
+  classes: [
+    { id: 'Fighter', desc: 'A warrior.' },
+    { id: 'Cleric', desc: 'A holy warrior.' },
+  ],
+  classPrimaryStats: { Fighter: 'STR', Cleric: 'WIS' },
+  classSkills: { Fighter: [], Cleric: [] },
+  requiredMembers: [{ name: 'Roland', cls: 'Fighter' }],
+};
+
+function renderRequired(onStart = vi.fn()) {
+  return render(
+    <CharScreen onStart={onStart} loading={false} availableContexts={[requiredCtx]} user={null} />
+  );
+}
+
+describe('CharScreen — required party members', () => {
+  it('seeds the required member with a locked (disabled) name + class', () => {
+    const { container, getByText } = renderRequired();
+    const name = container.querySelector('#char-0-name') as HTMLInputElement;
+    expect(name.value).toBe('Roland');
+    expect(name.disabled).toBe(true);
+    const cls = container.querySelector('#char-0-class') as HTMLSelectElement;
+    expect(cls.value).toBe('Fighter');
+    expect(cls.disabled).toBe(true);
+    expect(getByText(/REQUIRED/)).toBeTruthy();
+  });
+
+  it('a required member has no remove button; an added member does', () => {
+    const { getByTestId, queryByLabelText } = renderRequired();
+    // Roland is the only member → no remove control anyway. Add a member, then
+    // come back to Roland: still no ✕; the added member has one.
+    fireEvent.click(getByTestId('add-member-btn'));
+    fireEvent.click(getByTestId('nav-portrait-0')); // Roland (required)
+    expect(queryByLabelText('Remove this hero')).toBeNull();
+    fireEvent.click(getByTestId('nav-portrait-1')); // the added member
+    expect(queryByLabelText('Remove this hero')).not.toBeNull();
+  });
+
+  it('the locked required member starts the game (named Roland, Fighter)', async () => {
+    const onStart = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId } = renderRequired(onStart);
+    fireEvent.click(getByTestId('begin-adventure-btn'));
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
+    expect(onStart.mock.calls[0][0][0]).toMatchObject({
+      name: 'Roland',
+      character_class: 'Fighter',
+    });
+  });
+});
+
 // Caster spell picker — a full caster chooses cantrips + level-1 spells at
 // creation. Driven by the BackendContextSummary's casterSpellChoices (fetched
 // via listContexts), so this test mocks that response.

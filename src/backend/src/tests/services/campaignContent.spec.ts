@@ -1957,6 +1957,7 @@ describe('section CRUD + live refresh', () => {
       await putCampaignSection(db.pool, 'demo_campaign', 'recommendedParty', {
         size: 3,
         composition: ['Fighter', 'Cleric', 'Wizard'],
+        requiredMembers: [{ name: 'Roland', cls: 'Fighter' }],
       })
     ).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
@@ -1966,14 +1967,18 @@ describe('section CRUD + live refresh', () => {
       'Cleric',
       'Wizard',
     ]);
+    expect(contexts.demo_campaign.campaign?.requiredMembers).toEqual([
+      { name: 'Roland', cls: 'Fighter' },
+    ]);
 
     expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'recommendedParty')).toBe(true);
     await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
     // Reverts to the code campaign's value (the base template has none).
     expect(contexts.demo_campaign.campaign?.recommendedPartySize).toBeUndefined();
+    expect(contexts.demo_campaign.campaign?.requiredMembers).toBeUndefined();
   });
 
-  it('recommendedParty schema: bounded size + SRD-class composition', () => {
+  it('recommendedParty schema: bounded size + SRD-class composition + required members', () => {
     const sch = CAMPAIGN_SECTION_SCHEMAS.recommendedParty;
     expect(
       sch.safeParse({ size: 4, composition: ['Fighter', 'Rogue', 'Wizard', 'Cleric'] }).success
@@ -1981,6 +1986,28 @@ describe('section CRUD + live refresh', () => {
     expect(sch.safeParse({ size: 0, composition: [] }).success).toBe(false); // size floor
     expect(sch.safeParse({ size: 9, composition: [] }).success).toBe(false); // size cap
     expect(sch.safeParse({ size: 4, composition: ['Necromancer'] }).success).toBe(false); // not SRD
+    // requiredMembers: name required + SRD class.
+    expect(
+      sch.safeParse({
+        size: 4,
+        composition: [],
+        requiredMembers: [{ name: 'Roland', cls: 'Fighter' }],
+      }).success
+    ).toBe(true);
+    expect(
+      sch.safeParse({ size: 4, composition: [], requiredMembers: [{ name: '', cls: 'Fighter' }] })
+        .success
+    ).toBe(false); // empty name
+    expect(
+      sch.safeParse({ size: 4, composition: [], requiredMembers: [{ cls: 'Fighter' }] }).success
+    ).toBe(false); // missing name
+    expect(
+      sch.safeParse({
+        size: 4,
+        composition: [],
+        requiredMembers: [{ name: 'X', cls: 'Necromancer' }],
+      }).success
+    ).toBe(false); // not SRD class
   });
 
   it('rules overlay the context top level (engine reads context.rules)', async () => {

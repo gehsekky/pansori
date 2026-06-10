@@ -269,6 +269,7 @@ export interface BackendContextSummary {
   // Creation-screen party hint (the DB `recommendedParty` section).
   recommendedPartySize?: number;
   recommendedComposition?: string[];
+  requiredMembers?: { name: string; cls: string }[];
 }
 
 export const api = {

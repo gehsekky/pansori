@@ -122,6 +122,8 @@ export interface FrontendContext {
   // Per-campaign class composition the auto-fill button uses. Falls back to a
   // generic size-based template when unset (Fighter/Cleric/Rogue for 3, etc.).
   recommendedComposition?: string[];
+  // Fixed party members (name + class) auto-populated + locked at creation.
+  requiredMembers?: { name: string; cls: string }[];
 }
 
 // ─── Character (per-character state) ─────────────────────────────────────────

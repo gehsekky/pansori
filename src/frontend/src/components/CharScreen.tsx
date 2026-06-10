@@ -207,6 +207,46 @@ interface CharDraft {
   // SRD caster spell picks (cantrips + level-1 spells). Undefined = the default
   // pre-selection from the BE summary. Cleared on class change.
   casterSpells?: { cantrips: string[]; l1: string[] };
+  // A campaign-authored REQUIRED member: auto-seeded into every new party and
+  // locked — name + class can't be changed and the member can't be removed
+  // (stats and the rest stay editable). Set from the campaign's requiredMembers.
+  required?: boolean;
+}
+
+// A default party-member draft for a class — rolled stats assigned to the
+// class's key abilities (so an auto-filled / required Cleric isn't stuck at
+// WIS 10), human, default background, Cleric defaulting to Protector.
+function makeMemberForClass(ctx: FrontendContext, cls: string, name: string): CharDraft {
+  return {
+    name,
+    cls,
+    speciesId: 'human',
+    gender: '',
+    backgroundId: ctx.backgrounds?.[0]?.id ?? '',
+    stats: assignStatsForClass(rollStatBlock(), ctx, cls),
+    portrait: null,
+    rollCount: 1,
+    statMethod: 'roll',
+    ...(cls === 'Cleric' ? { divineOrder: 'protector' as const } : {}),
+  };
+}
+
+// Ensure the campaign's requiredMembers lead the party (locked name + class),
+// followed by the player's own (non-required) members. A required member's
+// editable fields (stats, species, …) carry over from a matching saved draft so
+// edits survive a reload, while name + class are re-forced from the campaign.
+// Capped at MAX_PARTY — required members win the slots.
+function reconcileRequired(party: CharDraft[], ctx: FrontendContext | undefined): CharDraft[] {
+  const required = ctx?.requiredMembers ?? [];
+  const reqDrafts = required.slice(0, MAX_PARTY).map((rm) => {
+    const existing = party.find((d) => d.required && d.name === rm.name);
+    const base = existing ?? makeMemberForClass(ctx as FrontendContext, rm.cls, rm.name);
+    return { ...base, name: rm.name, cls: rm.cls, required: true };
+  });
+  const extras = party
+    .filter((d) => !d.required)
+    .slice(0, Math.max(0, MAX_PARTY - reqDrafts.length));
+  return [...reqDrafts, ...extras];
 }
 
 // 'sleight_of_hand' → 'Sleight of Hand'. Skill ids are snake_case.
@@ -419,6 +459,7 @@ function CharScreen({
           // not the donor context's, which would otherwise leak through.
           recommendedPartySize: b.recommendedPartySize,
           recommendedComposition: b.recommendedComposition,
+          requiredMembers: b.requiredMembers,
         }));
   // Selection lookups resolve from code + synthesized contexts alike — so a
   // DB campaign uses ITS OWN classes/backgrounds/recommended party, not the
@@ -431,22 +472,29 @@ function CharScreen({
   // first-ever character-creation visit isn't completely blank).
   const [party, setParty] = useState<CharDraft[]>(() => {
     const saved = loadPartyDraft(contextId);
-    if (saved && selectedCtxForInit) {
-      return saved.map((d) => sanitizeDraft(d, selectedCtxForInit));
-    }
-    return [
-      {
-        name: localStorage.getItem('operative_name') || '',
-        cls: selectedCtxForInit?.classes[0]?.id ?? '',
-        speciesId: 'human',
-        gender: '',
-        backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
-        stats: rollStatBlock(),
-        portrait: user?.avatar_url ?? null,
-        rollCount: 1,
-        statMethod: 'roll',
-      },
-    ];
+    // A campaign with required members seeds them (locked); the player's own
+    // members follow. Without a saved draft AND without required members, fall
+    // back to a single default member.
+    const hasRequired = (selectedCtxForInit?.requiredMembers?.length ?? 0) > 0;
+    const seed: CharDraft[] =
+      saved && selectedCtxForInit
+        ? saved.map((d) => sanitizeDraft(d, selectedCtxForInit))
+        : hasRequired
+          ? []
+          : [
+              {
+                name: localStorage.getItem('operative_name') || '',
+                cls: selectedCtxForInit?.classes[0]?.id ?? '',
+                speciesId: 'human',
+                gender: '',
+                backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
+                stats: rollStatBlock(),
+                portrait: user?.avatar_url ?? null,
+                rollCount: 1,
+                statMethod: 'roll',
+              },
+            ];
+    return reconcileRequired(seed, selectedCtxForInit);
   });
   const [error, setError] = useState('');
   // Two-click swap state — when the player clicks a stat box, we remember
@@ -608,23 +656,25 @@ function CharScreen({
     // leader so we never point past the new (possibly shorter) list.
     setActiveIdx(0);
     setSwapFrom(null);
-    if (saved) {
-      setParty(saved.map((d) => sanitizeDraft(d, c)));
-    } else {
-      setParty([
-        {
-          name: localStorage.getItem('operative_name') || '',
-          cls: c.classes[0]?.id ?? '',
-          speciesId: 'human',
-          gender: '',
-          backgroundId: c.backgrounds?.[0]?.id ?? '',
-          stats: rollStatBlock(),
-          portrait: user?.avatar_url ?? null,
-          rollCount: 1,
-          statMethod: 'roll',
-        },
-      ]);
-    }
+    const hasRequired = (c.requiredMembers?.length ?? 0) > 0;
+    const seed: CharDraft[] = saved
+      ? saved.map((d) => sanitizeDraft(d, c))
+      : hasRequired
+        ? []
+        : [
+            {
+              name: localStorage.getItem('operative_name') || '',
+              cls: c.classes[0]?.id ?? '',
+              speciesId: 'human',
+              gender: '',
+              backgroundId: c.backgrounds?.[0]?.id ?? '',
+              stats: rollStatBlock(),
+              portrait: user?.avatar_url ?? null,
+              rollCount: 1,
+              statMethod: 'roll',
+            },
+          ];
+    setParty(reconcileRequired(seed, c));
   }, [contextId, availableContexts, user]);
 
   // Persist the current party draft to localStorage whenever it changes
@@ -662,6 +712,8 @@ function CharScreen({
   }
 
   function removeMember(idx: number) {
+    // Required members are locked into the party — never removable.
+    if (party[idx]?.required) return;
     setParty((prev) => prev.filter((_, i) => i !== idx));
     // Keep the selection valid after the list shrinks by one.
     setActiveIdx((cur) => Math.min(cur, party.length - 2));
@@ -674,36 +726,23 @@ function CharScreen({
   // class isn't supported by the campaign.
   function autoFillParty() {
     if (!selectedCtxForInit) return;
-    const validClasses = new Set(selectedCtxForInit.classes.map((c) => c.id));
-    const size = selectedCtxForInit.recommendedPartySize ?? 1;
-    const desired =
-      selectedCtxForInit.recommendedComposition ?? DEFAULT_COMPOSITION_BY_SIZE[size] ?? [];
-    const fallbackClass = selectedCtxForInit.classes[0]?.id ?? '';
-    const composition = (desired.length ? desired : [fallbackClass])
+    const ctx = selectedCtxForInit;
+    const validClasses = new Set(ctx.classes.map((c) => c.id));
+    const size = ctx.recommendedPartySize ?? 1;
+    const required = ctx.requiredMembers ?? [];
+    const desired = ctx.recommendedComposition ?? DEFAULT_COMPOSITION_BY_SIZE[size] ?? [];
+    const fallbackClass = ctx.classes[0]?.id ?? '';
+    // The composition fills only the slots NOT taken by required members.
+    const remaining = Math.max(0, Math.min(size, MAX_PARTY) - required.length);
+    const fill = (desired.length ? desired : [fallbackClass])
       .map((cls) => (validClasses.has(cls) ? cls : fallbackClass))
-      .slice(0, MAX_PARTY);
+      .slice(0, remaining)
+      // assignStatsForClass + Cleric→Protector live in makeMemberForClass, so an
+      // auto-filled caster isn't stuck at a 10 in its key ability.
+      .map((cls) => makeMemberForClass(ctx, cls, cls));
     selectMember(0);
-    setParty(
-      composition.map((cls) => ({
-        name: cls,
-        cls,
-        speciesId: 'human',
-        gender: '',
-        backgroundId: selectedCtxForInit.backgrounds?.[0]?.id ?? '',
-        // Roll 4d6-drop-lowest x6, then assign the highest to the class's
-        // primary stat and the 2nd-highest to CON. The rest fill in any
-        // order. Without this, a Cleric auto-filled with rolls in raw
-        // order often ended up with WIS 10 and one prepared spell.
-        stats: assignStatsForClass(rollStatBlock(), selectedCtxForInit, cls),
-        portrait: null,
-        rollCount: 1,
-        statMethod: 'roll',
-        // Divine Order is required at BEGIN — auto-fill defaults a Cleric
-        // to Protector (same spirit as defaulting skills/equipment/
-        // masteries; the player can still switch to Thaumaturge).
-        ...(cls === 'Cleric' ? { divineOrder: 'protector' as const } : {}),
-      }))
-    );
+    // Keep the required members (carrying any edited stats) at the front.
+    setParty(reconcileRequired([...party.filter((d) => d.required), ...fill], ctx));
   }
 
   async function handle() {
@@ -912,7 +951,8 @@ function CharScreen({
                   className={`${styles.card} ${styles.charHeroCard} ${styles.charActiveCard}`}
                   style={{ position: 'relative' }}
                 >
-                  {party.length > 1 && (
+                  {/* Required members are locked in — no remove button. */}
+                  {!draft.required && party.length > 1 && (
                     <button
                       onClick={() => removeMember(idx)}
                       style={{
@@ -941,12 +981,15 @@ function CharScreen({
                     }}
                   >
                     {idx === 0 ? 'PARTY LEADER' : `HERO ${idx + 1}`}
+                    {draft.required && (
+                      <span style={{ color: 'var(--t-primary)', marginLeft: 8 }}>· REQUIRED</span>
+                    )}
                   </p>
 
                   <div className={styles.charCardCols}>
                     <div className={styles.charCardCol}>
                       <label className={styles.formLbl} htmlFor={`char-${idx}-name`}>
-                        HERO NAME
+                        HERO NAME{draft.required && ' · LOCKED'}
                       </label>
                       <input
                         id={`char-${idx}-name`}
@@ -954,17 +997,22 @@ function CharScreen({
                         value={draft.name}
                         onChange={(e) => updateDraft(idx, { name: e.target.value })}
                         placeholder="e.g. Buck Starling"
-                        autoFocus={idx === 0}
+                        autoFocus={idx === 0 && !draft.required}
+                        disabled={draft.required}
+                        title={
+                          draft.required ? 'This member is required by the campaign' : undefined
+                        }
                       />
 
                       <label className={styles.formLbl} htmlFor={`char-${idx}-class`}>
-                        CLASS
+                        CLASS{draft.required && ' · LOCKED'}
                       </label>
                       <select
                         id={`char-${idx}-class`}
                         className={styles.formInp}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: draft.required ? 'not-allowed' : 'pointer' }}
                         value={draft.cls}
+                        disabled={draft.required}
                         onChange={(e) =>
                           // Reset the class-skill + equipment picks — the new class
                           // offers different options.

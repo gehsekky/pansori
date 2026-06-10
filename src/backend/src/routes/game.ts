@@ -350,6 +350,7 @@ gameRouter.get('/contexts', async (req, res) => {
         // DB campaigns surface their own size/composition, not the donor's.
         recommendedPartySize: c.campaign?.recommendedPartySize,
         recommendedComposition: c.campaign?.recommendedComposition,
+        requiredMembers: c.campaign?.requiredMembers,
       };
     });
   res.json(list);

@@ -53,4 +53,51 @@ describe('RecommendedPartyPanel', () => {
     expect(section).toBe('recommendedParty');
     expect(value).toEqual({ size: 2, composition: ['Bard', 'Barbarian'] }); // slot1 kept, slot2 defaulted
   });
+
+  it('loads required members and saves them in the payload', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'recommendedParty',
+      source: 'db',
+      value: {
+        size: 3,
+        composition: ['Fighter', 'Cleric', 'Wizard'],
+        requiredMembers: [{ name: 'Roland', cls: 'Fighter' }],
+      },
+    });
+    render(<RecommendedPartyPanel campaignId="sandbox" />);
+    const name = (await screen.findByLabelText('Required member 1 name')) as HTMLInputElement;
+    expect(name.value).toBe('Roland');
+    expect((screen.getByLabelText('Required member 1 class') as HTMLSelectElement).value).toBe(
+      'Fighter'
+    );
+    // Add a second required member.
+    fireEvent.click(screen.getByTestId('add-required-member-btn'));
+    fireEvent.change(screen.getByLabelText('Required member 2 name'), {
+      target: { value: 'Mira' },
+    });
+    fireEvent.change(screen.getByLabelText('Required member 2 class'), {
+      target: { value: 'Wizard' },
+    });
+    fireEvent.click(screen.getByTestId('save-recommended-party-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const value = mocked.putCampaignSection.mock.calls[0][2] as { requiredMembers?: unknown };
+    expect(value.requiredMembers).toEqual([
+      { name: 'Roland', cls: 'Fighter' },
+      { name: 'Mira', cls: 'Wizard' },
+    ]);
+  });
+
+  it('blocks save when a required member has no name', async () => {
+    mocked.getCampaignSection.mockResolvedValue({
+      section: 'recommendedParty',
+      source: 'none',
+      value: null,
+    });
+    render(<RecommendedPartyPanel campaignId="sandbox" />);
+    await screen.findByLabelText('SIZE');
+    fireEvent.click(screen.getByTestId('add-required-member-btn')); // blank name
+    fireEvent.click(screen.getByTestId('save-recommended-party-btn'));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/needs a name/i);
+    expect(mocked.putCampaignSection).not.toHaveBeenCalled();
+  });
 });
