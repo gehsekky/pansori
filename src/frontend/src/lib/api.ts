@@ -130,6 +130,8 @@ export type CharacterInput = {
   // SRD Species (formerly "race"). Optional — engine defaults to
   // Human when omitted.
   species?: string;
+  // Cosmetic identity; drives narration pronouns. Omitted = unspecified.
+  gender?: 'male' | 'female' | 'nonbinary';
   // 2024 background ability-score increase. Omitted = +1 to all three of the
   // background's listed abilities; supplied = +2 to `plus2` and +1 to `plus1`.
   ability_bonus?: { plus2: string; plus1: string };

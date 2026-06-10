@@ -130,6 +130,8 @@ export interface Character {
   id: string;
   name: string;
   character_class: string;
+  // Cosmetic identity; absent = unspecified. Drives narration pronouns.
+  gender?: 'male' | 'female' | 'nonbinary';
   portrait_url: string | null;
   hp: number;
   max_hp: number;

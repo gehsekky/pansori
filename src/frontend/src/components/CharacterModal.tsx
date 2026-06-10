@@ -115,6 +115,11 @@ function CharacterModal({ char, ctx, onClose }: Props) {
             {char.conditions.map(titleCase).join(', ')}
           </p>
         )}
+        {char.gender && (
+          <p className={styles.charSheetLine}>
+            <span style={{ color: 'var(--t-dim)' }}>Gender:</span> {titleCase(char.gender)}
+          </p>
+        )}
       </Section>
 
       {/* Species */}

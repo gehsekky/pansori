@@ -118,3 +118,18 @@ export function stripForLlm(s: string): string {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n');
 }
+
+// Narration pronouns from a character's gender — "subject/object" (he/him,
+// she/her, they/them). Anything unspecified (no gender chosen) falls back to
+// the neutral they/them so the LLM still has guidance. Fed to the narrative
+// prompt so the story refers to each party member correctly.
+export function pronounsForGender(gender: 'male' | 'female' | 'nonbinary' | undefined): string {
+  switch (gender) {
+    case 'male':
+      return 'he/him';
+    case 'female':
+      return 'she/her';
+    default:
+      return 'they/them';
+  }
+}

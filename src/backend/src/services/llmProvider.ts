@@ -6,6 +6,12 @@ export interface NarrativeMeta {
   charClass: string;
   roomName: string;
   contextTheme?: string;
+  // Pronouns for the active character (e.g. "she/her") and a roster of every
+  // party member's pronouns (e.g. "Alice (she/her); Bryn (they/them)") so the
+  // narration refers to each character correctly. Derived from Character.gender
+  // via pronounsForGender; both default to they/them when gender is unspecified.
+  pronouns?: string;
+  partyPronouns?: string;
 }
 
 export interface LLMProvider {
@@ -33,8 +39,11 @@ class NoneProvider implements LLMProvider {
 
 const SYSTEM_PROMPT = (meta: NarrativeMeta) =>
   `You are a narrative writer for a tabletop RPG called "${meta.worldName}". ` +
-  `The active character is ${meta.charName}, a ${meta.charClass}, currently in ${meta.roomName}. ` +
+  `The active character is ${meta.charName}${meta.pronouns ? ` (${meta.pronouns})` : ''}, a ${meta.charClass}, currently in ${meta.roomName}. ` +
   `The narrative may span multiple party members (lines prefixed with "[CharName] " — preserve those prefixes verbatim). ` +
+  (meta.partyPronouns
+    ? `Refer to each character with their pronouns — ${meta.partyPronouns}. `
+    : '') +
   `Rewrite the following game event as vivid, atmospheric prose of 1–3 sentences. ` +
   `Rules: keep ALL facts, numbers, damage values, and outcomes exactly as given. ` +
   `Do not invent new events, items, or characters. Return only the prose — no preamble.`;

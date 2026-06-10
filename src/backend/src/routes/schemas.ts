@@ -65,6 +65,8 @@ const CharacterInputSchema = z
     portrait_url: z.string().max(2048).optional(),
     subclass: z.string().min(1).max(40).optional(),
     species: z.string().min(1).max(40).optional(),
+    // Cosmetic identity; drives narration pronouns. Absent = unspecified.
+    gender: z.enum(['male', 'female', 'nonbinary']).optional(),
     // 2024 class skill proficiencies — the player's chosen "N from the class
     // list". Re-validated server-side against the class's options; an invalid
     // or omitted list falls back to the curated default.

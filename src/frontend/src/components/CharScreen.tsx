@@ -147,10 +147,20 @@ const DEFAULT_COMPOSITION_BY_SIZE: Record<number, string[]> = {
   4: ['Fighter', 'Cleric', 'Wizard', 'Rogue'],
 };
 
+// Gender options (cosmetic identity; drives narration pronouns). '' = unspecified.
+const GENDERS = [
+  { id: '', label: 'Unspecified' },
+  { id: 'male', label: 'Male' },
+  { id: 'female', label: 'Female' },
+  { id: 'nonbinary', label: 'Nonbinary' },
+] as const;
+type GenderId = '' | 'male' | 'female' | 'nonbinary';
+
 interface CharDraft {
   name: string;
   cls: string;
   speciesId: string;
+  gender: GenderId;
   backgroundId: string;
   stats: StatBlock;
   // SRD-13 — 'roll' = 4d6-drop-lowest six times, 'array' = the
@@ -335,7 +345,9 @@ function sanitizeDraft(d: CharDraft, ctx: FrontendContext): CharDraft {
   const bgIds = new Set((ctx.backgrounds ?? []).map((b) => b.id));
   const validCls = classIds.has(d.cls) ? d.cls : (ctx.classes[0]?.id ?? d.cls);
   const validBg = bgIds.has(d.backgroundId) ? d.backgroundId : (ctx.backgrounds?.[0]?.id ?? '');
-  return { ...d, cls: validCls, backgroundId: validBg };
+  // Default gender for drafts persisted before the field existed (keeps the
+  // select controlled).
+  return { ...d, cls: validCls, backgroundId: validBg, gender: d.gender ?? '' };
 }
 
 function CharScreen({
@@ -427,6 +439,7 @@ function CharScreen({
         name: localStorage.getItem('operative_name') || '',
         cls: selectedCtxForInit?.classes[0]?.id ?? '',
         speciesId: 'human',
+        gender: '',
         backgroundId: selectedCtxForInit?.backgrounds?.[0]?.id ?? '',
         stats: rollStatBlock(),
         portrait: user?.avatar_url ?? null,
@@ -603,6 +616,7 @@ function CharScreen({
           name: localStorage.getItem('operative_name') || '',
           cls: c.classes[0]?.id ?? '',
           speciesId: 'human',
+          gender: '',
           backgroundId: c.backgrounds?.[0]?.id ?? '',
           stats: rollStatBlock(),
           portrait: user?.avatar_url ?? null,
@@ -635,6 +649,7 @@ function CharScreen({
         name: '',
         cls: classes[0]?.id ?? '',
         speciesId: 'human',
+        gender: '',
         backgroundId: selectedCtx?.backgrounds?.[0]?.id ?? '',
         stats: rollStatBlock(),
         portrait: null,
@@ -673,6 +688,7 @@ function CharScreen({
         name: cls,
         cls,
         speciesId: 'human',
+        gender: '',
         backgroundId: selectedCtxForInit.backgrounds?.[0]?.id ?? '',
         // Roll 4d6-drop-lowest x6, then assign the highest to the class's
         // primary stat and the 2nd-highest to CON. The rest fill in any
@@ -775,6 +791,7 @@ function CharScreen({
           stats: d.stats,
           portrait_url: d.portrait ?? undefined,
           species: d.speciesId || undefined,
+          gender: d.gender || undefined,
           feat_choices: d.featChoices,
           ability_bonus: d.abilityBonus,
           class_skills: d.classSkills,
@@ -1382,6 +1399,27 @@ function CharScreen({
                         })()}
                     </div>
                     <div className={styles.charCardCol}>
+                      <label
+                        className={styles.formLbl}
+                        style={{ marginTop: 12 }}
+                        htmlFor={`char-${idx}-gender`}
+                      >
+                        GENDER
+                      </label>
+                      <select
+                        id={`char-${idx}-gender`}
+                        className={styles.formInp}
+                        style={{ cursor: 'pointer' }}
+                        value={draft.gender}
+                        onChange={(e) => updateDraft(idx, { gender: e.target.value as GenderId })}
+                        data-testid={`gender-select-${idx}`}
+                      >
+                        {GENDERS.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.label}
+                          </option>
+                        ))}
+                      </select>
                       <label
                         className={styles.formLbl}
                         style={{ marginTop: 12 }}

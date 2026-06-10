@@ -125,6 +125,16 @@ describe('CharScreen — Cleric Divine Order required at creation', () => {
     await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
   });
 
+  it('includes the chosen gender in the start payload', async () => {
+    const onStart = vi.fn().mockResolvedValue(undefined);
+    const { getByTestId, getByText } = renderCleric(onStart);
+    fireEvent.change(getByTestId('gender-select-0'), { target: { value: 'female' } });
+    fireEvent.click(getByText(/Protector — Martial weapons/));
+    fireEvent.click(getByTestId('begin-adventure-btn'));
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
+    expect(onStart.mock.calls[0][0][0]).toMatchObject({ gender: 'female' });
+  });
+
   it('auto-fill produces a start-able party: the Cleric defaults to Protector', async () => {
     // Regression (CI smoke breakage): auto-fill seeded a Cleric without a
     // Divine Order, so BEGIN ADVENTURE was blocked by the required-order

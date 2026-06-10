@@ -677,6 +677,8 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         subclass: undefined,
         // SRD species — seed mechanical traits from the catalog.
         species: speciesId,
+        // Cosmetic identity; drives narration pronouns. Omitted ⇒ unspecified.
+        ...(c.gender ? { gender: c.gender } : {}),
         speed: speciesData.speedFt,
         darkvision_ft: speciesData.darkvisionFt,
         // Multiplayer ownership — every PC defaults to the host at

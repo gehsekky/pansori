@@ -136,7 +136,7 @@ import {
   equippedShieldId,
   equippedWeaponId,
 } from './equipment.js';
-import { fmt, stripForLlm } from './narrativeFmt.js';
+import { fmt, pronounsForGender, stripForLlm } from './narrativeFmt.js';
 import { pickHookText, returnFromEncounter } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
@@ -10765,6 +10765,12 @@ export async function takeAction({
     charName: char.name,
     charClass: char.character_class,
     roomName: activeRoom?.name ?? st.current_room,
+    // Pronouns for the active character + a party roster, so the narration
+    // refers to each member correctly (derived from Character.gender).
+    pronouns: pronounsForGender(char.gender),
+    partyPronouns: st.characters
+      .map((c) => `${c.name} (${pronounsForGender(c.gender)})`)
+      .join('; '),
   });
   // Passthrough: if the provider returned the input unchanged (NoneProvider
   // or LLM error fallback), restore the tokenised raw narrative so the FE

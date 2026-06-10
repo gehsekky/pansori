@@ -1493,6 +1493,10 @@ export interface Character {
   // because pre-species saves still need to load — defaults applied as
   // "Human" when missing.
   species?: string;
+  // Character gender. Cosmetic identity — displayed on the sheet and used to
+  // derive narration pronouns (see pronounsForGender). Absent = unspecified
+  // (narration falls back to they/them).
+  gender?: 'male' | 'female' | 'nonbinary';
   // Multiplayer ownership: the userId of the human controlling this PC.
   // In solo mode every PC is owned by the host (= session.user_id). In
   // multiplayer the host can reassign via session_participants UI; the

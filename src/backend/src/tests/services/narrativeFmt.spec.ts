@@ -2,6 +2,7 @@ import {
   type NarrativePart,
   fmt,
   parseNarrativeTokens,
+  pronounsForGender,
   stripForLlm,
   stripNarrativeTokens,
 } from '../../services/narrativeFmt.js';
@@ -99,6 +100,18 @@ describe('narrativeFmt', () => {
 
     it('returns empty string on empty input', () => {
       expect(stripForLlm('')).toBe('');
+    });
+  });
+
+  describe('pronounsForGender', () => {
+    it('maps each gender to its pronouns', () => {
+      expect(pronounsForGender('male')).toBe('he/him');
+      expect(pronounsForGender('female')).toBe('she/her');
+      expect(pronounsForGender('nonbinary')).toBe('they/them');
+    });
+
+    it('falls back to they/them when gender is unspecified', () => {
+      expect(pronounsForGender(undefined)).toBe('they/them');
     });
   });
 });
