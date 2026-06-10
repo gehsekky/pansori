@@ -283,13 +283,14 @@ test('session resume: state survives a page reload', async ({ page, request }) =
   expect(page.url()).toBe(sessionUrl);
 });
 
-// SKIPPED 2026-05-22: this combat-loop E2E has been ~50% flaky across many
-// commits with a consistent "click intercepted by parent layout" error from
-// Playwright. The deterministic checks (BE typecheck/lint/prettier + unit
-// tests, FE typecheck/lint + unit tests) cover the combat path extensively.
-// Re-enable after debugging the underlying layout race — likely the
-// combat-attack button overlapping the grid card on certain layouts.
-test.skip('combat: enter a fight and resolve an attack', async ({ page, request }) => {
+// RE-ENABLED 2026-06-09: skipped 2026-05-22 for a "click intercepted by parent
+// layout" flake. That no longer reproduces — on a fresh ephemeral stack (the
+// real gate) this passes reliably (verified across many consecutive runs). The
+// only remaining flake is a whole-suite auth race that surfaces ONLY when many
+// heavy runs hammer one PERSISTED backend (resource degradation carrying into
+// the next run); CI/`test:e2e:stack` brings up a fresh stack per run, so it
+// can't occur there, and retries:2 covers the rest.
+test('combat: enter a fight and resolve an attack', async ({ page, request }) => {
   // Re-login as a fresh test user so this test is independent of the smoke.
   const email = `e2e-combat-${Date.now()}@pansori.local`;
   const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {

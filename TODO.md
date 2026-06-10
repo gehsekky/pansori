@@ -152,9 +152,18 @@ documented deferrals.
       starter campaign (and how to seed it) vs. leave it author-only. Candidates
       if we do: coastal pirate town, desert ruin, planar city — authored on the
       3-level grid. Ties into onboarding (deferred until launch).
-- [ ] **Re-enable the skipped combat-loop e2e** (`smoke.spec.ts` — the
-      "enter a fight and resolve an attack" test, skipped for a layout-race
-      click-intercept flake) now that it runs in the isolated ephemeral stack.
+- [x] **Re-enable the skipped combat-loop e2e** (`smoke.spec.ts` — "enter a fight
+      and resolve an attack") — done 2026-06-09. The 2026-05-22 click-intercept
+      flake no longer reproduces; verified passing across many consecutive runs on
+      the fresh ephemeral stack. (See the auth-under-load note below for the one
+      remaining flake, which only bites a persisted/hammered stack — not CI.)
+- [ ] **Backend auth race under sustained e2e load** (low; investigation only) —
+      running the e2e suite repeatedly against a single PERSISTED stack makes the
+      *next* run's `/api/auth/me` 401 for a whole run (login screen on every test),
+      then recover — alternating with heavy passing runs. Smells like connection-
+      pool / session-store exhaustion carried across runs. Doesn't affect CI (fresh
+      stack per run) and is masked by `retries:2`, so it's deferred — but worth a
+      look before any real concurrency load.
 - [ ] **Difficulty tuning from playtest data** — capture damage/HP/encounter
       telemetry to inform tuning (the Giant Spider near-TPK was the latest signal).
 
