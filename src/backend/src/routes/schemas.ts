@@ -1194,9 +1194,12 @@ const RoomObjectSchema = z
     interactText: HOOK,
     searchable: z.boolean().optional(),
     searchDC: z.number().int().min(1).max(30).optional(),
+    searchSkill: z.enum(['investigation', 'perception']).optional(),
     lootIds: z.array(z.string().min(1).max(80)).max(10).optional(),
     foundText: HOOK,
     emptyText: HOOK,
+    // Consequences fired once on a successful search (after loot).
+    onFound: z.array(DialogueConsequenceSchema).max(8).optional(),
     pos: GridPosSchema.optional(),
   })
   .strict();

@@ -1236,9 +1236,18 @@ export interface RoomObject {
   interactText: string | string[];
   searchable?: boolean;
   searchDC?: number;
+  // Which ability the search check rolls: 'investigation' (INT — deduce, the
+  // default) or 'perception' (WIS — spot). Lets a forensic scene mix "read the
+  // scorch pattern" (Investigation) with "spot the tracks" (Perception).
+  searchSkill?: 'investigation' | 'perception';
   lootIds?: string[];
   foundText?: string | string[];
   emptyText?: string | string[];
+  // Consequences fired ONCE, on a successful search, after any loot is granted
+  // (set_flag, give_xp, set_faction_rep, advance_quest, …). Turns environmental
+  // investigation into first-class story state — a searched clue can set a flag
+  // (e.g. clue_burn) without routing through a placeholder loot item + a rule.
+  onFound?: GameConsequence[];
   // Grid cell for the object on the local-room map. When set, the object
   // renders as a clickable map token; clicking walks the party adjacent
   // (the `approach` action) and the "Interact" choice is gated on adjacency.

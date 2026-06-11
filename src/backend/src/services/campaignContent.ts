@@ -854,9 +854,15 @@ export interface CampaignRoomObject {
   interactText?: string | string[];
   searchable?: boolean;
   searchDC?: number;
+  // INT 'investigation' (default) or WIS 'perception' — which ability the
+  // search check rolls. Mirrors the engine RoomObject.
+  searchSkill?: 'investigation' | 'perception';
   lootIds?: string[];
   foundText?: string | string[];
   emptyText?: string | string[];
+  // Consequences fired once on a successful search (after loot). Lets a clue
+  // set a flag / advance a quest directly. Mirrors the engine RoomObject.
+  onFound?: GameConsequence[];
   pos?: GridPos;
 }
 
@@ -1298,9 +1304,11 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
               ...o,
               desc: o.desc ?? '',
               interactText: o.interactText ?? `You examine the ${o.name}.`,
-              // A chest is searchable by virtue of holding loot — authors
-              // shouldn't need a separate flag for the common case.
-              ...(o.searchable === undefined && (o.lootIds?.length ?? 0) > 0
+              // A chest is searchable by virtue of holding loot — or by firing
+              // onFound consequences (a clue that sets a flag). Authors
+              // shouldn't need a separate flag for these common cases.
+              ...(o.searchable === undefined &&
+              ((o.lootIds?.length ?? 0) > 0 || (o.onFound?.length ?? 0) > 0)
                 ? { searchable: true }
                 : {}),
             })),

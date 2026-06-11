@@ -1,5 +1,6 @@
 import { abilityMod, d20TestPenalty, effectiveLightFor, skillCheck } from '../rulesEngine.js';
 import {
+  applyConsequence,
   consumeBardicForCheck,
   consumeInspirationForCheck,
   consumeLuckForCheck,
@@ -64,7 +65,9 @@ export const handleInteractObject: ActionHandler<{
     return;
   }
 
-  if (!obj.searchable || !obj.lootIds?.length) {
+  // A flavor object (not searchable, or with nothing to find — no loot AND no
+  // onFound consequences) is text-only and one-shot.
+  if (!obj.searchable || (!obj.lootIds?.length && !obj.onFound?.length)) {
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
     updatePcActor(ctx, nextChar);
     ctx.st = nextSt;
@@ -72,12 +75,16 @@ export const handleInteractObject: ActionHandler<{
     return;
   }
 
+  // Which ability the search rolls — INT (Investigation, the default: deduce)
+  // or WIS (Perception: spot). A forensic scene mixes the two ("read the scorch
+  // pattern" vs "spot the tracks").
+  const usePerception = obj.searchSkill === 'perception';
+  const skillName = usePerception ? 'Perception' : 'Investigation';
+  const abilityScore = usePerception ? nextChar.wis : nextChar.int;
   const proficient =
-    nextChar.skill_proficiencies?.some(
-      (s) => s.toLowerCase() === 'investigation' || s.toLowerCase() === 'perception'
-    ) ?? false;
-  // INT (Investigation). 2024 Exhaustion is a flat −2/level penalty (folded
-  // into d20TestPenalty below), not Disadvantage.
+    nextChar.skill_proficiencies?.some((s) => s.toLowerCase() === skillName.toLowerCase()) ?? false;
+  // 2024 Exhaustion is a flat −2/level penalty (folded into d20TestPenalty
+  // below), not Disadvantage.
   const inspAdv = consumeInspirationForCheck(nextChar);
   const luckAdv = consumeLuckForCheck(nextChar);
   const bardicRoll = consumeBardicForCheck(nextChar);
@@ -92,12 +99,12 @@ export const handleInteractObject: ActionHandler<{
   );
   const lowLightDisadv = effectiveLight !== 'bright';
   const check = skillCheck(
-    nextChar.int,
+    abilityScore,
     (obj.searchDC ?? 12) - bardicRoll,
     proficient,
     nextChar.level,
     lowLightDisadv,
-    hasExpertise(nextChar, 'Investigation'),
+    hasExpertise(nextChar, skillName),
     hasJackOfAllTrades(nextChar),
     inspAdv || luckAdv,
     nextChar.species === 'halfling',
@@ -122,7 +129,7 @@ export const handleInteractObject: ActionHandler<{
   if (check.success) {
     const gained: string[] = [];
     const gainedIds: string[] = [];
-    for (const lootId of obj.lootIds) {
+    for (const lootId of obj.lootIds ?? []) {
       const item = ctx.context.lootTable.find((l) => l.id === lootId);
       if (item) {
         nextChar = {
@@ -137,10 +144,27 @@ export const handleInteractObject: ActionHandler<{
       nextSt = { ...nextSt, loot_taken: [...(nextSt.loot_taken ?? []), ...gainedIds] };
     }
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
-    const foundDesc = pickHookText(obj.foundText) ?? `You find: ${gained.join(', ')}.`;
-    narrative = `${interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
+    const foundDesc =
+      pickHookText(obj.foundText) ?? (gained.length ? `You find: ${gained.join(', ')}.` : '');
+    narrative = `${interactText} (${skillName}: ${check.roll}+${abilityMod(abilityScore)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
+    // Fire the object's onFound consequences ONCE (after loot). Sync the looted
+    // searcher into state first so a consequence (give_xp level-up, etc.) sees
+    // the fresh character, then read it back so the post-handler commit keeps it.
+    if (obj.onFound?.length && ctx.actor.kind === 'pc') {
+      const idx = ctx.actor.safeIdx;
+      nextSt = {
+        ...nextSt,
+        characters: nextSt.characters.map((c, i) => (i === idx ? nextChar : c)),
+      };
+      const parts: string[] = [];
+      for (const con of obj.onFound) {
+        nextSt = applyConsequence(con, nextSt, ctx.seed, nextChar.id, parts, ctx.context);
+      }
+      nextChar = nextSt.characters[idx] ?? nextChar;
+      if (parts.length) narrative += ' ' + parts.join(' ');
+    }
   } else {
-    narrative = `${interactText} (Investigation: ${check.roll}+${abilityMod(nextChar.int)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${pickHookText(obj.emptyText) ?? 'You can try again.'}`;
+    narrative = `${interactText} (${skillName}: ${check.roll}+${abilityMod(abilityScore)}=${check.total} vs DC ${obj.searchDC ?? 12} — fail.) ${pickHookText(obj.emptyText) ?? 'You can try again.'}`;
   }
   updatePcActor(ctx, nextChar);
   ctx.st = nextSt;

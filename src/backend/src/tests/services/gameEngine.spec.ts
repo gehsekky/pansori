@@ -5025,6 +5025,101 @@ describe('interact_object retry on fail', () => {
   });
 });
 
+// onFound makes environmental investigation first-class — a searched clue fires
+// consequences (set a flag, advance a quest) once on success, even with no loot.
+// searchSkill picks WIS (Perception, "spot") vs INT (Investigation, "deduce").
+describe('interact_object onFound + searchSkill', () => {
+  function clueSeed(over: Record<string, unknown> = {}): Seed {
+    return {
+      context_id: ctx.id,
+      world_name: 'Clue',
+      ship_name: 'Clue',
+      intro: '',
+      seed_id: 'clue',
+      rooms: [
+        {
+          id: 'ash_pit',
+          name: 'Central Ash-Pit',
+          desc: '',
+          objects: [
+            {
+              id: 'scorch',
+              name: 'Scorch Pattern',
+              desc: '',
+              interactText: 'You study the burn.',
+              searchable: true,
+              searchDC: 10,
+              onFound: [{ type: 'set_flag', key: 'clue_burn', value: true }],
+              ...over,
+            },
+          ],
+        },
+      ],
+      enemies: {},
+      loot: {},
+      npcs: {},
+    } as unknown as Seed;
+  }
+
+  it('fires onFound consequences once on a successful search (no loot needed)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20, beats DC 10
+    const st = makeState({ int: 14 }, { current_room: 'ash_pit' });
+    const r = await takeAction({
+      action: { type: 'interact_object', objectId: 'scorch' },
+      history: [],
+      state: st,
+      seed: clueSeed(),
+      context: ctx,
+    });
+    expect(r.newState.flags?.clue_burn).toBe(true);
+    expect(r.newState.objects_searched).toContain('ash_pit:scorch');
+  });
+
+  it('does NOT fire onFound on a failed search', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 → 1, fails DC 10
+    const st = makeState({ int: 10 }, { current_room: 'ash_pit' });
+    const r = await takeAction({
+      action: { type: 'interact_object', objectId: 'scorch' },
+      history: [],
+      state: st,
+      seed: clueSeed(),
+      context: ctx,
+    });
+    expect(r.newState.flags?.clue_burn).toBeUndefined();
+    expect(r.newState.objects_searched).toEqual([]); // retry preserved
+  });
+
+  it('searchSkill "perception" rolls WIS, not INT', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 → 11
+    // INT +0 would miss DC 14 (11); WIS +5 clears it (16).
+    const st = makeState({ int: 10, wis: 20 }, { current_room: 'ash_pit' });
+    const r = await takeAction({
+      action: { type: 'interact_object', objectId: 'scorch' },
+      history: [],
+      state: st,
+      seed: clueSeed({ searchDC: 14, searchSkill: 'perception' }),
+      context: ctx,
+    });
+    expect(r.narrative).toMatch(/Perception/);
+    expect(r.narrative).toMatch(/success/i);
+    expect(r.newState.flags?.clue_burn).toBe(true);
+  });
+
+  it('fires onFound alongside granted loot', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const st = makeState({ int: 14 }, { current_room: 'ash_pit' });
+    const r = await takeAction({
+      action: { type: 'interact_object', objectId: 'scorch' },
+      history: [],
+      state: st,
+      seed: clueSeed({ lootIds: ['healing_potion'] }),
+      context: ctx,
+    });
+    expect(r.newState.flags?.clue_burn).toBe(true);
+    expect(r.newState.characters[0].inventory.length).toBeGreaterThan(0);
+  });
+});
+
 describe('interact_object — lighting-adjusted active search', () => {
   function searchSeed(lighting?: 'bright' | 'dim' | 'dark' | 'sunlight'): Seed {
     return {
