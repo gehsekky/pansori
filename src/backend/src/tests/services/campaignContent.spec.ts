@@ -397,9 +397,9 @@ function makeContentDb(initial: {
       return { rows: [], rowCount: 1 };
     }
     if (sql.includes('FROM campaign_dialogue_responses') && sql.includes('SELECT')) {
-      // params after campaign_id: [room, npc, id, parent, sort, label, reply,
-      // once, condition, skill_check, consequences]. Order: room, npc, parent
-      // NULLS FIRST, sort_order (matches getCampaignDialogue's ORDER BY).
+      // params after campaign_id: [room, npc, id, parent, sort, label, say, goto,
+      // reply, once, condition, skill_check, consequences]. Order: room, npc,
+      // parent NULLS FIRST, sort_order (matches getCampaignDialogue's ORDER BY).
       const list = [...(dialogue.get(params[0] as string) ?? [])].sort((a, b) => {
         if (a[0] !== b[0]) return String(a[0]) < String(b[0]) ? -1 : 1; // room
         if (a[1] !== b[1]) return String(a[1]) < String(b[1]) ? -1 : 1; // npc
@@ -419,11 +419,13 @@ function makeContentDb(initial: {
         id: p[2],
         parent_id: p[3],
         label: p[5],
-        reply: p[6],
-        once: p[7],
-        condition: parse(p[8]),
-        skill_check: parse(p[9]),
-        consequences: parse(p[10]),
+        say: (p[6] as string | undefined) ?? null,
+        goto: (p[7] as string | undefined) ?? null,
+        reply: p[8],
+        once: p[9],
+        condition: parse(p[10]),
+        skill_check: parse(p[11]),
+        consequences: parse(p[12]),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -1762,10 +1764,11 @@ describe('rooms table store', () => {
             {
               id: 'job',
               label: 'About the job',
+              say: 'So — about that job of yours.', // spoken line ≠ menu label
               reply: 'Bring the ledger.',
               once: true,
               condition: { fact: 'flags', path: '$.x', operator: 'equal', value: true },
-              responses: [{ label: 'On it', reply: 'Good.' }], // id-less child → minted
+              responses: [{ label: 'On it', reply: 'Good.', goto: 'job' }], // id-less child → minted; hub goto
             },
             { id: 'bye', label: 'Bye', reply: 'Hm.' },
           ],
@@ -1777,11 +1780,13 @@ describe('rooms table store', () => {
     const [job, bye] = npc.responses!;
     expect(job.id).toBe('job'); // authored ids preserved
     expect(job.once).toBe(true);
+    expect(job.say).toBe('So — about that job of yours.'); // say round-trips
     expect(job.condition).toEqual({ fact: 'flags', path: '$.x', operator: 'equal', value: true });
     expect(bye.id).toBe('bye');
     // Nesting + order preserved; the id-less child got a minted, non-empty id.
     expect(job.responses).toHaveLength(1);
     expect(job.responses![0].label).toBe('On it');
+    expect(job.responses![0].goto).toBe('job'); // goto round-trips
     expect(typeof job.responses![0].id).toBe('string');
     expect((job.responses![0].id as string).length).toBeGreaterThan(0);
   });
@@ -2953,5 +2958,33 @@ describe('lintCampaign — cross-section reference lint', () => {
     expect(msgs).toContain('region:startingRegionId → unknown region "no-region"');
     expect(msgs).toContain('member:loot → unknown required member "Nobody"');
     expect(msgs).toContain('item:loot → unknown item "mystery_item"');
+  });
+
+  it('flags a dangling dialogue goto (within an NPC tree)', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [
+      {
+        id: 'r1',
+        name: 'R1',
+        desc: 'd',
+        grid: [[{ t: 'grass' }]],
+        entryPos: { x: 0, y: 0 },
+        npcs: [
+          {
+            id: 'hob',
+            name: 'Hob',
+            responses: [
+              { id: 'a', label: 'A', goto: 'nowhere' }, // dangling
+              { id: 'b', label: 'B', goto: 'a' }, // ok — 'a' exists
+            ],
+          },
+        ],
+      },
+    ]);
+    const msgs = (await lintCampaign(db.pool, 'demo_campaign')).map(
+      (i) => `${i.category}:${i.message}`
+    );
+    expect(msgs).toContain('npc:goto → unknown dialogue node "nowhere"');
+    expect(msgs).not.toContain('npc:goto → unknown dialogue node "a"');
   });
 });

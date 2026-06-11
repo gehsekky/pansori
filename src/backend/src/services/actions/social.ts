@@ -16,11 +16,11 @@ import {
 import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import { onceKey, visibleResponses } from '../dialogueGating.js';
+import { pathToNode, responsesAtNodePath } from '../conversation.js';
 import type { ActionHandler } from './types.js';
 import type { ActiveGrid } from '../mapEngine.js';
 import type { GridPos } from '../../types.js';
 import { randomUUID } from 'crypto';
-import { responsesAtNodePath } from '../conversation.js';
 
 /**
  * The cell the party marker walks to when approaching an NPC: a free square
@@ -200,10 +200,23 @@ export const handleTalkResponse: ActionHandler<{
     return narrativeParts.length ? ' ' + narrativeParts.join(' ') : '';
   };
 
-  // The player's side of the exchange — the chosen line reads as the
-  // character speaking it, so the narrative pane carries BOTH halves of
-  // the conversation (authors write labels as spoken player lines).
-  const playerLine = `${char.name}: "${response.label}"`;
+  // The player's side of the exchange — the chosen line reads as the character
+  // speaking it (`say` when authored, else the menu `label`), so the narrative
+  // pane carries BOTH halves of the conversation.
+  const playerLine = `${char.name}: "${response.say ?? response.label}"`;
+
+  // The next conversation cursor when this option ADVANCES (a chosen leaf stays
+  // put; a passed check / plain pick advances). `goto` jumps to another node's
+  // children (hub-and-spoke); otherwise descend into this node's own children;
+  // a childless node stays at the current level.
+  const nextNodePath = (advance: boolean): string[] => {
+    if (!advance) return nodePath;
+    if (response.goto) {
+      const target = pathToNode(npc, response.goto);
+      if (target) return target;
+    }
+    return (response.responses?.length ?? 0) > 0 ? [...nodePath, action.responseId] : nodePath;
+  };
 
   // Skill-gated node: roll the CHA-based social check, pick the outcome's
   // reply + consequences; children open ONLY on success. Without `once`, a
@@ -237,12 +250,11 @@ export const handleTalkResponse: ActionHandler<{
     }). ${npc.name}: "${outcomeReply}"`;
     narrative += runConsequences(result.success ? chk.onSuccess : chk.onFail);
     if (conv) {
-      const descend = result.success && (response.responses?.length ?? 0) > 0;
       ctx.st = {
         ...ctx.st,
         active_conversation: {
           ...conv,
-          nodePath: descend ? [...nodePath, action.responseId] : nodePath,
+          nodePath: nextNodePath(result.success),
           prompt: outcomeReply,
         },
       };
@@ -258,12 +270,11 @@ export const handleTalkResponse: ActionHandler<{
   // Walk the conversation: a branch (has children) descends a level; a leaf
   // keeps the current options. The prompt becomes the NPC's reply either way.
   if (conv) {
-    const descend = (response.responses?.length ?? 0) > 0;
     ctx.st = {
       ...ctx.st,
       active_conversation: {
         ...conv,
-        nodePath: descend ? [...nodePath, action.responseId] : nodePath,
+        nodePath: nextNodePath(true),
         prompt: response.reply ?? `${npc.name} nods.`,
       },
     };

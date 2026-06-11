@@ -29,7 +29,10 @@ export interface DialogueCheck {
 }
 
 export interface DialogueNode {
+  id?: string;
   label: string;
+  say?: string;
+  goto?: string;
   reply?: string;
   condition?: unknown;
   once?: boolean;
@@ -37,6 +40,16 @@ export interface DialogueNode {
   consequences?: DialogueConsequence[];
   responses?: DialogueNode[];
   [key: string]: unknown;
+}
+
+// Every node id in a tree (goto targets) — minted server-side, so only nodes
+// that have been saved once are addressable.
+function collectNodeIds(nodes: DialogueNode[], into: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.id) into.push(n.id);
+    if (n.responses) collectNodeIds(n.responses, into);
+  }
+  return into;
 }
 
 export interface DialogueEditorProps {
@@ -59,10 +72,11 @@ function NodeEditor(props: {
   where: string;
   depth: number;
   pickers: RowPickers;
+  nodeIds: string[];
   onChange: (n: DialogueNode) => void;
   onRemove: () => void;
 }) {
-  const { node, where, depth, pickers, onChange } = props;
+  const { node, where, depth, pickers, nodeIds, onChange } = props;
   const set = (patch: Partial<DialogueNode>) => {
     const next = { ...node, ...patch };
     // undefined-valued keys are pruned so the saved JSON stays minimal.
@@ -83,9 +97,9 @@ function NodeEditor(props: {
       }}
     >
       <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div style={{ flex: '2 1 160px' }}>
+        <div style={{ flex: '2 1 140px' }}>
           <label className={styles.formLbl} htmlFor={`${where}-label`}>
-            PLAYER LINE
+            MENU LABEL
           </label>
           <input
             id={`${where}-label`}
@@ -93,6 +107,20 @@ function NodeEditor(props: {
             style={inp}
             value={node.label}
             onChange={(ev) => set({ label: ev.target.value })}
+          />
+        </div>
+        <div style={{ flex: '2 1 140px' }}>
+          <label className={styles.formLbl} htmlFor={`${where}-say`}>
+            SPOKEN LINE
+          </label>
+          <input
+            id={`${where}-say`}
+            aria-label={`${where} say`}
+            className={styles.formInp}
+            style={inp}
+            placeholder="(speaks the label)"
+            value={node.say ?? ''}
+            onChange={(ev) => set({ say: ev.target.value || undefined })}
           />
         </div>
         {!node.check && (
@@ -119,6 +147,32 @@ function NodeEditor(props: {
           />
           ONCE
         </label>
+        <div>
+          <label className={styles.formLbl} htmlFor={`${where}-goto`}>
+            GOTO
+          </label>
+          <select
+            id={`${where}-goto`}
+            aria-label={`${where} goto`}
+            className={styles.formInp}
+            style={{ ...inp, cursor: 'pointer', maxWidth: 130 }}
+            value={node.goto ?? ''}
+            onChange={(ev) => set({ goto: ev.target.value || undefined })}
+          >
+            <option value="">— descend —</option>
+            {nodeIds
+              .filter((id) => id !== node.id)
+              .map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            {node.goto && !nodeIds.includes(node.goto) && (
+              <option value={node.goto}>{node.goto} (unknown)</option>
+            )}
+          </select>
+        </div>
+        {node.id && <span style={{ ...lbl, paddingBottom: 8 }}>id: {node.id}</span>}
         <div style={{ display: 'flex', gap: 4, paddingBottom: 4 }}>
           <button
             className={styles.ghostBtn}
@@ -290,6 +344,7 @@ function NodeEditor(props: {
           where={`${where}.${i + 1}`}
           depth={depth + 1}
           pickers={pickers}
+          nodeIds={nodeIds}
           onChange={(next) =>
             set({ responses: node.responses!.map((x, j) => (j === i ? next : x)) })
           }
@@ -311,6 +366,7 @@ export default function DialogueEditor(props: DialogueEditorProps) {
     factions: props.factions,
     npcIds: props.npcIds,
   };
+  const nodeIds = collectNodeIds(value);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {value.length === 0 && (
@@ -325,6 +381,7 @@ export default function DialogueEditor(props: DialogueEditorProps) {
           where={`option ${i + 1}`}
           depth={0}
           pickers={pickers}
+          nodeIds={nodeIds}
           onChange={(next) => onChange(value.map((x, j) => (j === i ? next : x)))}
           onRemove={() => onChange(value.filter((_, j) => j !== i))}
         />

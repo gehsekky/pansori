@@ -1139,7 +1139,9 @@ type DialogueCheckShape = z.infer<typeof DialogueCheckSchema>;
 interface RoomNpcResponseShape {
   id?: string;
   label: string;
+  say?: string;
   reply?: string;
+  goto?: string;
   condition?: ConditionShape;
   once?: boolean;
   check?: DialogueCheckShape;
@@ -1153,6 +1155,9 @@ const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
       // nodes get one minted server-side; existing nodes round-trip theirs.
       id: DIALOGUE_NODE_ID.optional(),
       label: z.string().min(1).max(120),
+      // The spoken line (falls back to label); the node to jump to (hub-spoke).
+      say: z.string().min(1).max(2000).optional(),
+      goto: DIALOGUE_NODE_ID.optional(),
       reply: z.string().min(1).max(2000).optional(),
       condition: DialogueConditionSchema.optional(),
       once: z.boolean().optional(),

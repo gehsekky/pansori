@@ -832,6 +832,8 @@ export interface CampaignRoomLoot {
 export interface CampaignRoomNpcResponse {
   id?: string;
   label: string;
+  say?: string;
+  goto?: string;
   reply?: string;
   condition?: object;
   once?: boolean;
@@ -956,6 +958,8 @@ interface DialogueRow {
   id: string;
   parent_id: string | null;
   label: string;
+  say: string | null;
+  goto: string | null;
   reply: string | null;
   once: boolean;
   condition: object | null;
@@ -971,7 +975,7 @@ async function getCampaignDialogue(
   campaignId: string
 ): Promise<Map<string, NpcDialogueResponse[]>> {
   const { rows } = await pool.query<DialogueRow>(
-    `SELECT room_id, npc_id, id, parent_id, label, reply, once, condition, skill_check, consequences
+    `SELECT room_id, npc_id, id, parent_id, label, say, goto, reply, once, condition, skill_check, consequences
        FROM campaign_dialogue_responses
       WHERE campaign_id = $1
       ORDER BY room_id, npc_id, parent_id NULLS FIRST, sort_order`,
@@ -982,6 +986,8 @@ async function getCampaignDialogue(
     nodeById.set(`${r.room_id}/${r.npc_id}/${r.id}`, {
       id: r.id,
       label: r.label,
+      ...(r.say !== null ? { say: r.say } : {}),
+      ...(r.goto !== null ? { goto: r.goto } : {}),
       ...(r.reply !== null ? { reply: r.reply } : {}),
       ...(r.once ? { once: true } : {}),
       ...(r.condition !== null ? { condition: r.condition } : {}),
@@ -1026,8 +1032,8 @@ async function insertDialogueNodes(
     const id = r.id && /^[a-z0-9._-]+$/.test(r.id) ? r.id : randomUUID().slice(0, 8);
     await client.query(
       `INSERT INTO campaign_dialogue_responses
-         (campaign_id, room_id, npc_id, id, parent_id, sort_order, label, reply, once, condition, skill_check, consequences)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb)`,
+         (campaign_id, room_id, npc_id, id, parent_id, sort_order, label, say, goto, reply, once, condition, skill_check, consequences)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb)`,
       [
         campaignId,
         roomId,
@@ -1036,6 +1042,8 @@ async function insertDialogueNodes(
         parentId,
         i,
         r.label,
+        r.say ?? null,
+        r.goto ?? null,
         r.reply ?? null,
         r.once ?? false,
         r.condition ? JSON.stringify(r.condition) : null,

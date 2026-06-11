@@ -16,3 +16,21 @@ export function responsesAtNodePath(npc: PlacedNpc, nodePath: string[]): NpcDial
   }
   return node;
 }
+
+/**
+ * The nodePath from the root to a target node id (inclusive) — i.e. the cursor
+ * whose children are that node's `responses`. Used by `goto` (hub-and-spoke) to
+ * jump the conversation there. Returns null if the id isn't found in the tree.
+ */
+export function pathToNode(npc: PlacedNpc, targetId: string): string[] | null {
+  const walk = (responses: NpcDialogueResponse[], prefix: string[]): string[] | null => {
+    for (const r of responses) {
+      const here = [...prefix, r.id ?? ''];
+      if (r.id === targetId) return here;
+      const found = r.responses ? walk(r.responses, here) : null;
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(npc.responses, []);
+}

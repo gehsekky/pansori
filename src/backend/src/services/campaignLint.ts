@@ -219,9 +219,24 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
   };
 
   // ── Walk authored content ──
-  const walkResponses = (responses: CampaignRoomNpcResponse[] | undefined, where: string) => {
+  // All node ids within one NPC's dialogue tree — `goto` targets must resolve to
+  // one (a dangling goto silently no-ops at runtime).
+  const collectNodeIds = (responses: CampaignRoomNpcResponse[] | undefined, into: Set<string>) => {
+    for (const r of responses ?? []) {
+      if (r.id) into.add(r.id);
+      collectNodeIds(r.responses, into);
+    }
+    return into;
+  };
+  const walkResponses = (
+    responses: CampaignRoomNpcResponse[] | undefined,
+    where: string,
+    nodeIds: Set<string>
+  ) => {
     (responses ?? []).forEach((resp, i) => {
       const w = `${where} → reply ${i}${resp.label ? ` ("${resp.label}")` : ''}`;
+      if (resp.goto && !nodeIds.has(resp.goto))
+        add('npc', w, `goto → unknown dialogue node "${resp.goto}"`);
       checkConsequences(resp.consequences, w);
       const check = resp.check as Record<string, unknown> | undefined;
       if (check) {
@@ -229,7 +244,7 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
         checkConsequences(check.onFail, `${w} (fail)`);
       }
       if (resp.condition) checkCondition(resp.condition, `${w} [condition]`);
-      walkResponses(resp.responses, w);
+      walkResponses(resp.responses, w, nodeIds);
     });
   };
 
@@ -257,7 +272,12 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
   }
 
   for (const r of rooms)
-    for (const n of r.npcs ?? []) walkResponses(n.responses, `room "${r.id}" NPC "${n.id}"`);
+    for (const n of r.npcs ?? [])
+      walkResponses(
+        n.responses,
+        `room "${r.id}" NPC "${n.id}"`,
+        collectNodeIds(n.responses, new Set<string>())
+      );
 
   for (const rule of rules) {
     checkCondition(rule.conditions, `rule "${rule.name}" [condition]`);

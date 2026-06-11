@@ -1113,15 +1113,15 @@ describe('RegionEditorScreen', () => {
         <RegionEditorScreen campaignId="sandbox" regionId="cellar" kind="room" onBack={vi.fn()} />
       );
       await screen.findByTestId('cell-0-0');
-      // Open the tree, add an option — a blank PLAYER LINE blocks the save.
+      // Open the tree, add an option — a blank MENU LABEL blocks the save.
       fireEvent.click(screen.getByTestId('npc-dialogue-0'));
       expect(await screen.findByText(/No dialogue yet/)).toBeTruthy();
       fireEvent.click(screen.getByTestId('add-dialogue-option'));
       fireEvent.click(screen.getByText('SAVE'));
-      expect(await screen.findByText(/needs a PLAYER LINE/)).toBeTruthy();
+      expect(await screen.findByText(/needs a MENU LABEL/)).toBeTruthy();
       expect(mocked.putCampaignSection).not.toHaveBeenCalled();
-      // Fill the node: line + reply, a flag condition, a START QUEST effect.
-      fireEvent.change(screen.getByLabelText('PLAYER LINE'), {
+      // Fill the node: label + reply, a flag condition, a START QUEST effect.
+      fireEvent.change(screen.getByLabelText('MENU LABEL'), {
         target: { value: 'Need a hand with anything?' },
       });
       fireEvent.change(screen.getByLabelText('NPC REPLY'), {

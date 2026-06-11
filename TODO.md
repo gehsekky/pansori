@@ -184,10 +184,12 @@ documented deferrals.
       CampaignContentEditor (auto-run on load + after save). Remaining: surface in
       the RegionEditorScreen creator too; item refs are unvalidated in unit tests
       (mock catalog is empty) but live in prod.
-- [ ] **Dialogue follow-ups** — `say` field (menu label vs spoken line),
-      `goto`/node-ids for hub-and-spoke trees (the node-id work also unblocks
-      moving dialogue replies into `campaign_narratives`), mid-combat surrender,
-      NPC ICON sprite picker (`/art/sprites` stems; schema already stores `icon`).
+- [x] **Dialogue follow-ups** — done: `say` (spoken line vs menu `label`),
+      `goto` hub-and-spoke (jump the conversation cursor to another node by id —
+      `pathToNode` + the id-keyed dispatcher; lint catches dangling gotos), and
+      the NPC ICON sprite-stem dropdown (RegionEditorScreen, `sprite:<stem>`).
+      Still open: **mid-combat surrender** (an enemy yields mid-fight and opens a
+      parley — separate combat-system work; needs its trigger rules scoped).
 - [ ] Continue the **auto-pick → player-driven** creation migration (Divine Order
       + caster spells done) for any remaining auto-assigned choices.
 

@@ -1314,7 +1314,17 @@ export interface NpcDialogueResponse {
   // optional in authoring input (new nodes get one assigned).
   id?: string;
   label: string;
+  // The menu button text the player clicks. `say` is what the character ACTUALLY
+  // speaks when chosen (the narration reads `<Name>: "<say>"`); when omitted it
+  // falls back to `label`, so a short button ("Ask about the cellar") can voice
+  // a fuller line ("So — what's really down in that cellar?").
+  say?: string;
   reply?: string; // NPC's follow-up text after player picks this
+  // Hub-and-spoke: jump the conversation cursor to another node (by id) when
+  // this option is chosen, instead of descending into its own children — for
+  // "anything else?" menus, cross-links, and return-to-hub loops. The target
+  // node's children become the new options; an unknown id is ignored.
+  goto?: string;
   consequences?: GameConsequence[]; // applied when this response is chosen
   // Visibility gate — a json-rules-engine condition (the same shape as
   // QuestStep.condition) evaluated against CampaignFacts. A response whose

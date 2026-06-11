@@ -111,7 +111,7 @@ describe('DialogueEditor component', () => {
 
   it('label, reply and ONCE edit through the controlled value', () => {
     const onChange = setup([{ label: 'Hello' }]);
-    fireEvent.change(screen.getByLabelText('PLAYER LINE'), { target: { value: 'Hi there' } });
+    fireEvent.change(screen.getByLabelText('MENU LABEL'), { target: { value: 'Hi there' } });
     expect(last(onChange)).toEqual([{ label: 'Hi there' }]);
     fireEvent.change(screen.getByLabelText('NPC REPLY'), { target: { value: 'Well met.' } });
     expect(last(onChange)).toEqual([{ label: 'Hello', reply: 'Well met.' }]);
@@ -143,7 +143,7 @@ describe('DialogueEditor component', () => {
     const onChange = setup([{ label: 'X', condition: custom }]);
     expect(screen.getByText(/custom condition/)).toBeTruthy();
     // Other edits leave the custom condition in place.
-    fireEvent.change(screen.getByLabelText('PLAYER LINE'), { target: { value: 'Y' } });
+    fireEvent.change(screen.getByLabelText('MENU LABEL'), { target: { value: 'Y' } });
     expect(last(onChange)).toEqual([{ label: 'Y', condition: custom }]);
   });
 
@@ -187,5 +187,23 @@ describe('DialogueEditor component', () => {
     ]);
     fireEvent.click(screen.getByLabelText('Remove option 1.1'));
     expect(last(onChange)).toEqual([{ label: 'Branch' }]);
+  });
+
+  it('edits the spoken line (say) distinct from the menu label', () => {
+    const onChange = setup([{ label: 'Say hello' }]);
+    fireEvent.change(screen.getByLabelText('option 1 say'), {
+      target: { value: 'A fine morning!' },
+    });
+    expect(last(onChange)).toEqual([{ label: 'Say hello', say: 'A fine morning!' }]);
+  });
+
+  it('goto offers existing node ids and sets the jump target', () => {
+    // Two saved nodes (with ids); option 1 can goto option 2's id.
+    const onChange = setup([
+      { id: 'n1', label: 'Ask' },
+      { id: 'n2', label: 'Menu', reply: 'Pick.' },
+    ]);
+    fireEvent.change(screen.getByLabelText('option 1 goto'), { target: { value: 'n2' } });
+    expect(last(onChange)[0]).toEqual({ id: 'n1', label: 'Ask', goto: 'n2' });
   });
 });

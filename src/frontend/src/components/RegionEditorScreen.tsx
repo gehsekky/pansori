@@ -27,6 +27,17 @@ const siteIconOptions: Array<{ value: string; label: string; group: 'marker' | '
   })),
 ];
 
+// NPC marker sprites under /art/sprites (Tiny Swords overlay). The NPC `icon`
+// field is `sprite:<stem>`; absent → the default pawn; a non-sprite value is a
+// game-icons glyph (kept as a "(custom)" passthrough). The free tier renders a
+// glyph fallback for all of these.
+const NPC_SPRITES: Array<{ stem: string; label: string }> = [
+  { stem: 'pawn_purple_idle', label: 'Pawn (purple)' },
+  { stem: 'pawn_blue_axe_idle', label: 'Pawn (blue, axe)' },
+  { stem: 'pawn_yellow_idle', label: 'Pawn (yellow)' },
+  { stem: 'warrior_blue_idle', label: 'Warrior (blue)' },
+];
+
 // The painted preview for a 'tile:<id>' icon (variant 1, matching what the
 // overworld renderer pins landmarks to). Glyph / custom icons → null, and the
 // free tier (no painted art) → null too, so the caller shows the glyph.
@@ -1172,7 +1183,7 @@ function RegionEditorScreen({
     if (kind === 'room') {
       const badNode = (nodes: DialogueNode[] | undefined): string | null => {
         for (const node of nodes ?? []) {
-          if (!node.label.trim()) return 'Every dialogue option needs a PLAYER LINE.';
+          if (!node.label.trim()) return 'Every dialogue option needs a MENU LABEL.';
           if (node.check && (!node.check.successReply.trim() || !node.check.failReply.trim())) {
             return 'Every dialogue CHECK needs both outcome replies.';
           }
@@ -3181,20 +3192,33 @@ function RegionEditorScreen({
                           <label className={styles.formLbl} htmlFor={`npc-icon-${i}`}>
                             ICON
                           </label>
-                          <input
+                          <select
                             id={`npc-icon-${i}`}
+                            aria-label={`NPC ${i + 1} icon`}
                             className={styles.formInp}
-                            placeholder="default"
+                            style={{ cursor: 'pointer' }}
                             value={n.icon ?? ''}
                             onChange={(ev) => {
                               const icon = ev.target.value;
                               setPlacedNpcs((prev) =>
-                                prev.map((p, j) => (j === i ? { ...p, icon } : p))
+                                prev.map((p, j) =>
+                                  j === i ? { ...p, icon: icon || undefined } : p
+                                )
                               );
                               setDirty(true);
                               setSaved(false);
                             }}
-                          />
+                          >
+                            <option value="">— default pawn —</option>
+                            {NPC_SPRITES.map((s) => (
+                              <option key={s.stem} value={`sprite:${s.stem}`}>
+                                {s.label}
+                              </option>
+                            ))}
+                            {n.icon && !NPC_SPRITES.some((s) => `sprite:${s.stem}` === n.icon) && (
+                              <option value={n.icon}>{n.icon} (custom)</option>
+                            )}
+                          </select>
                         </div>
                         <span
                           style={{

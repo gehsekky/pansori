@@ -617,3 +617,69 @@ describe('promoted consequence arms (Demo Campaign parity) — the DB dialogue p
     expect(r.newState.characters[0].hp).toBe(r.newState.characters[0].max_hp);
   });
 });
+
+describe('dialogue follow-ups: say + goto', () => {
+  // A hub NPC: the root has a menu node; inside it, "Ask A" goto's back to the
+  // menu (hub-and-spoke), and "Greet" carries a distinct spoken line via `say`.
+  const hub: PlacedNpc = {
+    roomId: ROOM,
+    id: 'hub',
+    name: 'The Steward',
+    attitude: 'friendly',
+    hp: 4,
+    ac: 10,
+    damage: '1d4',
+    toHit: 0,
+    xp: 0,
+    greeting: 'How may I help?',
+    responses: [
+      {
+        id: 'menu',
+        label: 'Business',
+        reply: 'Of course. Which is it?',
+        responses: [
+          { id: 'ask_a', label: 'About the tax', reply: 'A complex matter.', goto: 'menu' },
+          { id: 'ask_b', label: 'About the road', reply: 'Closed for repairs.' },
+        ],
+      },
+      {
+        id: 'greet',
+        label: 'Say hello',
+        say: 'A fine morning to you, steward!',
+        reply: 'And to you.',
+      },
+    ],
+  };
+  const hubSeed = { ...seed, npcs: { hub } } as unknown as Seed;
+  const hubAct = (
+    state: ReturnType<typeof makeState>,
+    action: Parameters<typeof takeAction>[0]['action']
+  ) => takeAction({ action, history: [], state, seed: hubSeed, context: ctx });
+  const labelsOf = (state: ReturnType<typeof makeState>) =>
+    generateChoices(state, hubSeed, ctx).map((c) => c.label);
+  const startHub = () =>
+    makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['hub'] });
+
+  it('`say` is the spoken line; `label` stays the menu text', async () => {
+    let r = await hubAct(startHub(), { type: 'talk', npcId: 'hub' });
+    // The button reads the label…
+    expect(labelsOf(r.newState)).toContain('<To The Steward> Say hello');
+    r = await hubAct(r.newState, { type: 'talk_response', responseId: 'greet' });
+    // …but the character speaks `say`, not the label.
+    expect(r.narrative).toContain('Test Hero: "A fine morning to you, steward!"');
+    expect(r.narrative).not.toContain('Test Hero: "Say hello"');
+  });
+
+  it('`goto` jumps the cursor to the target node’s children (hub-and-spoke)', async () => {
+    let r = await hubAct(startHub(), { type: 'talk', npcId: 'hub' });
+    r = await hubAct(r.newState, { type: 'talk_response', responseId: 'menu' }); // descend
+    expect(r.newState.active_conversation?.nodePath).toEqual(['menu']);
+    r = await hubAct(r.newState, { type: 'talk_response', responseId: 'ask_a' }); // goto: menu
+    expect(r.narrative).toContain('A complex matter.');
+    // Back at the menu level — not descended into ask_a (a leaf).
+    expect(r.newState.active_conversation?.nodePath).toEqual(['menu']);
+    const labels = labelsOf(r.newState);
+    expect(labels).toContain('<To The Steward> About the tax');
+    expect(labels).toContain('<To The Steward> About the road');
+  });
+});
