@@ -36,7 +36,8 @@ const clockTick = (roomId: string): GameRule => ({
 });
 
 export const RULES: GameRule[] = [
-  // 1. Store flip — all five positional rats (store_room#0..#4) dead.
+  // 1. Store flip — all three positional rats (store_room#0..#2) dead. Must
+  // match the Giant Rat count in store_room (rooms.ts) exactly.
   {
     name: 'store_flip',
     once: true,
@@ -45,8 +46,6 @@ export const RULES: GameRule[] = [
         { fact: 'enemies_killed', operator: 'contains', value: 'store_room#0' },
         { fact: 'enemies_killed', operator: 'contains', value: 'store_room#1' },
         { fact: 'enemies_killed', operator: 'contains', value: 'store_room#2' },
-        { fact: 'enemies_killed', operator: 'contains', value: 'store_room#3' },
-        { fact: 'enemies_killed', operator: 'contains', value: 'store_room#4' },
       ],
     },
     consequences: [

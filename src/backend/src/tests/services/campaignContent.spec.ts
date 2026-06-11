@@ -834,6 +834,27 @@ describe('editable sections registry', () => {
     expect(room.trap?.disarmFail).toBeTruthy();
   });
 
+  it('dbRoomsToEngine drops unknown terrain types (a content typo can’t crash the grid)', () => {
+    const [room] = dbRoomsToEngine([
+      {
+        id: 'r',
+        name: 'R',
+        desc: '',
+        entryPos: { x: 0, y: 0 },
+        // 'swamp' is a real TerrainType; 'mud' is not — TERRAIN['mud'] would be
+        // undefined and crash the map render. The overlay must drop it.
+        grid: [[{ t: 'swamp' }, { t: 'mud' }, { t: 'plains' }]],
+      },
+    ]);
+    // Known terrain carried (rooms list every painted cell, plains included);
+    // the unknown 'mud' is dropped — no { type: 'mud' } reaches the render.
+    expect(room.terrain).toEqual([
+      { pos: { x: 0, y: 0 }, type: 'swamp' },
+      { pos: { x: 2, y: 0 }, type: 'plains' },
+    ]);
+    expect(room.terrain?.some((c) => c.type === ('mud' as never))).toBe(false);
+  });
+
   it('rooms schema validates NPCs: recursive dialogue, campaign-unique ids, bounds', () => {
     const rooms = CAMPAIGN_SECTION_SCHEMAS.rooms;
     const hob = {

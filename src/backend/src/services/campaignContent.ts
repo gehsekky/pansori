@@ -64,6 +64,7 @@ import {
   getItemCatalog,
   putCampaignCustomItems,
 } from './itemCatalog.js';
+import { TERRAIN } from '../types.js';
 import { baseCampaignContext } from '../campaignData/srd/baseCampaign.js';
 import { materializeEnemy } from './enemyFactory.js';
 import { randomUUID } from 'crypto';
@@ -747,12 +748,29 @@ export async function deleteCampaignTowns(pool: Pool, campaignId: string): Promi
 // Convert DB towns into the engine model — same dense→sparse terrain rule
 // as regions; venues pass through (the engine's MapVenue shape matches).
 // Per-cell tier/enc have no meaning at town scale and are dropped.
+// Coerce an authored cosmetic terrain string to a known TerrainType, or null.
+// The map renderer indexes TERRAIN[type] directly (FE + backend), so an unknown
+// type — a content typo, or a cast that slipped past tsc — would be `undefined`
+// and crash the grid render ("can't access property 'passable'"). Dropping it
+// at the overlay boundary turns the cell into plain floor instead. Warns once
+// per unknown value so the author can fix it.
+const warnedTerrain = new Set<string>();
+function knownTerrain(t: string): TerrainType | null {
+  if (t in TERRAIN) return t as TerrainType;
+  if (!warnedTerrain.has(t)) {
+    warnedTerrain.add(t);
+    console.warn(`[campaignContent] unknown terrain type "${t}" — cell rendered as default floor`);
+  }
+  return null;
+}
+
 export function dbTownsToEngine(towns: CampaignTown[]): Town[] {
   return towns.map((t) => {
     const terrain: TerrainCell[] = [];
     t.grid.forEach((row, y) =>
       row.forEach((cell, x) => {
-        if (cell.t !== 'plains') terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
+        const tt = cell.t && cell.t !== 'plains' ? knownTerrain(cell.t) : null;
+        if (tt) terrain.push({ pos: { x, y }, type: tt });
       })
     );
     return {
@@ -1267,7 +1285,10 @@ export function dbRoomsToEngine(rooms: CampaignRoom[]): Room[] {
     };
     r.grid.forEach((row, y) =>
       row.forEach((cell, x) => {
-        if (cell.t) terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
+        if (cell.t) {
+          const tt = knownTerrain(cell.t);
+          if (tt) terrain.push({ pos: { x, y }, type: tt });
+        }
         if (cell.m) mech[cell.m].push({ x, y });
       })
     );
@@ -1360,7 +1381,10 @@ export function dbRegionsToEngine(regions: CampaignRegion[]): Region[] {
     const zoneCells = new Map<string, GridPos[]>();
     r.grid.forEach((row, y) =>
       row.forEach((cell, x) => {
-        if (cell.t !== 'plains') terrain.push({ pos: { x, y }, type: cell.t as TerrainType });
+        if (cell.t !== 'plains') {
+          const tt = knownTerrain(cell.t);
+          if (tt) terrain.push({ pos: { x, y }, type: tt });
+        }
         if (cell.ez) {
           const list = zoneCells.get(cell.ez);
           if (list) list.push({ x, y });

@@ -36,7 +36,11 @@ function mergeObstacles(
   terrain: TerrainCell[] | undefined,
   transitions: MapTransition[]
 ): GridPos[] {
-  const impassable = (terrain ?? []).filter((c) => !TERRAIN[c.type].passable).map((c) => c.pos);
+  // Unknown terrain types default to passable rather than throwing on the
+  // undefined TERRAIN[type] lookup (mirrors activeGrid on the FE).
+  const impassable = (terrain ?? [])
+    .filter((c) => !(TERRAIN[c.type]?.passable ?? true))
+    .map((c) => c.pos);
   const transitionKeys = new Set(transitions.map((t) => `${t.pos.x},${t.pos.y}`));
   return [...(legacy ?? []), ...impassable].filter((o) => !transitionKeys.has(`${o.x},${o.y}`));
 }

@@ -24,15 +24,17 @@ const grid = (w: number, h: number) =>
     )
   );
 
-// A marsh grid: empty, with a scatter of peat (difficult) and a water channel
-// (swim) so the terrain mechanics actually bite. Deterministic (no RNG).
+// A marsh grid: empty, with a scatter of peat (difficult) and a swimmable
+// channel. The channel uses the `m: 'swim'` MECHANICAL flag (passable, costs
+// swim movement) — NOT a `t: 'water'` cosmetic tile, which is impassable terrain
+// and would wall the room in half (blocking the north exit). Deterministic.
 function marshGrid(w: number, h: number) {
   const g = grid(w, h);
-  for (let x = 0; x < w; x++) g[Math.floor(h / 2)][x] = { t: 'water', m: 'swim' }; // a channel across the middle
+  for (let x = 0; x < w; x++) g[Math.floor(h / 2)][x] = { m: 'swim' }; // a swimmable channel across the middle
   for (let y = 0; y < h; y++) {
     if (y !== Math.floor(h / 2)) {
-      g[y][1] = { t: 'mud', m: 'difficult' };
-      g[y][w - 2] = { t: 'mud', m: 'difficult' };
+      g[y][1] = { t: 'swamp', m: 'difficult' };
+      g[y][w - 2] = { t: 'swamp', m: 'difficult' };
     }
   }
   return g;
@@ -104,9 +106,10 @@ export const ROOMS: CampaignRoom[] = [
     floor: 'cobblestone',
     entryPos: { x: 4, y: 6 },
     grid: grid(8, 7),
-    // The venue starts as a combat room: a pack of giant rats (Pack Tactics).
-    // Clearing them flips Halda to merchant (see rules.ts).
-    enemies: [{ name: 'Giant Rat', count: 5 }],
+    // The venue starts as a combat room: a small pack of giant rats (Pack
+    // Tactics). 3 is a fair L1 skirmish — 5 was a near-TPK in playtest. The
+    // store_flip rule (rules.ts) must list exactly these instance ids.
+    enemies: [{ name: 'Giant Rat', count: 3 }],
     npcs: [{ ...HALDA, pos: { x: 1, y: 1 } }],
     exits: [{ pos: { x: 4, y: 6 }, ascends: true, label: 'Out to Silverford' }],
   },

@@ -129,6 +129,26 @@ describe('activeGrid (FE port)', () => {
     expect(g.obstacles).not.toContainEqual({ x: 2, y: 2 }); // road stays passable
   });
 
+  it('treats an unknown terrain type as passable instead of crashing', () => {
+    const badSeed = {
+      ...seed,
+      regions: [
+        {
+          ...(seed.regions as NonNullable<Seed['regions']>)[0],
+          // 'mud' is not a TerrainType — TERRAIN['mud'] is undefined. The render
+          // must not throw on the `.passable` lookup.
+          terrain: [{ pos: { x: 1, y: 1 }, type: 'mud' }],
+        },
+      ],
+    } as unknown as Seed;
+    const g = activeGrid(badSeed, {
+      map_level: 'regional',
+      current_region_id: 'reg1',
+    } as GameState)!;
+    expect(g).not.toBeNull();
+    expect(g.obstacles).not.toContainEqual({ x: 1, y: 1 }); // unknown → passable, not folded in
+  });
+
   it('returns null off the map model or for an unknown / transient room', () => {
     expect(activeGrid(seed, {} as GameState)).toBeNull();
     expect(at({ map_level: 'regional', current_region_id: 'nope' })).toBeNull();

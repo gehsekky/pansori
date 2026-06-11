@@ -9,12 +9,19 @@
 
 import type { CampaignRegion } from '../../services/campaignContent.js';
 
-// An 8×8 wetland: mostly swamp, a water channel, with Silverford on a dry verge.
+// An 8×8 wetland: mostly swamp, Silverford on a dry verge, and a small pond for
+// flavor. Overland `water` is IMPASSABLE, so the pond is only a 2×2 patch — it
+// must NOT span a row, or it would wall off the northern sites (Miller's
+// Thicket, Vane's camp) from the southern hub and the party could never reach
+// them ("No path there"). Everything stays mutually reachable.
 function carrGrid() {
   const g = Array.from({ length: 8 }, () =>
     Array.from({ length: 8 }, () => ({ t: 'swamp' }) as { t: string; ez?: string })
   );
-  for (let x = 0; x < 8; x++) g[4][x] = { t: 'water' }; // a broad channel across the middle
+  // A small impassable pond off to the west — routable around, never blocking.
+  g[3][0] = { t: 'water' };
+  g[4][0] = { t: 'water' };
+  g[3][1] = { t: 'water' };
   g[6][1] = { t: 'plains' }; // Silverford's dry verge
   g[6][2] = { t: 'plains' };
   return g;
