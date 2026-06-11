@@ -108,7 +108,7 @@ describe('multiple NPCs in one room', () => {
         active_conversation: {
           npcId: 'npc_aria',
           roomId: ROOM,
-          path: [],
+          nodePath: [],
           prompt: aria.greeting as string,
         },
         active_shop: { npcId: 'npc_aria', roomId: ROOM },
@@ -126,7 +126,7 @@ describe('multiple NPCs in one room', () => {
         active_conversation: {
           npcId: 'npc_aria',
           roomId: ROOM,
-          path: [],
+          nodePath: [],
           prompt: aria.greeting as string,
         },
       }),
@@ -139,7 +139,7 @@ describe('multiple NPCs in one room', () => {
         active_conversation: {
           npcId: 'npc_bram',
           roomId: ROOM,
-          path: [],
+          nodePath: [],
           prompt: bram.greeting as string,
         },
       }),

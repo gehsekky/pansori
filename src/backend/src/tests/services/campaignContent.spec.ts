@@ -80,6 +80,9 @@ function makeContentDb(initial: {
   // campaignId → faction insert params after campaign_id: [id, sort_order, name,
   // description, thresholds, shop_price_modifiers]
   const factions = new Map<string, unknown[][]>();
+  // campaignId → dialogue insert params after campaign_id: [room_id, npc_id, id,
+  // parent_id, sort_order, label, reply, once, condition, skill_check, consequences]
+  const dialogue = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -379,6 +382,49 @@ function makeContentDb(initial: {
       factions.delete(params[0] as string);
       return { rows: [], rowCount: prior };
     }
+    if (sql.includes('INSERT INTO campaign_dialogue_responses')) {
+      const [campaignId, ...rest] = params;
+      const list = dialogue.get(campaignId as string) ?? [];
+      list.push(rest);
+      dialogue.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_dialogue_responses') && sql.includes('SELECT')) {
+      // params after campaign_id: [room, npc, id, parent, sort, label, reply,
+      // once, condition, skill_check, consequences]. Order: room, npc, parent
+      // NULLS FIRST, sort_order (matches getCampaignDialogue's ORDER BY).
+      const list = [...(dialogue.get(params[0] as string) ?? [])].sort((a, b) => {
+        if (a[0] !== b[0]) return String(a[0]) < String(b[0]) ? -1 : 1; // room
+        if (a[1] !== b[1]) return String(a[1]) < String(b[1]) ? -1 : 1; // npc
+        const pa = a[3] as string | null;
+        const pb = b[3] as string | null;
+        if (pa !== pb) {
+          if (pa === null) return -1;
+          if (pb === null) return 1;
+          return pa < pb ? -1 : 1;
+        }
+        return (a[4] as number) - (b[4] as number); // sort_order
+      });
+      const parse = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v);
+      const rows = list.map((p) => ({
+        room_id: p[0],
+        npc_id: p[1],
+        id: p[2],
+        parent_id: p[3],
+        label: p[5],
+        reply: p[6],
+        once: p[7],
+        condition: parse(p[8]),
+        skill_check: parse(p[9]),
+        consequences: parse(p[10]),
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('DELETE FROM campaign_dialogue_responses')) {
+      const prior = (dialogue.get(params[0] as string) ?? []).length;
+      dialogue.delete(params[0] as string);
+      return { rows: [], rowCount: prior };
+    }
     throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
   });
 
@@ -500,8 +546,12 @@ const ROOM_A: CampaignRoom = {
       pos: { x: 4, y: 1 },
       icon: 'beer-stein',
       responses: [
-        { label: 'Ask about the cellar', reply: 'Rats. Big ones.' },
-        { label: 'Just nod', responses: [{ label: 'Leave', reply: 'Aye.' }] },
+        { id: 'cellar', label: 'Ask about the cellar', reply: 'Rats. Big ones.' },
+        {
+          id: 'nod',
+          label: 'Just nod',
+          responses: [{ id: 'leave', label: 'Leave', reply: 'Aye.' }],
+        },
       ],
       shop: [{ itemId: 'rope', price: 1 }],
     },
@@ -751,7 +801,14 @@ describe('editable sections registry', () => {
       firstGreeting: 'New faces! Welcome.',
       goodbye: 'Mind the step.',
       firstGoodbye: 'Come back for the stew.',
-      responses: [{ label: 'Ask', reply: 'No.', responses: [{ label: 'Press', reply: 'NO.' }] }],
+      responses: [
+        {
+          id: 'ask',
+          label: 'Ask',
+          reply: 'No.',
+          responses: [{ id: 'press', label: 'Press', reply: 'NO.' }],
+        },
+      ],
       shop: [{ itemId: 'rope', price: 1 }],
       factionId: 'millers',
       pos: { x: 3, y: 3 },
@@ -1629,7 +1686,7 @@ describe('rooms table store', () => {
     expect(back.trap!.dc).toBe(13);
   });
 
-  it('NPC greeting/goodbye round-trip as rows; dialogue replies stay inline', async () => {
+  it('NPC greeting/goodbye round-trip as rows; dialogue replies via the table', async () => {
     const db = makeContentDb({ campaigns: { demo_campaign: {} } });
     const room: CampaignRoom = {
       ...ROOM_B,
@@ -1640,7 +1697,7 @@ describe('rooms table store', () => {
           attitude: 'friendly',
           greeting: ['Evening.', 'You again.'], // a variant pool
           goodbye: 'Mind the step.', // single → collapses to string
-          responses: [{ label: 'Ask', reply: 'No.' }], // dialogue stays inline
+          responses: [{ id: 'ask', label: 'Ask', reply: 'No.' }], // → campaign_dialogue_responses
           shop: [{ itemId: 'rope', price: 1 }],
         },
       ],
@@ -1650,9 +1707,47 @@ describe('rooms table store', () => {
     expect(npc.greeting).toEqual(['Evening.', 'You again.']); // pool preserved + ordered
     expect(npc.goodbye).toBe('Mind the step.'); // 1 variant → string
     expect('firstGreeting' in npc).toBe(false); // unset hook absent
-    // Dialogue + shop ride along in the JSONB, untouched.
-    expect(npc.responses).toEqual([{ label: 'Ask', reply: 'No.' }]);
+    // Dialogue reattaches from the table (with its stable id); shop stays inline.
+    expect(npc.responses).toEqual([{ id: 'ask', label: 'Ask', reply: 'No.' }]);
     expect(npc.shop).toEqual([{ itemId: 'rope', price: 1 }]);
+  });
+
+  it('dialogue round-trips nested with stable ids; an id-less node gets a minted id', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const room: CampaignRoom = {
+      ...ROOM_B,
+      npcs: [
+        {
+          id: 'hob',
+          name: 'Hob',
+          attitude: 'friendly',
+          greeting: 'Evening.',
+          responses: [
+            {
+              id: 'job',
+              label: 'About the job',
+              reply: 'Bring the ledger.',
+              once: true,
+              condition: { fact: 'flags', path: '$.x', operator: 'equal', value: true },
+              responses: [{ label: 'On it', reply: 'Good.' }], // id-less child → minted
+            },
+            { id: 'bye', label: 'Bye', reply: 'Hm.' },
+          ],
+        },
+      ],
+    };
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'rooms', [room])).toBe(true);
+    const npc = (await getCampaignRooms(db.pool, 'demo_campaign'))[0].npcs![0];
+    const [job, bye] = npc.responses!;
+    expect(job.id).toBe('job'); // authored ids preserved
+    expect(job.once).toBe(true);
+    expect(job.condition).toEqual({ fact: 'flags', path: '$.x', operator: 'equal', value: true });
+    expect(bye.id).toBe('bye');
+    // Nesting + order preserved; the id-less child got a minted, non-empty id.
+    expect(job.responses).toHaveLength(1);
+    expect(job.responses![0].label).toBe('On it');
+    expect(typeof job.responses![0].id).toBe('string');
+    expect((job.responses![0].id as string).length).toBeGreaterThan(0);
   });
 
   it('put is replace-all; delete reverts to empty; missing campaign rejected', async () => {
@@ -2214,11 +2309,13 @@ describe('section CRUD + live refresh', () => {
     });
     const contexts: Record<string, Context> = { demo_campaign: code };
     const gated = {
+      id: 'job',
       label: 'About that job…',
       reply: 'Bring the ledger.',
       condition: { fact: 'flags', path: '$.knows_password', operator: 'equal', value: true },
     };
     const oneShot = {
+      id: 'bird',
       label: 'A little bird told me a password',
       reply: 'So you know Hob.',
       once: true,

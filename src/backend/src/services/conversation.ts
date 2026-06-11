@@ -1,16 +1,16 @@
 import type { NpcDialogueResponse, PlacedNpc } from '../types.js';
 
 /**
- * The dialogue responses available at a conversation node. `path` indexes the
- * nested response tree (root → `npc.responses`); each step descends into the
- * chosen response's `responses` children. Returns [] if the path is invalid.
- * Shared by the social handlers + generateChoices (kept dependency-free to
- * avoid a gameEngine ↔ social import cycle).
+ * The dialogue responses available at a conversation node. `nodePath` is the
+ * stable node ids descended from the root (root → `npc.responses`); each step
+ * descends into the matching response's `responses` children. Returns [] if the
+ * path doesn't resolve. Shared by the social handlers + generateChoices (kept
+ * dependency-free to avoid a gameEngine ↔ social import cycle).
  */
-export function responsesAtPath(npc: PlacedNpc, path: number[]): NpcDialogueResponse[] {
+export function responsesAtNodePath(npc: PlacedNpc, nodePath: string[]): NpcDialogueResponse[] {
   let node: NpcDialogueResponse[] = npc.responses;
-  for (const idx of path) {
-    const next = node[idx]?.responses;
+  for (const id of nodePath) {
+    const next = node.find((r) => r.id === id)?.responses;
     if (!next) return [];
     node = next;
   }

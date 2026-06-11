@@ -271,6 +271,14 @@ const SLUG = z
   .max(40)
   .regex(/^[a-z0-9_-]+$/, 'lowercase letters, digits, - and _ only');
 
+// Dialogue node id — also allows '.' so backfilled ids (the node's original
+// dotted index path, '0.1.2') round-trip. New nodes get opaque ids.
+const DIALOGUE_NODE_ID = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9._-]+$/, 'lowercase letters, digits, ., - and _ only');
+
 // One square of a region's dense terrain grid. `t` is the terrain type —
 // behavior (passability / travel cost / encounter multiplier) derives from
 // the shared TERRAIN registry; `tier` / `enc` are rare per-cell overrides
@@ -1129,6 +1137,7 @@ type DialogueCheckShape = z.infer<typeof DialogueCheckSchema>;
 // table at apply time; set_npc_attitude targets are cross-validated against
 // the payload's NPC ids in the payload superRefine.
 interface RoomNpcResponseShape {
+  id?: string;
   label: string;
   reply?: string;
   condition?: ConditionShape;
@@ -1140,6 +1149,9 @@ interface RoomNpcResponseShape {
 const RoomNpcResponseSchema: z.ZodType<RoomNpcResponseShape> = z.lazy(() =>
   z
     .object({
+      // Stable node id (campaign_dialogue_responses). Optional on input — new
+      // nodes get one minted server-side; existing nodes round-trip theirs.
+      id: DIALOGUE_NODE_ID.optional(),
       label: z.string().min(1).max(120),
       reply: z.string().min(1).max(2000).optional(),
       condition: DialogueConditionSchema.optional(),

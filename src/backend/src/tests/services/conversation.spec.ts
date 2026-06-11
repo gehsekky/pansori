@@ -1,7 +1,8 @@
 // Conversation mode — the NPC-dialogue state machine. After "Talk to X" the
 // engine enters a conversation: generateChoices surfaces ONLY the dialogue
 // options (responses at the current node + Back when nested + End conversation)
-// until the player ends it; responses can nest.
+// until the player ends it; responses can nest. Dialogue is addressed by stable
+// node id (talk_response.responseId + active_conversation.nodePath), not index.
 
 import type { PlacedNpc, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -27,18 +28,20 @@ const npc: PlacedNpc = {
   greeting: 'Ask me anything.',
   responses: [
     {
+      id: 'crypt',
       label: 'Tell me about the crypt',
       reply: 'It is old and cursed.',
       responses: [
-        { label: 'Who built it?', reply: 'A forgotten king.' },
+        { id: 'who', label: 'Who built it?', reply: 'A forgotten king.' },
         {
+          id: 'enough',
           label: 'I have heard enough',
           reply: 'As you wish.',
           consequences: [{ type: 'set_flag', key: 'heard_crypt_lore', value: true }],
         },
       ],
     },
-    { label: 'Farewell', reply: 'Safe travels.' },
+    { id: 'farewell', label: 'Farewell', reply: 'Safe travels.' },
   ],
 };
 
@@ -70,7 +73,7 @@ describe('conversation mode', () => {
     expect(r.newState.active_conversation).toEqual({
       npcId: NPC,
       roomId: ROOM,
-      path: [],
+      nodePath: [],
       prompt: 'Ask me anything.',
     });
     // The greeting narrates as the NPC speaking (speaker-prefixed), matching
@@ -88,8 +91,8 @@ describe('conversation mode', () => {
 
   it('picking a branch descends a level (children shown + Back appears)', async () => {
     let r = await act(start(), { type: 'talk', npcId: NPC });
-    r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // "Tell me about the crypt"
-    expect(r.newState.active_conversation?.path).toEqual([0]);
+    r = await act(r.newState, { type: 'talk_response', responseId: 'crypt' });
+    expect(r.newState.active_conversation?.nodePath).toEqual(['crypt']);
     expect(r.newState.active_conversation?.prompt).toBe('It is old and cursed.');
     // The narrative pane carries BOTH halves of the exchange — the player's
     // chosen line spoken by the character, then the NPC's reply.
@@ -104,9 +107,9 @@ describe('conversation mode', () => {
 
   it('a leaf reply stays at the current level; consequences still fire', async () => {
     let r = await act(start(), { type: 'talk', npcId: NPC });
-    r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // descend
-    r = await act(r.newState, { type: 'talk_response', responseIdx: 1 }); // leaf "I have heard enough"
-    expect(r.newState.active_conversation?.path).toEqual([0]); // unchanged — leaf
+    r = await act(r.newState, { type: 'talk_response', responseId: 'crypt' }); // descend
+    r = await act(r.newState, { type: 'talk_response', responseId: 'enough' }); // leaf
+    expect(r.newState.active_conversation?.nodePath).toEqual(['crypt']); // unchanged — leaf
     expect(r.newState.active_conversation?.prompt).toBe('As you wish.');
     expect(r.newState.flags?.heard_crypt_lore).toBe(true); // consequence fired
     expect(convoLabels(r.newState)).toContain('<To The Sage> Who built it?'); // siblings remain
@@ -114,9 +117,9 @@ describe('conversation mode', () => {
 
   it('Back steps up a level (prompt reverts to the parent / greeting)', async () => {
     let r = await act(start(), { type: 'talk', npcId: NPC });
-    r = await act(r.newState, { type: 'talk_response', responseIdx: 0 }); // path [0]
+    r = await act(r.newState, { type: 'talk_response', responseId: 'crypt' }); // nodePath ['crypt']
     r = await act(r.newState, { type: 'conversation_back' });
-    expect(r.newState.active_conversation?.path).toEqual([]);
+    expect(r.newState.active_conversation?.nodePath).toEqual([]);
     expect(r.newState.active_conversation?.prompt).toBe('Ask me anything.');
     expect(convoLabels(r.newState)).toContain('<To The Sage> Farewell');
   });
@@ -135,7 +138,7 @@ describe('conversation mode', () => {
     const state = {
       ...start(),
       combat_active: true,
-      active_conversation: { npcId: NPC, roomId: ROOM, path: [], prompt: 'Ask me anything.' },
+      active_conversation: { npcId: NPC, roomId: ROOM, nodePath: [], prompt: 'Ask me anything.' },
     } as ReturnType<typeof makeState>;
     const choices = generateChoices(state, seed, ctx);
     expect(choices.some((c) => c.kind === 'conversation')).toBe(false);
@@ -151,7 +154,7 @@ describe('NPC narrative hooks (firstGreeting / goodbye / firstGoodbye)', () => {
     firstGreeting: 'Strangers! We rarely see new faces here.',
     goodbye: 'Walk safe.',
     firstGoodbye: 'Come back when you have seen the old oak.',
-    responses: [{ label: 'Just passing through', reply: 'Mm.' }],
+    responses: [{ id: 'passing', label: 'Just passing through', reply: 'Mm.' }],
   };
   const eSeed = { ...seed, npcs: { elder } } as unknown as Seed;
   const eAct = (
@@ -218,7 +221,7 @@ describe('NPC narrative hooks (firstGreeting / goodbye / firstGoodbye)', () => {
 describe('gated dialogue (condition + once)', () => {
   // A smuggler whose root node mixes an open option, a flag-gated option and
   // a one-shot — the flag-gated one is UNLOCKED BY the one-shot's consequence,
-  // exercising mid-conversation visibility shifts on stable indices.
+  // exercising mid-conversation visibility shifts on stable node ids.
   const gatedNpc: PlacedNpc = {
     roomId: ROOM,
     id: 'smuggler',
@@ -231,13 +234,15 @@ describe('gated dialogue (condition + once)', () => {
     xp: 0,
     greeting: 'Looking for something?',
     responses: [
-      { label: 'Just browsing', reply: 'Suit yourself.' },
+      { id: 'browsing', label: 'Just browsing', reply: 'Suit yourself.' },
       {
+        id: 'job',
         label: 'About that job…',
         reply: 'Keep your voice down. The ledger. Bring it.',
         condition: { fact: 'flags', path: '$.knows_password', operator: 'equal', value: true },
       },
       {
+        id: 'password',
         label: 'A little bird told me a password',
         reply: 'Hah. So you know Hob after all.',
         once: true,
@@ -258,23 +263,23 @@ describe('gated dialogue (condition + once)', () => {
   it('a locked option is hidden — and refused server-side if submitted anyway', async () => {
     const r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
     expect(labels(r.newState)).not.toContain('<To The Smuggler> About that job…');
-    // A stale client submits the hidden index directly: rejected, no reply,
+    // A stale client submits the hidden node id directly: rejected, no reply,
     // no descent.
-    const forced = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 1 });
+    const forced = await gatedAct(r.newState, { type: 'talk_response', responseId: 'job' });
     expect(forced.narrative).toContain('Invalid response.');
     expect(forced.newState.active_conversation?.prompt).toBe('Looking for something?');
   });
 
-  it('a consequence mid-conversation unlocks a sibling at its original index', async () => {
+  it('a consequence mid-conversation unlocks a sibling by its stable id', async () => {
     let r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
-    // Spend the one-shot (index 2): flag set, option gone, gated sibling appears.
-    r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });
+    // Spend the one-shot: flag set, option gone, gated sibling appears.
+    r = await gatedAct(r.newState, { type: 'talk_response', responseId: 'password' });
     expect(r.newState.flags?.knows_password).toBe(true);
     const after = labels(r.newState);
     expect(after).toContain('<To The Smuggler> About that job…');
     expect(after).not.toContain('<To The Smuggler> A little bird told me a password');
-    // The unlocked option answers at its ORIGINAL index (1) — stable identity.
-    r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 1 });
+    // The unlocked option answers under its stable id — identity is the id.
+    r = await gatedAct(r.newState, { type: 'talk_response', responseId: 'job' });
     expect(r.newState.active_conversation?.prompt).toBe(
       'Keep your voice down. The ledger. Bring it.'
     );
@@ -292,6 +297,7 @@ describe('gated dialogue (condition + once)', () => {
       name: 'The Patron',
       responses: [
         {
+          id: 'did-job',
           label: 'I did the job',
           reply: 'So you did. Payment, as agreed.',
           consequences: [
@@ -312,7 +318,7 @@ describe('gated dialogue (condition + once)', () => {
       context: ctx,
     });
     r = await takeAction({
-      action: { type: 'talk_response', responseIdx: 0 },
+      action: { type: 'talk_response', responseId: 'did-job' },
       history: [],
       state: r.newState,
       seed: rewardSeed,
@@ -331,6 +337,7 @@ describe('gated dialogue (condition + once)', () => {
       name: 'The Guard',
       responses: [
         {
+          id: 'pass',
           label: 'Let us pass',
           check: {
             skill: 'persuasion',
@@ -340,7 +347,7 @@ describe('gated dialogue (condition + once)', () => {
             onSuccess: [{ type: 'set_flag', key: 'gate_open', value: true }],
             onFail: [{ type: 'set_flag', key: 'guard_annoyed', value: true }],
           },
-          responses: [{ label: 'Thank you', reply: 'Hm.' }],
+          responses: [{ id: 'thanks', label: 'Thank you', reply: 'Hm.' }],
         },
       ],
     };
@@ -359,19 +366,19 @@ describe('gated dialogue (condition + once)', () => {
     );
     // FAIL: d20 → 1. failReply, onFail fires, no descent — option stays for retry.
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    let f = await gAct(r.newState, { type: 'talk_response', responseIdx: 0 });
+    let f = await gAct(r.newState, { type: 'talk_response', responseId: 'pass' });
     expect(f.narrative).toContain('fail');
     expect(f.narrative).toContain('Not a chance.');
     expect(f.newState.flags?.guard_annoyed).toBe(true);
     expect(f.newState.flags?.gate_open).toBeUndefined();
-    expect(f.newState.active_conversation?.path).toEqual([]);
+    expect(f.newState.active_conversation?.nodePath).toEqual([]);
     // SUCCESS: d20 → 20. successReply, onSuccess fires, descends into children.
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    f = await gAct(f.newState, { type: 'talk_response', responseIdx: 0 });
+    f = await gAct(f.newState, { type: 'talk_response', responseId: 'pass' });
     expect(f.narrative).toContain('success');
     expect(f.narrative).toContain('Go on, then.');
     expect(f.newState.flags?.gate_open).toBe(true);
-    expect(f.newState.active_conversation?.path).toEqual([0]);
+    expect(f.newState.active_conversation?.nodePath).toEqual(['pass']);
     expect(generateChoices(f.newState, guardSeed, ctx).map((c) => c.label)).toContain(
       '<To The Guard> Thank you'
     );
@@ -395,11 +402,13 @@ describe('gated dialogue (condition + once)', () => {
       name: 'The Hirer',
       responses: [
         {
+          id: 'need',
           label: 'Need a hand?',
           reply: 'Rats. Cellar. Coin on completion.',
           consequences: [{ type: 'start_quest', questId: 'rat-problem' }],
         },
         {
+          id: 'ghost',
           label: 'Ghost work?',
           reply: 'Eh?',
           consequences: [{ type: 'start_quest', questId: 'no-such-quest' }],
@@ -415,18 +424,18 @@ describe('gated dialogue (condition + once)', () => {
       makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['hirer'] }),
       { type: 'talk', npcId: 'hirer' }
     );
-    r = await hAct(r.newState, { type: 'talk_response', responseIdx: 0 });
+    r = await hAct(r.newState, { type: 'talk_response', responseId: 'need' });
     expect(r.narrative).toContain('✦ Quest accepted — The Rat Problem.');
     expect(r.newState.quest_progress).toEqual([
       { questId: 'rat-problem', status: 'active', completedSteps: [] },
     ]);
     // Replaying the trigger doesn't duplicate the entry or re-announce.
-    r = await hAct(r.newState, { type: 'talk_response', responseIdx: 0 });
+    r = await hAct(r.newState, { type: 'talk_response', responseId: 'need' });
     expect(r.narrative).not.toContain('Quest accepted');
     expect(r.newState.quest_progress).toHaveLength(1);
     // An unknown quest id warns and no-ops.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    r = await hAct(r.newState, { type: 'talk_response', responseIdx: 1 });
+    r = await hAct(r.newState, { type: 'talk_response', responseId: 'ghost' });
     expect(r.newState.quest_progress).toHaveLength(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('no-such-quest'));
     warn.mockRestore();
@@ -434,14 +443,14 @@ describe('gated dialogue (condition + once)', () => {
 
   it('once persists for the playthrough: re-opening the talk keeps it spent', async () => {
     let r = await gatedAct(gatedStart(), { type: 'talk', npcId: 'smuggler' });
-    r = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });
+    r = await gatedAct(r.newState, { type: 'talk_response', responseId: 'password' });
     r = await gatedAct(r.newState, { type: 'end_conversation' });
-    expect(r.newState.dialogue_chosen).toEqual(['smuggler:2']);
+    expect(r.newState.dialogue_chosen).toEqual(['smuggler:password']);
     // Fresh conversation, same playthrough — the one-shot stays gone and a
-    // direct re-submit of its index is refused.
+    // direct re-submit of its id is refused.
     r = await gatedAct(r.newState, { type: 'talk', npcId: 'smuggler' });
     expect(labels(r.newState)).not.toContain('<To The Smuggler> A little bird told me a password');
-    const again = await gatedAct(r.newState, { type: 'talk_response', responseIdx: 2 });
+    const again = await gatedAct(r.newState, { type: 'talk_response', responseId: 'password' });
     expect(again.narrative).toContain('Invalid response.');
     expect(again.newState.flags?.knows_password).toBe(true); // not double-fired (still just set)
   });
@@ -463,6 +472,7 @@ describe('parley (hostile NPCs with dialogue)', () => {
     greeting: 'One more step and you bleed.',
     responses: [
       {
+        id: 'standdown',
         label: 'Stand down — you are outmatched',
         check: {
           skill: 'intimidation',
@@ -513,7 +523,7 @@ describe('parley (hostile NPCs with dialogue)', () => {
     // Parley opens straight on the greeting — no CHA gate at the door.
     expect(r.newState.active_conversation?.prompt).toBe('One more step and you bleed.');
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // d20 → 20
-    r = await pAct(s, r.newState, { type: 'talk_response', responseIdx: 0 });
+    r = await pAct(s, r.newState, { type: 'talk_response', responseId: 'standdown' });
     expect(r.narrative).toContain('Easy now. We want no trouble.');
     expect(r.newState.npc_attitudes?.captain).toBe('indifferent');
     r = await pAct(s, r.newState, { type: 'end_conversation' });
@@ -551,6 +561,7 @@ describe('promoted consequence arms (Demo Campaign parity) — the DB dialogue p
     greeting: 'You look hurt.',
     responses: [
       {
+        id: 'ledger',
         label: 'I found the ledger',
         reply: 'So this is what Aldric wanted.',
         consequences: [
@@ -560,6 +571,7 @@ describe('promoted consequence arms (Demo Campaign parity) — the DB dialogue p
         ],
       },
       {
+        id: 'heal',
         label: 'Please, mend these wounds',
         reply: 'Hold still.',
         consequences: [{ type: 'modify_hp', amount: 8 }],
@@ -586,7 +598,7 @@ describe('promoted consequence arms (Demo Campaign parity) — the DB dialogue p
       instance_id: 'led-1',
     } as never);
     let r = await actH(st, { type: 'talk', npcId: 'healer' });
-    r = await actH(r.newState, { type: 'talk_response', responseIdx: 0 });
+    r = await actH(r.newState, { type: 'talk_response', responseId: 'ledger' });
     // The step lands (quest auto-started active since it wasn't accepted).
     expect(r.newState.quest_progress).toEqual([
       { questId: 'quest_ledger', status: 'active', completedSteps: ['step_deliver'] },
@@ -601,7 +613,7 @@ describe('promoted consequence arms (Demo Campaign parity) — the DB dialogue p
     const st = makeState({ id: 'pc-1', cha: 14 }, { current_room: ROOM, npc_talked: ['healer'] });
     st.characters[0].hp = st.characters[0].max_hp - 3; // only 3 missing — the +8 caps
     let r = await actH(st, { type: 'talk', npcId: 'healer' });
-    r = await actH(r.newState, { type: 'talk_response', responseIdx: 1 });
+    r = await actH(r.newState, { type: 'talk_response', responseId: 'heal' });
     expect(r.newState.characters[0].hp).toBe(r.newState.characters[0].max_hp);
   });
 });

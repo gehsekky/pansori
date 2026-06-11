@@ -50,7 +50,7 @@ const talking = (over: Partial<GameState> = {}, gold = 100): GameState =>
       active_conversation: {
         npcId: NPC,
         roomId: ROOM,
-        path: [],
+        nodePath: [],
         prompt: aldric.greeting as string,
       },
       ...over,

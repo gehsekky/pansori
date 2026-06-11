@@ -164,9 +164,15 @@ documented deferrals.
       (quest text is persistent display, so the pool dimension is inert).
       **Factions** are now a first-class table too (`campaign_factions`, migration
       042; thresholds + shopPriceModifiers stay JSONB columns, name + a new
-      `description` are plain columns) — which drains the campaign-block script
-      JSONB entirely. Still inline JSONB: **NPC dialogue replies** (index-addressed,
-      no stable node ids — needs its own table + an id-keyed dispatcher first).
+      `description` are plain columns). And **NPC dialogue replies** are now their
+      own adjacency-list table (`campaign_dialogue_responses`, migration 043) with
+      stable node ids + an id-keyed conversation dispatcher (once-tracking, the
+      `active_conversation.nodePath` cursor and `talk_response.responseId` address
+      by id, robust to editor reordering; a `normalizeState` shim translates
+      pre-migration `path` cursors). **This drains the last script content out of
+      JSONB — campaign content is now fully relational.** (`mechanics` like a
+      step's condition / a reply's consequences still live in JSONB *columns*,
+      which is correct — they're irreducible rules-engine structures.)
 - [x] **Cross-section reference lint** — `lintCampaign` (services/campaignLint.ts)
       + `GET /campaigns/:id/validate` (editor-gated, non-blocking) walk the FK-like
       references — consequences (dialogue incl. `check`, quest rewards, rules:

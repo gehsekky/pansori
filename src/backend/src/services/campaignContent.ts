@@ -35,6 +35,7 @@ import type {
   GameConsequence,
   GridPos,
   LootItem,
+  NpcDialogueResponse,
   PlacedLoot,
   PlacedNpc,
   Quest,
@@ -63,6 +64,7 @@ import {
 } from './itemCatalog.js';
 import { baseCampaignContext } from '../campaignData/srd/baseCampaign.js';
 import { materializeEnemy } from './enemyFactory.js';
+import { randomUUID } from 'crypto';
 
 // The code supplement for a DB-born campaign (no campaignData/ folder):
 // the base template, re-keyed to the campaign's id. Everything the
@@ -824,6 +826,7 @@ export interface CampaignRoomLoot {
 // passes them through to the engine verbatim. Faction wiring stays
 // code-side for now.
 export interface CampaignRoomNpcResponse {
+  id?: string;
   label: string;
   reply?: string;
   condition?: object;
@@ -942,6 +945,106 @@ interface RoomRow {
   trap: CampaignRoomTrap | null;
 }
 
+// ─── NPC dialogue (first-class adjacency-list table) ─────────────────────────
+interface DialogueRow {
+  room_id: string;
+  npc_id: string;
+  id: string;
+  parent_id: string | null;
+  label: string;
+  reply: string | null;
+  once: boolean;
+  condition: object | null;
+  skill_check: NpcDialogueResponse['check'] | null;
+  consequences: GameConsequence[];
+}
+
+// Reconstruct each NPC's dialogue tree from the adjacency-list rows. Keyed
+// `${roomId}/${npcId}` → root responses. The query groups children under their
+// parent in sort_order, so pushing in row order rebuilds the authored order.
+async function getCampaignDialogue(
+  pool: Pool,
+  campaignId: string
+): Promise<Map<string, NpcDialogueResponse[]>> {
+  const { rows } = await pool.query<DialogueRow>(
+    `SELECT room_id, npc_id, id, parent_id, label, reply, once, condition, skill_check, consequences
+       FROM campaign_dialogue_responses
+      WHERE campaign_id = $1
+      ORDER BY room_id, npc_id, parent_id NULLS FIRST, sort_order`,
+    [campaignId]
+  );
+  const nodeById = new Map<string, NpcDialogueResponse>();
+  for (const r of rows) {
+    nodeById.set(`${r.room_id}/${r.npc_id}/${r.id}`, {
+      id: r.id,
+      label: r.label,
+      ...(r.reply !== null ? { reply: r.reply } : {}),
+      ...(r.once ? { once: true } : {}),
+      ...(r.condition !== null ? { condition: r.condition } : {}),
+      ...(r.skill_check !== null ? { check: r.skill_check } : {}),
+      ...(Array.isArray(r.consequences) && r.consequences.length > 0
+        ? { consequences: r.consequences }
+        : {}),
+    });
+  }
+  const roots = new Map<string, NpcDialogueResponse[]>();
+  for (const r of rows) {
+    const node = nodeById.get(`${r.room_id}/${r.npc_id}/${r.id}`)!;
+    if (r.parent_id === null) {
+      const k = `${r.room_id}/${r.npc_id}`;
+      let list = roots.get(k);
+      if (!list) {
+        list = [];
+        roots.set(k, list);
+      }
+      list.push(node);
+    } else {
+      const parent = nodeById.get(`${r.room_id}/${r.npc_id}/${r.parent_id}`);
+      if (parent) (parent.responses ??= []).push(node);
+    }
+  }
+  return roots;
+}
+
+// Insert an NPC's dialogue tree depth-first, minting an opaque id for any node
+// that lacks one (preserving authored ids — incl. the dotted backfill ids).
+// parent_id NULL = a root option; sort_order = sibling index.
+async function insertDialogueNodes(
+  client: PoolClient,
+  campaignId: string,
+  roomId: string,
+  npcId: string,
+  responses: CampaignRoomNpcResponse[],
+  parentId: string | null
+): Promise<void> {
+  for (let i = 0; i < responses.length; i++) {
+    const r = responses[i];
+    const id = r.id && /^[a-z0-9._-]+$/.test(r.id) ? r.id : randomUUID().slice(0, 8);
+    await client.query(
+      `INSERT INTO campaign_dialogue_responses
+         (campaign_id, room_id, npc_id, id, parent_id, sort_order, label, reply, once, condition, skill_check, consequences)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb)`,
+      [
+        campaignId,
+        roomId,
+        npcId,
+        id,
+        parentId,
+        i,
+        r.label,
+        r.reply ?? null,
+        r.once ?? false,
+        r.condition ? JSON.stringify(r.condition) : null,
+        r.check ? JSON.stringify(r.check) : null,
+        JSON.stringify(r.consequences ?? []),
+      ]
+    );
+    if (r.responses?.length) {
+      await insertDialogueNodes(client, campaignId, roomId, npcId, r.responses, id);
+    }
+  }
+}
+
 export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<CampaignRoom[]> {
   const { rows } = await pool.query<RoomRow>(
     `SELECT id, name, description, grid, entry_x, entry_y, exits,
@@ -952,6 +1055,9 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     [campaignId]
   );
   const nar = await getCampaignNarratives(pool, campaignId);
+  // Dialogue replies live in their own table now — reattach per NPC, ignoring
+  // any (inert, pre-resave) responses still in the npcs JSONB.
+  const dialogue = await getCampaignDialogue(pool, campaignId);
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -969,10 +1075,15 @@ export async function getCampaignRooms(pool: Pool, campaignId: string): Promise<
     // onto the JSONB (dialogue replies stay inline).
     ...(r.npcs.length > 0
       ? {
-          npcs: r.npcs.map((n) => ({
-            ...n,
-            ...hookFields(nar, 'roomNpc', `${r.id}/${n.id}`, NPC_HOOKS),
-          })),
+          npcs: r.npcs.map((n) => {
+            const { responses: _inert, ...rest } = n;
+            const tree = dialogue.get(`${r.id}/${n.id}`);
+            return {
+              ...rest,
+              ...hookFields(nar, 'roomNpc', `${r.id}/${n.id}`, NPC_HOOKS),
+              ...(tree && tree.length > 0 ? { responses: tree } : {}),
+            };
+          }),
         }
       : {}),
     // Object / trap narrative lives in campaign_narratives — overlay it onto the
@@ -1014,6 +1125,9 @@ export async function putCampaignRooms(
       return false;
     }
     await client.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
+    await client.query('DELETE FROM campaign_dialogue_responses WHERE campaign_id = $1', [
+      campaignId,
+    ]);
     await client.query(
       `DELETE FROM campaign_narratives WHERE campaign_id = $1
          AND owner_kind IN ('room', 'roomNpc', 'roomObject', 'roomTrap')`,
@@ -1043,9 +1157,15 @@ export async function putCampaignRooms(
           r.canRest ?? false,
           JSON.stringify(r.enemies ?? []),
           JSON.stringify(r.loot ?? []),
-          // NPC greeting/goodbye narrative moves to campaign_narratives — store the
-          // rest of the NPC (incl. the dialogue tree) here, sans those keys.
-          JSON.stringify((r.npcs ?? []).map((n) => stripHooks(n, NPC_HOOKS))),
+          // NPC greeting/goodbye narrative moves to campaign_narratives; the
+          // dialogue tree moves to campaign_dialogue_responses — store only the
+          // rest of the NPC here (sans hook keys AND `responses`).
+          JSON.stringify(
+            (r.npcs ?? []).map((n) => {
+              const { responses: _responses, ...rest } = stripHooks(n, NPC_HOOKS);
+              return rest;
+            })
+          ),
           // Narration hooks moved to campaign_narratives; on_* columns inert.
           null,
           null,
@@ -1070,6 +1190,7 @@ export async function putCampaignRooms(
           goodbye: n.goodbye,
           firstGoodbye: n.firstGoodbye,
         });
+        await insertDialogueNodes(client, campaignId, r.id, n.id, n.responses ?? [], null);
       }
       for (const o of r.objects ?? []) {
         await insertNarratives(client, campaignId, 'roomObject', `${r.id}/${o.id}`, {
@@ -1103,6 +1224,7 @@ export async function deleteCampaignRooms(pool: Pool, campaignId: string): Promi
   const { rowCount } = await pool.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
   if (!rowCount) return false;
   await pool.query('DELETE FROM campaign_rooms WHERE campaign_id = $1', [campaignId]);
+  await pool.query('DELETE FROM campaign_dialogue_responses WHERE campaign_id = $1', [campaignId]);
   await pool.query(
     `DELETE FROM campaign_narratives WHERE campaign_id = $1
        AND owner_kind IN ('room', 'roomNpc', 'roomObject', 'roomTrap')`,

@@ -8,7 +8,7 @@ import type {
 } from '../types.js';
 import { factionAttitude } from './campaignEngine.js';
 import { formatGameClock } from './gameClock.js';
-import { responsesAtPath } from './conversation.js';
+import { responsesAtNodePath } from './conversation.js';
 
 /**
  * Dialogue gating — conditions + one-shot options on NPC dialogue nodes.
@@ -149,36 +149,37 @@ export function dialogueFacts(st: GameState, context: Context): CampaignFacts {
 
 // ─── Visibility ───────────────────────────────────────────────────────────────
 
-/** GameState.dialogue_chosen key for a node: npcId + its index path. */
-export function onceKey(npcId: string, path: number[], idx: number): string {
-  return `${npcId}:${[...path, idx].join('.')}`;
+/** GameState.dialogue_chosen key for a node: npcId + the node's stable id. */
+export function onceKey(npcId: string, nodeId: string): string {
+  return `${npcId}:${nodeId}`;
 }
 
 /**
- * The dialogue responses VISIBLE at a conversation node, carrying their
- * ORIGINAL index in the unfiltered tree. `active_conversation.path` and
- * `talk_response.responseIdx` always index the unfiltered tree, so hiding
- * an option never shifts its siblings' identities mid-conversation.
+ * The dialogue responses VISIBLE at a conversation node, carrying each node's
+ * stable id. `once`/`condition`-hidden options drop out; identity is the node
+ * id (not tree position), so reordering options never shifts which node a
+ * mid-conversation cursor or once-record refers to.
  */
 export function visibleResponses(
   npc: PlacedNpc,
-  path: number[],
+  nodePath: string[],
   st: GameState,
   context: Context
-): Array<{ response: NpcDialogueResponse; idx: number }> {
-  const node = responsesAtPath(npc, path);
+): Array<{ response: NpcDialogueResponse; id: string }> {
+  const node = responsesAtNodePath(npc, nodePath);
   if (node.length === 0) return [];
   // Facts built once per node, not per option.
   let facts: Facts | null = null;
   const chosen = st.dialogue_chosen ?? [];
-  const out: Array<{ response: NpcDialogueResponse; idx: number }> = [];
-  node.forEach((response, idx) => {
-    if (response.once && chosen.includes(onceKey(npc.id, path, idx))) return;
+  const out: Array<{ response: NpcDialogueResponse; id: string }> = [];
+  for (const response of node) {
+    const id = response.id ?? '';
+    if (response.once && chosen.includes(onceKey(npc.id, id))) continue;
     if (response.condition) {
       facts ??= dialogueFacts(st, context) as unknown as Facts;
-      if (!evalCondition(response.condition, facts)) return;
+      if (!evalCondition(response.condition, facts)) continue;
     }
-    out.push({ response, idx });
-  });
+    out.push({ response, id });
+  }
   return out;
 }

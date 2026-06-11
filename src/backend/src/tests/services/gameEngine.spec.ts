@@ -91,6 +91,36 @@ describe('normalizeState', () => {
     expect(result.characters[0].id).toBe('char-1');
   });
 
+  it('migrates a pre-id-keyed conversation cursor (path → nodePath dotted ids)', () => {
+    // Old saves carried active_conversation.path: number[]. Backfilled node ids
+    // are the dotted index path, so [0, 1] → ['0', '0.1'].
+    const old = {
+      ...makeState(),
+      active_conversation: { npcId: 'hob', roomId: 'cellar', path: [0, 1], prompt: 'Hm.' },
+    };
+    const result = normalizeState(old as unknown as Record<string, unknown>);
+    expect(result.active_conversation).toEqual({
+      npcId: 'hob',
+      roomId: 'cellar',
+      nodePath: ['0', '0.1'],
+      prompt: 'Hm.',
+    });
+  });
+
+  it('leaves a new-format conversation cursor (nodePath) untouched', () => {
+    const cur = {
+      ...makeState(),
+      active_conversation: { npcId: 'hob', roomId: 'cellar', nodePath: ['job'], prompt: 'Hm.' },
+    };
+    const result = normalizeState(cur as unknown as Record<string, unknown>);
+    expect(result.active_conversation).toEqual({
+      npcId: 'hob',
+      roomId: 'cellar',
+      nodePath: ['job'],
+      prompt: 'Hm.',
+    });
+  });
+
   it('wraps legacy flat GameState into a 1-character party', () => {
     const legacy = {
       hp: 15,
@@ -1418,8 +1448,9 @@ const npcTemplate: NpcTemplate = {
   xp: 25,
   greeting: 'Greetings, traveller!',
   responses: [
-    { label: 'Ask about the area', reply: 'Dangerous around here.' },
+    { id: 'area', label: 'Ask about the area', reply: 'Dangerous around here.' },
     {
+      id: 'help',
       label: 'Ask for help',
       reply: 'Gladly!',
       consequences: [{ type: 'set_flag', key: 'guide_helped', value: true }],
@@ -1500,7 +1531,7 @@ describe('NPC actions', () => {
       active_conversation: {
         npcId: placedNpc.id,
         roomId: npcRoomId,
-        path: [],
+        nodePath: [],
         prompt: 'Greetings, traveller!',
       },
     };
@@ -1544,7 +1575,7 @@ describe('NPC actions', () => {
   it('talk_response applies consequences and shows NPC reply', async () => {
     const state = { ...makeNpcState(), npc_talked: [placedNpc.id] };
     const result = await takeAction({
-      action: { type: 'talk_response', responseIdx: 1 },
+      action: { type: 'talk_response', responseId: 'help' },
       history: [],
       state,
       seed: seedWithNpc,
@@ -1564,7 +1595,7 @@ describe('NPC actions', () => {
       active_conversation: {
         npcId: placedNpc.id,
         roomId: npcRoomId,
-        path: [],
+        nodePath: [],
         prompt: 'Greetings, traveller!',
       },
     };
@@ -1586,7 +1617,7 @@ describe('NPC actions', () => {
     });
     expect(result.newState.active_conversation).toMatchObject({
       roomId: npcRoomId,
-      path: [],
+      nodePath: [],
       prompt: 'Greetings, traveller!',
     });
     // No inline "<To NPC>" hint dumped into the narrative anymore.
@@ -4768,29 +4799,32 @@ describe('seenKeyForAction', () => {
     ).toBeUndefined();
   });
 
-  it('talk_response folds the room id, active NPC id, conversation path, and response index', () => {
+  it('talk_response folds the room id, active NPC id, conversation node path, and node id', () => {
     // No active conversation → empty npc + path segments.
-    expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, st)).toBe(
-      'talk_response::crypt_room_a::::::2'
+    expect(seenKeyForAction({ type: 'talk_response', responseId: 'n2' }, st)).toBe(
+      'talk_response::crypt_room_a::::::n2'
     );
-    // A nested node's path + the active NPC id are included, so the same index at
-    // different depths / NPCs gets a distinct key.
+    // A nested node's path + the active NPC id are included, so the same node id
+    // at different depths / NPCs gets a distinct key.
     const nested = {
       ...st,
-      active_conversation: { npcId: 'x', roomId: 'crypt_room_a', path: [0, 1], prompt: '' },
+      active_conversation: { npcId: 'x', roomId: 'crypt_room_a', nodePath: ['a', 'b'], prompt: '' },
     };
-    expect(seenKeyForAction({ type: 'talk_response', responseIdx: 2 }, nested)).toBe(
-      'talk_response::crypt_room_a::x::0.1::2'
+    expect(seenKeyForAction({ type: 'talk_response', responseId: 'n2' }, nested)).toBe(
+      'talk_response::crypt_room_a::x::a.b::n2'
     );
   });
 
   it('two NPCs sharing a room get distinct talk_response keys (Elise/Bram regression)', () => {
     const withNpc = (npcId: string) => ({
       ...st,
-      active_conversation: { npcId, roomId: 'crypt_room_a', path: [], prompt: '' },
+      active_conversation: { npcId, roomId: 'crypt_room_a', nodePath: [], prompt: '' },
     });
-    const elise = seenKeyForAction({ type: 'talk_response', responseIdx: 0 }, withNpc('npc_elise'));
-    const bram = seenKeyForAction({ type: 'talk_response', responseIdx: 0 }, withNpc('npc_bram'));
+    const elise = seenKeyForAction(
+      { type: 'talk_response', responseId: 'r0' },
+      withNpc('npc_elise')
+    );
+    const bram = seenKeyForAction({ type: 'talk_response', responseId: 'r0' }, withNpc('npc_bram'));
     expect(elise).not.toBe(bram); // dimming Elise's response no longer dims Bram's
   });
 

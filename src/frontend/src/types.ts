@@ -305,8 +305,8 @@ export interface GameState {
 
   // Active NPC conversation — see backend GameState. When set (out of combat,
   // in the NPC's room), the dedicated ConversationPanel renders `prompt` + the
-  // `kind:'conversation'` choices. `path` indexes the nested response tree.
-  active_conversation?: { npcId: string; roomId: string; path: number[]; prompt: string };
+  // `kind:'conversation'` choices. `nodePath` = stable node ids from the root.
+  active_conversation?: { npcId: string; roomId: string; nodePath: string[]; prompt: string };
 
   // Vendor pane nested under the conversation — see backend GameState. When set
   // (out of combat, in the NPC's room), the VendorPanel renders the NPC's wares

@@ -38,7 +38,7 @@ function ctxWith(
 describe('social + interactObject handlers reject non-PC actors (Phase-4 seam)', () => {
   const cases: Array<[string, (ctx: ActionContext) => unknown]> = [
     ['talk', (ctx) => handleTalk(ctx, { type: 'talk', npcId: 'x' })],
-    ['talk_response', (ctx) => handleTalkResponse(ctx, { type: 'talk_response', responseIdx: 0 })],
+    ['talk_response', (ctx) => handleTalkResponse(ctx, { type: 'talk_response', responseId: 'x' })],
     ['buy', (ctx) => handleBuy(ctx, { type: 'buy', itemId: 'x', price: 5 })],
     ['influence', (ctx) => handleInfluence(ctx, { type: 'influence', skill: 'persuasion' })],
     ['study', (ctx) => handleStudy(ctx, { type: 'study', skill: 'arcana' })],

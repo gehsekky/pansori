@@ -750,9 +750,9 @@ export type StructuredAction =
   | { type: 'recover_slots'; recovery: 'arcane' | 'natural'; plan?: string }
   // `npcId` selects which NPC in the room (a room may host several).
   | { type: 'talk'; npcId: string }
-  // `responseIdx` is relative to the conversation's CURRENT node (resolved via
-  // `GameState.active_conversation.path`).
-  | { type: 'talk_response'; responseIdx: number }
+  // `responseId` is the stable id of the chosen dialogue node (the conversation
+  // cursor `GameState.active_conversation.nodePath` scopes which level it's in).
+  | { type: 'talk_response'; responseId: string }
   // Conversation navigation: step up a nested dialogue level / leave entirely.
   | { type: 'conversation_back' }
   | { type: 'end_conversation' }
@@ -1302,6 +1302,12 @@ export interface NpcTemplate {
 }
 
 export interface NpcDialogueResponse {
+  // Stable node id, unique within an NPC — the conversation engine addresses
+  // dialogue (once-tracking, the conversation cursor, talk_response) by id, not
+  // by tree position, so reordering options in the editor never shifts which
+  // node was "seen". Minted server-side on save (campaign_dialogue_responses);
+  // optional in authoring input (new nodes get one assigned).
+  id?: string;
   label: string;
   reply?: string; // NPC's follow-up text after player picks this
   consequences?: GameConsequence[]; // applied when this response is chosen

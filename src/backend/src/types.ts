@@ -1741,10 +1741,11 @@ export interface GameState {
 
   // Active NPC conversation. While set (out of combat, in the NPC's room),
   // generateChoices offers ONLY dialogue choices — the responses at the current
-  // node, a Back when nested, and End conversation. `path` indexes the nested
-  // response tree (root = []); `prompt` is the NPC's current line. Cleared by
+  // node, a Back when nested, and End conversation. `nodePath` is the stable
+  // node ids descended from the root (root = []); the level shown is the
+  // children of the last id. `prompt` is the NPC's current line. Cleared by
   // `end_conversation` or on leaving the room.
-  active_conversation?: { npcId: string; roomId: string; path: number[]; prompt: string };
+  active_conversation?: { npcId: string; roomId: string; nodePath: string[]; prompt: string };
 
   // Vendor pane — a sub-state nested under `active_conversation`. While set (out
   // of combat, in the NPC's room), generateChoices offers ONLY the NPC's wares

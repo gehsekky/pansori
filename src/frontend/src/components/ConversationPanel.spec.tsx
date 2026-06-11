@@ -7,15 +7,15 @@ import React from 'react';
 const choices: GameChoice[] = [
   {
     label: '<To The Sage> Who built it?',
-    action: { type: 'talk_response', responseIdx: 0 },
+    action: { type: 'talk_response', responseId: 'who' },
     kind: 'conversation',
-    seenKey: 'talk_response::parley::::0',
+    seenKey: 'talk_response::parley::::who',
   },
   {
     label: '<To The Sage> I have heard enough',
-    action: { type: 'talk_response', responseIdx: 1 },
+    action: { type: 'talk_response', responseId: 'enough' },
     kind: 'conversation',
-    seenKey: 'talk_response::parley::::1',
+    seenKey: 'talk_response::parley::::enough',
   },
   { label: '↩ Back', action: { type: 'conversation_back' }, kind: 'conversation' },
   { label: '✕ End conversation', action: { type: 'end_conversation' }, kind: 'conversation' },
@@ -54,7 +54,7 @@ describe('ConversationPanel', () => {
     );
     fireEvent.click(getByText(/Who built it\?/));
     expect(onChoose).toHaveBeenLastCalledWith(
-      expect.objectContaining({ action: { type: 'talk_response', responseIdx: 0 } })
+      expect.objectContaining({ action: { type: 'talk_response', responseId: 'who' } })
     );
     fireEvent.click(getByText('✕ End conversation'));
     expect(onChoose).toHaveBeenLastCalledWith(
@@ -68,7 +68,7 @@ describe('ConversationPanel', () => {
         npcName="The Sage"
         prompt="It is old and cursed."
         choices={choices}
-        seenChoices={['talk_response::parley::::0']}
+        seenChoices={['talk_response::parley::::who']}
         onChoose={() => {}}
       />
     );

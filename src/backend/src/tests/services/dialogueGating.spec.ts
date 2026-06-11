@@ -153,27 +153,32 @@ describe('visibleResponses', () => {
     xp: 0,
     greeting: 'Ask.',
     responses: [
-      { label: 'Always here' },
+      { id: 'always', label: 'Always here' },
       {
+        id: 'gated',
         label: 'Quest-gated',
         condition: { fact: 'quests_active', operator: 'contains', value: 'rat-problem' },
       },
-      { label: 'One-shot', once: true },
-      { label: 'Broken gate', condition: { fact: 'x', operator: 'looksLike', value: 1 } },
+      { id: 'oneshot', label: 'One-shot', once: true },
+      {
+        id: 'broken',
+        label: 'Broken gate',
+        condition: { fact: 'x', operator: 'looksLike', value: 1 },
+      },
     ],
   };
 
-  it('hides unmet conditions + spent once-options, keeping ORIGINAL indices', () => {
+  it('hides unmet conditions + spent once-options, carrying each node id', () => {
     const st = makeState({ id: 'pc-1' }, { current_room: 'parley' });
-    // No active quest, nothing chosen: gated + broken hidden, indices 0 and 2 survive.
+    // No active quest, nothing chosen: gated + broken hidden; always + oneshot survive.
     const vis = visibleResponses(npc, [], st, ctx);
-    expect(vis.map((v) => [v.response.label, v.idx])).toEqual([
-      ['Always here', 0],
-      ['One-shot', 2],
+    expect(vis.map((v) => [v.response.label, v.id])).toEqual([
+      ['Always here', 'always'],
+      ['One-shot', 'oneshot'],
     ]);
   });
 
-  it('a met condition reveals the option at its original index', () => {
+  it('a met condition reveals the option (its id appears)', () => {
     const st = makeState(
       { id: 'pc-1' },
       {
@@ -182,15 +187,15 @@ describe('visibleResponses', () => {
       }
     );
     const vis = visibleResponses(npc, [], st, ctx);
-    expect(vis.map((v) => v.idx)).toEqual([0, 1, 2]);
+    expect(vis.map((v) => v.id)).toEqual(['always', 'gated', 'oneshot']);
   });
 
-  it('a chosen once-option disappears (dialogue_chosen)', () => {
+  it('a chosen once-option disappears (dialogue_chosen by node id)', () => {
     const st = makeState(
       { id: 'pc-1' },
-      { current_room: 'parley', dialogue_chosen: [onceKey('sage', [], 2)] }
+      { current_room: 'parley', dialogue_chosen: [onceKey('sage', 'oneshot')] }
     );
     const vis = visibleResponses(npc, [], st, ctx);
-    expect(vis.map((v) => v.idx)).toEqual([0]);
+    expect(vis.map((v) => v.id)).toEqual(['always']);
   });
 });

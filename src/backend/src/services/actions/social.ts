@@ -20,7 +20,7 @@ import type { ActionHandler } from './types.js';
 import type { ActiveGrid } from '../mapEngine.js';
 import type { GridPos } from '../../types.js';
 import { randomUUID } from 'crypto';
-import { responsesAtPath } from '../conversation.js';
+import { responsesAtNodePath } from '../conversation.js';
 
 /**
  * The cell the party marker walks to when approaching an NPC: a free square
@@ -124,7 +124,12 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
     }
     ctx.st = {
       ...ctx.st,
-      active_conversation: { npcId: npc.id, roomId: ctx.roomId, path: [], prompt: greetingText },
+      active_conversation: {
+        npcId: npc.id,
+        roomId: ctx.roomId,
+        nodePath: [],
+        prompt: greetingText,
+      },
     };
   } else {
     updatePcActor(ctx, { turn_actions: { ...char.turn_actions, action_used: true } });
@@ -139,7 +144,7 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
  */
 export const handleTalkResponse: ActionHandler<{
   type: 'talk_response';
-  responseIdx: number;
+  responseId: string;
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can respond in dialogue.' };
   const { char } = ctx.actor;
@@ -151,21 +156,21 @@ export const handleTalkResponse: ActionHandler<{
     ctx.narrative = 'There is no one here.';
     return;
   }
-  // `responseIdx` is relative to the conversation's current node (the path
-  // tracks the nested level); default to the root list for a direct dispatch.
-  const path = conv?.path ?? [];
-  const node = responsesAtPath(npc, path);
-  const response = node[action.responseIdx];
+  // `responseId` names a node at the conversation's current level (the nodePath
+  // scopes which level); default to the root list for a direct dispatch.
+  const nodePath = conv?.nodePath ?? [];
+  const node = responsesAtNodePath(npc, nodePath);
+  const response = node.find((r) => r.id === action.responseId);
   if (!response) {
     ctx.narrative = 'Invalid response.';
     return;
   }
   // Server-side gate re-check: a stale client (or a consequence that just
   // flipped a fact mid-conversation) can submit an option that is no longer
-  // visible — refuse it the same way as an out-of-range index. The check
-  // mirrors visibleResponses (condition + once), indexed on the unfiltered
-  // tree so responseIdx means the same node both places.
-  if (!visibleResponses(npc, path, ctx.st, ctx.context).some((v) => v.idx === action.responseIdx)) {
+  // visible — refuse it. The check mirrors visibleResponses (condition + once).
+  if (
+    !visibleResponses(npc, nodePath, ctx.st, ctx.context).some((v) => v.id === action.responseId)
+  ) {
     ctx.narrative = 'Invalid response.';
     return;
   }
@@ -175,10 +180,7 @@ export const handleTalkResponse: ActionHandler<{
   if (response.once) {
     ctx.st = {
       ...ctx.st,
-      dialogue_chosen: [
-        ...(ctx.st.dialogue_chosen ?? []),
-        onceKey(npc.id, path, action.responseIdx),
-      ],
+      dialogue_chosen: [...(ctx.st.dialogue_chosen ?? []), onceKey(npc.id, action.responseId)],
     };
   }
   // Shared by the plain and check paths: run a consequence list, then
@@ -240,7 +242,7 @@ export const handleTalkResponse: ActionHandler<{
         ...ctx.st,
         active_conversation: {
           ...conv,
-          path: descend ? [...path, action.responseIdx] : path,
+          nodePath: descend ? [...nodePath, action.responseId] : nodePath,
           prompt: outcomeReply,
         },
       };
@@ -261,7 +263,7 @@ export const handleTalkResponse: ActionHandler<{
       ...ctx.st,
       active_conversation: {
         ...conv,
-        path: descend ? [...path, action.responseIdx] : path,
+        nodePath: descend ? [...nodePath, action.responseId] : nodePath,
         prompt: response.reply ?? `${npc.name} nods.`,
       },
     };
@@ -281,15 +283,16 @@ export const handleConversationBack: ActionHandler<{ type: 'conversation_back' }
     return;
   }
   const npc = npcById(ctx.seed, conv.npcId);
-  const newPath = conv.path.slice(0, -1);
+  const newPath = conv.nodePath.slice(0, -1);
   let prompt = pickHookText(npc?.greeting) ?? '';
   if (npc && newPath.length > 0) {
     // The response that opened this (now-parent) level. `reply` is a single
     // dialogue line (stays inline); fall back to the greeting pool.
-    const parent = responsesAtPath(npc, newPath.slice(0, -1))[newPath[newPath.length - 1]];
+    const parentId = newPath[newPath.length - 1];
+    const parent = responsesAtNodePath(npc, newPath.slice(0, -1)).find((r) => r.id === parentId);
     prompt = parent?.reply ?? pickHookText(npc.greeting) ?? '';
   }
-  ctx.st = { ...ctx.st, active_conversation: { ...conv, path: newPath, prompt } };
+  ctx.st = { ...ctx.st, active_conversation: { ...conv, nodePath: newPath, prompt } };
   ctx.narrative = prompt;
 };
 

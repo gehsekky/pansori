@@ -3733,6 +3733,24 @@ export function backfillOwnership(state: GameState, hostUserId: string): GameSta
   return mutated ? { ...state, characters } : state;
 }
 
+// Pre-id-keyed-dialogue saves carried `active_conversation.path` (number[]).
+// The dialogue migration minted node ids = the dotted index path, so a numeric
+// path [0,1] translates to nodePath ["0","0.1"] (cumulative dotted ids) — an
+// exact cursor for content that predates the change. Idempotent: a state that
+// already has nodePath passes through.
+function migrateConversationCursor(
+  conv: GameState['active_conversation'] | { path?: number[] } | undefined
+): GameState['active_conversation'] {
+  if (!conv) return undefined;
+  if ('nodePath' in conv && Array.isArray((conv as GameState['active_conversation'])!.nodePath)) {
+    return conv as GameState['active_conversation'];
+  }
+  const old = conv as { npcId: string; roomId: string; path?: number[]; prompt: string };
+  const path = Array.isArray(old.path) ? old.path : [];
+  const nodePath = path.map((_, i) => path.slice(0, i + 1).join('.'));
+  return { npcId: old.npcId, roomId: old.roomId, nodePath, prompt: old.prompt };
+}
+
 export function normalizeState(raw: Record<string, unknown>): GameState {
   // Already new format — patch any fields added after initial rollout
   // (default-backfill), then route through the schema migration ladder
@@ -3741,6 +3759,7 @@ export function normalizeState(raw: Record<string, unknown>): GameState {
     const gs = raw as unknown as GameState;
     const backfilled: GameState = {
       ...gs,
+      active_conversation: migrateConversationCursor(gs.active_conversation),
       short_rested_rooms: gs.short_rested_rooms ?? [],
       long_rested: gs.long_rested ?? false,
       npc_attitudes: gs.npc_attitudes ?? {},
@@ -3971,8 +3990,8 @@ export function seenKeyForAction(action: StructuredAction, state: GameState): st
       // path so the SAME response index at different nesting levels gets a
       // distinct key (picking root option 0 must not dim a nested option 0).
       const npcId = state.active_conversation?.npcId ?? '';
-      const path = (state.active_conversation?.path ?? []).join('.');
-      return `talk_response::${room}::${npcId}::${path}::${action.responseIdx}`;
+      const nodePath = (state.active_conversation?.nodePath ?? []).join('.');
+      return `talk_response::${room}::${npcId}::${nodePath}::${action.responseId}`;
     }
     case 'interact_object':
       return `interact_object::${room}::${action.objectId}`;
@@ -4471,11 +4490,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     const cnpc = npcById(seed, conv.npcId);
     if (cnpc && !npcIsKilled(state, conv.npcId)) {
       // Conditioned / one-shot options are filtered out here (hidden, never
-      // grayed); `idx` is the ORIGINAL index in the unfiltered tree, so the
-      // conversation path + talk_response stay stable as visibility shifts.
-      const convoChoices: GameChoice[] = visibleResponses(cnpc, conv.path, state, context).map(
-        ({ response: r, idx }) => {
-          const action = { type: 'talk_response' as const, responseIdx: idx };
+      // grayed); each option carries its stable node id, so talk_response +
+      // once-tracking stay stable as visibility (or authored order) shifts.
+      const convoChoices: GameChoice[] = visibleResponses(cnpc, conv.nodePath, state, context).map(
+        ({ response: r, id }) => {
+          const action = { type: 'talk_response' as const, responseId: id };
           // Skill-gated options advertise the roll, mirroring the indifferent
           // NPC talk hint ("(CHA check DC 12)").
           const checkHint = r.check
@@ -4491,7 +4510,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           };
         }
       );
-      if (conv.path.length > 0) {
+      if (conv.nodePath.length > 0) {
         convoChoices.push({
           label: '↩ Back',
           action: { type: 'conversation_back' as const },
