@@ -4,6 +4,7 @@
 // at its level. Mirrors what the creation route does per character.
 
 import {
+  casterCreationLoadout,
   casterSpellOptionsByLevel,
   expandCasterSpellsForLevel,
   knownSpellTargetForLevel,
@@ -84,5 +85,30 @@ describe('starting-level helpers', () => {
     expect(knownSpellTargetForLevel('Bard', 3)).toBe(6);
     expect(knownSpellTargetForLevel('Cleric', 3)).toBeNull();
     expect(knownSpellTargetForLevel('Fighter', 3)).toBeNull();
+  });
+
+  it('casterCreationLoadout at L1 matches the original cantrips + L1 picker', () => {
+    const l = casterCreationLoadout('Wizard', 1, ctx.spellTable ?? {});
+    expect(l).not.toBeNull();
+    expect(l!.maxSpellLevel).toBe(1);
+    expect(l!.spellCount).toBe(6); // the L1 spellbook
+    expect(l!.spellOptions.every((id) => (ctx.spellTable ?? {})[id]?.level === 1)).toBe(true);
+    expect(l!.defaultSpells).toHaveLength(6);
+  });
+
+  it('casterCreationLoadout at L3 scales the count + offers (and defaults to) level-2 spells', () => {
+    const l = casterCreationLoadout('Wizard', 3, ctx.spellTable ?? {});
+    expect(l!.maxSpellLevel).toBe(2);
+    expect(l!.spellCount).toBe(10);
+    // Options span both castable levels; the default loadout is complete and
+    // already includes level-2 spells (so an untouched picker is valid + usable).
+    const spellTable = ctx.spellTable ?? {};
+    expect(l!.spellOptions.some((id) => spellTable[id]?.level === 2)).toBe(true);
+    expect(l!.defaultSpells).toHaveLength(10);
+    expect(l!.defaultSpells.some((id) => spellTable[id]?.level === 2)).toBe(true);
+  });
+
+  it('casterCreationLoadout returns null for non-casters', () => {
+    expect(casterCreationLoadout('Fighter', 3, ctx.spellTable ?? {})).toBeNull();
   });
 });

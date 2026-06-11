@@ -35,12 +35,9 @@ import {
 } from '../services/rulesEngine.js';
 import { Request, Response, Router } from 'express';
 import {
-  SRD_CASTER_SPELL_COUNTS,
   SRD_DEFAULT_WEAPON_MASTERIES,
   SRD_SPECIES,
   SRD_WEAPON_MASTERY_SLOTS,
-  casterSpellCounts,
-  defaultCasterSpells,
   defaultClassSkills,
   defaultWeaponMasteries,
   masterableWeapons,
@@ -73,8 +70,7 @@ import {
 } from '../services/campaignEngine.js';
 import { broadcastParticipantChange, broadcastSessionState } from '../services/broadcast.js';
 import {
-  casterSpellOptions,
-  classSpellListTag,
+  casterCreationLoadout,
   expandCasterSpellsForLevel,
   expertiseSlotsForClassLevel,
   resolveCreationExpertise,
@@ -297,20 +293,28 @@ gameRouter.get('/contexts', async (req, res) => {
         casterSpellChoices: Object.fromEntries(
           Object.keys(c.classPrimaryStats)
             .map((cls) => {
-              const tag = classSpellListTag(cls);
-              if (!tag || !(cls in SRD_CASTER_SPELL_COUNTS)) return null;
-              const available = casterSpellOptions(cls, c.spellTable ?? {});
-              const counts = casterSpellCounts(cls, available);
-              if (!counts || counts.cantrips + counts.l1 === 0) return null;
-              const def = defaultCasterSpells(cls, available, c.classSpells?.[cls] ?? []);
+              // Scaled to the campaign's starting level: at L1 this is the
+              // original cantrips + L1 picks; above L1 the counts grow and the
+              // picker offers spells up to the caster's max castable level.
+              const startLevel = Math.max(1, c.campaign?.recommendedStartingLevel ?? 1);
+              const loadout = casterCreationLoadout(
+                cls,
+                startLevel,
+                c.spellTable ?? {},
+                c.classSpells?.[cls] ?? []
+              );
+              if (!loadout || loadout.cantripCount + loadout.spellCount === 0) return null;
               return [
                 cls,
                 {
-                  spellList: tag,
-                  cantripCount: counts.cantrips,
-                  l1Count: counts.l1,
-                  defaultCantrips: def.cantrips,
-                  defaultL1: def.l1,
+                  spellList: loadout.spellListTag,
+                  cantripCount: loadout.cantripCount,
+                  // FE prop names kept; above L1 these now carry the leveled
+                  // total + the full default loadout, plus the level ceiling.
+                  l1Count: loadout.spellCount,
+                  maxSpellLevel: loadout.maxSpellLevel,
+                  defaultCantrips: loadout.defaultCantrips,
+                  defaultL1: loadout.defaultSpells,
                 },
               ] as const;
             })
@@ -599,18 +603,29 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         SRD_DEFAULT_WEAPON_MASTERIES[c.character_class] ?? []
       );
 
-      // Caster spell picks (level 1) — the player-chosen (or default) cantrips +
-      // level-1 spells become `spells_known`. Non-caster / half-caster classes
-      // keep the curated `classSpells` default. (Re-validated server-side.)
+      // The level every PC is built at (campaign starting level; default 1).
+      const startLevel = Math.max(1, ctx.campaign?.recommendedStartingLevel ?? 1);
+
+      // Caster spell picks — the player-chosen (or default) cantrips + leveled
+      // spells become `spells_known`, scaled to the starting level (above L1 the
+      // counts grow and the pool spans every castable spell level). Non-caster /
+      // half-caster classes keep the curated `classSpells` default. (Re-validated
+      // server-side against the same level-scaled options + counts the FE used.)
       const curatedKnown = ctx.classSpells?.[c.character_class] ?? [];
       const casterStartingSpells = (() => {
-        if (!(c.character_class in SRD_CASTER_SPELL_COUNTS)) return curatedKnown;
-        const available = casterSpellOptions(c.character_class, ctx.spellTable ?? {});
+        const loadout = casterCreationLoadout(
+          c.character_class,
+          startLevel,
+          ctx.spellTable ?? {},
+          curatedKnown
+        );
+        if (!loadout) return curatedKnown;
         const picks = resolveCasterSpells(
           c.character_class,
           c.caster_spells,
-          available,
-          curatedKnown
+          { cantrips: loadout.cantripOptions, l1: loadout.spellOptions },
+          curatedKnown,
+          { cantrips: loadout.cantripCount, l1: loadout.spellCount }
         );
         return [...picks.cantrips, ...picks.l1];
       })();
@@ -726,7 +741,7 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       // slots, subclass auto-granted at L3, class features), then scale the
       // caster's known/spellbook pool so an above-L1 caster can actually cast at
       // its level. ASI/feat/mastery-at-creation (L4+) is a deferred follow-up.
-      const startLevel = Math.max(1, ctx.campaign?.recommendedStartingLevel ?? 1);
+      // (startLevel computed above, with the caster spell picks.)
       for (let lvl = (finalChar.level ?? 1) + 1; lvl <= startLevel; lvl++) {
         applyLevelUpForClass(finalChar, finalChar.character_class, ctx);
       }

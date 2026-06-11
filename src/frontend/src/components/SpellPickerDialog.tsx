@@ -16,7 +16,13 @@ interface Props {
   // The spell list this picker draws from. Filters `spells` to tagged entries.
   spellList: 'arcane' | 'divine' | 'primal';
   cantripCount: number;
+  // How many leveled (non-cantrip) spells to pick, across levels 1..maxLevel.
+  // `l1Count` is the historical name; it's the TOTAL leveled count.
   l1Count: number;
+  // Highest spell level offered (default 1). Above 1, the leveled section shows
+  // each level's spells under its own subheader, sharing the single l1Count cap —
+  // so a caster built at L3 can pick its level-2 spells in the same dialog.
+  maxLevel?: number;
   spells: SpellOption[];
   // Prior picks — repopulated when the dialog is reopened. Empty on first open.
   initialCantrips: string[];
@@ -41,6 +47,7 @@ function SpellPickerDialog({
   spellList,
   cantripCount,
   l1Count,
+  maxLevel = 1,
   spells,
   initialCantrips,
   initialL1,
@@ -61,10 +68,16 @@ function SpellPickerDialog({
     () => spells.filter((s) => s.level === 0 && s.spellList.includes(spellList)),
     [spells, spellList]
   );
-  const l1Options = useMemo(
-    () => spells.filter((s) => s.level === 1 && s.spellList.includes(spellList)),
-    [spells, spellList]
-  );
+  // Leveled (non-cantrip) options across levels 1..maxLevel, grouped by level so
+  // the section can show a subheader per level while sharing one pick cap.
+  const spellLevels = useMemo(() => {
+    const groups: { level: number; options: SpellOption[] }[] = [];
+    for (let lvl = 1; lvl <= maxLevel; lvl++) {
+      const options = spells.filter((s) => s.level === lvl && s.spellList.includes(spellList));
+      if (options.length > 0) groups.push({ level: lvl, options });
+    }
+    return groups;
+  }, [spells, spellList, maxLevel]);
 
   const cappedToggle = (setter: Dispatch<SetStateAction<string[]>>, cap: number, id: string) =>
     setter((prev) => {
@@ -82,7 +95,7 @@ function SpellPickerDialog({
       ? `${cantripCount - cantrips.length} more cantrip${cantripCount - cantrips.length === 1 ? '' : 's'}`
       : null,
     l1Count - l1.length > 0
-      ? `${l1Count - l1.length} more L1 spell${l1Count - l1.length === 1 ? '' : 's'}`
+      ? `${l1Count - l1.length} more spell${l1Count - l1.length === 1 ? '' : 's'}`
       : null,
   ].filter(Boolean);
 
@@ -103,8 +116,10 @@ function SpellPickerDialog({
           }}
         >
           Pick {cantripCount} cantrip{cantripCount === 1 ? '' : 's'}
-          {l1Count > 0 ? ` and ${l1Count} level-1 spell${l1Count === 1 ? '' : 's'}` : ''} from the{' '}
-          <span style={{ color: 'var(--t-primary)' }}>{spellList}</span> spell list.
+          {l1Count > 0
+            ? ` and ${l1Count} ${maxLevel > 1 ? 'spell' : 'level-1 spell'}${l1Count === 1 ? '' : 's'}`
+            : ''}{' '}
+          from the <span style={{ color: 'var(--t-primary)' }}>{spellList}</span> spell list.
           {note ? ` ${note}` : ''}
         </p>
 
@@ -175,54 +190,72 @@ function SpellPickerDialog({
                 textTransform: 'uppercase',
               }}
             >
-              Level-1 spell{l1Count === 1 ? '' : 's'} ({l1.length}/{l1Count})
+              {maxLevel > 1 ? 'Spells' : `Level-1 spell${l1Count === 1 ? '' : 's'}`} ({l1.length}/
+              {l1Count})
             </h3>
-            <div className={styles.invBody}>
-              {l1Options.length === 0 ? (
-                <p className={styles.campaignEmpty}>
-                  No level-1 spells available on the {spellList} list.
-                </p>
-              ) : (
-                l1Options.map((s) => {
-                  const picked = l1.includes(s.id);
-                  const lockedElsewhere = !picked && exclude.has(s.id);
-                  const limitHit = !picked && !lockedElsewhere && l1.length >= l1Count;
-                  return (
-                    <div
-                      key={s.id}
-                      className={styles.invItem}
-                      data-testid={`spell-picker-l1-${s.id}`}
-                      style={limitHit || lockedElsewhere ? { opacity: 0.55 } : undefined}
+            {spellLevels.length === 0 ? (
+              <div className={styles.invBody}>
+                <p className={styles.campaignEmpty}>No spells available on the {spellList} list.</p>
+              </div>
+            ) : (
+              spellLevels.map(({ level, options }) => (
+                <div key={level}>
+                  {maxLevel > 1 && (
+                    <h4
+                      style={{
+                        margin: '0.6rem 0 0.3rem',
+                        fontSize: '0.7rem',
+                        color: 'var(--t-dim)',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                      }}
                     >
-                      <label
-                        style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
-                        className={styles.invItemHeader}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={picked}
-                          disabled={limitHit || lockedElsewhere}
-                          onChange={() => cappedToggle(setL1, l1Count, s.id)}
-                          data-testid={`spell-picker-l1-input-${s.id}`}
-                        />
-                        <span style={{ flex: 1 }}>
-                          <span className={styles.invItemName}>
-                            {s.name}
-                            {lockedElsewhere && (
-                              <span style={{ color: 'var(--t-dim)', fontSize: '0.72rem' }}>
-                                {' '}
-                                — already in your spell list
+                      Level {level}
+                    </h4>
+                  )}
+                  <div className={styles.invBody}>
+                    {options.map((s) => {
+                      const picked = l1.includes(s.id);
+                      const lockedElsewhere = !picked && exclude.has(s.id);
+                      const limitHit = !picked && !lockedElsewhere && l1.length >= l1Count;
+                      return (
+                        <div
+                          key={s.id}
+                          className={styles.invItem}
+                          data-testid={`spell-picker-l1-${s.id}`}
+                          style={limitHit || lockedElsewhere ? { opacity: 0.55 } : undefined}
+                        >
+                          <label
+                            style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}
+                            className={styles.invItemHeader}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={picked}
+                              disabled={limitHit || lockedElsewhere}
+                              onChange={() => cappedToggle(setL1, l1Count, s.id)}
+                              data-testid={`spell-picker-l1-input-${s.id}`}
+                            />
+                            <span style={{ flex: 1 }}>
+                              <span className={styles.invItemName}>
+                                {s.name}
+                                {lockedElsewhere && (
+                                  <span style={{ color: 'var(--t-dim)', fontSize: '0.72rem' }}>
+                                    {' '}
+                                    — already in your spell list
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
-                          <div className={styles.invItemDesc}>{s.desc}</div>
-                        </span>
-                      </label>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                              <div className={styles.invItemDesc}>{s.desc}</div>
+                            </span>
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
           </>
         )}
       </div>

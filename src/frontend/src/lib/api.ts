@@ -239,7 +239,12 @@ export interface BackendContextSummary {
     {
       spellList: 'arcane' | 'divine' | 'primal';
       cantripCount: number;
+      // The leveled (non-cantrip) total to pick + the highest castable spell
+      // level. At the campaign's starting level these scale above L1 (e.g. a
+      // L3 caster picks more spells, up to level 2). `defaultL1` is a complete
+      // default loadout spanning those levels. Names kept for back-compat.
       l1Count: number;
+      maxSpellLevel?: number;
       defaultCantrips: string[];
       defaultL1: string[];
     }

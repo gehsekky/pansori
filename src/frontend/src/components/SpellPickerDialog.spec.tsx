@@ -347,4 +347,35 @@ describe('SpellPickerDialog', () => {
     );
     expect(queryByTestId('spell-picker-l1-magic_missile')).toBeNull();
   });
+
+  it('with maxLevel=2, shows level-2 spells and shares one pick cap across levels', () => {
+    const onSave = vi.fn();
+    const { queryByTestId, getByTestId } = render(
+      <SpellPickerDialog
+        featName="Wizard"
+        spellList="arcane"
+        cantripCount={0}
+        l1Count={2}
+        maxLevel={2}
+        spells={SPELLS}
+        initialCantrips={[]}
+        initialL1={[]}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+    // Level-2 spell now visible alongside the level-1 options.
+    expect(queryByTestId('spell-picker-l1-misty_step')).toBeTruthy();
+    expect(queryByTestId('spell-picker-l1-magic_missile')).toBeTruthy();
+
+    // Pick one L1 + one L2 — the cap of 2 is shared across both levels.
+    fireEvent.click(getByTestId('spell-picker-l1-input-magic_missile'));
+    fireEvent.click(getByTestId('spell-picker-l1-input-misty_step'));
+    // Cap hit → a third leveled spell is disabled regardless of its level.
+    expect((getByTestId('spell-picker-l1-input-shield') as HTMLInputElement).disabled).toBe(true);
+
+    // Save returns the cross-level picks together (the historical `l1` arg).
+    fireEvent.click(getByTestId('spell-picker-save'));
+    expect(onSave).toHaveBeenCalledWith([], ['magic_missile', 'misty_step']);
+  });
 });

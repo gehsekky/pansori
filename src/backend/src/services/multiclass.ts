@@ -20,6 +20,7 @@
 //     only — that rule stays once the prereq + spell-slot PRs land.
 
 import type { Character, Spell } from '../types.js';
+import { SRD_CASTER_SPELL_COUNTS, defaultCasterSpells } from '../campaignData/srd/classes.js';
 import {
   abilityMod,
   extraAttackCount,
@@ -1124,6 +1125,68 @@ export function expandCasterSpellsForLevel(
     }
   }
   char.spells_known = Array.from(known);
+}
+
+export interface CasterCreationLoadout {
+  spellListTag: 'arcane' | 'divine' | 'primal';
+  cantripCount: number;
+  spellCount: number; // leveled (non-cantrip) spells to pick
+  maxSpellLevel: number;
+  cantripOptions: string[];
+  spellOptions: string[]; // ids across levels 1..maxSpellLevel
+  defaultCantrips: string[];
+  defaultSpells: string[]; // a complete default loadout (length spellCount)
+}
+
+// The single source of truth for a caster's creation spell picker AT A GIVEN
+// STARTING LEVEL — the counts, the castable spell-level ceiling, the option
+// lists, and a complete default pre-selection. The contexts API feeds it to the
+// FE picker; the creation route uses its options + counts to validate the
+// player's picks. At level 1 it reduces to the original cantrips + L1 behavior.
+// Returns null for non-casters (and half-casters, which have no L1 creation pick).
+export function casterCreationLoadout(
+  cls: string,
+  level: number,
+  spellTable: Record<string, Spell>,
+  curatedKnown: readonly string[] = []
+): CasterCreationLoadout | null {
+  const tag = classSpellListTag(cls);
+  const base = SRD_CASTER_SPELL_COUNTS[cls];
+  if (!tag || !base) return null;
+  const maxSpellLevel = maxSpellLevelForLevel(level);
+  const byLevel = casterSpellOptionsByLevel(cls, spellTable, maxSpellLevel);
+  const cantripOptions = byLevel[0] ?? [];
+  const spellOptions: string[] = [];
+  for (let l = 1; l <= maxSpellLevel; l++) spellOptions.push(...(byLevel[l] ?? []));
+  const cantripCount = Math.min(base.cantrips, cantripOptions.length);
+  // Known/spellbook casters scale by level; prepared-from-list casters
+  // (Cleric/Druid) keep the L1 seed (they re-prepare in play from the full list).
+  const target = knownSpellTargetForLevel(cls, level) ?? base.l1;
+  const spellCount = Math.min(target, spellOptions.length);
+  // Default loadout: the L1 default pre-selection, topped up from the highest
+  // castable level down (so a built-at-L3 caster's default already holds L2).
+  const def = defaultCasterSpells(
+    cls,
+    { cantrips: cantripOptions, l1: byLevel[1] ?? [] },
+    curatedKnown
+  );
+  const chosen = new Set<string>(def.l1.slice(0, spellCount));
+  for (let l = maxSpellLevel; l >= 1 && chosen.size < spellCount; l--) {
+    for (const id of byLevel[l] ?? []) {
+      if (chosen.size >= spellCount) break;
+      chosen.add(id);
+    }
+  }
+  return {
+    spellListTag: tag,
+    cantripCount,
+    spellCount,
+    maxSpellLevel,
+    cantripOptions,
+    spellOptions,
+    defaultCantrips: def.cantrips.slice(0, cantripCount),
+    defaultSpells: Array.from(chosen).slice(0, spellCount),
+  };
 }
 
 /**

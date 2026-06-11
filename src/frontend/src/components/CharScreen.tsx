@@ -1660,7 +1660,7 @@ function CharScreen({
                                 onClick={() => setCasterPickerIdx(idx)}
                                 data-testid={`caster-spells-trigger-${idx}`}
                               >
-                                {`✦ Spells — ${picked.cantrips.length} cantrips + ${picked.l1.length} level-1 (click to choose)`}
+                                {`✦ Spells — ${picked.cantrips.length} cantrips + ${picked.l1.length} ${(choice.maxSpellLevel ?? 1) > 1 ? 'spells' : 'level-1'} (click to choose)`}
                               </button>
                             );
                           })()}
@@ -2338,6 +2338,7 @@ function CharScreen({
               spellList={choice.spellList}
               cantripCount={choice.cantripCount}
               l1Count={choice.l1Count}
+              maxLevel={choice.maxSpellLevel ?? 1}
               spells={beCtx?.spells ?? []}
               initialCantrips={draft.casterSpells?.cantrips ?? choice.defaultCantrips}
               initialL1={draft.casterSpells?.l1 ?? choice.defaultL1}

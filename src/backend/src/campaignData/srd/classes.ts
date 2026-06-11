@@ -421,9 +421,13 @@ export function resolveCasterSpells(
   className: string,
   chosen: { cantrips?: string[]; l1?: string[] } | undefined,
   available: { cantrips: string[]; l1: string[] },
-  curatedKnown: readonly string[]
+  curatedKnown: readonly string[],
+  // Above-L1 starting levels pass explicit counts (and a leveled `available`
+  // whose `l1` spans every castable spell level) so the validator accepts a
+  // bigger, level-appropriate loadout. Omitted ⇒ the L1 counts (unchanged).
+  countsOverride?: { cantrips: number; l1: number }
 ): { cantrips: string[]; l1: string[] } {
-  const counts = casterSpellCounts(className, available);
+  const counts = countsOverride ?? casterSpellCounts(className, available);
   if (!counts) return { cantrips: [], l1: [] };
   const valid = (picks: string[] | undefined, opts: string[], count: number): string[] | null => {
     if (!picks) return null;
