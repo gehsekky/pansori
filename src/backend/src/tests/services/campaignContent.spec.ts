@@ -83,6 +83,9 @@ function makeContentDb(initial: {
   // campaignId → dialogue insert params after campaign_id: [room_id, npc_id, id,
   // parent_id, sort_order, label, reply, once, condition, skill_check, consequences]
   const dialogue = new Map<string, unknown[][]>();
+  // campaignId → act insert params after campaign_id: [id, sort_order, name,
+  // starting_region_id, start_x, start_y, start_effect, end_effect, advance_trigger]
+  const acts = new Map<string, unknown[][]>();
 
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
@@ -319,6 +322,7 @@ function makeContentDb(initial: {
         (a, b) => (a[1] as number) - (b[1] as number)
       );
       // pg returns JSONB columns parsed; the mock stored the stringified value.
+      const parse = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : (v ?? null));
       const rows = list.map((p) => ({
         id: p[0],
         title: p[2],
@@ -328,6 +332,9 @@ function makeContentDb(initial: {
         rep_gain: p[6],
         start_active: p[7],
         rewards: typeof p[8] === 'string' ? JSON.parse(p[8] as string) : p[8],
+        act_id: (p[9] as string | undefined) ?? null,
+        start_effect: parse(p[10]),
+        complete_effect: parse(p[11]),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -423,6 +430,35 @@ function makeContentDb(initial: {
     if (sql.includes('DELETE FROM campaign_dialogue_responses')) {
       const prior = (dialogue.get(params[0] as string) ?? []).length;
       dialogue.delete(params[0] as string);
+      return { rows: [], rowCount: prior };
+    }
+    if (sql.includes('INSERT INTO campaign_acts')) {
+      const [campaignId, ...rest] = params;
+      const list = acts.get(campaignId as string) ?? [];
+      list.push(rest);
+      acts.set(campaignId as string, list);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('FROM campaign_acts') && sql.includes('SELECT')) {
+      const list = [...(acts.get(params[0] as string) ?? [])].sort(
+        (a, b) => (a[1] as number) - (b[1] as number)
+      );
+      const parse = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : (v ?? null));
+      const rows = list.map((p) => ({
+        id: p[0],
+        name: p[2],
+        starting_region_id: p[3],
+        start_x: p[4],
+        start_y: p[5],
+        start_effect: parse(p[6]),
+        end_effect: parse(p[7]),
+        advance_trigger: parse(p[8]),
+      }));
+      return { rows, rowCount: rows.length };
+    }
+    if (sql.includes('DELETE FROM campaign_acts')) {
+      const prior = (acts.get(params[0] as string) ?? []).length;
+      acts.delete(params[0] as string);
       return { rows: [], rowCount: prior };
     }
     throw new Error(`fake content db: unhandled query: ${sql.split('\n')[0]}`);
@@ -2016,6 +2052,50 @@ describe('section CRUD + live refresh', () => {
     const { present, value } = await getDbSection(db.pool, 'demo_campaign', 'factions');
     expect(present).toBe(true);
     expect(value).toEqual([f1, f2]);
+  });
+
+  it('acts round-trip through the table (region/pos, hooks, effects, trigger) + fold', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const code = codeCtx({ id: 'demo_campaign' });
+    const contexts: Record<string, Context> = { demo_campaign: code };
+    const act = {
+      id: 'act-1',
+      name: 'Act I',
+      startingRegionId: 'r1',
+      startPos: { x: 2, y: 3 },
+      onStart: 'Dawn over the vale.', // 1-variant hook → string round-trip
+      onEnd: 'The gates groan shut.',
+      startEffect: { grant: [{ itemId: 'gate_key', member: 'Roland' }] },
+      endEffect: { revoke: [{ itemId: 'gate_key', member: 'Roland' }] },
+      trigger: { questId: 'q1' },
+    };
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'acts', [act])).toBe(true);
+    const { present, value } = await getDbSection(db.pool, 'demo_campaign', 'acts');
+    expect(present).toBe(true);
+    expect(value).toEqual([act]);
+    // Folds into the campaign block; delete reverts.
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.acts).toEqual([act]);
+    expect(await deleteCampaignSection(db.pool, 'demo_campaign', 'acts')).toBe(true);
+    await refreshCampaignOverlay(db.pool, contexts, { demo_campaign: code }, 'demo_campaign');
+    expect(contexts.demo_campaign.campaign?.acts).toBeUndefined();
+  });
+
+  it('quests carry actId + start/complete loot effects through the table', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    const quest = {
+      id: 'q1',
+      actId: 'act-1',
+      title: 'The Key',
+      desc: 'd',
+      steps: [{ id: 's1', desc: 'x', condition: {} }],
+      rewards: [],
+      startEffect: { grant: [{ itemId: 'gate_key', member: 'Roland' }] },
+      completeEffect: { revoke: [{ itemId: 'gate_key', member: 'Roland' }] },
+    };
+    expect(await putCampaignSection(db.pool, 'demo_campaign', 'quests', [quest])).toBe(true);
+    const { value } = await getDbSection(db.pool, 'demo_campaign', 'quests');
+    expect(value).toEqual([quest]);
   });
 
   it('quests round-trip through the table preserving quest + step order and JSONB fields', async () => {

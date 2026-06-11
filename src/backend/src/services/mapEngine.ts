@@ -176,13 +176,21 @@ export function revealRegional(campaign: CampaignData | undefined, st: GameState
 }
 
 export function initMapState(campaign: CampaignData | undefined, st: GameState): GameState {
-  const region = campaign?.regions?.[0];
-  if (!region || st.map_level) return st;
+  if (st.map_level) return st;
+  // Act 1 (acts[0]) drives the starting placement when acts are authored —
+  // its startingRegion + startPos; otherwise fall back to the first region
+  // (legacy campaigns with no acts behave exactly as before).
+  const act = campaign?.acts?.[0];
+  const region = act
+    ? (campaign?.regions?.find((r) => r.id === act.startingRegionId) ?? campaign?.regions?.[0])
+    : campaign?.regions?.[0];
+  if (!region) return st;
   return revealRegional(campaign, {
     ...st,
     map_level: 'regional',
+    ...(act ? { current_act: act.id } : {}),
     current_region_id: region.id,
-    marker_pos: region.startPos,
+    marker_pos: act?.startPos ?? region.startPos,
     // Game start counts as entering the starting region — the regionEnter
     // narration hook fires once per region, so record the visit.
     visited_regions: [region.id],

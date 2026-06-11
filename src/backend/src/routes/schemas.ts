@@ -1569,6 +1569,20 @@ const QuestStepSchema = z
   })
   .strict();
 
+// A reusable loot grant/revoke effect (acts + quests). Each entry targets a
+// required member by name; item ids are free-form (composed loot table). The
+// runtime resolves the member by name+class against the campaign's required
+// members and no-ops if it can't (the member could be absent).
+const LootEntrySchema = z
+  .object({ itemId: z.string().min(1).max(80), member: z.string().min(1).max(80) })
+  .strict();
+const LootEffectSchema = z
+  .object({
+    grant: z.array(LootEntrySchema).max(20).optional(),
+    revoke: z.array(LootEntrySchema).max(20).optional(),
+  })
+  .strict();
+
 // Rewards are the same safe consequence subset DB dialogue may fire —
 // they run through the identical applyConsequence pipeline on completion.
 const QuestSchema = z
@@ -1576,12 +1590,16 @@ const QuestSchema = z
     id: SLUG,
     title: z.string().min(1).max(120),
     desc: z.string().min(1).max(2000),
+    // The act this quest belongs to (campaign → acts → quests).
+    actId: SLUG.optional(),
     giverNpcId: SLUG.optional(),
     steps: z.array(QuestStepSchema).min(1).max(12),
     rewards: z.array(DialogueConsequenceSchema).max(8),
     factionId: SLUG.optional(),
     repGain: z.number().int().min(-100).max(100).optional(),
     startActive: z.boolean().optional(),
+    startEffect: LootEffectSchema.optional(),
+    completeEffect: LootEffectSchema.optional(),
   })
   .strict();
 
@@ -1610,6 +1628,43 @@ const QuestsSchema = z
         }
         stepIds.add(s.id);
       });
+    });
+  });
+
+// An act: name + starting region/coords, onStart/onEnd narrative pools, start/
+// end loot effects, and the quest objective that advances to the next act.
+const HookPool = z.union([
+  z.string().min(1).max(4000),
+  z.array(z.string().min(1).max(4000)).max(12),
+]);
+const ActSchema = z
+  .object({
+    id: SLUG,
+    name: z.string().min(1).max(120),
+    startingRegionId: SLUG,
+    startPos: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }),
+    onStart: HookPool.optional(),
+    onEnd: HookPool.optional(),
+    startEffect: LootEffectSchema.optional(),
+    endEffect: LootEffectSchema.optional(),
+    trigger: z.object({ questId: SLUG, stepId: SLUG.optional() }).strict().optional(),
+  })
+  .strict();
+
+const ActsSchema = z
+  .array(ActSchema)
+  .max(20)
+  .superRefine((acts, ctx) => {
+    const ids = new Set<string>();
+    acts.forEach((a, ai) => {
+      if (ids.has(a.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate act id "${a.id}"`,
+          path: [ai, 'id'],
+        });
+      }
+      ids.add(a.id);
     });
   });
 
@@ -1826,6 +1881,7 @@ export const CAMPAIGN_SECTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // folded into campaign.quests / campaign.factions wholesale at overlay).
   quests: QuestsSchema,
   factions: FactionsSchema,
+  acts: ActsSchema,
   // Engine rules (Context.rules) — condition → consequence scripting.
   rules: RulesSchema,
   terrainArt: TerrainArtSchema,

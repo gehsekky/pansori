@@ -1523,6 +1523,10 @@ export interface Quest {
   id: string;
   title: string;
   desc: string;
+  // The act this quest belongs to (campaign → acts → quests). Entering an act
+  // activates its `startActive` quests. Optional in the type for back-compat;
+  // every authored quest carries one (migration backfills 'act-1').
+  actId?: string;
   giverNpcId?: string;
   steps: QuestStep[];
   rewards: GameConsequence[];
@@ -1532,6 +1536,43 @@ export interface Quest {
   // player begins with direction. All other quests stay hidden from the quest
   // log until discovered (their first step fires, auto-activating them).
   startActive?: boolean;
+  // Loot granted to required members when the quest starts (e.g. a door key)
+  // and revoked when it completes (e.g. the spent quest item). See LootEffect.
+  startEffect?: LootEffect;
+  completeEffect?: LootEffect;
+}
+
+// A reusable loot grant/revoke effect, applied to REQUIRED party members only
+// (resolved at runtime by name+class against the campaign's requiredMembers —
+// we can't predict user-added members). Shared by acts (start/end) and quests
+// (start/complete). The author targets a specific required member, by name, for
+// each item.
+export interface LootEffect {
+  grant?: { itemId: string; member: string }[];
+  revoke?: { itemId: string; member: string }[];
+}
+
+// A campaign is a sequence of 1..N acts, like a play. The party starts in act 1
+// (acts[0]); completing the act's `trigger` quest objective advances to the
+// next act — relocating the party to its starting region/coords, firing its
+// loot effect, activating its quests, and playing its onStart hook.
+export interface Act {
+  id: string;
+  name: string;
+  startingRegionId: string;
+  startPos: { x: number; y: number };
+  // onStart/onEnd narrative — variant pools (campaign_narratives owner_kind
+  // 'act'), folded on at overlay time; one variant is picked when the act
+  // begins / the prior act ends.
+  onStart?: string | string[];
+  onEnd?: string | string[];
+  // Loot granted/revoked from required members on entering / leaving this act.
+  startEffect?: LootEffect;
+  endEffect?: LootEffect;
+  // The quest objective whose completion advances to the NEXT act. `questId`
+  // (whole-quest completion) is honored now; `stepId` is reserved for step-
+  // granularity later, no schema change.
+  trigger?: { questId: string; stepId?: string };
 }
 
 export interface QuestProgress {

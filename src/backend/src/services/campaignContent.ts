@@ -25,6 +25,7 @@
 // refreshCampaignOverlay, so changes go live without a restart.
 
 import type {
+  Act,
   Context,
   EncounterEntry,
   EncounterZone,
@@ -34,6 +35,7 @@ import type {
   FloorType,
   GameConsequence,
   GridPos,
+  LootEffect,
   LootItem,
   NpcDialogueResponse,
   PlacedLoot,
@@ -122,6 +124,7 @@ export const EDITABLE_SECTIONS = [
   'rooms',
   'quests',
   'factions',
+  'acts',
   // Engine rules (Context.rules) — a plain top-level field, folded by the
   // generic overlay merge (gameEngine reads context.rules directly).
   'rules',
@@ -242,6 +245,7 @@ export interface CampaignRegion {
 const LEVEL_HOOKS = ['onEnter', 'onFirstEnter', 'onExit', 'onFirstExit'] as const;
 const OBJECT_HOOKS = ['desc', 'interactText', 'foundText', 'emptyText'] as const;
 const NPC_HOOKS = ['greeting', 'firstGreeting', 'goodbye', 'firstGoodbye'] as const;
+const ACT_HOOKS = ['onStart', 'onEnd'] as const;
 const TRAP_HOOKS = [
   'desc',
   'triggerNarrative',
@@ -1430,6 +1434,10 @@ export async function getDbSection(
     const factions = await getCampaignFactions(pool, campaignId);
     return { present: factions.length > 0, value: factions.length > 0 ? factions : undefined };
   }
+  if (section === 'acts') {
+    const acts = await getCampaignActs(pool, campaignId);
+    return { present: acts.length > 0, value: acts.length > 0 ? acts : undefined };
+  }
   if (section === 'regions') {
     const regions = await getCampaignRegions(pool, campaignId);
     return { present: regions.length > 0, value: regions.length > 0 ? regions : undefined };
@@ -1470,6 +1478,9 @@ interface QuestRow {
   rep_gain: number | null;
   start_active: boolean;
   rewards: GameConsequence[];
+  act_id: string | null;
+  start_effect: LootEffect | null;
+  complete_effect: LootEffect | null;
 }
 interface QuestStepRow {
   quest_id: string;
@@ -1483,7 +1494,8 @@ interface QuestStepRow {
 // (title / desc / step desc) from plain columns — no campaign_narratives.
 export async function getCampaignQuests(pool: Pool, campaignId: string): Promise<Quest[]> {
   const { rows: qRows } = await pool.query<QuestRow>(
-    `SELECT id, title, description, giver_npc_id, faction_id, rep_gain, start_active, rewards
+    `SELECT id, title, description, giver_npc_id, faction_id, rep_gain, start_active, rewards,
+            act_id, start_effect, complete_effect
        FROM campaign_quests WHERE campaign_id = $1 ORDER BY sort_order`,
     [campaignId]
   );
@@ -1509,6 +1521,9 @@ export async function getCampaignQuests(pool: Pool, campaignId: string): Promise
     ...(r.faction_id !== null ? { factionId: r.faction_id } : {}),
     ...(r.rep_gain !== null ? { repGain: r.rep_gain } : {}),
     ...(r.start_active ? { startActive: true } : {}),
+    ...(r.act_id !== null ? { actId: r.act_id } : {}),
+    ...(r.start_effect !== null ? { startEffect: r.start_effect } : {}),
+    ...(r.complete_effect !== null ? { completeEffect: r.complete_effect } : {}),
   }));
 }
 
@@ -1533,8 +1548,9 @@ export async function putCampaignQuests(
       const q = quests[i];
       await client.query(
         `INSERT INTO campaign_quests
-           (campaign_id, id, sort_order, title, description, giver_npc_id, faction_id, rep_gain, start_active, rewards)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
+           (campaign_id, id, sort_order, title, description, giver_npc_id, faction_id, rep_gain, start_active, rewards,
+            act_id, start_effect, complete_effect)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13::jsonb)`,
         [
           campaignId,
           q.id,
@@ -1546,6 +1562,9 @@ export async function putCampaignQuests(
           q.repGain ?? null,
           q.startActive ?? false,
           JSON.stringify(q.rewards ?? []),
+          q.actId ?? null,
+          q.startEffect ? JSON.stringify(q.startEffect) : null,
+          q.completeEffect ? JSON.stringify(q.completeEffect) : null,
         ]
       );
       for (let j = 0; j < q.steps.length; j++) {
@@ -1660,6 +1679,108 @@ export async function deleteCampaignFactions(pool: Pool, campaignId: string): Pr
   return (rowCount ?? 0) > 0;
 }
 
+// ─── Acts (first-class table; campaign → acts → quests) ──────────────────────
+// Mechanics (start/end loot effects, the advance trigger) are JSONB columns;
+// name + starting coords are plain columns; onStart/onEnd are pooled hooks in
+// campaign_narratives (owner_kind 'act').
+interface ActRow {
+  id: string;
+  name: string;
+  starting_region_id: string;
+  start_x: number;
+  start_y: number;
+  start_effect: LootEffect | null;
+  end_effect: LootEffect | null;
+  advance_trigger: { questId: string; stepId?: string } | null;
+}
+
+export async function getCampaignActs(pool: Pool, campaignId: string): Promise<Act[]> {
+  const { rows } = await pool.query<ActRow>(
+    `SELECT id, name, starting_region_id, start_x, start_y, start_effect, end_effect, advance_trigger
+       FROM campaign_acts WHERE campaign_id = $1 ORDER BY sort_order`,
+    [campaignId]
+  );
+  if (rows.length === 0) return [];
+  const nar = await getCampaignNarratives(pool, campaignId);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    startingRegionId: r.starting_region_id,
+    startPos: { x: r.start_x, y: r.start_y },
+    ...hookFields(nar, 'act', r.id, ACT_HOOKS),
+    ...(r.start_effect !== null ? { startEffect: r.start_effect } : {}),
+    ...(r.end_effect !== null ? { endEffect: r.end_effect } : {}),
+    ...(r.advance_trigger !== null ? { trigger: r.advance_trigger } : {}),
+  }));
+}
+
+// Replace-all in a txn: clear the campaign's acts + their 'act' hooks, re-insert
+// in order, strip the stale JSONB key.
+export async function putCampaignActs(
+  pool: Pool,
+  campaignId: string,
+  acts: Act[]
+): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query('SELECT 1 FROM campaigns WHERE id = $1', [campaignId]);
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query('DELETE FROM campaign_acts WHERE campaign_id = $1', [campaignId]);
+    await client.query(
+      `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'act'`,
+      [campaignId]
+    );
+    for (let i = 0; i < acts.length; i++) {
+      const a = acts[i];
+      await client.query(
+        `INSERT INTO campaign_acts
+           (campaign_id, id, sort_order, name, starting_region_id, start_x, start_y,
+            start_effect, end_effect, advance_trigger)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb)`,
+        [
+          campaignId,
+          a.id,
+          i,
+          a.name,
+          a.startingRegionId,
+          a.startPos?.x ?? 0,
+          a.startPos?.y ?? 0,
+          a.startEffect ? JSON.stringify(a.startEffect) : null,
+          a.endEffect ? JSON.stringify(a.endEffect) : null,
+          a.trigger ? JSON.stringify(a.trigger) : null,
+        ]
+      );
+      await insertNarratives(client, campaignId, 'act', a.id, {
+        onStart: a.onStart,
+        onEnd: a.onEnd,
+      });
+    }
+    await client.query(`UPDATE campaigns SET data = data - $2 WHERE id = $1`, [campaignId, 'acts']);
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteCampaignActs(pool: Pool, campaignId: string): Promise<boolean> {
+  const { rowCount } = await pool.query('DELETE FROM campaign_acts WHERE campaign_id = $1', [
+    campaignId,
+  ]);
+  await pool.query(
+    `DELETE FROM campaign_narratives WHERE campaign_id = $1 AND owner_kind = 'act'`,
+    [campaignId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 // The campaign-level game-start opening, stored as a campaign-scoped POOLED
 // hook (owner_kind 'campaign', owner_id = the campaign id, hook 'gameStart') —
 // the normalized successor to the campaigns.data 'gameStart' string. Replace-all
@@ -1720,6 +1841,9 @@ export async function putCampaignSection(
   if (section === 'factions') {
     return putCampaignFactions(pool, campaignId, value as Faction[]);
   }
+  if (section === 'acts') {
+    return putCampaignActs(pool, campaignId, value as Act[]);
+  }
   if (section === 'regions') {
     return putCampaignRegions(pool, campaignId, value as CampaignRegion[]);
   }
@@ -1759,6 +1883,9 @@ export async function deleteCampaignSection(
   }
   if (section === 'factions') {
     return deleteCampaignFactions(pool, campaignId);
+  }
+  if (section === 'acts') {
+    return deleteCampaignActs(pool, campaignId);
   }
   if (section === 'regions') {
     return deleteCampaignRegions(pool, campaignId);
@@ -1854,6 +1981,9 @@ async function loadOverlay(
   // legacy JSONB key (inert post-migration) and read the table.
   delete overlay.factions;
   const dbFactions = await getCampaignFactions(pool, campaignId);
+  // Acts are a first-class table too. Drop the legacy JSONB key, read the table.
+  delete overlay.acts;
+  const dbActs = await getCampaignActs(pool, campaignId);
 
   // The composed catalogs come first — room enemy placements resolve
   // against the composed bestiary below.
@@ -1886,7 +2016,8 @@ async function loadOverlay(
     worldName !== undefined ||
     recParty !== undefined ||
     dbQuests.length > 0 ||
-    dbFactions.length > 0
+    dbFactions.length > 0 ||
+    dbActs.length > 0
   ) {
     overlay.campaign = {
       ...(code.campaign ?? { world_name: code.id, intro: '', rooms: [] }),
@@ -1903,6 +2034,7 @@ async function loadOverlay(
         : {}),
       ...(dbQuests.length > 0 ? { quests: dbQuests } : {}),
       ...(dbFactions.length > 0 ? { factions: dbFactions } : {}),
+      ...(dbActs.length > 0 ? { acts: dbActs } : {}),
       ...(dbRegions.length > 0
         ? {
             regions: dbRegionsToEngine(

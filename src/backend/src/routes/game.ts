@@ -49,14 +49,16 @@ import {
   resolveStartingEquipment,
   resolveWeaponMasteries,
 } from '../campaignData/srd/index.js';
-import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
+  advanceActIfTriggered,
   applyConsequence,
+  applyLootEffect,
   backfillOwnership,
   generateChoices,
   normalizeState,
   takeAction,
 } from '../services/gameEngine.js';
+import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
   applyQuestCompletions,
   evaluateQuestSteps,
@@ -84,7 +86,7 @@ import {
   toggleWornItem,
 } from '../services/equipment.js';
 import { generateSeed, reconcileSeedWithContext } from '../services/procgen.js';
-import { initMapState, regionEnterNarration } from '../services/mapEngine.js';
+import { initMapState, pickHookText, regionEnterNarration } from '../services/mapEngine.js';
 import { syncSetAbilities, wornAcBonus } from '../services/wornEffects.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
@@ -754,6 +756,24 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     // campaigns still on the Location model.
     Object.assign(initialState, initMapState(ctx.campaign, initialState));
 
+    // Act 1 + opening (startActive) quests grant their start loot to required
+    // members at session start; act 1's onStart hook leads the opening.
+    const startLootParts: string[] = [];
+    const act0 = ctx.campaign?.acts?.[0];
+    if (act0) {
+      Object.assign(
+        initialState,
+        applyLootEffect(act0.startEffect, initialState, seed, ctx, startLootParts)
+      );
+    }
+    for (const q of (ctx.campaign?.quests ?? []).filter((q) => q.startActive)) {
+      Object.assign(
+        initialState,
+        applyLootEffect(q.startEffect, initialState, seed, ctx, startLootParts)
+      );
+    }
+    const actOpening = act0 ? (pickHookText(act0.onStart) ?? '') : '';
+
     // Announce the opening quest(s) in the intro so the player has immediate
     // direction (they also appear in the quest log).
     const starterQuestLine = (ctx.campaign?.quests ?? [])
@@ -763,7 +783,12 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
     // regionEnter narration hook — game start counts as first entry to the
     // starting region (initMapState recorded it in visited_regions).
     const regionArrival = regionEnterNarration(ctx.campaign, initialState.current_region_id);
-    const startNarrative = seed.intro + regionArrival + starterQuestLine;
+    const startNarrative =
+      seed.intro +
+      (actOpening ? `\n\n${actOpening}` : '') +
+      regionArrival +
+      starterQuestLine +
+      startLootParts.join('');
     initialState.run_log = [
       { character_id: leader.id, action: 'start', narrative: startNarrative },
     ];
@@ -1506,6 +1531,14 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
           const def = ctx.campaign.quests?.find((q) => q.id === qid);
           if (!def) continue;
           activationLines.push(`\n\n✦ Quest accepted — ${def.title}. ${def.desc}`);
+          // Quest-start loot for required members (e.g. a door key).
+          result.newState = applyLootEffect(
+            def.startEffect,
+            result.newState,
+            row.seed,
+            ctx,
+            activationLines
+          );
         }
         if (activationLines.length) {
           const tail = activationLines.join(' ');
@@ -1557,6 +1590,31 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
             const sign = def.repGain >= 0 ? '+' : '';
             rewardNarrativeParts.push(`${sign}${def.repGain} reputation with ${def.factionId}.`);
           }
+          // Quest-complete loot for required members (e.g. drop the spent item).
+          result.newState = applyLootEffect(
+            def.completeEffect,
+            result.newState,
+            row.seed,
+            ctx,
+            rewardNarrativeParts
+          );
+        }
+        // Advance the act if a completed quest is the current act's trigger —
+        // relocates the party, fires act loot + onEnd/onStart, activates the
+        // next act's quests. Appends to the same completion tail below.
+        const actBefore = result.newState.current_act;
+        result.newState = advanceActIfTriggered(
+          result.newState,
+          row.seed,
+          ctx,
+          completedQuestIds,
+          rewardNarrativeParts
+        );
+        // An act transition relocates the party (new region/room), so the
+        // choices takeAction already computed are stale — refresh them.
+        if (result.newState.current_act !== actBefore) {
+          result.newState.last_choices = generateChoices(result.newState, row.seed, ctx);
+          result.choices = result.newState.last_choices;
         }
         if (completedQuestIds.length) {
           const completionTail = rewardNarrativeParts.join(' ');

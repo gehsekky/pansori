@@ -9,6 +9,7 @@
 export * from './shared-types.js';
 import type {
   AbilityKey,
+  Act,
   Background,
   CampaignTheme,
   CombatEntity,
@@ -1783,6 +1784,10 @@ export interface GameState {
   // `current_room` (above) is the active local room. `current_region_id` /
   // `current_town_id` scope the regional / town grids.
   map_level?: MapLevel;
+  // Which act the playthrough is in (campaign.acts[].id). Session-local position,
+  // like marker_pos — set to acts[0] at init, advanced when an act's trigger
+  // quest completes. Absent for legacy campaigns with no acts.
+  current_act?: string;
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;
@@ -1907,6 +1912,9 @@ export interface CampaignData {
   towns?: Town[];
   quests?: Quest[];
   factions?: Faction[];
+  // The campaign's acts (≥1), ordered. Act 1 (acts[0]) drives the starting
+  // placement; later acts are entered by completing their predecessor's trigger.
+  acts?: Act[];
   // Authoring hint: the campaign is balanced for this many PCs — and it's the
   // baseline for encounter scaling. A room's authored enemy COUNT is the right
   // fight at this size; `scaleRoomEnemiesByCount` grows/shrinks the count for

@@ -37,6 +37,7 @@ import type {
   GameState,
   GridPos,
   InventoryItem,
+  LootEffect,
   LootItem,
   NpcAttitude,
   NpcDialogueResponse,
@@ -137,7 +138,7 @@ import {
   equippedWeaponId,
 } from './equipment.js';
 import { fmt, pronounsForGender, stripForLlm } from './narrativeFmt.js';
-import { pickHookText, returnFromEncounter } from './mapEngine.js';
+import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
@@ -7177,6 +7178,123 @@ export function applyConsequence(
     default:
       return st;
   }
+}
+
+// ─── Loot effects + act transitions (acts ⊃ quests) ──────────────────────────
+
+// Apply a LootEffect — grant/revoke items to REQUIRED party members only,
+// resolved by name+class against campaign.requiredMembers (user-added members
+// are never targeted; we can't predict them). Grants reuse give_item's item
+// resolution; revokes pull one instance from the named member. An unresolvable
+// member or item is skipped. Shared by acts (start/end) and quests
+// (start/complete).
+export function applyLootEffect(
+  effect: LootEffect | undefined,
+  st: GameState,
+  seed: Seed,
+  context: Context,
+  narrativeParts: string[]
+): GameState {
+  if (!effect) return st;
+  const required = context.campaign?.requiredMembers ?? [];
+  const findMember = (name: string) =>
+    st.characters.find(
+      (c) =>
+        c.name === name && required.some((rm) => rm.name === c.name && rm.cls === c.character_class)
+    );
+  for (const g of effect.grant ?? []) {
+    const target = findMember(g.member);
+    if (target) {
+      st = applyConsequence(
+        { type: 'give_item', itemId: g.itemId, characterId: target.id },
+        st,
+        seed,
+        target.id,
+        narrativeParts,
+        context
+      );
+    }
+  }
+  for (const r of effect.revoke ?? []) {
+    const target = findMember(r.member);
+    if (!target) continue;
+    const idx = target.inventory.findIndex((i) => i.id === r.itemId);
+    if (idx < 0) continue;
+    const removed = target.inventory[idx];
+    st = {
+      ...st,
+      characters: st.characters.map((c) =>
+        c.id === target.id ? { ...c, inventory: c.inventory.filter((_, k) => k !== idx) } : c
+      ),
+    };
+    narrativeParts.push(`${target.name} hands over ${removed.name}.`);
+  }
+  return st;
+}
+
+// If a completed quest is the CURRENT act's advance trigger, move to the next
+// act: play onEnd + endEffect → relocate to the next act's region/coords → set
+// current_act → activate the next act's startActive quests (+ their startEffect)
+// → startEffect + onStart. No-op if there's no current act, no trigger match, or
+// it's already the last act.
+export function advanceActIfTriggered(
+  st: GameState,
+  seed: Seed,
+  context: Context,
+  completedQuestIds: string[],
+  narrativeParts: string[]
+): GameState {
+  const acts = context.campaign?.acts ?? [];
+  if (acts.length === 0) return st;
+  const curIdx = acts.findIndex((a) => a.id === (st.current_act ?? acts[0].id));
+  const cur = acts[curIdx];
+  if (!cur?.trigger || !completedQuestIds.includes(cur.trigger.questId)) return st;
+  const next = acts[curIdx + 1];
+  if (!next) return st; // final act — nothing to advance to
+
+  const endLine = pickHookText(cur.onEnd);
+  if (endLine) narrativeParts.push(`\n\n${endLine}`);
+  st = applyLootEffect(cur.endEffect, st, seed, context, narrativeParts);
+
+  // Relocate to the next act's starting region + coords (the region-gate patch).
+  const region = context.campaign?.regions?.find((r) => r.id === next.startingRegionId);
+  st = {
+    ...st,
+    current_act: next.id,
+    ...(region
+      ? {
+          map_level: 'regional' as const,
+          current_region_id: region.id,
+          marker_pos: next.startPos ?? region.startPos,
+          current_town_id: undefined,
+          current_room: '',
+          region_marker_pos: undefined,
+          visited_regions: Array.from(new Set([...(st.visited_regions ?? []), region.id])),
+        }
+      : {}),
+  };
+  if (region) st = revealRegional(context.campaign, st);
+
+  // Activate the next act's startActive quests (and fire their startEffect).
+  for (const q of (context.campaign?.quests ?? []).filter(
+    (q) => q.actId === next.id && q.startActive
+  )) {
+    if (!(st.quest_progress ?? []).some((p) => p.questId === q.id)) {
+      st = {
+        ...st,
+        quest_progress: [
+          ...(st.quest_progress ?? []),
+          { questId: q.id, status: 'active', completedSteps: [] },
+        ],
+      };
+      st = applyLootEffect(q.startEffect, st, seed, context, narrativeParts);
+    }
+  }
+
+  st = applyLootEffect(next.startEffect, st, seed, context, narrativeParts);
+  const startLine = pickHookText(next.onStart);
+  narrativeParts.push(`\n\n✦ ${next.name}.${startLine ? ` ${startLine}` : ''}`);
+  return st;
 }
 
 // ─── Enemy turn auto-resolve (with reaction-window support) ───────────────────
