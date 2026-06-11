@@ -1891,6 +1891,11 @@ const RecommendedPartySchema = z
     size: z.number().int().min(1).max(8),
     composition: z.array(CLASS_ID).max(8),
     requiredMembers: z.array(RequiredMemberSchema).max(8).optional(),
+    // The level every PC is built at when a new game starts (default 1). The
+    // creation flow applies levels 2..N via the normal level-up machinery
+    // (HP/slots/subclass/features) and scales the caster spell loadout. Lets a
+    // campaign open its party at, e.g., L3 to match its encounter tier.
+    startingLevel: z.number().int().min(1).max(20).optional(),
   })
   .strict();
 

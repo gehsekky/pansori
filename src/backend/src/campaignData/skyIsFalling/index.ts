@@ -54,6 +54,10 @@ const RECOMMENDED_PARTY = {
     { name: 'Cassian Althion', cls: 'Fighter' },
     { name: 'Julian Sterling', cls: 'Wizard' },
   ],
+  // Act I is balanced for L3 (STORY.md Part 8 level curve). The party is built
+  // straight to L3 at creation — HP/slots/subclass + a level-3 caster loadout —
+  // instead of starting L1 against L3-tier encounters.
+  startingLevel: 3,
 };
 
 // The DB sections this campaign overlays onto the SRD base template, applied in

@@ -124,6 +124,9 @@ export interface FrontendContext {
   recommendedComposition?: string[];
   // Fixed party members (name + class) auto-populated + locked at creation.
   requiredMembers?: { name: string; cls: string }[];
+  // The level the party is built at on a new game (default 1). Drives the
+  // creation flow's level-up + spell scaling; surfaced so the UI can show it.
+  recommendedStartingLevel?: number;
 }
 
 // ─── Character (per-character state) ─────────────────────────────────────────

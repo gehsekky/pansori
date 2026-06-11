@@ -1045,6 +1045,87 @@ export function casterSpellOptions(
   };
 }
 
+// The class's eligible spell ids grouped by spell level (0..maxLevel), for
+// building a level-appropriate loadout above L1. `casterSpellOptions` is the
+// L1-only special case (cantrips + l1); this generalizes it so a campaign that
+// starts the party above L1 can offer (or auto-fill) higher-level spells.
+export function casterSpellOptionsByLevel(
+  cls: string,
+  spellTable: Record<string, Spell>,
+  maxLevel: number
+): Record<number, string[]> {
+  const lists = CLASS_SPELL_LISTS[cls.toLowerCase()] ?? [];
+  const byLevel: Record<number, string[]> = {};
+  if (lists.length === 0) return byLevel;
+  const onList = (s: Spell) => (s.spellList ?? []).some((l) => lists.includes(l));
+  const byName = (a: Spell, b: Spell) => a.name.localeCompare(b.name);
+  const all = Object.values(spellTable).filter(onList).sort(byName);
+  for (let lvl = 0; lvl <= maxLevel; lvl++) {
+    byLevel[lvl] = all.filter((s) => s.level === lvl).map((s) => s.id);
+  }
+  return byLevel;
+}
+
+// The highest spell level a (full or known) caster can cast at a class level —
+// SRD: 1st at L1, 2nd at L3, 3rd at L5, … = ceil(level/2), capped at 9. (Bounds
+// the creation spell loadout; half-caster nuance is deferred — the recommended
+// parties are full/prepared casters.)
+export function maxSpellLevelForLevel(level: number): number {
+  return Math.min(9, Math.max(1, Math.ceil(level / 2)));
+}
+
+// How many non-cantrip spells a caster's "known" pool (a Wizard's spellbook; a
+// Sorcerer/Bard/Warlock's spells-known) should hold at a class level. Prepared
+// full-list casters (Cleric/Druid/Paladin/Ranger) prepare from the whole list
+// and aren't gated by a known pool, so they return null (no top-up needed).
+export function knownSpellTargetForLevel(cls: string, level: number): number | null {
+  const c = cls.toLowerCase();
+  switch (c) {
+    case 'wizard':
+      return 6 + 2 * (level - 1); // spellbook: 6 at L1, +2 per level after
+    case 'bard':
+      return 3 + level; // known: 4 at L1 → +1/level
+    case 'sorcerer':
+    case 'warlock':
+      return 1 + level; // known: 2 at L1 → +1/level
+    default:
+      return null; // Cleric/Druid/Paladin/Ranger: prepared from list (no known gate)
+  }
+}
+
+// Scale a created caster's known/spellbook pool to a starting level so it can
+// actually cast at that level. Prepared full-list casters (Cleric/Druid) prepare
+// from the whole list (preparedSpellsCap already scales with level), so they
+// need no top-up — only Wizard (spellbook) and the known casters
+// (Sorcerer/Bard/Warlock) do. Fills from the highest available spell level down,
+// so the pool gains castable higher-level options (a Wizard built at L3 gets L2
+// spells in its book). Mutates `char.spells_known`. A simple auto-fill; the
+// creation UI's per-level picker (a follow-up) will let players choose precisely.
+export function expandCasterSpellsForLevel(
+  char: Character,
+  level: number,
+  spellTable: Record<string, Spell>
+): void {
+  if (level <= 1) return;
+  const target = knownSpellTargetForLevel(char.character_class, level);
+  if (target === null) return; // non-caster, half-caster, or prepared-from-list
+  const maxLvl = maxSpellLevelForLevel(level);
+  const byLevel = casterSpellOptionsByLevel(char.character_class, spellTable, maxLvl);
+  const cantrips = new Set(byLevel[0] ?? []);
+  const known = new Set(char.spells_known ?? []);
+  // Only non-cantrip spells count toward the known/spellbook target.
+  let pool = (char.spells_known ?? []).filter((id) => !cantrips.has(id)).length;
+  for (let lvl = maxLvl; lvl >= 1 && pool < target; lvl--) {
+    for (const id of byLevel[lvl] ?? []) {
+      if (pool >= target) break;
+      if (known.has(id)) continue;
+      known.add(id);
+      pool++;
+    }
+  }
+  char.spells_known = Array.from(known);
+}
+
 /**
  * Multiclass spell-casting ability resolver (SRD).
  *

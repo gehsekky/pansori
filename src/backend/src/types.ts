@@ -1935,6 +1935,10 @@ export interface CampaignData {
   // locked — the player edits their stats but can't rename, reclass, or remove
   // them. A subset of `recommendedPartySize`; the player fills the rest.
   requiredMembers?: { name: string; cls: string }[];
+  // The level every PC is built at on a new game (default 1 when unset). The
+  // creation flow applies levels 2..N (HP/slots/subclass/features) and scales
+  // the caster spell loadout, so a campaign can open at its encounter tier.
+  recommendedStartingLevel?: number;
 }
 
 export type TieredNarrative = string[] | Record<string, string[]>;

@@ -52,11 +52,13 @@ import {
 import {
   advanceActIfTriggered,
   applyConsequence,
+  applyLevelUpForClass,
   applyLootEffect,
   backfillOwnership,
   generateChoices,
   normalizeState,
   takeAction,
+  xpForLevel,
 } from '../services/gameEngine.js';
 import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
 import {
@@ -73,6 +75,7 @@ import { broadcastParticipantChange, broadcastSessionState } from '../services/b
 import {
   casterSpellOptions,
   classSpellListTag,
+  expandCasterSpellsForLevel,
   expertiseSlotsForClassLevel,
   resolveCreationExpertise,
 } from '../services/multiclass.js';
@@ -353,6 +356,7 @@ gameRouter.get('/contexts', async (req, res) => {
         recommendedPartySize: c.campaign?.recommendedPartySize,
         recommendedComposition: c.campaign?.recommendedComposition,
         requiredMembers: c.campaign?.requiredMembers,
+        recommendedStartingLevel: c.campaign?.recommendedStartingLevel,
       };
     });
   res.json(list);
@@ -707,17 +711,30 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
       // is consumed because origin feats don't compete with ASI slots.
       // Magic Initiate variants need `feat_choices` from the FE picker
       // — without choices the feat applies a no-op narrative.
+      let finalChar = builtChar;
       if (bg?.originFeat) {
         const feat = ctx.featTable?.[bg.originFeat];
         if (feat) {
-          const { newChar } = applyFeatTake(builtChar, feat, {
+          finalChar = applyFeatTake(builtChar, feat, {
             cantripChoices: c.feat_choices?.cantripChoices,
             l1Choice: c.feat_choices?.l1Choice,
-          });
-          return newChar;
+          }).newChar;
         }
       }
-      return builtChar;
+      // Build the party at the campaign's starting level (default 1). Apply
+      // levels 2..N through the normal level-up machinery (rolled HP, recomputed
+      // slots, subclass auto-granted at L3, class features), then scale the
+      // caster's known/spellbook pool so an above-L1 caster can actually cast at
+      // its level. ASI/feat/mastery-at-creation (L4+) is a deferred follow-up.
+      const startLevel = Math.max(1, ctx.campaign?.recommendedStartingLevel ?? 1);
+      for (let lvl = (finalChar.level ?? 1) + 1; lvl <= startLevel; lvl++) {
+        applyLevelUpForClass(finalChar, finalChar.character_class, ctx);
+      }
+      if (startLevel > 1) {
+        finalChar.xp = xpForLevel(startLevel);
+        expandCasterSpellsForLevel(finalChar, startLevel, ctx.spellTable ?? {});
+      }
+      return finalChar;
     });
 
     const leader = partyChars[0];

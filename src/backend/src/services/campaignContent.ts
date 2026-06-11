@@ -2018,6 +2018,7 @@ async function loadOverlay(
           size?: number;
           composition?: string[];
           requiredMembers?: { name: string; cls: string }[];
+          startingLevel?: number;
         })
       : undefined;
   delete overlay.recommendedParty;
@@ -2081,6 +2082,9 @@ async function loadOverlay(
         : {}),
       ...(Array.isArray(recParty?.requiredMembers)
         ? { requiredMembers: recParty.requiredMembers }
+        : {}),
+      ...(typeof recParty?.startingLevel === 'number'
+        ? { recommendedStartingLevel: recParty.startingLevel }
         : {}),
       ...(dbQuests.length > 0 ? { quests: dbQuests } : {}),
       ...(dbFactions.length > 0 ? { factions: dbFactions } : {}),
