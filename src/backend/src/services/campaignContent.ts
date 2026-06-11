@@ -1702,12 +1702,13 @@ interface ActRow {
   advance_trigger: { questId: string; stepId?: string } | null;
   transitions: Act['transitions'] | null;
   ending: Act['ending'] | null;
+  suppresses_magic: Act['suppressesMagic'] | null;
 }
 
 export async function getCampaignActs(pool: Pool, campaignId: string): Promise<Act[]> {
   const { rows } = await pool.query<ActRow>(
     `SELECT id, name, starting_region_id, start_x, start_y, start_effect, end_effect,
-            advance_trigger, transitions, ending
+            advance_trigger, transitions, ending, suppresses_magic
        FROM campaign_acts WHERE campaign_id = $1 ORDER BY sort_order`,
     [campaignId]
   );
@@ -1724,6 +1725,7 @@ export async function getCampaignActs(pool: Pool, campaignId: string): Promise<A
     ...(r.advance_trigger !== null ? { trigger: r.advance_trigger } : {}),
     ...(r.transitions !== null ? { transitions: r.transitions } : {}),
     ...(r.ending !== null ? { ending: r.ending } : {}),
+    ...(r.suppresses_magic !== null ? { suppressesMagic: r.suppresses_magic } : {}),
   }));
 }
 
@@ -1752,8 +1754,8 @@ export async function putCampaignActs(
       await client.query(
         `INSERT INTO campaign_acts
            (campaign_id, id, sort_order, name, starting_region_id, start_x, start_y,
-            start_effect, end_effect, advance_trigger, transitions, ending)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb)`,
+            start_effect, end_effect, advance_trigger, transitions, ending, suppresses_magic)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb)`,
         [
           campaignId,
           a.id,
@@ -1767,6 +1769,7 @@ export async function putCampaignActs(
           a.trigger ? JSON.stringify(a.trigger) : null,
           a.transitions ? JSON.stringify(a.transitions) : null,
           a.ending ? JSON.stringify(a.ending) : null,
+          a.suppressesMagic ? JSON.stringify(a.suppressesMagic) : null,
         ]
       );
       await insertNarratives(client, campaignId, 'act', a.id, {

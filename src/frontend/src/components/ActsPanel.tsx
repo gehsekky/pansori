@@ -25,6 +25,7 @@ interface EditorAct {
   trigger?: { questId: string; stepId?: string };
   transitions?: { when: unknown; to: string }[];
   ending?: { outcome: string; text?: string };
+  suppressesMagic?: { maxLevel?: number };
   [key: string]: unknown;
 }
 
@@ -144,6 +145,16 @@ function ActsPanel({ campaignId }: { campaignId: string }) {
               outcome: a.ending.outcome.trim(),
               ...(a.ending.text?.trim() ? { text: a.ending.text.trim() } : {}),
             },
+          }
+        : {}),
+      // Act-scoped anti-magic — present (possibly with a maxLevel cap) only when
+      // the author flags the act as a dead-magic field.
+      ...(a.suppressesMagic
+        ? {
+            suppressesMagic:
+              typeof a.suppressesMagic.maxLevel === 'number'
+                ? { maxLevel: a.suppressesMagic.maxLevel }
+                : {},
           }
         : {}),
     }));
@@ -500,6 +511,53 @@ function ActsPanel({ campaignId }: { campaignId: string }) {
                     patch(i, { ending: { ...a.ending!, text: e.target.value || undefined } })
                   }
                 />
+              </div>
+            )}
+          </div>
+
+          {/* Act-scoped anti-magic — the whole act is a dead-magic field. */}
+          <div style={{ marginTop: 6 }}>
+            <label style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="checkbox"
+                aria-label={`Act ${i + 1} suppresses magic`}
+                checked={!!a.suppressesMagic}
+                onChange={(e) => patch(i, { suppressesMagic: e.target.checked ? {} : undefined })}
+              />
+              THIS ACT SUPPRESSES ALL MAGIC
+            </label>
+            {a.suppressesMagic && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
+                <label
+                  style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 4 }}
+                  htmlFor={`act-${i}-supcap`}
+                >
+                  cap at spell level
+                </label>
+                <select
+                  id={`act-${i}-supcap`}
+                  aria-label={`Act ${i + 1} suppression max level`}
+                  className={styles.formInp}
+                  style={{ cursor: 'pointer', width: 'auto' }}
+                  value={
+                    typeof a.suppressesMagic.maxLevel === 'number'
+                      ? String(a.suppressesMagic.maxLevel)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    patch(i, {
+                      suppressesMagic:
+                        e.target.value === '' ? {} : { maxLevel: Number(e.target.value) },
+                    })
+                  }
+                >
+                  <option value="">all levels (cantrips too)</option>
+                  {Array.from({ length: 10 }, (_, lvl) => (
+                    <option key={lvl} value={String(lvl)}>
+                      ≤ {lvl === 0 ? 'cantrips' : `level ${lvl}`}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>

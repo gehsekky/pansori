@@ -3037,8 +3037,18 @@ export function isSpellSuppressed(
   st: GameState,
   casterId: string,
   targetPos: GridPos | undefined,
-  spellLevel: number
+  spellLevel: number,
+  context?: Context
 ): { blocked: boolean; zoneName?: string } {
+  // Act-scoped anti-magic — the active act is a region-wide dead-magic field
+  // (an anti-magic occupation). Global, no geometry: every cast fizzles, in
+  // combat or out. `maxLevel` caps which slot levels are stopped (omitted = all,
+  // cantrips included). Checked first — it overrides any zone bookkeeping.
+  const act = context?.campaign?.acts?.find((a) => a.id === st.current_act);
+  if (act?.suppressesMagic) {
+    const cap = act.suppressesMagic.maxLevel;
+    if (cap === undefined || spellLevel <= cap) return { blocked: true, zoneName: act.name };
+  }
   const zones = (st.spell_zones ?? []).filter(
     (z) => z.suppressesMagic && z.roomId === st.current_room
   );
@@ -8775,9 +8785,10 @@ async function attemptEnemySpellCast(args: {
   if (!spell?.damage && !spell?.condition) return { kind: 'no-cast' };
 
   // SRD anti-magic suppression — an enemy spell crossing an Antimagic Field /
-  // Globe of Invulnerability fizzles before it's cast.
+  // Globe of Invulnerability (or cast within an act-scoped dead-magic field)
+  // fizzles before it's cast.
   const supTargetPos = st.entities?.find((e) => e.id === target.id && !e.isEnemy)?.pos;
-  if (isSpellSuppressed(st, enemyId, supTargetPos, spell.level).blocked) {
+  if (isSpellSuppressed(st, enemyId, supTargetPos, spell.level, context).blocked) {
     return { kind: 'no-cast' };
   }
 

@@ -134,6 +134,39 @@ describe('ActsPanel', () => {
     expect(payload[0].ending).toEqual({ outcome: 'Victory', text: 'The sky holds.' });
   });
 
+  it('loads an act-scoped anti-magic field with its level cap', async () => {
+    mocked.getCampaignSection.mockImplementation(
+      loader([
+        {
+          id: 'act-1',
+          name: 'The Occupation',
+          startingRegionId: 'r1',
+          startPos: { x: 0, y: 0 },
+          suppressesMagic: { maxLevel: 5 },
+        },
+      ])
+    );
+    render(<ActsPanel campaignId="sandbox" />);
+    expect(
+      ((await screen.findByLabelText('Act 1 suppresses magic')) as HTMLInputElement).checked
+    ).toBe(true);
+    expect((screen.getByLabelText('Act 1 suppression max level') as HTMLSelectElement).value).toBe(
+      '5'
+    );
+  });
+
+  it('flags an act as a dead-magic field (all levels) and saves it', async () => {
+    mocked.getCampaignSection.mockImplementation(
+      loader([{ id: 'act-1', name: 'Act I', startingRegionId: 'r1', startPos: { x: 0, y: 0 } }])
+    );
+    render(<ActsPanel campaignId="sandbox" />);
+    fireEvent.click(await screen.findByLabelText('Act 1 suppresses magic'));
+    fireEvent.click(screen.getByTestId('save-acts-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const payload = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    expect(payload[0].suppressesMagic).toEqual({}); // no cap → all levels
+  });
+
   it('blocks save when an act has no starting region', async () => {
     mocked.getCampaignSection.mockImplementation(loader([]));
     render(<ActsPanel campaignId="sandbox" />);

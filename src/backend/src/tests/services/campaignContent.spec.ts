@@ -457,6 +457,7 @@ function makeContentDb(initial: {
         advance_trigger: parse(p[8]),
         transitions: parse(p[9]),
         ending: parse(p[10]),
+        suppresses_magic: parse(p[11]),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -2079,6 +2080,7 @@ describe('section CRUD + live refresh', () => {
         { when: { fact: 'flags', path: '$.war', operator: 'equal', value: true }, to: 'act-war' },
       ],
       ending: { outcome: 'War', text: 'The trail goes cold.' },
+      suppressesMagic: { maxLevel: 5 },
     };
     expect(await putCampaignSection(db.pool, 'demo_campaign', 'acts', [act])).toBe(true);
     const { present, value } = await getDbSection(db.pool, 'demo_campaign', 'acts');

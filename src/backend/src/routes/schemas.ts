@@ -1672,6 +1672,12 @@ const ActSchema = z
       .object({ outcome: z.string().min(1).max(120), text: z.string().max(4000).optional() })
       .strict()
       .optional(),
+    // Act-scoped anti-magic — the whole act is a dead-magic field. `maxLevel`
+    // (0-9) caps which spell levels fizzle; omitted = all (cantrips included).
+    suppressesMagic: z
+      .object({ maxLevel: z.number().int().min(0).max(9).optional() })
+      .strict()
+      .optional(),
   })
   .strict();
 

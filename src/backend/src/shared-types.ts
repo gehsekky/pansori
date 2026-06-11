@@ -1596,6 +1596,12 @@ export interface Act {
   // shows an ending screen; no further play). `outcome` is a short label, `text`
   // the closing narration.
   ending?: { outcome: string; text?: string };
+  // Act-scoped anti-magic — while this act is current, the WHOLE act is a
+  // region-wide dead-magic field: every spell cast (in combat or out) fizzles,
+  // no geometry. Models an anti-magic occupation. `maxLevel` caps which spell
+  // levels are stopped (omitted = all levels, cantrips included). Built on the
+  // same `isSpellSuppressed` chokepoint as Antimagic Field / Globe.
+  suppressesMagic?: { maxLevel?: number };
 }
 
 export interface QuestProgress {

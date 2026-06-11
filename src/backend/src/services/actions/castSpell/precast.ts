@@ -242,17 +242,20 @@ export function runPrecast(
     return { done: true };
   }
 
-  // SRD anti-magic suppression — Antimagic Field / Globe of Invulnerability. A
-  // spell that crosses such a zone fizzles before the slot is spent. Checked at
-  // the slot level (upcasts count toward Globe's cap). The suppression spells
-  // themselves still raise their zone normally (their own zone doesn't exist yet
-  // at cast time, so this never self-blocks).
-  if (ctx.st.combat_active) {
-    const targetId = (action as { targetEnemyId?: string }).targetEnemyId;
+  // SRD anti-magic suppression — Antimagic Field / Globe of Invulnerability (a
+  // combat zone), or an act-scoped dead-magic field (global, in combat OR out).
+  // A spell that crosses one fizzles before the slot is spent. Checked at the
+  // slot level (upcasts count toward Globe's cap). The zone-raising suppression
+  // spells don't self-block (their zone doesn't exist yet at cast time); an
+  // act-scoped field, however, smothers everything — including casting them.
+  {
+    const targetId = ctx.st.combat_active
+      ? (action as { targetEnemyId?: string }).targetEnemyId
+      : undefined;
     const targetPos = targetId
       ? ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.pos
       : undefined;
-    const sup = isSpellSuppressed(ctx.st, pc.char.id, targetPos, slotLevel);
+    const sup = isSpellSuppressed(ctx.st, pc.char.id, targetPos, slotLevel, ctx.context);
     if (sup.blocked) {
       ctx.narrative = `${spell.name} fizzles — ${sup.zoneName} suppresses the magic.`;
       return { done: true };

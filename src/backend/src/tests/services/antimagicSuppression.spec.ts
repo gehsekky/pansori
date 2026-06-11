@@ -3,7 +3,7 @@
 // fizzles; the cast pipeline (PC precast + enemy cast) reads it. Unit tests pin
 // the geometry/level rules; an integration test confirms a PC cast is blocked.
 
-import type { GameState, Seed, SpellZone } from '../../types.js';
+import type { Context, GameState, Seed, SpellZone } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isSpellSuppressed, takeAction } from '../../services/gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
@@ -79,6 +79,107 @@ describe('isSpellSuppressed — Antimagic Field (magic in or out, any level)', (
 
   it('does NOT block when both caster and target are outside', () => {
     expect(isSpellSuppressed(stWith(field, OUTSIDE), 'caster', OUTSIDE, 9).blocked).toBe(false);
+  });
+});
+
+// Act-scoped anti-magic — the active act is a region-wide dead-magic field
+// (an anti-magic occupation). Global: every cast fizzles regardless of geometry,
+// zones, or combat, keyed only on `current_act` matching a `suppressesMagic` act.
+describe('isSpellSuppressed — act-scoped dead-magic field', () => {
+  const actCtx = (suppressesMagic?: { maxLevel?: number }): Context =>
+    ({
+      campaign: {
+        acts: [{ id: 'occupation', name: 'The Sundered Weave', suppressesMagic }],
+      },
+    }) as unknown as Context;
+  // No zones, no entities — proves the check is geometry-free / combat-free.
+  const stInAct = (act = 'occupation') => ({ current_act: act }) as unknown as GameState;
+
+  it('blocks any cast while a suppressesMagic act is current (no geometry needed)', () => {
+    const r = isSpellSuppressed(stInAct(), 'caster', undefined, 3, actCtx({}));
+    expect(r.blocked).toBe(true);
+    expect(r.zoneName).toBe('The Sundered Weave');
+  });
+
+  it('blocks cantrips (level 0) when no maxLevel cap is set', () => {
+    expect(isSpellSuppressed(stInAct(), 'caster', undefined, 0, actCtx({})).blocked).toBe(true);
+  });
+
+  it('respects maxLevel — blocks ≤ cap, allows above', () => {
+    const c = actCtx({ maxLevel: 3 });
+    expect(isSpellSuppressed(stInAct(), 'caster', undefined, 3, c).blocked).toBe(true);
+    expect(isSpellSuppressed(stInAct(), 'caster', undefined, 4, c).blocked).toBe(false);
+  });
+
+  it('does NOT suppress when the suppressing act is not the current act', () => {
+    expect(
+      isSpellSuppressed(stInAct('some-other-act'), 'caster', undefined, 1, actCtx({})).blocked
+    ).toBe(false);
+  });
+
+  it('does NOT suppress without a context (the active act is unknown)', () => {
+    expect(isSpellSuppressed(stInAct(), 'caster', undefined, 1).blocked).toBe(false);
+  });
+});
+
+describe('act-scoped anti-magic — PC cast is blocked OUT of combat', () => {
+  const seed: Seed = {
+    context_id: ctx.id,
+    world_name: 'AM Test',
+    ship_name: 'AM Test',
+    intro: '',
+    seed_id: 'am-act',
+    rooms: [{ id: 'entry_hall', name: 'Start', desc: '' }],
+    enemies: {},
+    loot: {},
+    npcs: {},
+  };
+  // ctx + an act that smothers all magic, marked current.
+  const occCtx = {
+    ...ctx,
+    campaign: {
+      ...ctx.campaign,
+      acts: [
+        {
+          id: 'occupation',
+          name: 'The Sundered Weave',
+          startingRegionId: 'r1',
+          startPos: { x: 0, y: 0 },
+          suppressesMagic: {},
+        },
+      ],
+    },
+  } as unknown as Context;
+
+  it('a utility self-buff (Mage Armor) cast out of combat fizzles, slot not spent', async () => {
+    const wiz = makeChar({
+      id: 'pc-1',
+      character_class: 'Wizard',
+      level: 5,
+      int: 18,
+      hp: 30,
+      max_hp: 30,
+      spells_known: ['mage_armor'],
+      prepared_spells: ['mage_armor'],
+      spell_slots_max: { 1: 2 },
+      spell_slots_used: {},
+    });
+    const state = {
+      ...makeState({ id: 'pc-1' }, { current_room: 'entry_hall', combat_active: false }),
+      current_act: 'occupation',
+      characters: [wiz],
+      active_character_id: 'pc-1',
+    } as unknown as GameState;
+    const r = await takeAction({
+      action: { type: 'cast_spell', spellId: 'mage_armor', slotLevel: 1 },
+      history: [],
+      state,
+      seed,
+      context: occCtx,
+    });
+    expect(r.narrative.toLowerCase()).toContain('suppress');
+    expect(r.newState.characters[0].spell_slots_used?.[1] ?? 0).toBe(0);
+    expect(r.newState.characters[0].mage_armor_active ?? false).toBe(false);
   });
 });
 
