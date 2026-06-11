@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import QuestsPanel from './QuestsPanel';
 import React from 'react';
 
@@ -135,5 +135,47 @@ describe('QuestsPanel', () => {
     const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
     expect(saved[0].factionId).toBe('millers');
     expect(saved[0].repGain).toBe(10);
+  });
+
+  it('assigns a quest to an act and saves a complete-loot revoke', async () => {
+    mocked.getItemCatalog.mockResolvedValue([{ id: 'guild_ledger', name: 'Guild Ledger' }]);
+    mocked.getCampaignSection.mockImplementation(async (_cid: string, section: string) => {
+      if (section === 'quests') return { section, source: 'db', value: [QUEST] };
+      if (section === 'acts')
+        return { section, source: 'db', value: [{ id: 'act-2', name: 'Act II' }] };
+      if (section === 'recommendedParty')
+        return {
+          section,
+          source: 'db',
+          value: { requiredMembers: [{ name: 'Roland', cls: 'Fighter' }] },
+        };
+      if (section === 'rooms')
+        return {
+          section,
+          source: 'db',
+          value: [{ id: 'acorn-cellar', name: 'Cellar', npcs: [{ id: 'old-hob' }] }],
+        };
+      return { section, source: 'db', value: [] };
+    });
+    render(<QuestsPanel campaignId="sandbox" />);
+    await screen.findByTestId('quest-open-0');
+    fireEvent.click(screen.getByTestId('quest-open-0'));
+    fireEvent.change(screen.getByLabelText('Quest 1 act'), { target: { value: 'act-2' } });
+    // The COMPLETE-loot editor is the second on the card; add a revoke row.
+    const completeLoot = screen.getAllByTestId('loot-effect-editor')[1];
+    fireEvent.click(within(completeLoot).getByText('+ revoke'));
+    fireEvent.change(within(completeLoot).getByLabelText('revoke 1 item'), {
+      target: { value: 'guild_ledger' },
+    });
+    fireEvent.change(within(completeLoot).getByLabelText('revoke 1 member'), {
+      target: { value: 'Roland' },
+    });
+    fireEvent.click(screen.getByTestId('save-quests-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const saved = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    expect(saved[0].actId).toBe('act-2');
+    expect(saved[0].completeEffect).toEqual({
+      revoke: [{ itemId: 'guild_ledger', member: 'Roland' }],
+    });
   });
 });

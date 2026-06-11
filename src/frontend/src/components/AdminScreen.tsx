@@ -7,6 +7,7 @@ import {
   api,
 } from '../lib/api.ts';
 import { useCallback, useEffect, useState } from 'react';
+import ActsPanel from './ActsPanel.tsx';
 import Breadcrumb from './Breadcrumb.tsx';
 import CampaignContentEditor from './CampaignContentEditor.tsx';
 import FactionsPanel from './FactionsPanel.tsx';
@@ -726,6 +727,7 @@ function AdminScreen({
         {/* ── Story content: quests + factions (structured section panels;
             dialogue references both — start_quest effects, tier gates). ── */}
         {selected && <RecommendedPartyPanel campaignId={selected.id} />}
+        {selected && <ActsPanel campaignId={selected.id} />}
         {selected && <QuestsPanel campaignId={selected.id} />}
         {selected && <FactionsPanel campaignId={selected.id} />}
 

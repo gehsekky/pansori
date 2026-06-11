@@ -4,6 +4,7 @@ import {
   EffectList,
   type RowPickers,
 } from './conditionEffectRows.tsx';
+import LootEffectEditor, { type LootEffectValue, cleanLootEffect } from './LootEffectEditor.tsx';
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api.ts';
 import styles from '../styles.module.css';
@@ -35,6 +36,9 @@ interface EditorQuest {
   factionId?: string;
   repGain?: number;
   startActive?: boolean;
+  actId?: string;
+  startEffect?: LootEffectValue;
+  completeEffect?: LootEffectValue;
   [key: string]: unknown;
 }
 
@@ -62,6 +66,8 @@ function QuestsPanel({ campaignId }: { campaignId: string }) {
   const [rooms, setRooms] = useState<Array<{ id: string; name: string }>>([]);
   const [towns, setTowns] = useState<Array<{ id: string; name: string }>>([]);
   const [npcIds, setNpcIds] = useState<string[]>([]);
+  const [actList, setActList] = useState<Array<{ id: string; name: string }>>([]);
+  const [members, setMembers] = useState<string[]>([]);
 
   useEffect(() => {
     setQuests(null);
@@ -115,6 +121,24 @@ function QuestsPanel({ campaignId }: { campaignId: string }) {
         setTowns(list.map((t) => ({ id: t.id, name: t.name })));
       })
       .catch(() => setTowns([]));
+    // Acts (the act a quest belongs to) + required members (loot-effect targets).
+    api
+      .getCampaignSection(campaignId, 'acts')
+      .then((s) => {
+        const list = Array.isArray(s.value) ? (s.value as Array<{ id: string; name: string }>) : [];
+        setActList(list.map((a) => ({ id: a.id, name: a.name })));
+      })
+      .catch(() => setActList([]));
+    api
+      .getCampaignSection(campaignId, 'recommendedParty')
+      .then((s) => {
+        const rm =
+          s.value && typeof s.value === 'object' && !Array.isArray(s.value)
+            ? (s.value as { requiredMembers?: Array<{ name?: unknown }> }).requiredMembers
+            : undefined;
+        setMembers((rm ?? []).map((m) => String(m.name ?? '')).filter(Boolean));
+      })
+      .catch(() => setMembers([]));
     Promise.all([
       api.getItemCatalog().catch(() => []),
       api.getCampaignSection(campaignId, 'customItems').catch(() => ({ value: null })),
@@ -177,6 +201,9 @@ function QuestsPanel({ campaignId }: { campaignId: string }) {
       title: q.title.trim(),
       desc: q.desc.trim(),
       steps: q.steps.map((s) => ({ ...s, desc: s.desc.trim() })),
+      // Drop blank loot rows (undefined ⇒ key omitted on serialize).
+      startEffect: cleanLootEffect(q.startEffect),
+      completeEffect: cleanLootEffect(q.completeEffect),
     }));
     try {
       await api.putCampaignSection(campaignId, 'quests', cleaned);
@@ -335,6 +362,26 @@ function QuestsPanel({ campaignId }: { campaignId: string }) {
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
+                  <label className={styles.formLbl} htmlFor={`quest-act-${i}`}>
+                    ACT
+                  </label>
+                  <select
+                    id={`quest-act-${i}`}
+                    aria-label={`Quest ${i + 1} act`}
+                    className={styles.formInp}
+                    style={{ cursor: 'pointer', width: 'auto' }}
+                    value={q.actId ?? ''}
+                    onChange={(ev) => patchQuest(i, { actId: ev.target.value || undefined })}
+                  >
+                    <option value="">— ACT 1 (default) —</option>
+                    {actList.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className={styles.formLbl} htmlFor={`quest-giver-${i}`}>
                     GIVER NPC
                   </label>
@@ -481,6 +528,25 @@ function QuestsPanel({ campaignId }: { campaignId: string }) {
                 max={8}
                 onChange={(rewards) => patchQuest(i, { rewards })}
               />
+
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: 6 }}>
+                <div style={{ flex: '1 1 240px' }}>
+                  <p style={lbl}>START LOOT (required members)</p>
+                  <LootEffectEditor
+                    value={q.startEffect ?? {}}
+                    members={members}
+                    onChange={(v) => patchQuest(i, { startEffect: v })}
+                  />
+                </div>
+                <div style={{ flex: '1 1 240px' }}>
+                  <p style={lbl}>COMPLETE LOOT (required members)</p>
+                  <LootEffectEditor
+                    value={q.completeEffect ?? {}}
+                    members={members}
+                    onChange={(v) => patchQuest(i, { completeEffect: v })}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
