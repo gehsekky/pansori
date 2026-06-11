@@ -3321,17 +3321,26 @@ export function buildInitiativeOrder(
 //      combat-end revival lives in endCombatState.) This self-heals saves that
 //      predate the mechanic, and is a safety net for any path that ended combat
 //      without reviving.
+// The "back on their feet at 1 HP" flourish for one or more revived members.
+function plotArmorNotice(names: string[]): string {
+  if (names.length === 0) return '';
+  const verb = names.length === 1 ? 'claws' : 'claw';
+  return `${names.join(' and ')} ${verb} back from the edge of death — bloodied, but breathing.`;
+}
+
 export function backfillRequiredPlotArmor(st: GameState, context: Context): GameState {
   const required = context.campaign?.requiredMembers ?? [];
   if (required.length === 0) return st;
   const isReq = (c: Character) =>
     required.some((rm) => rm.name === c.name && rm.cls === c.character_class);
   let changed = false;
+  const revivedNames: string[] = [];
   const characters = st.characters.map((c) => {
     const reqd = c.required || isReq(c);
     if (!reqd) return c;
     if (!st.combat_active && (c.dead || c.hp <= 0)) {
       changed = true;
+      revivedNames.push(c.name);
       return {
         ...c,
         required: true,
@@ -3349,7 +3358,12 @@ export function backfillRequiredPlotArmor(st: GameState, context: Context): Game
     }
     return c;
   });
-  return changed ? { ...st, characters } : st;
+  if (!changed) return st;
+  return {
+    ...st,
+    characters,
+    ...(revivedNames.length ? { revival_notice: plotArmorNotice(revivedNames) } : {}),
+  };
 }
 
 export function endCombatState(st: GameState): GameState {
@@ -3376,6 +3390,9 @@ export function endCombatState(st: GameState): GameState {
       : c
   );
   const anyRevived = revivedChars.some((c, i) => c !== collapsed.characters[i]);
+  const revivedNames = collapsed.characters
+    .filter((c) => c.required && (c.dead || c.hp <= 0))
+    .map((c) => c.name);
   // Gate the return to exploration behind a "Continue" choice instead of
   // auto-switching the view the instant combat resolves — but only when the
   // party survived (an all-dead party goes to the game-over screen, not a
@@ -3410,6 +3427,10 @@ export function endCombatState(st: GameState): GameState {
     // fight so a non-concentration zone (Guardian of Faith) can't leak into the
     // next encounter. Concentration zones are already dropped by breakConcentration.
     spell_zones: [],
+    // Plot-armor flourish — folded into the action narrative by takeAction.
+    ...(revivedNames.length
+      ? { revival_notice: plotArmorNotice(revivedNames) }
+      : { revival_notice: collapsed.revival_notice }),
     characters: revivedChars.map((c) => ({
       ...c,
       turn_actions: { ...FRESH_TURN },
@@ -10576,6 +10597,11 @@ export async function takeAction({
           if (livingAfterDeath.length > 0) {
             st.active_character_id = livingAfterDeath[0].id;
           }
+          // Fold in the plot-armor flourish if the rescue above revived someone.
+          if (st.revival_notice) {
+            narrative = `${narrative} ${st.revival_notice}`.trim();
+            st = { ...st, revival_notice: undefined };
+          }
           st.last_choices = generateChoices(st, seed, context);
           return {
             narrative,
@@ -11241,12 +11267,20 @@ export async function takeAction({
   // one rendered into the next round's prompts.
   st = processBossPhaseTransitions(st, seed);
 
+  // Fold the plot-armor revival flourish into this action's narrative (and clear
+  // the transient marker) so the player sees "…claws back from the edge of death"
+  // right after the combat that ended, or after the action that self-healed them.
+  const narrativeOut = st.revival_notice
+    ? `${finalNarrative} ${st.revival_notice}`.trim()
+    : finalNarrative;
+  if (st.revival_notice) st = { ...st, revival_notice: undefined };
+
   const roomChanged = st.current_room !== state.current_room;
   st.run_log = [
     ...(st.run_log || []),
-    { character_id: char.id, action: action.type, narrative: finalNarrative },
+    { character_id: char.id, action: action.type, narrative: narrativeOut },
   ];
-  st.room_log = roomChanged ? [finalNarrative] : [...(st.room_log ?? []), finalNarrative];
+  st.room_log = roomChanged ? [narrativeOut] : [...(st.room_log ?? []), narrativeOut];
 
   // Record the action's seenKey (if any) so the FE can dim repeat
   // presentations of the same choice. Computed against the pre-action
@@ -11267,7 +11301,7 @@ export async function takeAction({
   const allDead = st.characters.every((c) => c.dead);
 
   return {
-    narrative: finalNarrative,
+    narrative: narrativeOut,
     choices: st.last_choices,
     newState: st,
     // The seed is normally immutable, but a few actions mutate it in place

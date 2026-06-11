@@ -22,9 +22,10 @@ import type { CampaignRoomNpc } from '../../services/campaignContent.js';
 export const VARGIS: CampaignRoomNpc = {
   id: 'npc_vargis',
   name: 'Commander Vargis',
-  attitude: 'indifferent',
+  // Friendly so talking opens straight on the greeting (no CHA gate) — he WANTS
+  // the Gavel's help. His wariness lives in the dialogue, not a dice wall.
+  attitude: 'friendly',
   icon: 'orc-head',
-  persuasionDC: 14,
   hp: 52,
   ac: 18,
   damage: '1d8+3',
@@ -97,9 +98,9 @@ export const VARGIS: CampaignRoomNpc = {
 export const VANE: CampaignRoomNpc = {
   id: 'npc_vane',
   name: 'Commander Lucian Vane',
-  attitude: 'indifferent', // a cold aristocrat — talkable, but the greeting drips contempt
+  // Friendly = no CHA gate to open dialogue; his contempt is all in the prose.
+  attitude: 'friendly',
   icon: 'knight-helmet',
-  persuasionDC: 15,
   hp: 52,
   ac: 18,
   damage: '1d8+3',
@@ -155,9 +156,10 @@ export const LORIEN: CampaignRoomNpc = {
   id: 'npc_lorien',
   name: 'Lorien',
   proper_noun: true,
-  attitude: 'indifferent',
+  // Friendly = talkable without a CHA gate; his distrust is in the lines (and a
+  // failed Deception on `pry_intel` still sours him to hostile).
+  attitude: 'friendly',
   icon: 'hood',
-  persuasionDC: 13,
   hp: 27,
   ac: 14,
   damage: '1d6+2',
@@ -206,6 +208,7 @@ export const LORIEN: CampaignRoomNpc = {
       label: 'Ask if there’s work — goodwill is currency too.',
       say: 'We could use a friend in this swamp, Lorien. Anything you need quietly done?',
       condition: { fact: 'flags', path: '$.found_crate', operator: 'notEqual', value: true },
+      once: true,
       reply:
         '"A rival ‘misplaced’ a crate of mine here in the den — back behind the ' +
         'brine barrels. Fetch it before he does and I’ll remember it. I’m a ' +
@@ -337,6 +340,7 @@ export const DOCKHAND: CampaignRoomNpc = {
       id: 'lost_locket',
       label: 'Hear him out.',
       say: 'We’re headed that way. What is it?',
+      once: true,
       reply:
         '"My mother’s locket went off the causeway when the planks gave. Silver, ' +
         'a heron on the front. If you spot it in the muck… it’s all I’ve left of ' +
@@ -378,6 +382,7 @@ export const LOGGER_WIFE: CampaignRoomNpc = {
       id: 'missing_logger',
       label: 'Promise to learn her husband’s fate.',
       say: 'We’ll find out what happened to him. You have my word.',
+      once: true,
       reply:
         '"His name is Tomas. He carved a heron into the haft of his axe — like the ' +
         'one on Pell’s locket; they were close." Her voice steadies. "Bring me the ' +

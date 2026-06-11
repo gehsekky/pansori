@@ -1861,6 +1861,10 @@ export interface GameState {
   // interact_object, accept_quest, etc.). Resets only on a new adventure.
   // See generateChoices / seenKeyForAction for the key construction.
   seen_choices?: string[];
+  // Transient: a one-line flourish for a plot-armored required member that was
+  // just revived (combat end / out-of-combat self-heal). Folded into the
+  // action's narrative and cleared on the same action. Never persists.
+  revival_notice?: string;
 }
 
 // ─── Script engine rules ──────────────────────────────────────────────────────

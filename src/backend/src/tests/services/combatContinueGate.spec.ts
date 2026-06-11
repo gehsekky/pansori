@@ -137,6 +137,26 @@ describe('continue action', () => {
 // but is revived to 1 HP when combat ends, and a party that still holds one is
 // never permanently wiped.
 describe('endCombatState — required-member plot armor', () => {
+  it('sets a revival_notice naming the revived member (folded into the action narrative)', () => {
+    const after = endCombatState(
+      inCombat({
+        characters: [
+          makeChar({
+            id: 'req',
+            name: 'Cassian Althion',
+            hp: 0,
+            max_hp: 20,
+            dead: true,
+            required: true,
+          }),
+          makeChar({ id: 'pc-2', hp: 6, max_hp: 12 }),
+        ],
+      })
+    );
+    expect(after.revival_notice).toContain('Cassian Althion');
+    expect(after.revival_notice).toMatch(/breathing/i);
+  });
+
   it('revives a fallen required member to 1 HP at combat end; non-required stay dead', () => {
     const after = endCombatState(
       inCombat({
