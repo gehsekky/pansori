@@ -1785,9 +1785,12 @@ export interface GameState {
   // `current_town_id` scope the regional / town grids.
   map_level?: MapLevel;
   // Which act the playthrough is in (campaign.acts[].id). Session-local position,
-  // like marker_pos — set to acts[0] at init, advanced when an act's trigger
-  // quest completes. Absent for legacy campaigns with no acts.
+  // like marker_pos — set to acts[0] at init, advanced when an act transition
+  // fires. Absent for legacy campaigns with no acts.
   current_act?: string;
+  // Set when the party enters an act with an `ending` — the campaign is resolved
+  // (the session goes terminal, like death/escape; the FE shows the outcome).
+  campaign_outcome?: { outcome: string; text?: string };
   current_region_id?: string;
   current_town_id?: string;
   marker_pos?: GridPos;

@@ -85,6 +85,7 @@ import {
   slotsForInstance,
   toggleWornItem,
 } from '../services/equipment.js';
+import { derivedProgressFacts, dialogueFacts } from '../services/dialogueGating.js';
 import { generateSeed, reconcileSeedWithContext } from '../services/procgen.js';
 import { initMapState, pickHookText, regionEnterNarration } from '../services/mapEngine.js';
 import { syncSetAbilities, wornAcBonus } from '../services/wornEffects.js';
@@ -92,7 +93,6 @@ import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
-import { derivedProgressFacts } from '../services/dialogueGating.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
@@ -1599,23 +1599,6 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
             rewardNarrativeParts
           );
         }
-        // Advance the act if a completed quest is the current act's trigger —
-        // relocates the party, fires act loot + onEnd/onStart, activates the
-        // next act's quests. Appends to the same completion tail below.
-        const actBefore = result.newState.current_act;
-        result.newState = advanceActIfTriggered(
-          result.newState,
-          row.seed,
-          ctx,
-          completedQuestIds,
-          rewardNarrativeParts
-        );
-        // An act transition relocates the party (new region/room), so the
-        // choices takeAction already computed are stale — refresh them.
-        if (result.newState.current_act !== actBefore) {
-          result.newState.last_choices = generateChoices(result.newState, row.seed, ctx);
-          result.choices = result.newState.last_choices;
-        }
         if (completedQuestIds.length) {
           const completionTail = rewardNarrativeParts.join(' ');
           result.narrative = (result.narrative ?? '') + completionTail;
@@ -1637,11 +1620,51 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
           result.newState = { ...result.newState, room_log: roomLog, run_log: runLog };
         }
       }
+      // Act transitions are evaluated EVERY action (not just on quest completion)
+      // so a timer/counter edge can fire with nothing completing. Facts are
+      // rebuilt from the post-action, post-completion state so a freshly-finished
+      // trigger quest is visible.
+      const actBefore = result.newState.current_act;
+      const actParts: string[] = [];
+      result.newState = advanceActIfTriggered(
+        result.newState,
+        row.seed,
+        ctx,
+        dialogueFacts(result.newState, ctx),
+        actParts
+      );
+      if (result.newState.current_act !== actBefore) {
+        // A transition relocates the party (or ends the campaign) — refresh the
+        // stale choices and surface the act narrative.
+        result.newState.last_choices = generateChoices(result.newState, row.seed, ctx);
+        result.choices = result.newState.last_choices;
+        if (actParts.length) {
+          const tail = actParts.join(' ');
+          result.narrative = (result.narrative ?? '') + tail;
+          const roomLog = result.newState.room_log ?? [];
+          if (roomLog.length) roomLog[roomLog.length - 1] = roomLog[roomLog.length - 1] + tail;
+          const runLog = result.newState.run_log ?? [];
+          if (runLog.length)
+            runLog[runLog.length - 1] = {
+              ...runLog[runLog.length - 1],
+              narrative: runLog[runLog.length - 1].narrative + tail,
+            };
+          result.newState = { ...result.newState, room_log: roomLog, run_log: runLog };
+        }
+      }
       const updatedCs = extractCampaignDelta(campaignState, result.newState);
       await saveCampaignState(pool, updatedCs);
     }
 
-    const newStatus = result.dead ? 'dead' : result.escaped ? 'escaped' : row.status;
+    // Entering a terminal act resolves the campaign — the session goes terminal
+    // (like death/escape), so no further actions are accepted.
+    const newStatus = result.newState.campaign_outcome
+      ? 'resolved'
+      : result.dead
+        ? 'dead'
+        : result.escaped
+          ? 'escaped'
+          : row.status;
     const nextTurnSeq = row.turn_seq + 1;
     // Persist the seed only when it actually changed (see seedBefore above) —
     // the seed holds the campaign content + maps and is large; rewriting it

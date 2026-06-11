@@ -22,7 +22,9 @@ import {
 } from './rulesEngine.js';
 import type {
   AbilityKey,
+  Act,
   BossPhase,
+  CampaignFacts,
   Character,
   ChoiceDirection,
   CombatEntity,
@@ -137,6 +139,7 @@ import {
   equippedShieldId,
   equippedWeaponId,
 } from './equipment.js';
+import { evalCondition, visibleResponses } from './dialogueGating.js';
 import { fmt, pronounsForGender, stripForLlm } from './narrativeFmt.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
@@ -149,7 +152,6 @@ import { factionShopPrice } from './campaignEngine.js';
 import { fillEnemyTokens } from './narrative/enemyName.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
-import { visibleResponses } from './dialogueGating.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -6988,6 +6990,13 @@ export function applyConsequence(
     case 'set_flag':
       return { ...st, flags: { ...st.flags, [c.key]: c.value } };
 
+    case 'adjust_flag': {
+      // Relative numeric change (campaign counters/meters); flag read as 0 when
+      // unset or non-numeric.
+      const cur = Number(st.flags?.[c.key] ?? 0);
+      return { ...st, flags: { ...st.flags, [c.key]: (Number.isFinite(cur) ? cur : 0) + c.delta } };
+    }
+
     case 'start_quest': {
       // Activate a quest from a script trigger (dialogue node, quest reward
       // chain). Idempotent: an existing progress entry — active, completed
@@ -7237,26 +7246,21 @@ export function applyLootEffect(
 // current_act → activate the next act's startActive quests (+ their startEffect)
 // → startEffect + onStart. No-op if there's no current act, no trigger match, or
 // it's already the last act.
-export function advanceActIfTriggered(
+// Enter `next` act from `prev`: onEnd + endEffect → relocate (region-gate patch)
+// → set current_act → activate next act's startActive quests (+ startEffect) →
+// startEffect + onStart; a terminal act (ending) resolves the campaign.
+function enterAct(
   st: GameState,
+  prev: Act,
+  next: Act,
   seed: Seed,
   context: Context,
-  completedQuestIds: string[],
   narrativeParts: string[]
 ): GameState {
-  const acts = context.campaign?.acts ?? [];
-  if (acts.length === 0) return st;
-  const curIdx = acts.findIndex((a) => a.id === (st.current_act ?? acts[0].id));
-  const cur = acts[curIdx];
-  if (!cur?.trigger || !completedQuestIds.includes(cur.trigger.questId)) return st;
-  const next = acts[curIdx + 1];
-  if (!next) return st; // final act — nothing to advance to
-
-  const endLine = pickHookText(cur.onEnd);
+  const endLine = pickHookText(prev.onEnd);
   if (endLine) narrativeParts.push(`\n\n${endLine}`);
-  st = applyLootEffect(cur.endEffect, st, seed, context, narrativeParts);
+  st = applyLootEffect(prev.endEffect, st, seed, context, narrativeParts);
 
-  // Relocate to the next act's starting region + coords (the region-gate patch).
   const region = context.campaign?.regions?.find((r) => r.id === next.startingRegionId);
   st = {
     ...st,
@@ -7275,7 +7279,6 @@ export function advanceActIfTriggered(
   };
   if (region) st = revealRegional(context.campaign, st);
 
-  // Activate the next act's startActive quests (and fire their startEffect).
   for (const q of (context.campaign?.quests ?? []).filter(
     (q) => q.actId === next.id && q.startActive
   )) {
@@ -7294,6 +7297,55 @@ export function advanceActIfTriggered(
   st = applyLootEffect(next.startEffect, st, seed, context, narrativeParts);
   const startLine = pickHookText(next.onStart);
   narrativeParts.push(`\n\n✦ ${next.name}.${startLine ? ` ${startLine}` : ''}`);
+
+  // Terminal act → resolve the campaign (the FE shows an ending screen).
+  if (next.ending) {
+    st = {
+      ...st,
+      campaign_outcome: {
+        outcome: next.ending.outcome,
+        ...(next.ending.text ? { text: next.ending.text } : {}),
+      },
+    };
+    if (next.ending.text) narrativeParts.push(`\n\n${next.ending.text}`);
+  }
+  return st;
+}
+
+// Evaluate the CURRENT act's transitions every action: the FIRST edge whose
+// `when` holds advances to its target act. The legacy `trigger` is folded in as
+// a final success edge (→ next act by order). No-op once the campaign is
+// resolved, or when nothing matches.
+export function advanceActIfTriggered(
+  st: GameState,
+  seed: Seed,
+  context: Context,
+  facts: CampaignFacts,
+  narrativeParts: string[]
+): GameState {
+  const acts = context.campaign?.acts ?? [];
+  if (acts.length === 0 || st.campaign_outcome) return st;
+  const curIdx = acts.findIndex((a) => a.id === (st.current_act ?? acts[0].id));
+  const cur = acts[curIdx];
+  if (!cur) return st;
+
+  const edges: Array<{ holds: boolean; to: string | undefined }> = (cur.transitions ?? []).map(
+    (t) => ({ holds: evalCondition(t.when, facts as unknown as Record<string, unknown>), to: t.to })
+  );
+  if (cur.trigger) {
+    const t = cur.trigger;
+    const holds = t.stepId
+      ? (facts.steps_done ?? []).includes(`${t.questId}:${t.stepId}`)
+      : (facts.quests_completed ?? []).includes(t.questId);
+    edges.push({ holds, to: acts[curIdx + 1]?.id });
+  }
+
+  for (const e of edges) {
+    if (!e.holds) continue;
+    const next = acts.find((a) => a.id === e.to);
+    if (!next || next.id === cur.id) continue; // unknown / self-loop → skip
+    return enterAct(st, cur, next, seed, context, narrativeParts);
+  }
   return st;
 }
 

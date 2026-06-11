@@ -269,6 +269,12 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
       add('region', `act "${a.id}"`, `startingRegionId → unknown region "${a.startingRegionId}"`);
     checkLootEffect(a.startEffect, `act "${a.id}" start loot`);
     checkLootEffect(a.endEffect, `act "${a.id}" end loot`);
+    // Branching edges: target act must exist; the `when` reuses the condition walker.
+    (a.transitions ?? []).forEach((t, ti) => {
+      if (t.to && !actIds.has(t.to))
+        add('act', `act "${a.id}" transition ${ti}`, `to → unknown act "${t.to}"`);
+      checkCondition(t.when, `act "${a.id}" transition ${ti} [when]`);
+    });
   }
 
   for (const r of rooms)

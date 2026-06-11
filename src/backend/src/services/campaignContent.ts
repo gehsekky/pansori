@@ -1700,11 +1700,14 @@ interface ActRow {
   start_effect: LootEffect | null;
   end_effect: LootEffect | null;
   advance_trigger: { questId: string; stepId?: string } | null;
+  transitions: Act['transitions'] | null;
+  ending: Act['ending'] | null;
 }
 
 export async function getCampaignActs(pool: Pool, campaignId: string): Promise<Act[]> {
   const { rows } = await pool.query<ActRow>(
-    `SELECT id, name, starting_region_id, start_x, start_y, start_effect, end_effect, advance_trigger
+    `SELECT id, name, starting_region_id, start_x, start_y, start_effect, end_effect,
+            advance_trigger, transitions, ending
        FROM campaign_acts WHERE campaign_id = $1 ORDER BY sort_order`,
     [campaignId]
   );
@@ -1719,6 +1722,8 @@ export async function getCampaignActs(pool: Pool, campaignId: string): Promise<A
     ...(r.start_effect !== null ? { startEffect: r.start_effect } : {}),
     ...(r.end_effect !== null ? { endEffect: r.end_effect } : {}),
     ...(r.advance_trigger !== null ? { trigger: r.advance_trigger } : {}),
+    ...(r.transitions !== null ? { transitions: r.transitions } : {}),
+    ...(r.ending !== null ? { ending: r.ending } : {}),
   }));
 }
 
@@ -1747,8 +1752,8 @@ export async function putCampaignActs(
       await client.query(
         `INSERT INTO campaign_acts
            (campaign_id, id, sort_order, name, starting_region_id, start_x, start_y,
-            start_effect, end_effect, advance_trigger)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb)`,
+            start_effect, end_effect, advance_trigger, transitions, ending)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb)`,
         [
           campaignId,
           a.id,
@@ -1760,6 +1765,8 @@ export async function putCampaignActs(
           a.startEffect ? JSON.stringify(a.startEffect) : null,
           a.endEffect ? JSON.stringify(a.endEffect) : null,
           a.trigger ? JSON.stringify(a.trigger) : null,
+          a.transitions ? JSON.stringify(a.transitions) : null,
+          a.ending ? JSON.stringify(a.ending) : null,
         ]
       );
       await insertNarratives(client, campaignId, 'act', a.id, {

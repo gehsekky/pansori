@@ -455,6 +455,8 @@ function makeContentDb(initial: {
         start_effect: parse(p[6]),
         end_effect: parse(p[7]),
         advance_trigger: parse(p[8]),
+        transitions: parse(p[9]),
+        ending: parse(p[10]),
       }));
       return { rows, rowCount: rows.length };
     }
@@ -2073,6 +2075,10 @@ describe('section CRUD + live refresh', () => {
       startEffect: { grant: [{ itemId: 'gate_key', member: 'Roland' }] },
       endEffect: { revoke: [{ itemId: 'gate_key', member: 'Roland' }] },
       trigger: { questId: 'q1' },
+      transitions: [
+        { when: { fact: 'flags', path: '$.war', operator: 'equal', value: true }, to: 'act-war' },
+      ],
+      ending: { outcome: 'War', text: 'The trail goes cold.' },
     };
     expect(await putCampaignSection(db.pool, 'demo_campaign', 'acts', [act])).toBe(true);
     const { present, value } = await getDbSection(db.pool, 'demo_campaign', 'acts');
@@ -2948,6 +2954,12 @@ describe('lintCampaign — cross-section reference lint', () => {
         startPos: { x: 0, y: 0 },
         trigger: { questId: 'ghost-quest' }, // dangling quest
         startEffect: { grant: [{ itemId: 'mystery_item', member: 'Nobody' }] }, // both dangling
+        transitions: [
+          {
+            when: { fact: 'flags', path: '$.x', operator: 'equal', value: true },
+            to: 'nowhere-act',
+          }, // dangling
+        ],
       },
     ]);
     const msgs = (await lintCampaign(db.pool, 'demo_campaign')).map(
@@ -2958,6 +2970,7 @@ describe('lintCampaign — cross-section reference lint', () => {
     expect(msgs).toContain('region:startingRegionId → unknown region "no-region"');
     expect(msgs).toContain('member:loot → unknown required member "Nobody"');
     expect(msgs).toContain('item:loot → unknown item "mystery_item"');
+    expect(msgs).toContain('act:to → unknown act "nowhere-act"');
   });
 
   it('flags a dangling dialogue goto (within an NPC tree)', async () => {

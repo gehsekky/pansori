@@ -1078,6 +1078,15 @@ const DialogueConsequenceSchema = z.discriminatedUnion('type', [
       value: ConditionScalarSchema,
     })
     .strict(),
+  // Relative numeric change to a flag (campaign counters/meters) — spend a time
+  // block (-1), raise friction (+1), tally a clue (+1). Read as 0 when unset.
+  z
+    .object({
+      type: z.literal('adjust_flag'),
+      key: z.string().min(1).max(60),
+      delta: z.number().int().min(-1000).max(1000),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('set_npc_attitude'),
@@ -1653,6 +1662,16 @@ const ActSchema = z
     startEffect: LootEffectSchema.optional(),
     endEffect: LootEffectSchema.optional(),
     trigger: z.object({ questId: SLUG, stepId: SLUG.optional() }).strict().optional(),
+    // Conditioned edges (the act graph): first matching `when` advances to `to`.
+    transitions: z
+      .array(z.object({ when: QuestConditionSchema, to: SLUG }).strict())
+      .max(12)
+      .optional(),
+    // Terminal act — entering it resolves the campaign with this outcome.
+    ending: z
+      .object({ outcome: z.string().min(1).max(120), text: z.string().max(4000).optional() })
+      .strict()
+      .optional(),
   })
   .strict();
 

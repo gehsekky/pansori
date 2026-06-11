@@ -1223,7 +1223,11 @@ export type GameConsequence =
   // member who carries it). Used for quest turn-ins like the Guild
   // Ledger — when the player hands over a quest item, it should leave
   // their pack.
-  | { type: 'consume_item'; itemId: string };
+  | { type: 'consume_item'; itemId: string }
+  // Relative numeric change to a flag (set_flag is absolute) — for campaign
+  // counters/meters: spend a time block (delta -1), raise friction (+1), etc.
+  // The flag is read as 0 when unset.
+  | { type: 'adjust_flag'; key: string; delta: number };
 
 // ─── Room objects + NPCs ─────────────────────────────────────────────
 
@@ -1579,10 +1583,19 @@ export interface Act {
   // Loot granted/revoked from required members on entering / leaving this act.
   startEffect?: LootEffect;
   endEffect?: LootEffect;
-  // The quest objective whose completion advances to the NEXT act. `questId`
-  // (whole-quest completion) is honored now; `stepId` is reserved for step-
-  // granularity later, no schema change.
+  // The quest objective whose completion advances to the NEXT act (by order).
+  // Sugar for a single success transition — `transitions` is the richer form.
+  // `questId` (whole-quest) honored now; `stepId` for step granularity.
   trigger?: { questId: string; stepId?: string };
+  // Conditioned transitions (the act graph): each action, the FIRST edge whose
+  // `when` holds fires — moving to act `to` (relocate + loot + hooks). Lets an
+  // act branch on success / failure / variants (e.g. a timer flag hitting 0 →
+  // a war-failure act). Evaluated alongside the legacy `trigger`.
+  transitions?: { when: object; to: string }[];
+  // A terminal act: entering it resolves the campaign with this outcome (the FE
+  // shows an ending screen; no further play). `outcome` is a short label, `text`
+  // the closing narration.
+  ending?: { outcome: string; text?: string };
 }
 
 export interface QuestProgress {
