@@ -3313,6 +3313,45 @@ export function buildInitiativeOrder(
   return entries;
 }
 
+// Plot armor maintenance for campaign-required members, run per action:
+//   1. Backfill `Character.required` (matched name+class against
+//      campaign.requiredMembers) for sessions created before the flag existed.
+//   2. Enforce the invariant that a required member is NEVER dead OUT of combat —
+//      revive any dead/downed one to 1 HP. (In combat they can fall; the
+//      combat-end revival lives in endCombatState.) This self-heals saves that
+//      predate the mechanic, and is a safety net for any path that ended combat
+//      without reviving.
+export function backfillRequiredPlotArmor(st: GameState, context: Context): GameState {
+  const required = context.campaign?.requiredMembers ?? [];
+  if (required.length === 0) return st;
+  const isReq = (c: Character) =>
+    required.some((rm) => rm.name === c.name && rm.cls === c.character_class);
+  let changed = false;
+  const characters = st.characters.map((c) => {
+    const reqd = c.required || isReq(c);
+    if (!reqd) return c;
+    if (!st.combat_active && (c.dead || c.hp <= 0)) {
+      changed = true;
+      return {
+        ...c,
+        required: true,
+        hp: 1,
+        dead: false,
+        stable: false,
+        death_saves: { successes: 0, failures: 0 },
+        died_at_round: undefined,
+        conditions: c.conditions.filter((cond) => cond !== 'unconscious'),
+      };
+    }
+    if (!c.required) {
+      changed = true;
+      return { ...c, required: true };
+    }
+    return c;
+  });
+  return changed ? { ...st, characters } : st;
+}
+
 export function endCombatState(st: GameState): GameState {
   // A wilderness encounter collapses straight back onto the map — march the
   // party to the cell they were travelling on and drop the transient encounter
@@ -10333,6 +10372,11 @@ export async function takeAction({
   context: Context;
 }) {
   void history;
+
+  // Plot armor upkeep: backfill `required` on pre-mechanic saves and revive any
+  // required member left dead while out of combat (they're never permanently
+  // lost). Runs before the action so a revived member can act this turn.
+  state = backfillRequiredPlotArmor(state, context);
 
   // Pre-action HP snapshot (per entity/character id) for the charm-break sweep:
   // any Charmed creature that loses HP this action has its charm end (SRD).

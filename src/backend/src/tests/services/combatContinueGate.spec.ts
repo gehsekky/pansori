@@ -3,9 +3,14 @@
 // shows a Continue prompt; generateChoices then offers ONLY Continue, and the
 // `continue` action clears the flag to restore the normal choices.
 
-import type { GameState, Seed } from '../../types.js';
+import type { Context, GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { endCombatState, generateChoices, takeAction } from '../../services/gameEngine.js';
+import {
+  backfillRequiredPlotArmor,
+  endCombatState,
+  generateChoices,
+  takeAction,
+} from '../../services/gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import { context as ctx } from '../fixtures/testContext.js';
 
@@ -200,5 +205,57 @@ describe('endCombatState — required-member plot armor', () => {
     );
     expect(after.combat_over_pending).toBeFalsy();
     expect(after.characters.every((c) => c.dead)).toBe(true);
+  });
+});
+
+// Backfill upkeep — stamps `required` on pre-mechanic saves and enforces the
+// "never dead out of combat" invariant (the per-action self-heal in takeAction).
+describe('backfillRequiredPlotArmor', () => {
+  const armorCtx = {
+    campaign: { requiredMembers: [{ name: 'Cassian Althion', cls: 'Fighter' }] },
+  } as unknown as Context;
+
+  const cassian = (over: Partial<ReturnType<typeof makeChar>> = {}) =>
+    makeChar({ id: 'cas', name: 'Cassian Althion', character_class: 'Fighter', ...over });
+
+  it('backfills the required flag for a matching pre-mechanic character', () => {
+    const st = { ...makeState({ id: 'cas' }), characters: [cassian()] } as GameState;
+    const after = backfillRequiredPlotArmor(st, armorCtx);
+    expect(after.characters[0].required).toBe(true);
+  });
+
+  it('revives a dead required member to 1 HP when OUT of combat', () => {
+    const st = {
+      ...makeState({ id: 'cas' }, { combat_active: false }),
+      characters: [
+        cassian({ hp: 0, max_hp: 23, dead: true, death_saves: { successes: 0, failures: 3 } }),
+      ],
+    } as GameState;
+    const after = backfillRequiredPlotArmor(st, armorCtx);
+    expect(after.characters[0].dead).toBe(false);
+    expect(after.characters[0].hp).toBe(1);
+    expect(after.characters[0].death_saves).toEqual({ successes: 0, failures: 0 });
+  });
+
+  it('does NOT revive a dead required member during combat (only flags them)', () => {
+    const st = {
+      ...makeState({ id: 'cas' }, { combat_active: true }),
+      characters: [cassian({ hp: 0, max_hp: 23, dead: true })],
+    } as GameState;
+    const after = backfillRequiredPlotArmor(st, armorCtx);
+    expect(after.characters[0].dead).toBe(true); // stays down mid-fight
+    expect(after.characters[0].required).toBe(true);
+  });
+
+  it('leaves non-required members untouched', () => {
+    const st = {
+      ...makeState({ id: 'x' }, { combat_active: false }),
+      characters: [
+        makeChar({ id: 'x', name: 'Hireling', character_class: 'Rogue', hp: 0, dead: true }),
+      ],
+    } as GameState;
+    const after = backfillRequiredPlotArmor(st, armorCtx);
+    expect(after.characters[0].required).toBeFalsy();
+    expect(after.characters[0].dead).toBe(true);
   });
 });
