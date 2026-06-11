@@ -205,6 +205,7 @@ function TinySelect(props: {
 
 const EFFECT_TYPES = [
   { value: 'set_flag', label: 'SET FLAG' },
+  { value: 'adjust_flag', label: 'ADJUST FLAG' },
   { value: 'give_gold', label: 'GIVE GOLD' },
   { value: 'give_item', label: 'GIVE ITEM' },
   { value: 'give_xp', label: 'GIVE XP' },
@@ -220,6 +221,8 @@ function defaultEffect(type: string, pickers: RowPickers): DialogueConsequence {
   switch (type) {
     case 'set_flag':
       return { type, key: '', value: true };
+    case 'adjust_flag':
+      return { type, key: '', delta: -1 };
     case 'give_gold':
     case 'give_xp':
       return { type, amount: 10 };
@@ -269,6 +272,27 @@ function EffectRow(props: {
             aria-label={`${where} flag value`}
             value={String(e.value ?? '')}
             onChange={(ev) => onChange({ ...e, value: parseFlagValue(ev.target.value) })}
+          />
+        </>
+      )}
+      {e.type === 'adjust_flag' && (
+        <>
+          <input
+            className={styles.formInp}
+            style={{ ...inp, width: 110 }}
+            aria-label={`${where} flag key`}
+            placeholder="flag_key"
+            value={String(e.key ?? '')}
+            onChange={(ev) => onChange({ ...e, key: ev.target.value })}
+          />
+          <span style={lbl}>+=</span>
+          <input
+            className={styles.formInp}
+            style={{ ...inp, width: 70 }}
+            type="number"
+            aria-label={`${where} delta`}
+            value={Number(e.delta ?? 0)}
+            onChange={(ev) => onChange({ ...e, delta: Number(ev.target.value) })}
           />
         </>
       )}

@@ -403,7 +403,7 @@ export default function App() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const allDead = !!gameState && gameState.characters.every((c) => c.dead);
-      if (view !== 'game' || loading || escaped || allDead) return;
+      if (view !== 'game' || loading || escaped || allDead || gameState?.campaign_outcome) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       // 'i' toggles inventory modal
       if (e.key === 'i' || e.key === 'I') {
@@ -639,6 +639,9 @@ export default function App() {
             gameState?.characters[0] ??
             null;
           const allDead = !!gameState && gameState.characters.every((c) => c.dead);
+          // A resolved campaign (entered a terminal act) is also a terminal
+          // screen — hide the action/invite/resign/map surfaces like `escaped`.
+          const resolved = !!gameState?.campaign_outcome;
           // Build the right-rail tab list from current game state. Tabs only
           // appear when their data exists (e.g. quests + factions only with a
           // campaign, combat log only with events).
@@ -744,7 +747,7 @@ export default function App() {
                         <img src={user.avatar_url} alt="" className={styles.userAvatar} />
                       )}
                       <span>{user.display_name.toUpperCase()}</span>
-                      {gameState && !escaped && !allDead && (
+                      {gameState && !escaped && !allDead && !resolved && (
                         <button
                           className={styles.signOutBtn}
                           onClick={() => setInviteOpen(true)}
@@ -755,7 +758,7 @@ export default function App() {
                           INVITE
                         </button>
                       )}
-                      {gameState && !escaped && !allDead && (
+                      {gameState && !escaped && !allDead && !resolved && (
                         <button
                           className={styles.signOutBtn}
                           onClick={() => {
@@ -806,7 +809,11 @@ export default function App() {
                     // visible on a wipe and during the post-combat "Continue"
                     // gate (rendered READ-ONLY in the gate — see below). See
                     // mapPanelVisible.
-                    if (!gameState || !seed || !mapPanelVisible(gameState, { escaped, allDead }))
+                    if (
+                      !gameState ||
+                      !seed ||
+                      !mapPanelVisible(gameState, { escaped: escaped || resolved, allDead })
+                    )
                       return null;
                     if (
                       (gameState.combat_active || gameState.combat_over_pending) &&
@@ -1093,6 +1100,50 @@ export default function App() {
                               : 'to finish their turn'
                           }
                         />
+                      ) : !loading && gameState?.campaign_outcome ? (
+                        <div
+                          className={styles.card}
+                          style={{
+                            borderColor: 'var(--t-primary)',
+                            textAlign: 'center',
+                            padding: '1.5rem',
+                          }}
+                        >
+                          <h2
+                            style={{
+                              color: 'var(--t-primary)',
+                              fontSize: '1.1rem',
+                              letterSpacing: '0.2em',
+                              marginBottom: '0.5rem',
+                              marginTop: 0,
+                              textShadow: '0 0 8px var(--t-primary)',
+                              fontWeight: 'normal',
+                            }}
+                          >
+                            <span aria-hidden="true">★ </span>
+                            {gameState.campaign_outcome.outcome.toUpperCase()}
+                            <span aria-hidden="true"> ★</span>
+                          </h2>
+                          {gameState.campaign_outcome.text && (
+                            <p
+                              style={{
+                                color: 'var(--t-mid)',
+                                fontSize: '0.8rem',
+                                marginBottom: '1.25rem',
+                                whiteSpace: 'pre-wrap',
+                              }}
+                            >
+                              {gameState.campaign_outcome.text}
+                            </p>
+                          )}
+                          <button
+                            className={styles.submit}
+                            style={{ width: 'auto', padding: '0.6rem 2rem' }}
+                            onClick={startNewAdventure}
+                          >
+                            START NEW ADVENTURE
+                          </button>
+                        </div>
                       ) : !loading && escaped ? (
                         <div
                           className={styles.card}

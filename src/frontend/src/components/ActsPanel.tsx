@@ -1,3 +1,4 @@
+import { ConditionRowsEditor, type RowPickers } from './conditionEffectRows.tsx';
 import LootEffectEditor, { type LootEffectValue, cleanLootEffect } from './LootEffectEditor.tsx';
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api.ts';
@@ -22,6 +23,8 @@ interface EditorAct {
   startEffect?: LootEffectValue;
   endEffect?: LootEffectValue;
   trigger?: { questId: string; stepId?: string };
+  transitions?: { when: unknown; to: string }[];
+  ending?: { outcome: string; text?: string };
   [key: string]: unknown;
 }
 
@@ -130,6 +133,19 @@ function ActsPanel({ campaignId }: { campaignId: string }) {
       ...(cleanLootEffect(a.startEffect) ? { startEffect: cleanLootEffect(a.startEffect) } : {}),
       ...(cleanLootEffect(a.endEffect) ? { endEffect: cleanLootEffect(a.endEffect) } : {}),
       ...(a.trigger?.questId ? { trigger: { questId: a.trigger.questId } } : {}),
+      // Edges with a target only; an ending only when an outcome is named.
+      ...(() => {
+        const edges = (a.transitions ?? []).filter((t) => t.to);
+        return edges.length ? { transitions: edges } : {};
+      })(),
+      ...(a.ending?.outcome.trim()
+        ? {
+            ending: {
+              outcome: a.ending.outcome.trim(),
+              ...(a.ending.text?.trim() ? { text: a.ending.text.trim() } : {}),
+            },
+          }
+        : {}),
     }));
     try {
       await api.putCampaignSection(campaignId, 'acts', payload);
@@ -141,6 +157,10 @@ function ActsPanel({ campaignId }: { campaignId: string }) {
       setBusy(false);
     }
   }
+
+  // Edges branch on campaign progress — flags (counters / set state) and quest
+  // completion are the relevant levers; items/factions/npcs aren't act-level.
+  const edgePickers: RowPickers = { items: [], quests, factions: [], npcIds: [] };
 
   return (
     <div className={styles.card} style={{ marginTop: '1rem' }}>
@@ -357,6 +377,131 @@ function ActsPanel({ campaignId }: { campaignId: string }) {
                 onChange={(v) => patch(i, { endEffect: v })}
               />
             </div>
+          </div>
+
+          {/* Branches — the first edge whose condition holds advances to its
+              target act (else the trigger quest above → next act). */}
+          <div style={{ marginTop: 6 }}>
+            <p style={{ ...lbl, letterSpacing: '0.08em' }}>
+              BRANCHES
+              <span style={{ textTransform: 'none' }}> · first matching condition wins</span>
+            </p>
+            {(a.transitions ?? []).map((t, ti) => (
+              <div
+                key={ti}
+                style={{
+                  border: '1px dashed var(--t-border)',
+                  borderRadius: 4,
+                  padding: 6,
+                  marginBottom: 6,
+                }}
+              >
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                  <span style={lbl}>WHEN → GO TO</span>
+                  <select
+                    aria-label={`Act ${i + 1} branch ${ti + 1} target`}
+                    className={styles.formInp}
+                    style={{ cursor: 'pointer', width: 'auto' }}
+                    value={t.to}
+                    onChange={(e) =>
+                      patch(i, {
+                        transitions: (a.transitions ?? []).map((x, j) =>
+                          j === ti ? { ...x, to: e.target.value } : x
+                        ),
+                      })
+                    }
+                  >
+                    <option value="">— act —</option>
+                    {(acts ?? [])
+                      .filter((x) => x.id !== a.id)
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name || x.id} ({x.id})
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    className={styles.ghostBtn}
+                    aria-label={`Remove act ${i + 1} branch ${ti + 1}`}
+                    style={{ padding: '0.2rem 0.5rem', marginLeft: 'auto' }}
+                    onClick={() =>
+                      patch(i, { transitions: (a.transitions ?? []).filter((_, j) => j !== ti) })
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+                <ConditionRowsEditor
+                  value={t.when}
+                  where={`act ${i + 1} branch ${ti + 1}`}
+                  pickers={edgePickers}
+                  onChange={(when) =>
+                    patch(i, {
+                      transitions: (a.transitions ?? []).map((x, j) =>
+                        j === ti ? { ...x, when } : x
+                      ),
+                    })
+                  }
+                />
+              </div>
+            ))}
+            <button
+              className={styles.ghostBtn}
+              style={{ fontSize: '0.65rem' }}
+              aria-label={`Add act ${i + 1} branch`}
+              onClick={() =>
+                patch(i, { transitions: [...(a.transitions ?? []), { when: undefined, to: '' }] })
+              }
+            >
+              + BRANCH
+            </button>
+          </div>
+
+          {/* Ending — a terminal act resolves the campaign. */}
+          <div style={{ marginTop: 6 }}>
+            <label style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="checkbox"
+                aria-label={`Act ${i + 1} is an ending`}
+                checked={!!a.ending}
+                onChange={(e) =>
+                  patch(i, {
+                    ending: e.target.checked
+                      ? { outcome: a.ending?.outcome ?? '', text: a.ending?.text }
+                      : undefined,
+                  })
+                }
+              />
+              THIS ACT ENDS THE CAMPAIGN
+            </label>
+            {a.ending && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                <input
+                  aria-label={`Act ${i + 1} ending outcome`}
+                  className={styles.formInp}
+                  style={{ width: 180 }}
+                  placeholder="outcome (e.g. Victory)"
+                  value={a.ending.outcome}
+                  onChange={(e) => patch(i, { ending: { ...a.ending!, outcome: e.target.value } })}
+                />
+                <textarea
+                  aria-label={`Act ${i + 1} ending text`}
+                  className={styles.formInp}
+                  rows={2}
+                  style={{
+                    flex: '1 1 240px',
+                    fontFamily: 'inherit',
+                    fontSize: '0.75rem',
+                    resize: 'vertical',
+                  }}
+                  placeholder="closing narration"
+                  value={a.ending.text ?? ''}
+                  onChange={(e) =>
+                    patch(i, { ending: { ...a.ending!, text: e.target.value || undefined } })
+                  }
+                />
+              </div>
+            )}
           </div>
         </div>
       ))}

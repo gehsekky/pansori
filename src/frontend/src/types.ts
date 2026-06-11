@@ -357,6 +357,13 @@ export interface GameState {
   // Choice-dimming memory — keys of choices already clicked this
   // adventure. Mirror of the backend field.
   seen_choices?: string[];
+
+  // Which act the party is in (campaigns with an act graph). Mirror of the BE
+  // field; the FE only reads it to know the campaign is mid-arc.
+  current_act?: string;
+  // Set when the party enters a terminal act — the campaign is resolved. The FE
+  // shows an ending screen (mirrors the escaped screen). Mirror of the BE field.
+  campaign_outcome?: { outcome: string; text?: string };
 }
 
 // `RoomObject` is re-exported from ./shared-types (see src/shared/types.ts).

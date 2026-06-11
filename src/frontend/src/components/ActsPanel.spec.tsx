@@ -85,6 +85,55 @@ describe('ActsPanel', () => {
     });
   });
 
+  it('loads an act with a branch edge + a terminal ending', async () => {
+    mocked.getCampaignSection.mockImplementation(
+      loader([
+        {
+          id: 'act-1',
+          name: 'Act I',
+          startingRegionId: 'r1',
+          startPos: { x: 0, y: 0 },
+          transitions: [
+            { when: { fact: 'flags', path: '$.war', operator: 'equal', value: true }, to: 'act-2' },
+          ],
+        },
+        {
+          id: 'act-2',
+          name: 'Act II',
+          startingRegionId: 'r1',
+          startPos: { x: 0, y: 0 },
+          ending: { outcome: 'War', text: 'The trail goes cold.' },
+        },
+      ])
+    );
+    render(<ActsPanel campaignId="sandbox" />);
+    // Act I's branch points at act-2.
+    expect(
+      ((await screen.findByLabelText('Act 1 branch 1 target')) as HTMLSelectElement).value
+    ).toBe('act-2');
+    // Act II is a terminal ending — checkbox on, outcome populated.
+    expect((screen.getByLabelText('Act 2 is an ending') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Act 2 ending outcome') as HTMLInputElement).value).toBe('War');
+  });
+
+  it('marks an act as an ending and saves the ending payload', async () => {
+    mocked.getCampaignSection.mockImplementation(
+      loader([{ id: 'act-1', name: 'Act I', startingRegionId: 'r1', startPos: { x: 0, y: 0 } }])
+    );
+    render(<ActsPanel campaignId="sandbox" />);
+    fireEvent.click(await screen.findByLabelText('Act 1 is an ending'));
+    fireEvent.change(screen.getByLabelText('Act 1 ending outcome'), {
+      target: { value: 'Victory' },
+    });
+    fireEvent.change(screen.getByLabelText('Act 1 ending text'), {
+      target: { value: 'The sky holds.' },
+    });
+    fireEvent.click(screen.getByTestId('save-acts-btn'));
+    await waitFor(() => expect(mocked.putCampaignSection).toHaveBeenCalledTimes(1));
+    const payload = mocked.putCampaignSection.mock.calls[0][2] as Array<Record<string, unknown>>;
+    expect(payload[0].ending).toEqual({ outcome: 'Victory', text: 'The sky holds.' });
+  });
+
   it('blocks save when an act has no starting region', async () => {
     mocked.getCampaignSection.mockImplementation(loader([]));
     render(<ActsPanel campaignId="sandbox" />);
