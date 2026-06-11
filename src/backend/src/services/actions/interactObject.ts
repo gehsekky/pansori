@@ -23,12 +23,13 @@ import { updatePcActor } from './actor.js';
  * unless the character is a Thief (Rogue L3+ subclass), in which
  * case Fast Hands (SRD) lets them use a bonus action.
  *
- * Flavor objects (no DC, no lootIds) are one-shot — text only.
- * Searchable objects roll INT (Investigation) DC; on success, add
- * lootIds to inventory and record in loot_taken so quest checks
- * fire whether the item was floor-loot or container-loot. On
- * failure: object stays in the choice list so the player can retry
- * (the seenKey written by takeAction dims the button visually).
+ * Flavor objects (nothing to find — no lootIds AND no onFound) are
+ * one-shot, text only. Searchable objects roll a search check —
+ * INT (Investigation, default) or WIS (Perception) per `searchSkill`;
+ * on success, add lootIds to inventory (recorded in loot_taken so
+ * quest checks fire) and fire onFound consequences once. On failure:
+ * the object stays in the choice list for a retry (the seenKey written
+ * by takeAction dims the button visually).
  *
  * ctx.narrative is APPENDED to, never overwritten — takeAction seeds it
  * with the hidden-trap trigger text (an undetected room trap fires on the
