@@ -3318,11 +3318,30 @@ export function endCombatState(st: GameState): GameState {
   // party to the cell they were travelling on and drop the transient encounter
   // room. No-op for authored-room combat (encounter_return unset).
   const collapsed = returnFromEncounter(st);
+  // Plot armor — a campaign-required member that fell during the fight is
+  // revived to 1 HP the moment combat ends (and clears its down/dead state), so
+  // a mandatory pre-gen can't be permanently lost and a party with one standing
+  // is never wiped. Player-built members are untouched (they need a real revive
+  // or a long rest). See Character.required.
+  const revivedChars = collapsed.characters.map((c) =>
+    c.required && (c.dead || c.hp <= 0)
+      ? {
+          ...c,
+          hp: 1,
+          dead: false,
+          stable: false,
+          death_saves: { successes: 0, failures: 0 },
+          died_at_round: undefined,
+          conditions: c.conditions.filter((cond) => cond !== 'unconscious'),
+        }
+      : c
+  );
+  const anyRevived = revivedChars.some((c, i) => c !== collapsed.characters[i]);
   // Gate the return to exploration behind a "Continue" choice instead of
   // auto-switching the view the instant combat resolves — but only when the
   // party survived (an all-dead party goes to the game-over screen, not a
-  // Continue prompt).
-  const partySurvived = st.characters.some((c) => !c.dead);
+  // Continue prompt). Computed AFTER plot-armor revival.
+  const partySurvived = revivedChars.some((c) => !c.dead);
   // Keep the combat battlefield on screen through the post-combat "Continue"
   // gate for EVERY survived fight — the player should see the field they just
   // fought (with the fallen enemy), not snap to the exploration map. For a
@@ -3337,13 +3356,22 @@ export function endCombatState(st: GameState): GameState {
     combat_over_pending: partySurvived,
     initiative_order: [],
     initiative_idx: 0,
-    entities: keepBattlefield ? st.entities : undefined,
+    // Keep the battlefield through the Continue gate; sync any revived
+    // required member's grid token off the skull (hp 0) back to 1 HP.
+    entities: keepBattlefield
+      ? anyRevived
+        ? (st.entities ?? []).map((e) => {
+            const rc = !e.isEnemy ? revivedChars.find((c) => c.id === e.id) : undefined;
+            return rc ? { ...e, hp: rc.hp } : e;
+          })
+        : st.entities
+      : undefined,
     movement_used: undefined,
     // Persistent damage zones are combat constructs; clear any that outlived the
     // fight so a non-concentration zone (Guardian of Faith) can't leak into the
     // next encounter. Concentration zones are already dropped by breakConcentration.
     spell_zones: [],
-    characters: st.characters.map((c) => ({
+    characters: revivedChars.map((c) => ({
       ...c,
       turn_actions: { ...FRESH_TURN },
       // Rage / Monk Superior Defense / Sorcerer Innate Sorcery / Paladin Holy
@@ -10480,7 +10508,15 @@ export async function takeAction({
       if (endedCombat) st = endCombatState(st);
       if (died) {
         commitChar();
-        const allDead = st.characters.every((c) => c.dead);
+        let allDead = st.characters.every((c) => c.dead);
+        // Plot armor — if that death dropped the last PC but the party holds a
+        // required member, end combat (which revives required members to 1 HP)
+        // instead of a game-over. endCombatState clears the fight; the revived
+        // member wakes alone, bloodied but alive.
+        if (allDead && st.characters.some((c) => c.required)) {
+          st = endCombatState(st);
+          allDead = st.characters.every((c) => c.dead);
+        }
         st.run_log = [
           ...(st.run_log || []),
           { character_id: char.id, action: action.type, narrative },

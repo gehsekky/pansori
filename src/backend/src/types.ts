@@ -1505,6 +1505,11 @@ export interface Character {
   // hop without a join. Optional because pre-MP saves don't carry it —
   // normalizeState backfills missing values to session.user_id.
   owner_user_id?: string;
+  // A campaign-required pre-gen member (matched name+class against
+  // campaign.requiredMembers at creation). Plot-armored: can fall in combat but
+  // is revived to 1 HP when combat ends, and a party that still has one can't be
+  // permanently wiped (see endCombatState). Absent for player-built members.
+  required?: boolean;
 }
 
 // ─── Reactive spell window ───────────────────────────────────────────────────

@@ -749,6 +749,16 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         finalChar.xp = xpForLevel(startLevel);
         expandCasterSpellsForLevel(finalChar, startLevel, ctx.spellTable ?? {});
       }
+      // Plot armor: a campaign-required pre-gen member (name+class match) is
+      // marked so combat-end revives it to 1 HP and the party can't be wiped
+      // while one stands. See endCombatState.
+      if (
+        (ctx.campaign?.requiredMembers ?? []).some(
+          (rm) => rm.name === finalChar.name && rm.cls === finalChar.character_class
+        )
+      ) {
+        finalChar.required = true;
+      }
       return finalChar;
     });
 

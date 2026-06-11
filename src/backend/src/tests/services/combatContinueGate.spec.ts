@@ -127,3 +127,78 @@ describe('continue action', () => {
     expect(r.newState.entities).toBeUndefined(); // …cleared on Continue
   });
 });
+
+// Required-member plot armor — a campaign's locked pre-gen can fall in combat
+// but is revived to 1 HP when combat ends, and a party that still holds one is
+// never permanently wiped.
+describe('endCombatState — required-member plot armor', () => {
+  it('revives a fallen required member to 1 HP at combat end; non-required stay dead', () => {
+    const after = endCombatState(
+      inCombat({
+        characters: [
+          makeChar({
+            id: 'req',
+            hp: 0,
+            max_hp: 20,
+            dead: true,
+            required: true,
+            death_saves: { successes: 0, failures: 3 },
+          }),
+          makeChar({ id: 'pc-2', hp: 0, max_hp: 18, dead: true }), // not required → stays dead
+          makeChar({ id: 'pc-3', hp: 5, max_hp: 12 }),
+        ],
+      })
+    );
+    const req = after.characters.find((c) => c.id === 'req')!;
+    expect(req.dead).toBe(false);
+    expect(req.hp).toBe(1);
+    expect(req.death_saves).toEqual({ successes: 0, failures: 0 });
+    expect(after.characters.find((c) => c.id === 'pc-2')!.dead).toBe(true);
+  });
+
+  it('also lifts a downed-but-alive required member off 0 HP and clears unconscious', () => {
+    const after = endCombatState(
+      inCombat({
+        characters: [
+          makeChar({
+            id: 'req',
+            hp: 0,
+            max_hp: 20,
+            dead: false,
+            stable: true,
+            required: true,
+            conditions: ['unconscious'],
+          }),
+          makeChar({ id: 'pc-2', hp: 8, max_hp: 18 }),
+        ],
+      })
+    );
+    const req = after.characters.find((c) => c.id === 'req')!;
+    expect(req.hp).toBe(1);
+    expect(req.conditions).not.toContain('unconscious');
+  });
+
+  it('an all-down party that holds a required member is NOT wiped (revives + gates)', () => {
+    const after = endCombatState(
+      inCombat({
+        characters: [
+          makeChar({ id: 'req', hp: 0, max_hp: 20, dead: true, required: true }),
+          makeChar({ id: 'pc-2', hp: 0, max_hp: 18, dead: true }), // stays dead
+        ],
+      })
+    );
+    expect(after.combat_over_pending).toBe(true); // survived via plot armor → Continue gate
+    expect(after.characters.find((c) => c.id === 'req')!.dead).toBe(false);
+    expect(after.characters.some((c) => !c.dead)).toBe(true);
+  });
+
+  it('a true wipe with NO required member is still a game-over', () => {
+    const after = endCombatState(
+      inCombat({
+        characters: [makeChar({ id: 'pc-1', hp: 0, max_hp: 20, dead: true })],
+      })
+    );
+    expect(after.combat_over_pending).toBeFalsy();
+    expect(after.characters.every((c) => c.dead)).toBe(true);
+  });
+});
