@@ -8,6 +8,7 @@
     "sync-types:check": "tsx scripts/sync-shared-types.ts --check",
     "check-migrations": "bash scripts/check-migrations.sh",
     "sync-assets": "bash scripts/sync-assets.sh",
+    "seed:sky": "tsx src/backend/src/scripts/seedSkyIsFalling.ts",
     "pretest": "npm run sync-types",
     "predev": "npm run sync-types && npm run sync-assets",
     "lint": "npm run lint   --workspace=src/frontend --workspace=src/backend",
