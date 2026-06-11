@@ -17,8 +17,16 @@
 // (rooms→monsters/items/npcs, regions→towns/rooms, quests/rules→flags) stay in
 // one coherent place. Sections are applied in dependency order by the seeder.
 
+import { ACTS } from './acts.js';
 import type { EditableSection } from '../../services/campaignContent.js';
 import { FACTIONS } from './factions.js';
+import { ITEMS } from './items.js';
+import { MONSTERS } from './monsters.js';
+import { QUESTS } from './quests.js';
+import { REGIONS } from './regions.js';
+import { ROOMS } from './rooms.js';
+import { RULES } from './rules.js';
+import { TOWNS } from './towns.js';
 
 export const SKY_CAMPAIGN_ID = 'the-sky-is-falling';
 export const SKY_CAMPAIGN_NAME = 'The Sky Is Falling';
@@ -59,5 +67,14 @@ export const SKY_CAMPAIGN_SECTIONS: { section: EditableSection; value: unknown }
   },
   { section: 'gameStart', value: GAME_START },
   { section: 'recommendedParty', value: RECOMMENDED_PARTY },
+  // Leaf data first — geography / quests / rules / acts reference it by id/name.
   { section: 'factions', value: FACTIONS },
+  { section: 'customMonsters', value: MONSTERS },
+  { section: 'customItems', value: ITEMS },
+  { section: 'rooms', value: ROOMS },
+  { section: 'towns', value: TOWNS },
+  { section: 'regions', value: REGIONS },
+  { section: 'quests', value: QUESTS },
+  { section: 'rules', value: RULES },
+  { section: 'acts', value: ACTS },
 ];
