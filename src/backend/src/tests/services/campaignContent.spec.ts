@@ -2906,4 +2906,52 @@ describe('lintCampaign — cross-section reference lint', () => {
     expect(msgs).not.toContain('faction:factionId → unknown faction "guild"');
     expect(issues.every((i) => i.severity === 'warning')).toBe(true);
   });
+
+  it('flags dangling act references (trigger quest, region, loot member/item, quest actId)', async () => {
+    const db = makeContentDb({ campaigns: { demo_campaign: {} } });
+    await putCampaignSection(db.pool, 'demo_campaign', 'recommendedParty', {
+      size: 1,
+      composition: [],
+      requiredMembers: [{ name: 'Roland', cls: 'Fighter' }],
+    });
+    await putCampaignSection(db.pool, 'demo_campaign', 'regions', [
+      {
+        id: 'r1',
+        name: 'Region One',
+        isStartingRegion: true,
+        feetPerSquare: 5280,
+        grid: [[{ t: 'plains' }]],
+        startPos: { x: 0, y: 0 },
+        sites: [],
+      },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'quests', [
+      {
+        id: 'q1',
+        actId: 'no-such-act', // dangling act
+        title: 'Q',
+        desc: 'd',
+        steps: [{ id: 's', desc: 'x', condition: {} }],
+        rewards: [],
+      },
+    ]);
+    await putCampaignSection(db.pool, 'demo_campaign', 'acts', [
+      {
+        id: 'act-1',
+        name: 'Act I',
+        startingRegionId: 'no-region', // dangling region
+        startPos: { x: 0, y: 0 },
+        trigger: { questId: 'ghost-quest' }, // dangling quest
+        startEffect: { grant: [{ itemId: 'mystery_item', member: 'Nobody' }] }, // both dangling
+      },
+    ]);
+    const msgs = (await lintCampaign(db.pool, 'demo_campaign')).map(
+      (i) => `${i.category}:${i.message}`
+    );
+    expect(msgs).toContain('act:actId → unknown act "no-such-act"');
+    expect(msgs).toContain('quest:trigger → unknown quest "ghost-quest"');
+    expect(msgs).toContain('region:startingRegionId → unknown region "no-region"');
+    expect(msgs).toContain('member:loot → unknown required member "Nobody"');
+    expect(msgs).toContain('item:loot → unknown item "mystery_item"');
+  });
 });

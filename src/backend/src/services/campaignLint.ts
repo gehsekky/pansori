@@ -14,6 +14,7 @@
 
 import {
   type CampaignRoomNpcResponse,
+  getCampaignActs,
   getCampaignQuests,
   getCampaignRegions,
   getCampaignRooms,
@@ -24,7 +25,17 @@ import type { Faction, GameRule } from '../types.js';
 import { composeLootTable, getCampaignCustomItems, getItemCatalog } from './itemCatalog.js';
 import type { Pool } from 'pg';
 
-export type LintCategory = 'quest' | 'faction' | 'npc' | 'room' | 'town' | 'item' | 'location';
+export type LintCategory =
+  | 'quest'
+  | 'faction'
+  | 'npc'
+  | 'room'
+  | 'town'
+  | 'item'
+  | 'location'
+  | 'act'
+  | 'region'
+  | 'member';
 
 export interface LintIssue {
   severity: 'warning';
@@ -49,6 +60,11 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
   ]);
   const factions = ((await getDbSection(pool, campaignId, 'factions')).value as Faction[]) ?? [];
   const rules = ((await getDbSection(pool, campaignId, 'rules')).value as GameRule[]) ?? [];
+  const acts = await getCampaignActs(pool, campaignId);
+  // Required members (loot-effect targets) live in the recommendedParty section.
+  const recParty = (await getDbSection(pool, campaignId, 'recommendedParty')).value as
+    | { requiredMembers?: { name: string }[] }
+    | undefined;
   const itemIds = new Set(
     composeLootTable(
       await getCampaignCustomItems(pool, campaignId),
@@ -64,6 +80,9 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
   const roomIds = new Set(rooms.map((r) => r.id));
   const npcIds = new Set(rooms.flatMap((r) => (r.npcs ?? []).map((n) => n.id)));
   const townIds = new Set(towns.map((t) => t.id));
+  const actIds = new Set(acts.map((a) => a.id));
+  const regionIds = new Set(regions.map((r) => r.id));
+  const memberNames = new Set((recParty?.requiredMembers ?? []).map((m) => m.name));
   const locationIds = new Set<string>([
     ...regions.flatMap((r) => (r.sites ?? []).map((s) => s.id)),
     ...towns.flatMap((t) => (t.venues ?? []).map((v) => v.id)),
@@ -72,6 +91,25 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
   const issues: LintIssue[] = [];
   const add = (category: LintCategory, location: string, message: string) =>
     issues.push({ severity: 'warning', category, location, message });
+
+  // ── Loot effects (acts + quests): item id + required-member targets ──
+  const checkLootEffect = (
+    effect:
+      | {
+          grant?: { itemId: string; member: string }[];
+          revoke?: { itemId: string; member: string }[];
+        }
+      | undefined,
+    where: string
+  ) => {
+    if (!effect) return;
+    for (const e of [...(effect.grant ?? []), ...(effect.revoke ?? [])]) {
+      if (e.itemId && !itemIds.has(e.itemId))
+        add('item', where, `loot → unknown item "${e.itemId}"`);
+      if (e.member && !memberNames.has(e.member))
+        add('member', where, `loot → unknown required member "${e.member}"`);
+    }
+  };
 
   // ── Consequence references (dialogue, quest rewards, rules) ──
   const checkConsequences = (list: unknown, where: string) => {
@@ -200,9 +238,22 @@ export async function lintCampaign(pool: Pool, campaignId: string): Promise<Lint
       add('npc', `quest "${q.id}"`, `giverNpcId → unknown NPC "${q.giverNpcId}"`);
     if (q.factionId && !factionIds.has(q.factionId))
       add('faction', `quest "${q.id}"`, `factionId → unknown faction "${q.factionId}"`);
+    if (q.actId && !actIds.has(q.actId))
+      add('act', `quest "${q.id}"`, `actId → unknown act "${q.actId}"`);
     checkConsequences(q.rewards, `quest "${q.id}" reward`);
+    checkLootEffect(q.startEffect, `quest "${q.id}" start loot`);
+    checkLootEffect(q.completeEffect, `quest "${q.id}" complete loot`);
     for (const s of q.steps)
       checkCondition(s.condition, `quest "${q.id}" step "${s.id}" [condition]`);
+  }
+
+  for (const a of acts) {
+    if (a.trigger?.questId && !questIds.has(a.trigger.questId))
+      add('quest', `act "${a.id}" trigger`, `trigger → unknown quest "${a.trigger.questId}"`);
+    if (a.startingRegionId && !regionIds.has(a.startingRegionId))
+      add('region', `act "${a.id}"`, `startingRegionId → unknown region "${a.startingRegionId}"`);
+    checkLootEffect(a.startEffect, `act "${a.id}" start loot`);
+    checkLootEffect(a.endEffect, `act "${a.id}" end loot`);
   }
 
   for (const r of rooms)

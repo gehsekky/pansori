@@ -78,7 +78,17 @@ export interface CampaignSectionValue extends CampaignSectionInfo {
 // A dangling cross-section reference found by the validate lint (advisory).
 export interface CampaignLintIssue {
   severity: 'warning';
-  category: 'quest' | 'faction' | 'npc' | 'room' | 'town' | 'item' | 'location';
+  category:
+    | 'quest'
+    | 'faction'
+    | 'npc'
+    | 'room'
+    | 'town'
+    | 'item'
+    | 'location'
+    | 'act'
+    | 'region'
+    | 'member';
   location: string;
   message: string;
 }
