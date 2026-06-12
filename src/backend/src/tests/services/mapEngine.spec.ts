@@ -7,6 +7,7 @@ import type { CampaignData, GameState, Room } from '../../types.js';
 import {
   ENCOUNTER_ROOM_ID,
   activeGrid,
+  formatTravelDistance,
   initMapState,
   regionEnterNarration,
   resolveMarkerMove,
@@ -785,5 +786,20 @@ describe('typed overland terrain (unified model)', () => {
     expect(resolveMarkerMove(terrainCampaign, rooms, stAt(0, 0), { x: 0, y: 3 }).encounter).toEqual(
       [{ name: 'Bandit Ruffian', count: 1 }]
     );
+  });
+});
+
+describe('formatTravelDistance — the travelMove {distance} token', () => {
+  it('formats overland moves in miles (decimals trimmed, singular at 1)', () => {
+    expect(formatTravelDistance('regional', 2, 5280)).toBe('2 miles');
+    expect(formatTravelDistance('regional', 1, 5280)).toBe('1 mile');
+    expect(formatTravelDistance('regional', 1, 1320)).toBe('0.25 miles'); // ¼-mile squares
+    expect(formatTravelDistance('regional', 3, 1320)).toBe('0.75 miles');
+  });
+
+  it('formats town/local moves in feet', () => {
+    expect(formatTravelDistance('town', 3, 25)).toBe('75 ft');
+    expect(formatTravelDistance('local', 2, 5)).toBe('10 ft');
+    expect(formatTravelDistance(undefined, 4, 5)).toBe('20 ft');
   });
 });

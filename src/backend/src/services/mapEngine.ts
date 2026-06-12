@@ -127,6 +127,24 @@ export type TravelPace = keyof typeof PACE_MILES_PER_HOUR;
 // the hour runs out; the journey is a sequence of clicks.
 export const TRAVEL_TURN_MIN = 60;
 
+/**
+ * Author-facing distance for a plain move — the `{distance}` token in the
+ * `travelMove` narrative pool. Overland reads in miles (up to two decimals,
+ * trailing zeros trimmed); town/local grids read in feet.
+ */
+export function formatTravelDistance(
+  level: string | undefined,
+  squares: number,
+  feetPerSquare: number
+): string {
+  const feet = squares * feetPerSquare;
+  if (level === 'regional') {
+    const miles = Math.round((feet / FEET_PER_MILE) * 100) / 100;
+    return `${miles} mile${miles === 1 ? '' : 's'}`;
+  }
+  return `${feet} ft`;
+}
+
 // The transient room id a wilderness encounter fights in. Not an authored room —
 // `activeGrid` returns null for it (no marker movement mid-fight); combat uses the
 // campaign's default combat grid. Cleared on return.

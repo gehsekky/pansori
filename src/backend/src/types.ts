@@ -2035,6 +2035,9 @@ export interface Context {
     combatStart?: string[]; // prefix before "Initiative: X → Y"; {enemy} substituted
     shortRest?: string[]; // flavor before HP numbers; {name} {hpGained} {hpNow} {hpMax} substituted
     longRest?: string[]; // flavor before per-character HP summary; {party} substituted
+    // Plain map move ("The party moves across the map." when unset);
+    // {distance} substituted — overland in miles, town/local in feet.
+    travelMove?: string[];
   };
 }
 

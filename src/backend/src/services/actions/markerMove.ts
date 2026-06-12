@@ -1,11 +1,13 @@
 import type { Context, Enemy, GameState, GridPos } from '../../types.js';
 import {
   ENCOUNTER_ROOM_ID,
+  activeGrid,
   applyEncounterArena,
+  formatTravelDistance,
   resolveMarkerMove,
   stageEncounter,
 } from '../mapEngine.js';
-import { buildArrivalNarrative, hasSaveProficiency } from '../gameEngine.js';
+import { buildArrivalNarrative, hasSaveProficiency, pick } from '../gameEngine.js';
 import { materializeEnemy, scaledEnemyCount } from '../enemyFactory.js';
 import type { ActionHandler } from './types.js';
 import { rollConditionSave } from '../rulesEngine.js';
@@ -13,6 +15,20 @@ import { runCombatStart } from './attack/combatStart.js';
 import { wornSaveBonus } from '../wornEffects.js';
 
 const MARCH_BUDGET_MIN = 8 * 60; // SRD: 8 hours of travel/day before fatigue risk
+
+// The plain-move line: a campaign's `travelMove` narrative pool (one line
+// picked at random, `{distance}` substituted — overland in miles, town/local
+// in feet) when authored; the engine's stock sentence otherwise.
+function travelMoveLine(
+  context: Context,
+  grid: { level: string; feetPerSquare: number } | null,
+  squares: number
+): string {
+  const pool = context.narratives.travelMove;
+  if (!pool || pool.length === 0) return ' The party moves across the map.';
+  const distance = formatTravelDistance(grid?.level, squares, grid?.feetPerSquare ?? 5);
+  return ` ${pick(pool).replace(/\{distance\}/g, distance)}`;
+}
 
 /**
  * SRD 5.2.1 Extended Travel ("forced march"): each full hour of overland travel
@@ -104,6 +120,10 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
       died: m.st.characters.filter((c) => c.dead).length > deadBefore,
     };
   };
+  // The grid the move happens ON — its scale + level feed the {distance}
+  // token in the travelMove narrative pool. (A transition move lands on a
+  // different grid, but the pooled line only renders for plain moves.)
+  const gridBefore = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st);
   const res = resolveMarkerMove(
     ctx.context.campaign,
     ctx.seed.rooms,
@@ -148,7 +168,7 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
         ctx.context,
         res.enteredRoomFirst ?? false
       )
-    : res.narrative || ' The party moves across the map.';
+    : res.narrative || travelMoveLine(ctx.context, gridBefore, res.squaresMoved);
   ctx.narrative = (ctx.narrative ?? '') + arrival;
   // Regional travel-time flavor (whole-hour granularity reads cleanly).
   if (res.elapsedHours >= 1) {

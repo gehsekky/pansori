@@ -74,6 +74,29 @@ function ctxFor(
   } as unknown as ActionContext;
 }
 
+describe('handleMarkerMove — travelMove narrative pool', () => {
+  // The same region without encounter zones — plain moves only.
+  const calm: CampaignData = {
+    ...campaign,
+    regions: [{ ...campaign.regions![0], encounterZones: [] }],
+  };
+
+  it('uses the campaign pool with {distance} substituted (overland → miles)', () => {
+    const ctx = ctxFor(calm);
+    (ctx.context as unknown as { narratives: Record<string, unknown> }).narratives = {
+      travelMove: ['The party slogs {distance} through the peat.'],
+    };
+    handleMarkerMove(ctx, { type: 'marker_move', to: { x: 2, y: 0 } });
+    expect(ctx.narrative).toContain('The party slogs 2 miles through the peat.');
+  });
+
+  it('falls back to the stock line when no pool is authored', () => {
+    const ctx = ctxFor(calm);
+    handleMarkerMove(ctx, { type: 'marker_move', to: { x: 1, y: 0 } });
+    expect(ctx.narrative).toContain('The party moves across the map.');
+  });
+});
+
 describe('handleMarkerMove — wilderness encounter drop', () => {
   it('drops the party into a local combat against the rolled creature', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // < chance → encounter; index 0 → Bandit Ruffian

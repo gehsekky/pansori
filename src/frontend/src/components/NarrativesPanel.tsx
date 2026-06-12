@@ -43,6 +43,12 @@ const FLAT_GROUPS: { title: string; pools: Pool[] }[] = [
         label: 'GENERIC ARRIVAL',
         tokens: 'fallback when a room has no ROOM ARRIVAL line',
       },
+      {
+        key: 'travelMove',
+        label: 'PARTY MOVES',
+        tokens: '{distance} — overland in miles, town/room in feet',
+        optional: true,
+      },
     ],
   },
   {

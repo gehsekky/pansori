@@ -244,6 +244,7 @@ const NarrativesSchema = z
     combatStart: StringArray.optional(),
     shortRest: StringArray.optional(),
     longRest: StringArray.optional(),
+    travelMove: StringArray.optional(),
   })
   .strict();
 
