@@ -129,4 +129,30 @@ describe('MoveDPad', () => {
       expect((btn as HTMLButtonElement).disabled).toBe(true);
     }
   });
+
+  it('rotates the layout with the diorama camera: the up arrow always moves away from it', () => {
+    // Camera orbited one quadrant (sitting east, looking west): grid WEST is
+    // now screen-up, so the W choice occupies the top cell — and clicking the
+    // top cell dispatches the true grid-W move. NORTH appears screen-right.
+    const onChoose = vi.fn();
+    const west = moveChoice('W', 4, 5);
+    const north = moveChoice('N', 5, 4);
+    const { getByTestId } = render(
+      <MoveDPad choices={[west, north]} onChoose={onChoose} cameraQuadrant={1} />
+    );
+    fireEvent.click(getByTestId('move-dpad-N')); // the visually-top button
+    expect(onChoose).toHaveBeenCalledWith(west);
+    fireEvent.click(getByTestId('move-dpad-E')); // visually right
+    expect(onChoose).toHaveBeenCalledWith(north);
+  });
+
+  it('quadrant 0 (and the 2D grid) keeps the grid-aligned layout', () => {
+    const onChoose = vi.fn();
+    const north = moveChoice('N', 5, 4);
+    const { getByTestId } = render(
+      <MoveDPad choices={[north]} onChoose={onChoose} cameraQuadrant={0} />
+    );
+    fireEvent.click(getByTestId('move-dpad-N'));
+    expect(onChoose).toHaveBeenCalledWith(north);
+  });
 });

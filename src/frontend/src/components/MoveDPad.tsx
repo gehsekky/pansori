@@ -76,6 +76,21 @@ interface Props {
   choices: GameChoice[];
   onChoose: (choice: GameChoice) => void;
   disabled?: boolean;
+  /** Camera quadrant (0–3) when the battlefield is the 3D diorama: how many
+   * 90° steps the orbit camera sits from its default south-side view. The pad
+   * rotates its LAYOUT to match, so the up arrow always moves "away from the
+   * camera" — what the player sees, not grid-absolute north. 0/undefined = the
+   * 2D grid (and the diorama's default view), where layout = grid directions. */
+  cameraQuadrant?: number;
+}
+
+// Clockwise compass cycle for the layout rotation.
+const CYCLE: ChoiceDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
+/** The VISUAL cell a grid direction lands in, given the camera quadrant. */
+export function visualCellFor(dir: ChoiceDirection, cameraQuadrant: number): ChoiceDirection {
+  const q = ((cameraQuadrant % 4) + 4) % 4;
+  return CYCLE[(CYCLE.indexOf(dir) + 2 * q) % 8];
 }
 
 // Pull the "[Nft left]" tail out of the backend label so we can show
@@ -86,10 +101,12 @@ function extractRemaining(label: string): string | null {
   return m ? `${m[1]} ft` : null;
 }
 
-function MoveDPad({ choices, onChoose, disabled }: Props) {
+function MoveDPad({ choices, onChoose, disabled, cameraQuadrant = 0 }: Props) {
+  // Keyed by VISUAL cell — placement, focus traversal, and testids all speak
+  // screen positions; each button still dispatches its true grid choice.
   const byDir = new Map<ChoiceDirection, GameChoice>();
   for (const c of choices) {
-    if (c.direction) byDir.set(c.direction, c);
+    if (c.direction) byDir.set(visualCellFor(c.direction, cameraQuadrant), c);
   }
   // Track the currently-focused cell so we can roving-tabindex it. Initial
   // focus lands on the first available direction (skip disabled cells so

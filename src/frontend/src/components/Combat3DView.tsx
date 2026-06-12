@@ -50,6 +50,9 @@ interface Props {
   gridHeight?: number;
   onMove?: (to: GridPos) => void;
   aoePreview?: AoePreview;
+  /** Reports the orbit camera's 90° quadrant (0 = the default south view) so
+   * the MoveDPad can rotate its layout to match what the player sees. */
+  onCameraQuadrant?: (q: number) => void;
 }
 
 const nameTag: React.CSSProperties = {
@@ -304,7 +307,33 @@ function CombatToken({
   );
 }
 
-function Combat3DView({ state, seed, gridWidth = 8, gridHeight = 8, onMove, aoePreview }: Props) {
+function Combat3DView({
+  state,
+  seed,
+  gridWidth = 8,
+  gridHeight = 8,
+  onMove,
+  aoePreview,
+  onCameraQuadrant,
+}: Props) {
+  // The orbit camera's 90° quadrant, reported upward so the D-pad layout
+  // tracks the view. Reset to the default view on mount — a fresh fight's
+  // camera starts south-side regardless of where the last one was left.
+  const controlsRef = useRef<{ getAzimuthalAngle: () => number } | null>(null);
+  const lastQuad = useRef(0);
+  useEffect(() => {
+    lastQuad.current = 0;
+    onCameraQuadrant?.(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const reportQuadrant = useCallback(() => {
+    const a = controlsRef.current?.getAzimuthalAngle() ?? 0;
+    const q = ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4;
+    if (q !== lastQuad.current) {
+      lastQuad.current = q;
+      onCameraQuadrant?.(q);
+    }
+  }, [onCameraQuadrant]);
   const entities = useMemo(() => state.entities ?? [], [state.entities]);
   const active = !!state.combat_active || !!state.combat_over_pending;
 
@@ -577,12 +606,14 @@ function Combat3DView({ state, seed, gridWidth = 8, gridHeight = 8, onMove, aoeP
         {overlays}
         {entities.map(tokenFor)}
         <OrbitControls
+          ref={controlsRef as never}
           target={[cx, 0, cz]}
           enablePan={false}
           minDistance={6}
           maxDistance={dist * 2}
           minPolarAngle={0.25}
           maxPolarAngle={1.25}
+          onChange={reportQuadrant}
         />
       </Canvas>
       <div

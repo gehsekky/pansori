@@ -214,6 +214,9 @@ export default function App() {
   const [crawler3d, setCrawler3d] = useState(preferCrawler);
   // Combat's 3D diorama, on its own preference switch.
   const [combat3d, setCombat3d] = useState(preferCombat3d);
+  // The diorama's orbit-camera quadrant — rotates the MoveDPad layout so its
+  // arrows match what the player SEES, not grid-absolute compass directions.
+  const [combatCamQuadrant, setCombatCamQuadrant] = useState(0);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   // The full quest journal (grouped by act, finished quests included) — the
   // right-rail tracker only shows open quests.
@@ -943,7 +946,10 @@ export default function App() {
                                 </div>
                               }
                             >
-                              <Combat3DView {...combatViewProps} />
+                              <Combat3DView
+                                {...combatViewProps}
+                                onCameraQuadrant={setCombatCamQuadrant}
+                              />
                             </Suspense>
                           ) : (
                             <GridCombatView {...combatViewProps} />
@@ -1436,6 +1442,9 @@ export default function App() {
                                         <MoveDPad
                                           choices={choices.filter((c) => c.kind === 'grid_move')}
                                           onChoose={handleChoice}
+                                          // Only the 3D diorama orbits; the 2D
+                                          // grid is always grid-aligned.
+                                          cameraQuadrant={combat3d ? combatCamQuadrant : 0}
                                         />
                                         <div className={styles.combatControlsCol}>
                                           {gameState && (
