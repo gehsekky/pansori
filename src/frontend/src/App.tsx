@@ -261,6 +261,7 @@ export default function App() {
     handleEquip,
     handleTransfer,
     handleDrop,
+    handleReorderInventory,
     handleChoice,
     resetGame,
   } = useGame();
@@ -1719,6 +1720,7 @@ export default function App() {
                   onEquip={handleEquip}
                   onTransfer={handleTransfer}
                   onDrop={handleDrop}
+                  onReorder={handleReorderInventory}
                 />
               )}
 

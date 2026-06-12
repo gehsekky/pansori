@@ -5,6 +5,7 @@ import {
   EquipSchema,
   JoinSessionSchema,
   NewSessionSchema,
+  ReorderInventorySchema,
   TransferSchema,
   parseBody,
 } from './schemas.js';
@@ -1176,6 +1177,58 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       equipment: clearInstance(char.equipment, item_instance_id),
       attuned_items: (char.attuned_items ?? []).filter((id) => id !== item_instance_id),
     };
+    const newState: GameState = {
+      ...state,
+      characters: state.characters.map((c, i) => (i === charIdx ? newChar : c)),
+    };
+    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+      JSON.stringify(newState),
+      row.id,
+    ]);
+    res.json({ newState });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Rearrange a character's inventory (the icon grid's drag + sort buttons).
+// Pure presentation state — no turn economy — but persisted so the layout
+// survives reloads. `order` must be a permutation of the current inventory's
+// instance_ids; anything else (stale view, duplicate, foreign item) rejects.
+gameRouter.post('/session/:id/reorder-inventory', async (req: Request, res: Response) => {
+  const parsed = parseBody(req, res, ReorderInventorySchema);
+  if (!parsed) return;
+  const { character_id, order } = parsed;
+  try {
+    const userId = authedUserId(req);
+    const row = await fetchSessionForParticipant(req.params.id, userId);
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    const state = backfillOwnership(normalizeState(row.state), row.user_id);
+    const charIdx = state.characters.findIndex((c) => c.id === character_id);
+    if (charIdx < 0) {
+      res.status(400).json({ error: 'Character not found in session' });
+      return;
+    }
+    const char = state.characters[charIdx];
+    if (char.owner_user_id !== userId) {
+      res.status(403).json({
+        error: `Only ${char.name}'s player can rearrange their inventory.`,
+      });
+      return;
+    }
+    const byInstance = new Map(char.inventory.map((i) => [i.instance_id, i]));
+    const isPermutation =
+      order.length === char.inventory.length &&
+      new Set(order).size === order.length &&
+      order.every((id) => byInstance.has(id));
+    if (!isPermutation) {
+      res.status(400).json({ error: 'Order must be a permutation of the current inventory.' });
+      return;
+    }
+    const newChar = { ...char, inventory: order.map((id) => byInstance.get(id)!) };
     const newState: GameState = {
       ...state,
       characters: state.characters.map((c, i) => (i === charIdx ? newChar : c)),

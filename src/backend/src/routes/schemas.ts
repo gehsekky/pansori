@@ -145,6 +145,16 @@ export const DropSchema = z
   })
   .strict();
 
+// Inventory grid rearrange — the full instance_id sequence in its new order
+// (a manual drag or a client-computed sort). Must be a permutation of the
+// character's current inventory; the route enforces that.
+export const ReorderInventorySchema = z
+  .object({
+    character_id: z.string().uuid(),
+    order: z.array(z.string().min(1).max(80)).max(200),
+  })
+  .strict();
+
 // Multiplayer — host reassigns which user owns a given PC.
 export const AssignCharacterSchema = z
   .object({

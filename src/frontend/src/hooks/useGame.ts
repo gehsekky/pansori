@@ -50,6 +50,7 @@ export interface UseGameReturn {
   handleEquip: (itemId: string, characterId: string) => Promise<void>;
   handleTransfer: (itemInstanceId: string, fromCharId: string, toCharId: string) => Promise<void>;
   handleDrop: (itemInstanceId: string, charId: string) => Promise<void>;
+  handleReorderInventory: (charId: string, order: string[]) => Promise<void>;
   handleChoice: (c: GameChoice) => void;
   resetGame: () => void;
 }
@@ -252,6 +253,17 @@ export function useGame(): UseGameReturn {
     }
   }
 
+  async function handleReorderInventory(charId: string, order: string[]) {
+    if (!session) return;
+    try {
+      const result = await api.reorderInventory(session.id, charId, order);
+      setGameState(result.newState);
+    } catch (e) {
+      const err = e as { error?: string };
+      if (err?.error) setRoomLog((prev) => [...prev, `⚠ ${err.error}`]);
+    }
+  }
+
   function handleChoice(c: GameChoice) {
     act(c.action, c.label, history);
   }
@@ -286,6 +298,7 @@ export function useGame(): UseGameReturn {
     handleEquip,
     handleTransfer,
     handleDrop,
+    handleReorderInventory,
     handleChoice,
     resetGame,
   };

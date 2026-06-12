@@ -423,6 +423,13 @@ export const api = {
       body: JSON.stringify({ item_instance_id, character_id }),
     }),
 
+  // Inventory grid rearrange — the full instance_id sequence in its new order.
+  reorderInventory: (sessionId: string, character_id: string, order: string[]) =>
+    req<{ newState: GameState }>(`/game/session/${sessionId}/reorder-inventory`, {
+      method: 'POST',
+      body: JSON.stringify({ character_id, order }),
+    }),
+
   deleteSession: (id: string) => req<{ ok: boolean }>(`/game/session/${id}`, { method: 'DELETE' }),
 
   clearCompleted: () =>

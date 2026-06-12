@@ -2696,3 +2696,112 @@
     letter-spacing: 0.08em;
   }
 }
+
+/* ─── Hover tooltip (shared — see components/HoverTooltip.tsx) ───────────── */
+
+.tooltipBox {
+  position: fixed;
+  z-index: 300; /* above the modal overlay (200) — tooltips ride on dialogs */
+  max-width: 300px;
+  background: var(--t-card);
+  border: 1px solid var(--t-border);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--t-mid);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  /* Never traps the cursor — hover state stays on the anchor. */
+  pointer-events: none;
+}
+
+.tooltipTitle {
+  color: var(--t-text);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.25rem;
+}
+
+.tooltipAnchor {
+  display: inline-block;
+}
+
+/* ─── Inventory icon grid ────────────────────────────────────────────────── */
+
+.invSortRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.invGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+}
+
+.invCell {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--t-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: inherit;
+}
+
+.invCellItem {
+  cursor: grab;
+}
+
+.invCellItem:hover,
+.invCellItem:focus-visible {
+  border-color: var(--t-primary);
+  outline: none;
+}
+
+.invCellSelected {
+  border-color: var(--t-primary);
+  box-shadow: inset 0 0 0 1px var(--t-primary);
+}
+
+.invCellDragOver {
+  border-color: var(--t-primary);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.invCellBadge {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 0.55rem;
+  letter-spacing: 0;
+  color: var(--t-primary);
+}
+
+.invCellCount {
+  position: absolute;
+  bottom: 1px;
+  right: 3px;
+  font-size: 0.6rem;
+  color: var(--t-mid);
+}
+
+.invActionBar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  min-height: 1.8rem;
+}
+
+/* The tooltip anchor stretched to fill a grid cell (declared after
+   .tooltipAnchor so it wins the display tie). */
+.invCellWrap {
+  display: block;
+  width: 100%;
+}
