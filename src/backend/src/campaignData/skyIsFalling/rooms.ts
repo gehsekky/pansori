@@ -83,6 +83,7 @@ export const ROOMS: CampaignRoom[] = [
     objects: [
       {
         id: 'stashed_crate',
+        pos: { x: 5, y: 0 },
         name: 'Brine Barrels',
         desc: 'A row of brine barrels against the back wall, one set slightly askew.',
         interactText: 'You shoulder the barrels aside, looking for what shouldn’t be there.',
@@ -143,6 +144,7 @@ export const ROOMS: CampaignRoom[] = [
     objects: [
       {
         id: 'thicket_tracks',
+        pos: { x: 3, y: 2 },
         name: 'Boot Tracks in the Ash',
         desc: 'Pressed into the cooling ash: bootprints, marching in step. Too orderly for refugees.',
         interactText: 'You crouch over the prints, reading their spacing and depth.',
@@ -173,6 +175,7 @@ export const ROOMS: CampaignRoom[] = [
     objects: [
       {
         id: 'scorch_pattern',
+        pos: { x: 4, y: 3 },
         name: 'The Scorch Pattern',
         desc:
           'The burn radiates from a single point in geometric rings — not the ' +
@@ -206,6 +209,7 @@ export const ROOMS: CampaignRoom[] = [
     objects: [
       {
         id: 'tomb_cache',
+        pos: { x: 2, y: 0 },
         name: 'The Cracked Reliquary',
         desc: 'A vault-niche in the barrow wall, its seal broken, something cold still inside.',
         interactText: 'Julian reaches into the niche, tools first.',
@@ -220,6 +224,7 @@ export const ROOMS: CampaignRoom[] = [
       },
       {
         id: 'drone_husk',
+        pos: { x: 6, y: 2 },
         name: 'Half-Buried Husk',
         desc: 'Something metal and many-jointed lies half-sunk in the peat, dormant, wrong.',
         interactText: 'You brush the peat from the half-buried shape.',
@@ -250,6 +255,7 @@ export const ROOMS: CampaignRoom[] = [
     objects: [
       {
         id: 'trooper_gear',
+        pos: { x: 5, y: 4 },
         name: 'The Trooper’s Gear',
         desc: 'The still trooper’s kit — standard issue, except for a tarnished sigil at the collar.',
         interactText: 'You search the trooper’s gear, turning the strange sigil to the light.',
@@ -263,6 +269,7 @@ export const ROOMS: CampaignRoom[] = [
       },
       {
         id: 'sunken_locket',
+        pos: { x: 2, y: 4 },
         name: 'Glint in the Muck',
         desc: 'Something silver catches the grey light where the planks gave way.',
         interactText: 'You probe the muck where the causeway collapsed.',

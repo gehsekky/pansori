@@ -65,6 +65,34 @@ describe('The Sky Is Falling — region navigability', () => {
   });
 });
 
+describe('The Sky Is Falling — room object placement', () => {
+  it('every searchable object carries an in-bounds authored pos off the entry/exit cells', () => {
+    // The 3D room renders objects as physical interactables. Unplaced objects
+    // get auto-placed by the view, but the flagship campaign places them
+    // deliberately so the flavor text and the spot agree (the Brine Barrels
+    // incident, 2026-06-13: no pos → invisible in the 3D den).
+    for (const room of ROOMS as CampaignRoom[]) {
+      const w = room.grid[0]?.length ?? 0;
+      const h = room.grid.length;
+      const blocked = new Set<string>([`${room.entryPos.x},${room.entryPos.y}`]);
+      for (const ex of room.exits ?? []) blocked.add(`${ex.pos.x},${ex.pos.y}`);
+      for (const n of room.npcs ?? []) if (n.pos) blocked.add(`${n.pos.x},${n.pos.y}`);
+      for (const o of room.objects ?? []) {
+        expect(o.pos, `object "${o.id}" in room "${room.id}" has no authored pos`).toBeDefined();
+        const p = o.pos!;
+        expect(p.x >= 0 && p.x < w && p.y >= 0 && p.y < h, `object "${o.id}" out of bounds`).toBe(
+          true
+        );
+        expect(
+          blocked.has(`${p.x},${p.y}`),
+          `object "${o.id}" sits on an entry/exit/npc cell in room "${room.id}"`
+        ).toBe(false);
+        blocked.add(`${p.x},${p.y}`); // objects must not stack either
+      }
+    }
+  });
+});
+
 describe('The Sky Is Falling — store_flip rule integrity', () => {
   it('the store_flip rule lists exactly one id per Giant Rat in store_room', () => {
     const store = (ROOMS as CampaignRoom[]).find((r) => r.id === 'store_room');
