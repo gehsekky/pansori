@@ -18,7 +18,8 @@ export const handleApproach: ActionHandler<{ type: 'approach'; pos: { x: number;
     ctx.narrative = 'You cannot reposition like this while in combat.';
     return;
   }
-  const grid = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st);
+  // Pass the NPC placements so the adjacent-cell pick can't land on someone.
+  const grid = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st, ctx.seed.npcs);
   if (!grid || !ctx.st.marker_pos) {
     ctx.narrative = 'There is nowhere to move here.';
     return;

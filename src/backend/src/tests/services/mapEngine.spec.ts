@@ -811,3 +811,121 @@ describe('formatTravelDistance — the travelMove {distance} token', () => {
     expect(formatTravelHours(0)).toBe('0 hours');
   });
 });
+
+// NPCs are solid on the local exploration grid: the party walks around a
+// person, not through them. Blocking ends when the NPC leaves the map
+// (turned hostile — it's a combat entity then — or killed), and an NPC
+// standing on a transition cell never walls off the exit.
+describe('resolveMarkerMove — living NPCs block local movement', () => {
+  // A 1-tall corridor: the NPC's cell is the ONLY way through.
+  const corridor: Room = {
+    id: 'corridor',
+    name: 'Corridor',
+    desc: '',
+    gridWidth: 5,
+    gridHeight: 1,
+    entryPos: { x: 0, y: 0 },
+    exits: [],
+  };
+  const allRooms = [...rooms, corridor];
+  const localState = (room: string): GameState =>
+    ({
+      map_level: 'local',
+      current_room: room,
+      marker_pos: { x: 0, y: 0 },
+      visited_rooms: [room],
+    }) as unknown as GameState;
+  const placedNpc = (roomId: string, pos: { x: number; y: number }) =>
+    ({
+      bram: {
+        id: 'bram',
+        name: 'Bram',
+        attitude: 'friendly',
+        hp: 8,
+        ac: 10,
+        damage: '1d4',
+        toHit: 2,
+        xp: 0,
+        roomId,
+        pos,
+      },
+    }) as unknown as Parameters<typeof resolveMarkerMove>[5];
+
+  it('rejects when the only path runs through a living NPC', () => {
+    const r = resolveMarkerMove(
+      campaign,
+      allRooms,
+      localState('corridor'),
+      { x: 4, y: 0 },
+      undefined,
+      placedNpc('corridor', { x: 2, y: 0 })
+    );
+    expect(r.rejected).toBe('No path there.');
+  });
+
+  it('routes around the NPC when the room has space', () => {
+    const r = resolveMarkerMove(
+      campaign,
+      rooms,
+      localState('tavern'), // 6×6 open room
+      { x: 2, y: 0 },
+      undefined,
+      placedNpc('tavern', { x: 1, y: 0 })
+    );
+    expect(r.rejected).toBeUndefined();
+    expect(r.st.marker_pos).toEqual({ x: 2, y: 0 });
+  });
+
+  it('stops blocking once the NPC turned hostile (a combat entity now)', () => {
+    const st = {
+      ...localState('corridor'),
+      npc_attitudes: { bram: 'hostile' },
+    } as unknown as GameState;
+    const r = resolveMarkerMove(
+      campaign,
+      allRooms,
+      st,
+      { x: 4, y: 0 },
+      undefined,
+      placedNpc('corridor', { x: 2, y: 0 })
+    );
+    expect(r.rejected).toBeUndefined();
+  });
+
+  it('stops blocking once the NPC is dead', () => {
+    const st = {
+      ...localState('corridor'),
+      npc_attitudes: { bram: 'hostile' },
+      enemies_killed: ['npc:bram'],
+    } as unknown as GameState;
+    const r = resolveMarkerMove(
+      campaign,
+      allRooms,
+      st,
+      { x: 4, y: 0 },
+      undefined,
+      placedNpc('corridor', { x: 2, y: 0 })
+    );
+    expect(r.rejected).toBeUndefined();
+  });
+
+  it('never walls off a transition cell (NPC standing on the exit)', () => {
+    const g = activeGrid(
+      campaign,
+      rooms,
+      localState('tavern'),
+      placedNpc('tavern', { x: 5, y: 5 }) // the tavern's ascend exit
+    )!;
+    expect(g.obstacles.some((o) => o.x === 5 && o.y === 5)).toBe(false);
+  });
+
+  it('NPCs in OTHER rooms do not leak into this grid', () => {
+    const g = activeGrid(
+      campaign,
+      allRooms,
+      localState('corridor'),
+      placedNpc('tavern', { x: 2, y: 0 })
+    )!;
+    expect(g.obstacles.some((o) => o.x === 2 && o.y === 0)).toBe(false);
+  });
+});

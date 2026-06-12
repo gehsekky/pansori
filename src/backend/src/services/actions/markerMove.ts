@@ -140,7 +140,9 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
     ctx.seed.rooms,
     ctx.st,
     action.to,
-    applyFatigue
+    applyFatigue,
+    // Living room NPCs are solid — the path bends around them.
+    ctx.seed.npcs
   );
   if (res.rejected) {
     ctx.narrative = res.rejected;

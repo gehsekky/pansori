@@ -15,6 +15,7 @@ import {
   type GridPos,
   type LevelNarrationHooks,
   type MapLevel,
+  type PlacedNpc,
   type Region,
   type Room,
   type Seed,
@@ -43,6 +44,33 @@ function mergeObstacles(
     .map((c) => c.pos);
   const transitionKeys = new Set(transitions.map((t) => `${t.pos.x},${t.pos.y}`));
   return [...(legacy ?? []), ...impassable].filter((o) => !transitionKeys.has(`${o.x},${o.y}`));
+}
+
+/**
+ * Cells occupied by NPCs standing in `roomId` — they're solid: the party walks
+ * around a person, not through them. An NPC stops blocking when it's gone from
+ * the exploration map (turned hostile — it's a combat entity now — or killed;
+ * mirrors the FE's token-visibility `npcGone`). A transition cell is never
+ * blocked (an NPC authored onto an exit must not wall it off — same discipline
+ * as mergeObstacles).
+ */
+function npcBlockedCells(
+  npcs: Record<string, PlacedNpc> | undefined,
+  roomId: string,
+  st: GameState,
+  transitions: MapTransition[]
+): GridPos[] {
+  const transitionKeys = new Set(transitions.map((t) => `${t.pos.x},${t.pos.y}`));
+  return Object.values(npcs ?? {})
+    .filter(
+      (n) =>
+        n.roomId === roomId &&
+        n.pos &&
+        st.npc_attitudes?.[n.id] !== 'hostile' &&
+        !(st.enemies_killed ?? []).includes(`npc:${n.id}`) &&
+        !transitionKeys.has(`${n.pos.x},${n.pos.y}`)
+    )
+    .map((n) => n.pos!);
 }
 
 /** Terrain type at a cell — defaults to `plains` for any unlisted square. */
@@ -351,7 +379,11 @@ function roomGrid(room: Room): { width: number; height: number; scale: number; e
 export function activeGrid(
   campaign: CampaignData | undefined,
   rooms: Room[],
-  st: GameState
+  st: GameState,
+  // Room NPC placements (seed.npcs). When supplied, living NPCs in the current
+  // LOCAL room block movement like obstacles — pass it from any caller that
+  // pathfinds (marker travel, approach); render-only callers may omit it.
+  npcs?: Record<string, PlacedNpc>
 ): ActiveGrid | null {
   if (!campaign) return null;
   const level = st.map_level;
@@ -427,9 +459,13 @@ export function activeGrid(
       feetPerSquare: g.scale,
       // Cosmetic room terrain (the same paint GridCombatView shows in combat) is
       // now surfaced in exploration too. Impassable terrain types fold into the
-      // obstacle set so they block marker travel the way town / region do.
+      // obstacle set so they block marker travel the way town / region do —
+      // and so do NPCs standing in the room (people are solid).
       terrain: room.terrain ?? [],
-      obstacles: mergeObstacles(room.obstacles, room.terrain, transitions),
+      obstacles: [
+        ...mergeObstacles(room.obstacles, room.terrain, transitions),
+        ...npcBlockedCells(npcs, room.id, st, transitions),
+      ],
       startPos: g.entry,
       transitions,
       floor: room.floor ?? 'cobblestone',
@@ -490,7 +526,9 @@ export function resolveMarkerMove(
   rooms: Room[],
   st: GameState,
   to: GridPos,
-  applyFatigue?: TravelFatigueFn
+  applyFatigue?: TravelFatigueFn,
+  // seed.npcs — living room NPCs block local-room pathfinding (see activeGrid).
+  npcs?: Record<string, PlacedNpc>
 ): MarkerMoveResult {
   const reject = (rejected: string): MarkerMoveResult => ({
     st,
@@ -500,7 +538,7 @@ export function resolveMarkerMove(
     elapsedHours: 0,
     rejected,
   });
-  const grid = activeGrid(campaign, rooms, st);
+  const grid = activeGrid(campaign, rooms, st, npcs);
   if (!grid) return reject('No map here.');
   const from = st.marker_pos ?? grid.startPos;
   // Re-issuing the move onto the cell the marker already occupies: a no-op,

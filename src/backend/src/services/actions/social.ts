@@ -117,7 +117,9 @@ export const handleTalk: ActionHandler<{ type: 'talk'; npcId: string }> = (ctx, 
     // the NPC's token before opening the conversation. No-op if the NPC has no
     // position or the party is already adjacent.
     if (npc.pos && ctx.st.marker_pos) {
-      const grid = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st);
+      // NPC placements fold into the obstacle set so the adjacent-cell pick
+      // can't put the party inside ANOTHER bystander.
+      const grid = activeGrid(ctx.context.campaign, ctx.seed.rooms, ctx.st, ctx.seed.npcs);
       if (grid) {
         ctx.st = { ...ctx.st, marker_pos: approachCell(grid, ctx.st.marker_pos, npc.pos) };
       }

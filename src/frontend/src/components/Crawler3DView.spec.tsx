@@ -4,8 +4,8 @@
 // lib/gridStep (its own spec); the placement logic in lib/roomPlacement.
 
 import type { ActiveGrid, GameState, Seed } from '../types';
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import Crawler3DView from './Crawler3DView.tsx';
 
 const grid: ActiveGrid = {
@@ -86,5 +86,49 @@ describe('Crawler3DView', () => {
       />
     );
     expect(screen.getAllByTestId('crawler-3d-unavailable').length).toBeGreaterThan(0);
+  });
+});
+
+describe('Crawler3DView — NPCs are solid', () => {
+  // Marker (3,5) in the 7×6 den faces north (initialHeading), so 'w' steps
+  // to (3,4). The keydown handler registers regardless of the WebGL
+  // fallback, so jsdom can drive it.
+  const step = (npcs: Seed['npcs']) => {
+    const onChoice = vi.fn();
+    render(
+      <Crawler3DView
+        gameState={gameState}
+        seed={{ ...seed, npcs } as Seed}
+        grid={grid}
+        choices={[]}
+        loading={false}
+        readOnly={false}
+        onChoice={onChoice}
+      />
+    );
+    fireEvent.keyDown(window, { key: 'w' });
+    return onChoice;
+  };
+
+  it('a step into a living NPC is a bump — no marker_move round-trip', () => {
+    const onChoice = step({
+      bram: {
+        id: 'bram',
+        name: 'Bram',
+        attitude: 'friendly',
+        roomId: 'den',
+        pos: { x: 3, y: 4 },
+      },
+    } as unknown as Seed['npcs']);
+    expect(onChoice).not.toHaveBeenCalled();
+  });
+
+  it('the same step dispatches marker_move when no one stands there', () => {
+    const onChoice = step({} as Seed['npcs']);
+    expect(onChoice).toHaveBeenCalledTimes(1);
+    expect(onChoice.mock.calls[0][0].action).toEqual({
+      type: 'marker_move',
+      to: { x: 3, y: 4 },
+    });
   });
 });

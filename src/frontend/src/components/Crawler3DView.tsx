@@ -512,6 +512,19 @@ function Crawler3DView({
     return list;
   }, [gameState, seed, grid, roomDef, npcGone]);
 
+  // NPCs are solid (the server's pathfinding treats them as obstacles) — block
+  // the step locally so a bump doesn't round-trip. Only NPCs, not loot/objects;
+  // and never a transition cell (an NPC on an exit must not wall it off,
+  // mirroring the backend's npcBlockedCells).
+  const npcBlockKeys = useMemo(() => {
+    const transitionKeys = new Set(grid.transitions.map((t) => `${t.pos.x},${t.pos.y}`));
+    return new Set(
+      interactables
+        .filter((it) => it.kind === 'npc' && !transitionKeys.has(`${it.pos.x},${it.pos.y}`))
+        .map((it) => `${it.pos.x},${it.pos.y}`)
+    );
+  }, [interactables, grid.transitions]);
+
   // The faced cell's interactable (or one underfoot) — the F target. A faced
   // TRANSITION gets a "step ahead to enter" hint instead (no key needed).
   const facedCell = stepTarget(marker, heading, 'forward');
@@ -557,8 +570,8 @@ function Crawler3DView({
   }, [facing, choices, onChoice]);
 
   // ── Keys: one press = one step (a real marker_move) or one 90° turn ──────
-  const stateRef = useRef({ marker, heading, loading, readOnly, grid });
-  stateRef.current = { marker, heading, loading, readOnly, grid };
+  const stateRef = useRef({ marker, heading, loading, readOnly, grid, npcBlockKeys });
+  stateRef.current = { marker, heading, loading, readOnly, grid, npcBlockKeys };
   const interactRef = useRef(interact);
   interactRef.current = interact;
   useEffect(() => {
@@ -589,9 +602,9 @@ function Crawler3DView({
         e.preventDefault();
         if (s.loading) return; // one engine step at a time
         const to = stepTarget(s.marker, s.heading, move);
-        // Pre-check walls/bounds so a bump doesn't round-trip the server;
+        // Pre-check walls/bounds/NPCs so a bump doesn't round-trip the server;
         // everything else (exits, traps, encounters) is the engine's call.
-        if (isBlocked(s.grid, to)) return;
+        if (isBlocked(s.grid, to) || s.npcBlockKeys.has(`${to.x},${to.y}`)) return;
         onChoice({ label: `Step to (${to.x},${to.y})`, action: { type: 'marker_move', to } });
         return;
       }
