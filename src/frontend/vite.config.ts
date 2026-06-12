@@ -3,6 +3,12 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
+  // The 3D crawler view (Room3DView) is lazy-imported, so its deps aren't in
+  // vite's initial pre-bundle scan — discovering them mid-session triggers a
+  // re-optimization that can split React into two module instances ("dispatcher
+  // is null" on the first hook). Pre-bundle them up front and dedupe react.
+  optimizeDeps: { include: ['three', '@react-three/fiber', '@react-three/drei'] },
+  resolve: { dedupe: ['react', 'react-dom', 'three'] },
   server: {
     host: true,
     port: 5173,

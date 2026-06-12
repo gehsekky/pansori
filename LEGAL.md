@@ -62,6 +62,28 @@ General Public License v3.0 — see [LICENSE](LICENSE).
   overland terrain tiles and location markers are part of the separately-licensed
   overlay (below).
 
+- 3D world ground/surface textures, under `src/frontend/public/art/textures3d/`:
+  color maps from [ambientCG](https://ambientcg.com) (assets Grass001, Rock035,
+  Ground037, Snow004, PavingStones070, Plaster003, RoofingTiles003, Bricks058,
+  Planks012, Ground054; downscaled to 512px), released under
+  [CC0 / Public Domain](https://creativecommons.org/publicdomain/zero/1.0/)
+  (any use, commercial or not, no attribution required — credited here as a
+  courtesy).
+
+- 3D world low-poly models, under `src/frontend/public/art/models3d/`: tree
+  models (tree_single_A/B + the shared palette texture) from the
+  [KayKit Medieval Hexagon Pack](https://kaylousberg.itch.io/kaykit-medieval-hexagon)
+  and dead-tree models (tree_dead_large/medium + palette) from
+  [KayKit Halloween Bits](https://kaylousberg.itch.io/halloween-bits); animated
+  character models (knight, mage, rogue, rogue_hooded, barbarian) from the
+  [KayKit Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers)
+  and (skeleton_warrior/minion/mage/rogue) from the
+  [KayKit Character Pack: Skeletons](https://kaylousberg.itch.io/kaykit-skeletons)
+  (re-processed for size: animation set reduced to 7 clips, mesh-quantized).
+  All by Kay Lousberg ([kaylousberg.com](https://www.kaylousberg.com)), released
+  under [CC0 / Public Domain](https://creativecommons.org/publicdomain/zero/1.0/)
+  (attribution not required — credited here as a courtesy).
+
 ## Painted-art overlay (separate repository)
 
 This repository ships a **free, fully-playable art tier** built only from
