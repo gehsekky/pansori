@@ -1,4 +1,5 @@
 import type { CombatEntity, FloorType, GameState, GridPos, Seed, TerrainType } from '../types';
+import { computeAoeCells, enemyDisplayNames } from '../lib/combatPreview';
 import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
@@ -359,8 +360,8 @@ function GridCombatView({
   }
 
   // AoE preview — when the player hovers a spell choice with an AoE shape,
-  // compute the affected cells. Mirrors the backend `entitiesInCone/Cube/
-  // Line/Blast` math from gridEngine.ts so the preview is RAW-accurate.
+  // compute the affected cells. Shared math with the 3D combat view
+  // (lib/combatPreview), itself a mirror of the backend gridEngine geometry.
   const aoeCells: Set<string> = (() => {
     const empty = new Set<string>();
     if (!aoePreview) return empty;
@@ -369,86 +370,19 @@ function GridCombatView({
     const targetEnt = aoePreview.targetEnemyId
       ? entities.find((e) => e.id === aoePreview.targetEnemyId)
       : undefined;
-    const epicenter = targetEnt?.pos ?? casterEnt.pos;
-    const sq = Math.floor(aoePreview.radiusFt / SQUARE_SIZE_FT);
-    const cells = new Set<string>();
-    switch (aoePreview.shape) {
-      case 'sphere':
-        for (let dx = -sq; dx <= sq; dx++) {
-          for (let dy = -sq; dy <= sq; dy++) {
-            if (Math.max(Math.abs(dx), Math.abs(dy)) > sq) continue;
-            cells.add(`${epicenter.x + dx},${epicenter.y + dy}`);
-          }
-        }
-        break;
-      case 'cone': {
-        const dx = Math.sign(epicenter.x - casterEnt.pos.x);
-        const dy = Math.sign(epicenter.y - casterEnt.pos.y);
-        if (dx === 0 && dy === 0) break;
-        for (let cx = 0; cx < gridWidth; cx++) {
-          for (let cy = 0; cy < gridHeight; cy++) {
-            const rx = cx - casterEnt.pos.x;
-            const ry = cy - casterEnt.pos.y;
-            const along = rx * dx + ry * dy;
-            if (along <= 0 || along > sq) continue;
-            const perp =
-              dx !== 0 && dy !== 0 ? Math.abs(rx * dy - ry * dx) / 2 : Math.abs(rx * dy - ry * dx);
-            if (perp <= along) cells.add(`${cx},${cy}`);
-          }
-        }
-        break;
-      }
-      case 'cube': {
-        const dx = Math.sign(epicenter.x - casterEnt.pos.x);
-        const dy = Math.sign(epicenter.y - casterEnt.pos.y);
-        const side = sq;
-        const minX =
-          dx >= 0
-            ? casterEnt.pos.x + (dx === 0 ? -Math.floor(side / 2) : 1)
-            : casterEnt.pos.x - side;
-        const maxX = minX + side - 1;
-        const minY =
-          dy >= 0
-            ? casterEnt.pos.y + (dy === 0 ? -Math.floor(side / 2) : 1)
-            : casterEnt.pos.y - side;
-        const maxY = minY + side - 1;
-        for (let cx = minX; cx <= maxX; cx++)
-          for (let cy = minY; cy <= maxY; cy++) cells.add(`${cx},${cy}`);
-        break;
-      }
-      case 'line': {
-        const dx = Math.sign(epicenter.x - casterEnt.pos.x);
-        const dy = Math.sign(epicenter.y - casterEnt.pos.y);
-        if (dx === 0 && dy === 0) break;
-        for (let i = 1; i <= sq; i++) {
-          cells.add(`${casterEnt.pos.x + dx * i},${casterEnt.pos.y + dy * i}`);
-        }
-        break;
-      }
-    }
-    return cells;
+    return computeAoeCells(
+      aoePreview,
+      casterEnt.pos,
+      targetEnt?.pos ?? casterEnt.pos,
+      gridWidth,
+      gridHeight
+    );
   })();
 
   // Disambiguate same-name enemies in the current room: when two or more
   // share a name (e.g. 2× Bandit Ruffian), append #1, #2, ... so the grid
   // tooltip matches the "Attack Bandit #2" choice the player sees.
-  const enemyDisplayName = (() => {
-    const map = new Map<string, string>();
-    const byName: Record<string, string[]> = {};
-    for (const e of entities) {
-      if (!e.isEnemy) continue;
-      const name = enemyLookup.get(e.id)?.name ?? 'Enemy';
-      (byName[name] ??= []).push(e.id);
-    }
-    for (const [name, ids] of Object.entries(byName)) {
-      if (ids.length === 1) {
-        map.set(ids[0], name);
-      } else {
-        ids.forEach((id, i) => map.set(id, `${name} #${i + 1}`));
-      }
-    }
-    return (id: string) => map.get(id) ?? enemyLookup.get(id)?.name ?? 'Enemy';
-  })();
+  const enemyDisplayName = enemyDisplayNames(entities, (id) => enemyLookup.get(id)?.name);
 
   const cells: React.ReactNode[] = [];
   for (let y = 0; y < gridHeight; y++) {

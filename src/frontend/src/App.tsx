@@ -43,9 +43,10 @@ import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
 
-// The first-person grid crawler (3D experiment v2) — lazy so three.js stays
-// out of the main bundle until a local room actually renders in 3D.
+// The first-person grid crawler + the combat diorama (3D experiment v2) —
+// lazy so three.js stays out of the main bundle until something renders in 3D.
 const Crawler3DView = lazy(() => import('./components/Crawler3DView.tsx'));
+const Combat3DView = lazy(() => import('./components/Combat3DView.tsx'));
 
 // The crawler-by-default preference for local rooms. e2e/CI opts out via
 // localStorage; WebGL-less browsers fall back inside the component itself.
@@ -59,6 +60,24 @@ function preferCrawler(): boolean {
 function persistPreferCrawler(on: boolean): void {
   try {
     localStorage.setItem('pansori_crawler', on ? 'on' : 'off');
+  } catch {
+    // private mode etc. — preference just won't stick
+  }
+}
+// The combat diorama keeps its OWN preference (the v1 lesson: one shared
+// switch let a battlefield toggle silently change the exploration default),
+// falling back to the crawler preference when never touched.
+function preferCombat3d(): boolean {
+  try {
+    const v = localStorage.getItem('pansori_combat_3d');
+    return v === null ? preferCrawler() : v !== 'off';
+  } catch {
+    return true;
+  }
+}
+function persistPreferCombat3d(on: boolean): void {
+  try {
+    localStorage.setItem('pansori_combat_3d', on ? 'on' : 'off');
   } catch {
     // private mode etc. — preference just won't stick
   }
@@ -192,6 +211,8 @@ export default function App() {
   // Local rooms render as the first-person grid crawler by default (3D
   // experiment v2); the 2D grid stays one toggle away.
   const [crawler3d, setCrawler3d] = useState(preferCrawler);
+  // Combat's 3D diorama, on its own preference switch.
+  const [combat3d, setCombat3d] = useState(preferCombat3d);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   // Which party member's character sheet modal is open (null = closed).
@@ -853,25 +874,56 @@ export default function App() {
                       // context.gridWidth) so a bare arena room with no size of its
                       // own draws at the same size the server bounds it to.
                       const combatRoom = seed.rooms.find((r) => r.id === gameState.current_room);
+                      // Identical contract for the 2D grid and the 3D diorama —
+                      // same turn-based engine, the player picks the presentation.
+                      const combatViewProps = {
+                        state: gameState,
+                        seed,
+                        gridWidth: clampCombatDim(combatRoom?.gridWidth ?? seed.gridWidth),
+                        gridHeight: clampCombatDim(combatRoom?.gridHeight ?? seed.gridHeight),
+                        aoePreview: hoveredChoice?.aoePreview,
+                        onMove: gameState.combat_active
+                          ? (to: { x: number; y: number }) => {
+                              const activeId = gameState.active_character_id;
+                              handleChoice({
+                                label: `Move to (${to.x},${to.y})`,
+                                action: { type: 'grid_move', entityId: activeId, to },
+                              });
+                            }
+                          : undefined,
+                      };
                       return (
-                        <GridCombatView
-                          state={gameState}
-                          seed={seed}
-                          gridWidth={clampCombatDim(combatRoom?.gridWidth ?? seed.gridWidth)}
-                          gridHeight={clampCombatDim(combatRoom?.gridHeight ?? seed.gridHeight)}
-                          aoePreview={hoveredChoice?.aoePreview}
-                          onMove={
-                            gameState.combat_active
-                              ? (to) => {
-                                  const activeId = gameState.active_character_id;
-                                  handleChoice({
-                                    label: `Move to (${to.x},${to.y})`,
-                                    action: { type: 'grid_move', entityId: activeId, to },
-                                  });
-                                }
-                              : undefined
-                          }
-                        />
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            className={styles.signOutBtn}
+                            style={{ position: 'absolute', right: 6, top: 6, zIndex: 5 }}
+                            onClick={() => {
+                              setCombat3d((v) => {
+                                persistPreferCombat3d(!v);
+                                return !v;
+                              });
+                            }}
+                            aria-label={
+                              combat3d ? 'Switch to 2D battlefield' : 'Switch to 3D battlefield'
+                            }
+                            data-testid="combat-3d-toggle"
+                          >
+                            {combat3d ? '2D GRID' : '3D VIEW'}
+                          </button>
+                          {combat3d ? (
+                            <Suspense
+                              fallback={
+                                <div className={styles.card} style={{ height: 440 }}>
+                                  Loading 3D battlefield…
+                                </div>
+                              }
+                            >
+                              <Combat3DView {...combatViewProps} />
+                            </Suspense>
+                          ) : (
+                            <GridCombatView {...combatViewProps} />
+                          )}
+                        </div>
                       );
                     }
                     if (!gameState.combat_active && gameState.map_level) {
