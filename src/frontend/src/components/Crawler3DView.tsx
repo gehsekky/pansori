@@ -89,9 +89,15 @@ const hudBox: React.CSSProperties = {
 };
 
 // ── Camera rig: tweens position to the marker's cell and yaw to the facing.
-// Yaw target is ACCUMULATED (±π/2 per turn, never normalized) so the tween
-// always takes the short way around. A torch light rides along. ─────────────
-function CameraRig({ target, yawTarget }: { target: { x: number; z: number }; yawTarget: number }) {
+// `heading` is the SINGLE source of truth for facing (the minimap arrow and
+// the movement mapping read the same state) — the camera yaw is DERIVED from
+// it each frame, picking the 2π-representative nearest the current yaw so a
+// 90° turn always tweens the short way around. (The previous design kept a
+// separate accumulated yaw ref, mutated inside the setState updater — React
+// may invoke updaters more than once (StrictMode does), which double-bumped
+// the camera while the heading turned once: the view, the minimap, and the
+// movement keys drifted out of agreement.) A torch light rides along. ────────
+function CameraRig({ target, heading }: { target: { x: number; z: number }; heading: Heading }) {
   const light = useRef<THREE.PointLight>(null);
   // The rig OWNS the camera. r3f's default camera arrives with a lookAt-style
   // orientation whose YXZ reinterpretation carries a nonzero ROLL — leaving z
@@ -100,16 +106,21 @@ function CameraRig({ target, yawTarget }: { target: { x: number; z: number }; ya
   // on the first tick, then keep pitch and roll pinned at zero.
   const initialized = useRef(false);
   useFrame(({ camera }, dt) => {
+    const base = yawForHeading(heading);
     if (!initialized.current) {
       initialized.current = true;
-      camera.rotation.set(0, yawTarget, 0, 'YXZ');
+      camera.rotation.set(0, base, 0, 'YXZ');
       camera.position.set(target.x, EYE, target.z);
     }
     const k = Math.min(1, dt * 7);
     camera.position.x += (target.x - camera.position.x) * k;
     camera.position.z += (target.z - camera.position.z) * k;
     camera.position.y = EYE;
-    camera.rotation.y += (yawTarget - camera.rotation.y) * Math.min(1, dt * 9);
+    // Nearest representative of the heading's yaw (mod 2π) to the current
+    // camera yaw — shortest-way tween without accumulating state.
+    const cur = camera.rotation.y;
+    const yawTarget = base + Math.round((cur - base) / (2 * Math.PI)) * 2 * Math.PI;
+    camera.rotation.y += (yawTarget - cur) * Math.min(1, dt * 9);
     camera.rotation.x = 0;
     camera.rotation.z = 0;
     if (light.current) {
@@ -441,10 +452,10 @@ function Crawler3DView({
   );
 
   // Facing — pure view state, reset to "look into the room" per grid change
-  // (room ↔ room, room ↔ town — the key covers every crawled level).
+  // (room ↔ room, room ↔ town — the key covers every crawled level). The ONE
+  // source of truth: the minimap arrow, the movement mapping, and the camera
+  // yaw (derived in CameraRig) all read this same state, so they can't drift.
   const [heading, setHeading] = useState<Heading>(() => initialHeading(marker, grid));
-  // Accumulated yaw target (±π/2 per turn, never normalized → shortest tween).
-  const yawRef = useRef(yawForHeading(heading));
   const roomKey = `${gameState.map_level}:${gameState.current_town_id ?? ''}:${gameState.current_room}`;
   const lastRoom = useRef(roomKey);
   // Doorway fade across room changes.
@@ -453,9 +464,7 @@ function Crawler3DView({
   useEffect(() => {
     if (lastRoom.current === roomKey) return;
     lastRoom.current = roomKey;
-    const h0 = initialHeading(gameState.marker_pos ?? grid.startPos, grid);
-    setHeading(h0);
-    yawRef.current = yawForHeading(h0);
+    setHeading(initialHeading(gameState.marker_pos ?? grid.startPos, grid));
     setFading(true);
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     fadeTimer.current = setTimeout(() => setFading(false), 80);
@@ -561,10 +570,9 @@ function Crawler3DView({
       if (k === 'a' || k === 'arrowleft' || k === 'd' || k === 'arrowright') {
         e.preventDefault();
         const dir = k === 'a' || k === 'arrowleft' ? 'left' : 'right';
-        setHeading((prev) => {
-          yawRef.current += dir === 'left' ? Math.PI / 2 : -Math.PI / 2;
-          return turn(prev, dir);
-        });
+        // PURE updater — React may invoke it more than once (StrictMode
+        // does); any side effect in here runs a variable number of times.
+        setHeading((prev) => turn(prev, dir));
         return;
       }
       const move =
@@ -683,7 +691,7 @@ function Crawler3DView({
         )}
         <CameraRig
           target={{ x: marker.x * CRAWL_CELL, z: marker.y * CRAWL_CELL }}
-          yawTarget={yawRef.current}
+          heading={heading}
         />
         <Suspense
           fallback={<RoomShellFallback w={grid.width} h={grid.height} obstacles={grid.obstacles} />}
