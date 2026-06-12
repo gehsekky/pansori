@@ -127,20 +127,28 @@ function CameraRig({ target, yawTarget }: { target: { x: number; z: number }; ya
   );
 }
 
-// ── Room shell: textured floor, ceiling, perimeter walls, obstacle blocks ──
+// ── Shell: textured floor + obstacle blocks; indoors adds ceiling and full-
+// height perimeter walls, outdoors (towns) a low boundary wall under open sky.
 function RoomShell({
   w,
   h,
   floor,
   obstacles,
+  outdoor,
 }: {
   w: number;
   h: number;
   floor?: string;
   obstacles: GridPos[];
+  outdoor?: boolean;
 }) {
   const floorKey = FLOOR_TEX_KEY[floor ?? 'cobblestone'] ?? 'cobblestone';
-  const tex = useTexture({ floor: TEX3D[floorKey], brick: TEX3D.bricks, planks: TEX3D.planks });
+  const tex = useTexture({
+    floor: TEX3D[floorKey],
+    brick: TEX3D.bricks,
+    planks: TEX3D.planks,
+    rock: TEX3D.rock,
+  });
   const maps = useMemo(() => {
     const f = configureTexture(tex.floor.clone());
     f.repeat.set(w, h);
@@ -154,7 +162,14 @@ function RoomShell({
     const wallZ = configureTexture(tex.brick.clone());
     wallZ.repeat.set(h * 1.5, 1.6);
     wallZ.needsUpdate = true;
-    return { f, ceil, wallX, wallZ, brick: configureTexture(tex.brick) };
+    return {
+      f,
+      ceil,
+      wallX,
+      wallZ,
+      brick: configureTexture(tex.brick),
+      rock: configureTexture(tex.rock),
+    };
   }, [tex, w, h]);
   useEffect(
     () => () => {
@@ -169,26 +184,30 @@ function RoomShell({
   const cz = ((h - 1) * CRAWL_CELL) / 2;
   const spanX = w * CRAWL_CELL;
   const spanZ = h * CRAWL_CELL;
+  // Outdoors the boundary is a knee wall (the engine blocks off-grid steps;
+  // the wall communicates it without blotting out the sky). Obstacle cells —
+  // town walls, debris — rise as stone, full height.
+  const wallH = outdoor ? 1.1 : WALL_H;
   const walls = [
     {
-      p: [cx, WALL_H / 2, -CRAWL_CELL / 2] as const,
-      s: [spanX + 1, WALL_H, 0.5] as const,
-      m: maps.wallX,
+      p: [cx, wallH / 2, -CRAWL_CELL / 2] as const,
+      s: [spanX + 1, wallH, 0.5] as const,
+      m: outdoor ? maps.rock : maps.wallX,
     },
     {
-      p: [cx, WALL_H / 2, spanZ - CRAWL_CELL / 2] as const,
-      s: [spanX + 1, WALL_H, 0.5] as const,
-      m: maps.wallX,
+      p: [cx, wallH / 2, spanZ - CRAWL_CELL / 2] as const,
+      s: [spanX + 1, wallH, 0.5] as const,
+      m: outdoor ? maps.rock : maps.wallX,
     },
     {
-      p: [-CRAWL_CELL / 2, WALL_H / 2, cz] as const,
-      s: [0.5, WALL_H, spanZ + 1] as const,
-      m: maps.wallZ,
+      p: [-CRAWL_CELL / 2, wallH / 2, cz] as const,
+      s: [0.5, wallH, spanZ + 1] as const,
+      m: outdoor ? maps.rock : maps.wallZ,
     },
     {
-      p: [spanX - CRAWL_CELL / 2, WALL_H / 2, cz] as const,
-      s: [0.5, WALL_H, spanZ + 1] as const,
-      m: maps.wallZ,
+      p: [spanX - CRAWL_CELL / 2, wallH / 2, cz] as const,
+      s: [0.5, wallH, spanZ + 1] as const,
+      m: outdoor ? maps.rock : maps.wallZ,
     },
   ];
   return (
@@ -197,11 +216,13 @@ function RoomShell({
         <planeGeometry args={[spanX, spanZ]} />
         <meshStandardMaterial map={maps.f} />
       </mesh>
-      {/* Crawlers are interiors — the ceiling sells it. */}
-      <mesh position={[cx, WALL_H, cz]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[spanX, spanZ]} />
-        <meshStandardMaterial map={maps.ceil} color="#6e6256" />
-      </mesh>
+      {/* Interiors get a ceiling — it sells the crawler; towns get the sky. */}
+      {!outdoor && (
+        <mesh position={[cx, WALL_H, cz]} rotation={[Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[spanX, spanZ]} />
+          <meshStandardMaterial map={maps.ceil} color="#6e6256" />
+        </mesh>
+      )}
       {walls.map((wall, i) => (
         <mesh key={i} position={wall.p as unknown as THREE.Vector3Tuple}>
           <boxGeometry args={wall.s as unknown as THREE.Vector3Tuple} />
@@ -211,10 +232,74 @@ function RoomShell({
       {obstacles.map((o) => (
         <mesh key={`${o.x},${o.y}`} position={[o.x * CRAWL_CELL, WALL_H / 2, o.y * CRAWL_CELL]}>
           <boxGeometry args={[CRAWL_CELL, WALL_H, CRAWL_CELL]} />
-          <meshStandardMaterial map={maps.brick} />
+          <meshStandardMaterial map={outdoor ? maps.rock : maps.brick} />
         </mesh>
       ))}
     </>
+  );
+}
+
+// ── Venue building: a facade the party walks INTO — stepping on its cell IS
+// the engine's room entry, the doorway fade covers the crossing. ────────────
+function VenueBuilding({ label }: { label: string }) {
+  const tex = useTexture({ wall: TEX3D.plaster, roof: TEX3D.rooftiles });
+  const maps = useMemo(
+    () => ({ wall: configureTexture(tex.wall), roof: configureTexture(tex.roof) }),
+    [tex]
+  );
+  const bw = CRAWL_CELL * 0.96;
+  return (
+    <group>
+      <mesh position={[0, 1.6, 0]}>
+        <boxGeometry args={[bw, 3.2, bw]} />
+        <meshStandardMaterial map={maps.wall} />
+      </mesh>
+      <mesh position={[0, 4.1, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[bw * 0.82, 1.8, 4]} />
+        <meshStandardMaterial map={maps.roof} />
+      </mesh>
+      {/* The door glow on every face — approach from any side reads as entry. */}
+      {[0, 1, 2, 3].map((i) => (
+        <mesh
+          key={i}
+          position={[
+            Math.sin((i * Math.PI) / 2) * (bw / 2 + 0.04),
+            1.1,
+            Math.cos((i * Math.PI) / 2) * (bw / 2 + 0.04),
+          ]}
+          rotation={[0, (i * Math.PI) / 2, 0]}
+        >
+          <boxGeometry args={[1.2, 2.2, 0.08]} />
+          <meshStandardMaterial color="#1f4f46" emissive="#2dd4bf" emissiveIntensity={0.6} />
+        </mesh>
+      ))}
+      <Html position={[0, 5.4, 0]} center distanceFactor={14}>
+        <div style={labelStyle}>⌂ {label}</div>
+      </Html>
+    </group>
+  );
+}
+
+// The town gate — an arch back out to the region map.
+function GateArch({ label }: { label: string }) {
+  const tex = useTexture({ stone: TEX3D.rock });
+  const stone = useMemo(() => configureTexture(tex.stone), [tex]);
+  return (
+    <group>
+      {[-1.1, 1.1].map((dx) => (
+        <mesh key={dx} position={[dx, 1.5, 0]}>
+          <boxGeometry args={[0.6, 3.0, 0.6]} />
+          <meshStandardMaterial map={stone} />
+        </mesh>
+      ))}
+      <mesh position={[0, 3.2, 0]}>
+        <boxGeometry args={[2.9, 0.5, 0.7]} />
+        <meshStandardMaterial map={stone} />
+      </mesh>
+      <Html position={[0, 4.1, 0]} center distanceFactor={14}>
+        <div style={labelStyle}>⤴ {label}</div>
+      </Html>
+    </group>
   );
 }
 
@@ -349,16 +434,18 @@ function Crawler3DView({
   height = 440,
 }: Props) {
   const marker = gameState.marker_pos ?? grid.startPos;
+  const outdoor = grid.level === 'town';
   const roomDef = useMemo(
     () => seed.rooms.find((r) => r.id === gameState.current_room),
     [seed.rooms, gameState.current_room]
   );
 
-  // Facing — pure view state, reset to "look into the room" per room.
+  // Facing — pure view state, reset to "look into the room" per grid change
+  // (room ↔ room, room ↔ town — the key covers every crawled level).
   const [heading, setHeading] = useState<Heading>(() => initialHeading(marker, grid));
   // Accumulated yaw target (±π/2 per turn, never normalized → shortest tween).
   const yawRef = useRef(yawForHeading(heading));
-  const roomKey = gameState.current_room;
+  const roomKey = `${gameState.map_level}:${gameState.current_town_id ?? ''}:${gameState.current_room}`;
   const lastRoom = useRef(roomKey);
   // Doorway fade across room changes.
   const [fading, setFading] = useState(false);
@@ -416,12 +503,15 @@ function Crawler3DView({
     return list;
   }, [gameState, seed, grid, roomDef, npcGone]);
 
-  // The faced cell's interactable (or one underfoot) — the F target.
+  // The faced cell's interactable (or one underfoot) — the F target. A faced
+  // TRANSITION gets a "step ahead to enter" hint instead (no key needed).
   const facedCell = stepTarget(marker, heading, 'forward');
   const facing =
     interactables.find((it) => it.pos.x === facedCell.x && it.pos.y === facedCell.y) ??
     interactables.find((it) => it.pos.x === marker.x && it.pos.y === marker.y) ??
     null;
+  const facingDoor =
+    grid.transitions.find((t) => t.pos.x === facedCell.x && t.pos.y === facedCell.y) ?? null;
 
   const interact = useCallback(() => {
     if (!facing) return;
@@ -522,8 +612,22 @@ function Crawler3DView({
     return () => clearTimeout(t);
   }, [attackChoice, loading, readOnly, choices, roomKey, onChoice]);
 
+  // Indoors: the room's authored lighting. Outdoors: the engine clock IS the
+  // light — sunUp swings ambience and the sky color through the day.
   const lighting = roomDef?.lighting ?? 'bright';
-  const ambient = lighting === 'dark' ? 0.12 : lighting === 'dim' ? 0.28 : 0.55;
+  const minute = (gameState.world_minute ?? 480) % 1440;
+  const sunUp = Math.max(0, Math.sin(((minute - 360) / 720) * Math.PI));
+  const ambient = outdoor
+    ? 0.35 + 0.45 * sunUp
+    : lighting === 'dark'
+      ? 0.12
+      : lighting === 'dim'
+        ? 0.28
+        : 0.55;
+  const sky = outdoor
+    ? `rgb(${Math.round(24 + 96 * sunUp)}, ${Math.round(30 + 116 * sunUp)}, ${Math.round(44 + 136 * sunUp)})`
+    : '#05070a';
+  const fogFar = outdoor ? 24 : lighting === 'dark' ? 5 : 9;
   const obstacleKeys = useMemo(
     () => new Set(grid.obstacles.map((o) => `${o.x},${o.y}`)),
     [grid.obstacles]
@@ -567,12 +671,16 @@ function Crawler3DView({
         camera={{ fov: 70, near: 0.1, far: 80 }}
         dpr={[1, 1.75]}
       >
-        <color attach="background" args={['#05070a']} />
-        <fog
-          attach="fog"
-          args={['#05070a', CRAWL_CELL * 2, CRAWL_CELL * (lighting === 'dark' ? 5 : 9)]}
-        />
+        <color attach="background" args={[sky]} />
+        <fog attach="fog" args={[sky, CRAWL_CELL * 2, CRAWL_CELL * fogFar]} />
         <ambientLight intensity={ambient} />
+        {outdoor && (
+          <directionalLight
+            position={[30, 25 + 50 * sunUp, 20]}
+            intensity={0.3 + 0.8 * sunUp}
+            color={sunUp > 0.25 ? '#fff4dc' : '#7d8bb5'}
+          />
+        )}
         <CameraRig
           target={{ x: marker.x * CRAWL_CELL, z: marker.y * CRAWL_CELL }}
           yawTarget={yawRef.current}
@@ -580,27 +688,47 @@ function Crawler3DView({
         <Suspense
           fallback={<RoomShellFallback w={grid.width} h={grid.height} obstacles={grid.obstacles} />}
         >
-          <RoomShell w={grid.width} h={grid.height} floor={grid.floor} obstacles={grid.obstacles} />
+          <RoomShell
+            w={grid.width}
+            h={grid.height}
+            floor={grid.floor}
+            obstacles={grid.obstacles}
+            outdoor={outdoor}
+          />
         </Suspense>
-        {/* Exits / ascents — glowing doorways at their transition cells. */}
+        {/* Transitions: in a town, venues are BUILDINGS you walk into and the
+            gate is an arch; indoors they're glowing doorways. Either way,
+            stepping on the cell IS the engine transition. */}
         {grid.transitions.map((t, i) => (
           <group key={i} position={[t.pos.x * CRAWL_CELL, 0, t.pos.y * CRAWL_CELL]}>
-            <mesh position={[0, 1.3, 0]}>
-              <boxGeometry args={[1.4, 2.6, 0.16]} />
-              <meshStandardMaterial
-                color="#1f4f46"
-                emissive="#2dd4bf"
-                emissiveIntensity={0.6}
-                transparent
-                opacity={0.85}
-              />
-            </mesh>
-            <Html position={[0, 2.9, 0]} center distanceFactor={10}>
-              <div style={labelStyle}>
-                {t.kind === 'ascend' ? '⤴ ' : '⇲ '}
-                {t.label}
-              </div>
-            </Html>
+            {outdoor && t.kind === 'venue' ? (
+              <Suspense fallback={null}>
+                <VenueBuilding label={t.label} />
+              </Suspense>
+            ) : outdoor && t.kind === 'ascend' ? (
+              <Suspense fallback={null}>
+                <GateArch label={t.label} />
+              </Suspense>
+            ) : (
+              <>
+                <mesh position={[0, 1.3, 0]}>
+                  <boxGeometry args={[1.4, 2.6, 0.16]} />
+                  <meshStandardMaterial
+                    color="#1f4f46"
+                    emissive="#2dd4bf"
+                    emissiveIntensity={0.6}
+                    transparent
+                    opacity={0.85}
+                  />
+                </mesh>
+                <Html position={[0, 2.9, 0]} center distanceFactor={10}>
+                  <div style={labelStyle}>
+                    {t.kind === 'ascend' ? '⤴ ' : '⇲ '}
+                    {t.label}
+                  </div>
+                </Html>
+              </>
+            )}
           </group>
         ))}
         {/* NPCs / objects / loot at their cells. */}
@@ -668,7 +796,7 @@ function Crawler3DView({
         marker={marker}
         heading={heading}
       />
-      {facing && !readOnly && (
+      {facing && !readOnly ? (
         <div
           style={{ ...hudBox, left: '50%', bottom: 34, transform: 'translateX(-50%)' }}
           data-testid="crawler-prompt"
@@ -680,7 +808,16 @@ function Crawler3DView({
               ? `Search the ${facing.name}`
               : `Pick up the ${facing.name}`}
         </div>
-      )}
+      ) : facingDoor && !readOnly ? (
+        <div
+          style={{ ...hudBox, left: '50%', bottom: 34, transform: 'translateX(-50%)' }}
+          data-testid="crawler-prompt"
+        >
+          <b style={{ color: '#9fe8da' }}>W</b>{' '}
+          {facingDoor.kind === 'ascend' ? 'Leave — ' : 'Enter — '}
+          {facingDoor.label}
+        </div>
+      ) : null}
       <div style={{ ...hudBox, left: 8, bottom: 8, color: 'var(--t-dim)' }}>
         W/S move · A/D turn · Q/E strafe · F interact
       </div>

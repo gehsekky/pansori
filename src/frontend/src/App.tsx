@@ -1036,7 +1036,7 @@ export default function App() {
                         // movement model). The 2D grid is the toggle fallback —
                         // and the only view for regional/town until the town
                         // crawler lands.
-                        const crawlerHere = grid.level === 'local';
+                        const crawlerHere = grid.level === 'local' || grid.level === 'town';
                         const crawlerToggle = crawlerHere && (
                           <button
                             className={styles.signOutBtn}
