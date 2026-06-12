@@ -182,29 +182,32 @@ export const baseCampaignContext: Context = {
       2: ['One foot in the grave.'],
       3: ['Stable — but unconscious.'],
     },
+    // Article-aware tokens ({the_enemy}/{The_enemy}) so proper-named foes —
+    // an NPC turned hostile, a titled boss — read "Lorien reels", never
+    // "The Lorien reels". Bare {enemy} stays for unarticled mentions.
     combatHit: {
-      high: ['A decisive strike — the {enemy} staggers.', 'Clean hit. The {enemy} reels.'],
-      mid: ['Your attack connects. The {enemy} is hurt.', 'You land a solid blow on the {enemy}.'],
-      low: ['A glancing blow, but it counts.', "You scrape past the {enemy}'s guard."],
+      high: ['A decisive strike — {the_enemy} staggers.', 'Clean hit. {The_enemy} reels.'],
+      mid: ['Your attack connects. {The_enemy} is hurt.', 'You land a solid blow on {the_enemy}.'],
+      low: ['A glancing blow, but it counts.', "You scrape past {the_enemy}'s guard."],
     },
     combatMiss: {
-      high: ['Your attack goes wide. The {enemy} is fast.', 'Near miss — the {enemy} dodges.'],
-      mid: ['Attack misses.', 'The {enemy} deflects your strike.'],
+      high: ['Your attack goes wide. {The_enemy} is fast.', 'Near miss — {the_enemy} dodges.'],
+      mid: ['Attack misses.', '{The_enemy} deflects your strike.'],
       low: ['You swing wide.', 'The attack fails to connect.'],
     },
     enemyAttacks: [
-      'The {enemy} strikes back for {dmg} damage.',
-      'The {enemy} retaliates — {dmg} damage.',
+      '{The_enemy} strikes back for {dmg} damage.',
+      '{The_enemy} retaliates — {dmg} damage.',
     ],
-    killShot: ['The {enemy} falls. +{xp} XP.', '{enemy} is defeated. +{xp} XP.'],
+    killShot: ['{The_enemy} falls. +{xp} XP.', '{enemy} is defeated. +{xp} XP.'],
     lootPickedUp: ['You pick up the {item}.', 'You take the {item}.'],
     noLoot: ['Nothing here to take.'],
     alreadyLooted: ['Already taken.'],
     noEnemy: ['No enemy here.'],
     alreadyDead: ['The remains of your foe lie still.'],
-    sneakSuccess: ['You slip past the {enemy} undetected.'],
+    sneakSuccess: ['You slip past {the_enemy} undetected.'],
     deathLines: ['Slain by {enemy}. The world claims another soul.'],
-    enemyDeflected: ["Your {armor} turns the {enemy}'s blow."],
+    enemyDeflected: ["Your {armor} turns {the_enemy}'s blow."],
     levelUp: ['Level up! You grow stronger.'],
   },
 };

@@ -133,6 +133,7 @@ import { consumeImproveFate, tryImproveFate } from './improveFate.js';
 import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
+import { enemyRef, fillEnemyTokens } from './narrative/enemyName.js';
 import {
   equipmentFromLegacy,
   equippedArmorId,
@@ -149,7 +150,6 @@ import { applyStateMigrations } from './stateSchema.js';
 import { availableLootIn } from './placedLoot.js';
 import { canTakeFeat } from './feats.js';
 import { factionShopPrice } from './campaignEngine.js';
-import { fillEnemyTokens } from './narrative/enemyName.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
 
@@ -969,11 +969,23 @@ export function buildCombatHitNarrative(
   const opening = fillEnemyTokens(pickTiered(context.narratives.combatHit, tier), enemy);
   const verbPool = context.narratives.weaponVerbs?.[weaponItem?.id ?? ''] ??
     context.narratives.weaponVerbs?.['unarmed'] ?? ['connects with'];
-  const verb = pick(verbPool);
+  const rawVerb = pick(verbPool);
   const stylePool = context.narratives.classStyle?.[char.character_class];
+  const styleText = stylePool ? pick(stylePool) : '';
+  // Verb phrases are often authored transitively ("cleaves with", "stabs
+  // with") and the object never comes — the style is the complement. Strip
+  // the dangling "with" and merge a with-style seamlessly, so
+  // "cleaves with" + "with martial precision" reads "cleaves with martial
+  // precision" instead of the old "cleaves with, with martial precision".
+  const dangling = / with$/.test(rawVerb);
+  const verb = dangling ? rawVerb.replace(/ with$/, '') : rawVerb;
   // No trailing comma — the sentence-ending "!" supplies the terminal
   // punctuation; a comma here produced a stray ",!" seam before the damage.
-  const style = stylePool ? `, ${pick(stylePool)}` : '';
+  const style = styleText
+    ? dangling && /^with /.test(styleText)
+      ? ` ${styleText}`
+      : `, ${styleText}`
+    : '';
   const reactionPool = context.narratives.enemyReactions?.[enemy.name];
   const reaction = reactionPool ? ` — ${pick(reactionPool)}` : '';
   const critNote = critical ? 'Critical hit! ' : '';
@@ -1728,7 +1740,7 @@ function computeEnemyAttack(
     darknessDisadv && darknessAdv
       ? ` Both combatants are Blinded by the darkness.`
       : darknessDisadv
-        ? ` The ${enemy.name} is Blinded by the darkness.`
+        ? ` ${enemyRef(enemy, true)} is Blinded by the darkness.`
         : darknessAdv
           ? ` ${char.name} is Blinded by the darkness.`
           : '';
@@ -2026,6 +2038,11 @@ function computeEnemyAttack(
       .replace('{target}', char.name)
       .replace('{dmg}', fmt.dmg(hpLost));
     narrative += ` ${char.name} takes ${fmt.dmg(hpLost)} damage.`;
+    // Say it when a PC drops — without this the next line ("attacks your
+    // prone form — 2 death save failures") read as a non sequitur.
+    if (dmgResult.knockedOut && !updatedChar.dead) {
+      narrative += ` ${char.name} falls unconscious!`;
+    }
     narrative += bonusNote;
     narrative +=
       rageNote +
@@ -2243,11 +2260,11 @@ function computeEnemyAttack(
   // second" reads oddly when the PC never actually took the Dodge action.
   // Picks per-call so a multi-attack round doesn't echo the same line.
   const missLines = [
-    `The ${enemy.name} lunges — but you dodge at the last second!`,
-    `The ${enemy.name}'s strike swings wide of the mark.`,
-    `The ${enemy.name} attacks, but the blow glances off your guard.`,
-    `The ${enemy.name} misjudges the distance — the swing finds only air.`,
-    `You sidestep the ${enemy.name}'s strike at the last moment.`,
+    `${enemyRef(enemy, true)} lunges — but you dodge at the last second!`,
+    `${enemyRef(enemy, true)}'s strike swings wide of the mark.`,
+    `${enemyRef(enemy, true)} attacks, but the blow glances off your guard.`,
+    `${enemyRef(enemy, true)} misjudges the distance — the swing finds only air.`,
+    `You sidestep ${enemyRef(enemy)}'s strike at the last moment.`,
     `The ${enemy.name} attacks ${char.name} — and misses cleanly.`,
   ];
   return {
@@ -3431,65 +3448,78 @@ export function endCombatState(st: GameState): GameState {
     ...(revivedNames.length
       ? { revival_notice: plotArmorNotice(revivedNames) }
       : { revival_notice: collapsed.revival_notice }),
-    characters: revivedChars.map((c) => ({
-      ...c,
-      turn_actions: { ...FRESH_TURN },
-      // Rage / Monk Superior Defense / Sorcerer Innate Sorcery / Paladin Holy
-      // Nimbus end when combat ends (the "lasts the encounter" simplification).
-      conditions: c.conditions.filter(
-        (cond) =>
-          cond !== 'raging' &&
-          cond !== 'superior_defense' &&
-          cond !== 'innate_sorcery' &&
-          cond !== 'holy_nimbus' &&
+    characters: revivedChars.map((c) => {
+      const conditions = c.conditions.filter((cond) => {
+        // Round durations only tick on combat turns, so outside combat they
+        // FREEZE — ghoul paralysis once rode through two rooms of exploration
+        // into the next fight, and a mid-fight Hide left a cleric Invisible
+        // forever. Minute-scale entries (≤ 10 rounds — inflicted conditions,
+        // Hide's Invisible, Hold Person) are encounter effects: clear them.
+        // Hour-scale spell buffs (Invisibility's 600) and 'permanent'
+        // conditions (unconscious, petrified — no entry) persist; a broken
+        // concentration already tears its own condition down.
+        const dur = (c.condition_durations ?? {})[cond];
+        if (typeof dur === 'number' && dur <= 10) return false;
+        // Rage / Monk Superior Defense / Sorcerer Innate Sorcery / Paladin
+        // Holy Nimbus end when combat ends ("lasts the encounter").
+        if (
+          cond === 'raging' ||
+          cond === 'superior_defense' ||
+          cond === 'innate_sorcery' ||
+          cond === 'holy_nimbus' ||
           // Holy Aura's party ward (1 min ≈ encounter) doesn't carry over.
-          cond !== 'holy_warded' &&
-          // Spell-driven shapeshift (Shapechange / Animal Shapes) ends with the
-          // encounter; a druid's own Wild Shape (no `shapeshift_spell`) persists.
-          !(cond === 'wild_shaped' && c.shapeshift_spell)
-      ),
-      condition_durations: Object.fromEntries(
-        Object.entries(c.condition_durations ?? {}).filter(
-          ([k]) =>
-            k !== 'raging' &&
-            k !== 'superior_defense' &&
-            k !== 'innate_sorcery' &&
-            k !== 'holy_nimbus'
-        )
-      ),
-      // Totem Warrior totem clears with rage at combat end.
-      totem_spirit: undefined,
-      // Per-attack weapon riders (Divine Favor, the smites) last ~1 minute ≈ an
-      // encounter; clear them when combat ends (the non-concentration ones —
-      // Divine Favor / Searing Smite — have no other teardown).
-      weapon_rider: undefined,
-      pending_smite: undefined,
-      // Fire Shield (retaliate) + resistance buffs (Fire Shield / Stoneskin /
-      // Protection from Energy) are ~1-minute / encounter effects; clear them at
-      // combat end so a non-concentration buff (Fire Shield) can't leak, and a
-      // concentration buff that outlived an unbroken-concentration combat-end
-      // doesn't linger.
-      fire_shield: undefined,
-      spell_resistances: undefined,
-      condition_immunities: undefined,
-      // Mirror Image duplicates (1 min ≈ encounter) don't carry to the next fight.
-      mirror_images: undefined,
-      // Blink (1 min ≈ encounter) doesn't carry to the next fight.
-      blinking: undefined,
-      // Sanctuary ward (1 min ≈ encounter) clears at combat end.
-      sanctuary_dc: undefined,
-      // Shillelagh (1 min ≈ encounter) — the imbued weapon reverts at combat end.
-      shillelagh: undefined,
-      // Dragon's Breath (1 min ≈ encounter) — the granted breath doesn't carry
-      // to the next fight.
-      granted_breath: undefined,
-      // Spell-driven shapeshift (Shapechange / Animal Shapes) ends with the
-      // encounter — clear the form (the `wild_shaped` condition itself is dropped
-      // by the conditions filter above). A druid's own Wild Shape is left alone.
-      ...(c.shapeshift_spell
-        ? { wild_shape_form: undefined, shapeshift_spell: undefined, temp_hp: undefined }
-        : {}),
-    })),
+          cond === 'holy_warded'
+        ) {
+          return false;
+        }
+        // Spell-driven shapeshift (Shapechange / Animal Shapes) ends with the
+        // encounter; a druid's own Wild Shape (no `shapeshift_spell`) persists.
+        if (cond === 'wild_shaped' && c.shapeshift_spell) return false;
+        return true;
+      });
+      const kept = new Set(conditions);
+      return {
+        ...c,
+        turn_actions: { ...FRESH_TURN },
+        conditions,
+        // Duration entries only make sense for conditions still present.
+        condition_durations: Object.fromEntries(
+          Object.entries(c.condition_durations ?? {}).filter(([k]) => kept.has(k))
+        ),
+        // Totem Warrior totem clears with rage at combat end.
+        totem_spirit: undefined,
+        // Per-attack weapon riders (Divine Favor, the smites) last ~1 minute ≈ an
+        // encounter; clear them when combat ends (the non-concentration ones —
+        // Divine Favor / Searing Smite — have no other teardown).
+        weapon_rider: undefined,
+        pending_smite: undefined,
+        // Fire Shield (retaliate) + resistance buffs (Fire Shield / Stoneskin /
+        // Protection from Energy) are ~1-minute / encounter effects; clear them at
+        // combat end so a non-concentration buff (Fire Shield) can't leak, and a
+        // concentration buff that outlived an unbroken-concentration combat-end
+        // doesn't linger.
+        fire_shield: undefined,
+        spell_resistances: undefined,
+        condition_immunities: undefined,
+        // Mirror Image duplicates (1 min ≈ encounter) don't carry to the next fight.
+        mirror_images: undefined,
+        // Blink (1 min ≈ encounter) doesn't carry to the next fight.
+        blinking: undefined,
+        // Sanctuary ward (1 min ≈ encounter) clears at combat end.
+        sanctuary_dc: undefined,
+        // Shillelagh (1 min ≈ encounter) — the imbued weapon reverts at combat end.
+        shillelagh: undefined,
+        // Dragon's Breath (1 min ≈ encounter) — the granted breath doesn't carry
+        // to the next fight.
+        granted_breath: undefined,
+        // Spell-driven shapeshift (Shapechange / Animal Shapes) ends with the
+        // encounter — clear the form (the `wild_shaped` condition itself is dropped
+        // by the conditions filter above). A druid's own Wild Shape is left alone.
+        ...(c.shapeshift_spell
+          ? { wild_shape_form: undefined, shapeshift_spell: undefined, temp_hp: undefined }
+          : {}),
+      };
+    }),
   };
 }
 

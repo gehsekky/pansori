@@ -168,6 +168,11 @@ describe('Magic Initiate — free L1 cast at cast time', () => {
     // without the Magic Initiate freebie.
     expect(next.spell_slots_used?.[1]).toBeUndefined();
     expect(result.narrative).not.toMatch(/No level-1 spell slots remaining/);
+    // The cast narration must label the freebie, not claim a slot was
+    // spent — a playtest log read "casts Healing Word (level-1 slot)" for
+    // a slot-less Magic Initiate cast.
+    expect(result.narrative).toMatch(/Magic Initiate — free cast/);
+    expect(result.narrative).not.toMatch(/level-1 slot/);
   });
 
   it('rejects the second cast when the token is already used and no slot exists', async () => {

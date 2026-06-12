@@ -107,6 +107,18 @@ describe('AdventureLogPanel', () => {
     expect(text).toMatch(/--- Turn 2 ---/);
   });
 
+  it('omits the Round line when out of combat (the counter is stale between fights)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const state = makeState({ name: 'Test' }, { round: 16, combat_active: false });
+    render(<AdventureLogPanel history={[{ content: '> look' }]} state={state} seed={mockSeed} />);
+    fireEvent.click(screen.getByTestId('adventure-log-copy-btn'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const text = writeText.mock.calls[0][0] as string;
+    expect(text).not.toMatch(/Round:/);
+    expect(text).toMatch(/In combat: no/);
+  });
+
   it('strips narrative token markup from the copied log', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });

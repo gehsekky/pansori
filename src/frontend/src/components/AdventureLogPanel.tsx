@@ -254,7 +254,9 @@ function AdventureLogPanel({ history, worldName, state, seed, campaignMeta }: Pr
     if (state?.world_minute != null) header.push(formatGameClock(state.world_minute).label);
     const activeChar = state?.characters?.find((c) => c.id === state.active_character_id);
     if (activeChar) header.push(`Active: ${activeChar.name} (lead)`);
-    if (state?.round != null) header.push(`Round: ${state.round}`);
+    // The round counter is only meaningful mid-combat — out of combat it's a
+    // stale leftover from the last fight.
+    if (state?.combat_active && state?.round != null) header.push(`Round: ${state.round}`);
     if (state?.current_room) header.push(`Current room: ${state.current_room}`);
     if (state?.combat_active != null) {
       header.push(`In combat: ${state.combat_active ? 'yes' : 'no'}`);

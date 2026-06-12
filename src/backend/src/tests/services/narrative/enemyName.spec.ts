@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { fillEnemyTokens, isProperNounName } from '../../../services/narrative/enemyName.js';
+import {
+  enemyRef,
+  fillEnemyTokens,
+  isProperNounName,
+} from '../../../services/narrative/enemyName.js';
 
 describe('isProperNounName', () => {
   it('treats common-noun monster types as common (needs an article)', () => {
@@ -40,5 +44,20 @@ describe('fillEnemyTokens', () => {
 
   it('leaves bare {enemy} unarticled (possessives / hand-articled prose)', () => {
     expect(fillEnemyTokens("off {enemy}'s guard.", ghoul)).toBe("off Crypt Ghoul's guard.");
+  });
+});
+
+describe('enemyRef', () => {
+  const ghoul = { name: 'Crypt Ghoul' };
+  const lorien = { name: 'Lorien', proper_noun: true };
+
+  it('articles a common noun, honoring capitalization', () => {
+    expect(enemyRef(ghoul)).toBe('the Crypt Ghoul');
+    expect(enemyRef(ghoul, true)).toBe('The Crypt Ghoul');
+  });
+
+  it('drops the article for a proper-named hostile (never "The Lorien")', () => {
+    expect(enemyRef(lorien)).toBe('Lorien');
+    expect(enemyRef(lorien, true)).toBe('Lorien');
   });
 });

@@ -457,6 +457,8 @@ export function runPrecast(
     primaryCastingAbility
   ) as AbilityKey;
   const castingScore = (pc.char[castingAbility] ?? 10) as number;
+  // Slot-free casts must not claim a slot — a playtest log showed Magic
+  // Initiate's freebie narrated as "(level-1 slot)".
   const slotNote = usedDivineIntervention
     ? ' (Divine Intervention)'
     : usedMysticArcanum
@@ -465,9 +467,15 @@ export function runPrecast(
         ? ' (Spell Mastery)'
         : usedSignature
           ? ' (Signature Spell)'
-          : spell.level > 0
-            ? ` (level-${slotLevel} slot)`
-            : ' (cantrip)';
+          : usedMagicInitiateFree
+            ? ' (Magic Initiate — free cast)'
+            : usedWish
+              ? ' (granted by Wish)'
+              : isRitualCast
+                ? ' (ritual)'
+                : spell.level > 0
+                  ? ` (level-${slotLevel} slot)`
+                  : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
   const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;

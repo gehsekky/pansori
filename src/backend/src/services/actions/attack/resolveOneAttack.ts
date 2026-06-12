@@ -34,6 +34,7 @@ import {
   hasClass,
   peerlessSkillDie,
 } from '../../multiclass.js';
+import { enemyRef, fillEnemyTokens } from '../../narrative/enemyName.js';
 import {
   overcomeDefensesApplies,
   overwhelmingStrikeDamage,
@@ -42,7 +43,6 @@ import {
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
-import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
@@ -1280,7 +1280,7 @@ export function resolveOneAttack(
     ctx.narrative += ` The ${formName} form shatters — ${target.name} returns to themselves!`;
   }
   ctx.narrative += fortitudeNote;
-  ctx.narrative += ` The ${target.name} has ${fmt.hp(newEnemyHp)} HP remaining. `;
+  ctx.narrative += ` ${enemyRef(target, true)} has ${fmt.hp(newEnemyHp)} HP remaining. `;
   // SRD Dominate — taking damage lets the target re-save to break free.
   dominatedDamageReSave(ctx, targetId, target.name);
   return false;

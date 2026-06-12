@@ -71,3 +71,16 @@ export function fillEnemyTokens(
     .replace(/\{the_enemy\}/g, lower)
     .replace(/\{enemy\}/g, enemy.name);
 }
+
+/**
+ * Article-aware enemy reference for HAND-BUILT prose (sites that don't go
+ * through a narrative pool): "the Crypt Ghoul" / "The Crypt Ghoul", but just
+ * "Lorien" for proper nouns.
+ */
+export function enemyRef(
+  enemy: { name: string; proper_noun?: boolean },
+  capitalized = false
+): string {
+  if (isProperNounName(enemy.name, enemy.proper_noun)) return enemy.name;
+  return `${capitalized ? 'The' : 'the'} ${enemy.name}`;
+}

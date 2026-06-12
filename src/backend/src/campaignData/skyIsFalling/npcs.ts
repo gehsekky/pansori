@@ -191,7 +191,13 @@ export const LORIEN: CampaignRoomNpc = {
           'He laughs. "Nice try. I’ve lied to better than you for three centuries. ' +
           'Come back when you’re holding something I can’t talk my way around."',
         onSuccess: [{ type: 'set_flag', key: 'clue_thirdparty', value: true }],
-        onFail: [{ type: 'set_npc_attitude', npcId: 'npc_lorien', attitude: 'hostile' }],
+        // No hostility on a failed lean: the failReply invites a retry, and a
+        // playtest (2026-06-15) showed the old set_npc_attitude→hostile here
+        // silently turned the quest-giving broker into a forced kill — the
+        // party chatted on amicably, took his quest, then got travel-locked
+        // against a "hostile" Lorien at the door. The retry grind is sting
+        // enough; aggression stays an explicit player choice.
+        onFail: [],
       },
     },
     {

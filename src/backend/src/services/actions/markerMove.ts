@@ -115,7 +115,7 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
   // (Sneak) — you can't simply stroll past it onto a transition cell. Mirrors
   // the old room `move` guard + the marker_move choice gating in generateChoices.
   if (ctx.enemyAlive) {
-    ctx.narrative = 'A hostile is here — deal with it before you travel on.';
+    ctx.narrative = 'A hostile is here — fight it or Sneak past before you travel on.';
     return;
   }
   const fromRoom = ctx.st.current_room;

@@ -28,10 +28,10 @@ import {
   improvedPotentTempHp,
   potentSpellcastingBonus,
 } from '../../multiclass.js';
+import { enemyRef, fillEnemyTokens } from '../../narrative/enemyName.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
-import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -294,7 +294,7 @@ export function runSaveSpell(
         targetName: spellTarget.name,
         condition: condToApply,
         source: spell.name,
-        prose: ` The ${spellTarget.name} is ${condToApply}${condAlso ? ` and ${condAlso}` : ''}!`,
+        prose: ` ${enemyRef(spellTarget, true)} is ${condToApply}${condAlso ? ` and ${condAlso}` : ''}!`,
       });
       if (spell.concentration) {
         char.concentrating_on = {
