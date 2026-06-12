@@ -1,5 +1,10 @@
 import type { CombatEntity, FloorType, GameState, GridPos, Seed, TerrainType } from '../types';
-import { computeAoeCells, enemyDisplayNames } from '../lib/combatPreview';
+import {
+  computeAoeCells,
+  doubledCellsFor,
+  enemyDisplayNames,
+  movementCosts,
+} from '../lib/combatPreview';
 import GameIcon from './GameIcon';
 import { TERRAIN } from '../types';
 import { TERRAIN_STYLE } from '../lib/terrainStyle';
@@ -351,12 +356,34 @@ function GridCombatView({
     return entities.find((e) => e.pos.x === x && e.pos.y === y && e.hp <= 0);
   }
 
+  // True movement costs per cell, mirroring the engine's grid_move pricing
+  // (difficult/climb/swim cells cost double along the engine's own BFS path)
+  // — so a highlighted cell is one the engine will actually accept, instead
+  // of the old Chebyshev guess that promised squares the budget couldn't buy.
+  const moveCosts = activeEntity
+    ? movementCosts({
+        from: activeEntity.pos,
+        gridWidth,
+        gridHeight,
+        blocked: new Set(
+          [
+            ...entities
+              .filter((e) => e.id !== activeEntity.id && e.hp > 0)
+              .map((e) => `${e.pos.x},${e.pos.y}`),
+            ...obstacleSet,
+          ].values()
+        ),
+        doubled: doubledCellsFor(currentRoom, activeChar),
+        maxSquares: remainingSquares,
+      })
+    : new Map<string, number>();
+
   function isReachable(x: number, y: number): boolean {
     if (!activeEntity || activeChar?.dead) return false;
     if (entityAt(x, y)) return false;
     if (isObstacle(x, y)) return false;
-    const dist = chebyshev(activeEntity.pos, { x, y });
-    return dist > 0 && dist <= remainingSquares;
+    const cost = moveCosts.get(`${x},${y}`);
+    return cost !== undefined && cost > 0 && cost <= remainingSquares;
   }
 
   // AoE preview — when the player hovers a spell choice with an AoE shape,
@@ -587,9 +614,7 @@ function GridCombatView({
         ariaParts.push('difficult terrain, double movement cost');
       }
       if (clickable) {
-        ariaParts.push(
-          `reachable, ${chebyshev(activeEntity!.pos, { x, y }) * SQUARE_SIZE_FT} feet`
-        );
+        ariaParts.push(`reachable, ${(moveCosts.get(`${x},${y}`) ?? 0) * SQUARE_SIZE_FT} feet`);
       }
       const ariaLabel = ariaParts.join(', ');
       // Hover tooltip: ground label · difficult-terrain note · the Move-here

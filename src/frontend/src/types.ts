@@ -210,6 +210,10 @@ export interface Character {
   } | null;
   subclass?: string;
   speed?: number;
+  // Alternate movement speeds (feature grants) — the reachable-cell highlight
+  // mirrors the engine's climb/swim cost waivers from these.
+  climb_speed_ft?: number;
+  swim_speed_ft?: number;
   feats?: string[];
   expertise_skills?: string[];
   prepared_spells?: string[];
@@ -499,6 +503,10 @@ export interface Seed {
     // block movement through these cells.
     obstacles?: GridPos[];
     difficultTerrain?: GridPos[];
+    // Climb/swim cells (2× movement without the matching speed) — the
+    // reachable-cell highlight mirrors the engine's pricing from these.
+    climbTerrain?: GridPos[];
+    swimTerrain?: GridPos[];
     // Cosmetic terrain paint for the combat grid — no mechanics (see BE Room.terrain).
     terrain?: TerrainCell[];
     // Local-room grid fields (3-level map). Mirror of the BE Room grid fields.

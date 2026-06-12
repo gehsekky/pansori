@@ -15,9 +15,10 @@ import * as THREE from 'three';
 import {
   type AoePreview,
   SQUARE_SIZE_FT,
-  chebyshev,
   computeAoeCells,
+  doubledCellsFor,
   enemyDisplayNames,
+  movementCosts,
 } from '../lib/combatPreview';
 import { CHAR_MODEL, modelForClass, modelForEnemyName } from '../lib/characters3d';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -475,11 +476,30 @@ function Combat3DView({
 
   const occupied = (x: number, y: number) =>
     entities.some((e) => e.pos.x === x && e.pos.y === y && e.hp > 0);
+  // True engine-mirrored movement costs (difficult/climb/swim double along
+  // the engine's BFS path) — shared with the 2D grid via combatPreview.
+  const moveCosts = activeEntity
+    ? movementCosts({
+        from: activeEntity.pos,
+        gridWidth,
+        gridHeight,
+        blocked: new Set(
+          [
+            ...entities
+              .filter((e) => e.id !== activeEntity.id && e.hp > 0)
+              .map((e) => `${e.pos.x},${e.pos.y}`),
+            ...obstacleSet,
+          ].values()
+        ),
+        doubled: doubledCellsFor(currentRoom, activeChar),
+        maxSquares: remainingSquares,
+      })
+    : new Map<string, number>();
   const reachable = (x: number, y: number): boolean => {
     if (!activeEntity || activeChar?.dead || !state.combat_active) return false;
     if (occupied(x, y) || obstacleSet.has(`${x},${y}`)) return false;
-    const dist = chebyshev(activeEntity.pos, { x, y });
-    return dist > 0 && dist <= remainingSquares;
+    const cost = moveCosts.get(`${x},${y}`);
+    return cost !== undefined && cost > 0 && cost <= remainingSquares;
   };
   const onClickCell = (x: number, y: number) => {
     if (reachable(x, y) && onMove) onMove({ x, y });
