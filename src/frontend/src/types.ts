@@ -609,4 +609,7 @@ export interface CampaignMeta {
   displayName?: string | null;
   quests: Quest[];
   factions: Faction[];
+  // Act id → display name, in campaign order — the quest-log modal groups
+  // quests by act. Optional: older session payloads predate it.
+  acts?: Array<{ id: string; name: string }>;
 }

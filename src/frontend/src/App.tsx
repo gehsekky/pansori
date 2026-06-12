@@ -25,6 +25,7 @@ import MoveDPad from './components/MoveDPad.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
 import OptionPickerDialog from './components/OptionPickerDialog.tsx';
 import PartyRail from './components/PartyRail.tsx';
+import QuestLogModal from './components/QuestLogModal.tsx';
 import RegionEditorScreen from './components/RegionEditorScreen.tsx';
 import RoomArtPanel from './components/RoomArtPanel.tsx';
 import SessionsScreen from './components/SessionScreen.tsx';
@@ -214,6 +215,9 @@ export default function App() {
   // Combat's 3D diorama, on its own preference switch.
   const [combat3d, setCombat3d] = useState(preferCombat3d);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  // The full quest journal (grouped by act, finished quests included) — the
+  // right-rail tracker only shows open quests.
+  const [questLogOpen, setQuestLogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   // Which party member's character sheet modal is open (null = closed).
   const [sheetCharId, setSheetCharId] = useState<string | null>(null);
@@ -456,10 +460,16 @@ export default function App() {
         setInventoryOpen((v) => !v);
         return;
       }
+      // 'j' toggles the quest-log journal ('q' belongs to the crawler's strafe)
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        setQuestLogOpen((v) => !v);
+        return;
+      }
       // Number keys pick choices when no modal blocks input. Choices that
       // get their own dedicated UI (grid move D-pad, default-action icon
       // row) drop out of the numbered list so the indices stay stable.
-      if (inventoryOpen || mapOpen || sheetCharId) return;
+      if (inventoryOpen || mapOpen || sheetCharId || questLogOpen) return;
       const idx = parseInt(e.key, 10);
       const numbered = choices.filter((c) => !ICONIZED_KINDS.has(c.kind ?? ''));
       if (!isNaN(idx) && idx >= 1 && idx <= numbered.length) chooseWithPicker(numbered[idx - 1]);
@@ -479,6 +489,7 @@ export default function App() {
     inventoryOpen,
     mapOpen,
     sheetCharId,
+    questLogOpen,
     chooseWithPicker,
   ]);
 
@@ -702,12 +713,14 @@ export default function App() {
             });
           }
           if (campaignMeta && gameState && campaignMeta.quests.length > 0) {
-            // Count only DISCOVERED quests (those with a progress entry) — the
-            // log hides quests the player hasn't found yet.
-            const discovered = gameState.quest_progress?.length ?? 0;
+            // The tracker shows only OPEN quests (finished ones live in the
+            // quest-log modal), so the tab count matches what's inside.
+            const open = (gameState.quest_progress ?? []).filter(
+              (p) => p.status === 'active' || p.status === 'available'
+            ).length;
             contextTabs.push({
               id: 'quests',
-              label: `QUESTS (${discovered})`,
+              label: `QUESTS (${open})`,
               render: () => <QuestsView state={gameState} meta={campaignMeta} />,
             });
           }
@@ -780,6 +793,18 @@ export default function App() {
                       >
                         <span aria-hidden="true">🎒 </span>INVENTORY
                       </button>
+                      {campaignMeta && campaignMeta.quests.length > 0 && (
+                        <button
+                          className={styles.invHeaderBtn}
+                          onClick={() => setQuestLogOpen(true)}
+                          title="Quest log (J)"
+                          aria-label="Open quest log"
+                          aria-keyshortcuts="j"
+                          data-testid="quest-log-btn"
+                        >
+                          <span aria-hidden="true">📜 </span>QUESTS
+                        </button>
+                      )}
                       <button
                         className={styles.invHeaderBtn}
                         onClick={() => setMapOpen(true)}
@@ -1072,7 +1097,16 @@ export default function App() {
                                   grid={grid}
                                   choices={choices}
                                   loading={loading}
-                                  readOnly={mapReadOnly}
+                                  // An open modal owns the keyboard — WASD in
+                                  // the quest log/inventory must not step the
+                                  // party around in the background.
+                                  readOnly={
+                                    mapReadOnly ||
+                                    inventoryOpen ||
+                                    mapOpen ||
+                                    questLogOpen ||
+                                    !!sheetCharId
+                                  }
                                   onChoice={handleChoice}
                                 />
                               </Suspense>
@@ -1668,6 +1702,14 @@ export default function App() {
                   onEquip={handleEquip}
                   onTransfer={handleTransfer}
                   onDrop={handleDrop}
+                />
+              )}
+
+              {questLogOpen && gameState && campaignMeta && (
+                <QuestLogModal
+                  state={gameState}
+                  meta={campaignMeta}
+                  onClose={() => setQuestLogOpen(false)}
                 />
               )}
 

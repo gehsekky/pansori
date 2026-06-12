@@ -37,7 +37,7 @@ function statusBadge(status: QuestStatus): { label: string; color: string } {
   }
 }
 
-function QuestRow({
+export function QuestRow({
   quest,
   status,
   completedSteps,
@@ -86,7 +86,7 @@ function QuestRow({
 // so ContextPanel can render them as tab content without dragging in
 // CampaignPanel's own tab switcher.
 
-function sortedQuestsForView(state: GameState, meta: CampaignMeta) {
+export function sortedQuestsForView(state: GameState, meta: CampaignMeta) {
   const progressById = new Map((state.quest_progress ?? []).map((p) => [p.questId, p] as const));
   const order: Record<QuestStatus, number> = {
     active: 0,
@@ -109,16 +109,24 @@ function sortedQuestsForView(state: GameState, meta: CampaignMeta) {
 
 export function QuestsView({ state, meta }: ViewProps) {
   const { sorted, progressById } = sortedQuestsForView(state, meta);
-  if (sorted.length === 0) {
+  // The TRACKER shows only what still needs doing — finished (completed /
+  // failed) quests live in the quest-log modal (J).
+  const open = sorted.filter((q) => {
+    const s = progressById.get(q.id)?.status ?? 'available';
+    return s === 'active' || s === 'available';
+  });
+  if (open.length === 0) {
     return (
       <p className={styles.campaignEmpty}>
-        No quests yet — explore the world and talk to people to find them.
+        {sorted.length > 0
+          ? 'Nothing in progress — finished quests live in the quest log (J).'
+          : 'No quests yet — explore the world and talk to people to find them.'}
       </p>
     );
   }
   return (
     <>
-      {sorted.map((q) => {
+      {open.map((q) => {
         const prog = progressById.get(q.id);
         return (
           <QuestRow

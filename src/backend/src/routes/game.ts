@@ -915,6 +915,9 @@ async function campaignMetaFor(ctx: Context | undefined) {
     displayName,
     quests: cmp.quests ?? [],
     factions: cmp.factions ?? [],
+    // Act id → display name, in campaign order — the quest-log modal groups
+    // quests by act.
+    acts: (cmp.acts ?? []).map((a) => ({ id: a.id, name: a.name })),
   };
 }
 

@@ -36,15 +36,29 @@ describe('QuestsView — discovered quests only', () => {
     expect(queryByText('Gamma')).toBeNull();
   });
 
-  it('shows a completed quest that has a progress entry', () => {
-    const { queryByText } = render(
+  it('hides finished quests — the tracker is for open work, the modal keeps history', () => {
+    const { queryByText, getByText } = render(
+      <QuestsView
+        state={stateWith([
+          { questId: 'q1', status: 'active', completedSteps: [] },
+          { questId: 'q2', status: 'completed', completedSteps: [] },
+        ])}
+        meta={meta}
+      />
+    );
+    expect(getByText('Alpha')).toBeTruthy(); // active stays
+    expect(queryByText('Beta')).toBeNull(); // completed → modal only
+  });
+
+  it('points at the quest log when everything discovered is finished', () => {
+    const { getByText, queryByText } = render(
       <QuestsView
         state={stateWith([{ questId: 'q2', status: 'completed', completedSteps: [] }])}
         meta={meta}
       />
     );
-    expect(queryByText('Beta')).toBeTruthy();
-    expect(queryByText('Alpha')).toBeNull();
+    expect(getByText(/finished quests live in the quest log/i)).toBeTruthy();
+    expect(queryByText('Beta')).toBeNull();
   });
 
   it('renders the empty hint when nothing is discovered yet', () => {
