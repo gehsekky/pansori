@@ -1441,6 +1441,13 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       res.status(410).json({ error: 'Adventure already complete.' });
       return;
     }
+    // A resolved campaign (terminal act) is just as terminal as death/escape —
+    // without this gate a stale client (the 3D world's movement sync, a second
+    // tab) keeps mutating a finished story.
+    if (row.status === 'resolved') {
+      res.status(410).json({ error: 'Campaign already resolved.' });
+      return;
+    }
 
     // Race detection. If the client sent a turn_seq with the request,
     // it must match the current server value. Mismatch = the client's

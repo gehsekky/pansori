@@ -224,6 +224,25 @@ describe('advanceActIfTriggered — branching edges + endings', () => {
     expect(parts.join(' ')).toContain('The armies clash');
   });
 
+  it('an act transition closes a mid-dialogue conversation (no dangling overlay)', () => {
+    // Act transitions usually FIRE from a dialogue consequence (the Silverford
+    // truce/war choice). The conversation must not survive into the new act —
+    // its NPC/room is gone, and a dangling pointer left the dialogue overlay
+    // looping on ambient choices (the set-travel-pace incident, 2026-06-14).
+    const st0 = {
+      ...at('act-1'),
+      active_conversation: {
+        npcId: 'vane',
+        roomId: 'vane_command',
+        nodePath: ['truce'],
+        prompt: 'Vane waits.',
+      },
+    };
+    const st = advanceActIfTriggered(st0, seed, branchCtx(), facts({ flags: { war: true } }), []);
+    expect(st.current_act).toBe('act-war');
+    expect(st.active_conversation).toBeUndefined();
+  });
+
   it('the FIRST matching edge wins (war beats peace on a tie)', () => {
     const st = advanceActIfTriggered(
       at('act-1'),

@@ -7363,6 +7363,12 @@ function enterAct(
   st = {
     ...st,
     current_act: next.id,
+    // Act transitions often FIRE from a dialogue consequence (the Silverford
+    // truce/war choice) — the conversation must close with the act, or it
+    // dangles forever: the NPC's tree is gone with the old room, the engine
+    // keeps surfacing only ambient choices, and the dialogue overlay loops on
+    // "Set travel pace" (the 2026-06-14 incident).
+    active_conversation: undefined,
     ...(region
       ? {
           map_level: 'regional' as const,
