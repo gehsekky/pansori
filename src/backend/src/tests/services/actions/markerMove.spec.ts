@@ -95,6 +95,27 @@ describe('handleMarkerMove — travelMove narrative pool', () => {
     handleMarkerMove(ctx, { type: 'marker_move', to: { x: 1, y: 0 } });
     expect(ctx.narrative).toContain('The party moves across the map.');
   });
+
+  it('a line that spends {hours} owns the time report — no automatic suffix', () => {
+    const ctx = ctxFor(calm);
+    (ctx.context as unknown as { narratives: Record<string, unknown> }).narratives = {
+      travelMove: ['{distance} and {hours} gone, the carr unbroken ahead.'],
+    };
+    // 3 squares × 1 mile at Normal pace (3 mph) = exactly the 1-hour turn.
+    handleMarkerMove(ctx, { type: 'marker_move', to: { x: 3, y: 0 } });
+    expect(ctx.narrative).toContain('3 miles and 1 hour gone, the carr unbroken ahead.');
+    expect(ctx.narrative).not.toContain('hr of travel');
+  });
+
+  it('a line without {hours} keeps the engine suffix on hour-long marches', () => {
+    const ctx = ctxFor(calm);
+    (ctx.context as unknown as { narratives: Record<string, unknown> }).narratives = {
+      travelMove: ['The party slogs {distance}.'],
+    };
+    handleMarkerMove(ctx, { type: 'marker_move', to: { x: 3, y: 0 } });
+    expect(ctx.narrative).toContain('The party slogs 3 miles.');
+    expect(ctx.narrative).toContain('(1 hr of travel.)');
+  });
 });
 
 describe('handleMarkerMove — wilderness encounter drop', () => {

@@ -46,7 +46,7 @@ const FLAT_GROUPS: { title: string; pools: Pool[] }[] = [
       {
         key: 'travelMove',
         label: 'PARTY MOVES',
-        tokens: '{distance} — overland in miles, town/room in feet',
+        tokens: '{distance} (miles overland, feet in town/rooms) · {hours} (owns the time report)',
         optional: true,
       },
     ],

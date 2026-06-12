@@ -145,6 +145,16 @@ export function formatTravelDistance(
   return `${feet} ft`;
 }
 
+/**
+ * Author-facing travel time — the `{hours}` token in the `travelMove`
+ * narrative pool. One decimal, trailing zero trimmed ("1 hour", "1.5 hours",
+ * "0.7 hours"); meaningful overland (town/room moves cost "0 hours").
+ */
+export function formatTravelHours(hours: number): string {
+  const h = Math.round(hours * 10) / 10;
+  return `${h} hour${h === 1 ? '' : 's'}`;
+}
+
 // The transient room id a wilderness encounter fights in. Not an authored room —
 // `activeGrid` returns null for it (no marker movement mid-fight); combat uses the
 // campaign's default combat grid. Cleared on return.

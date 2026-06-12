@@ -4,6 +4,7 @@ import {
   activeGrid,
   applyEncounterArena,
   formatTravelDistance,
+  formatTravelHours,
   resolveMarkerMove,
   stageEncounter,
 } from '../mapEngine.js';
@@ -17,17 +18,27 @@ import { wornSaveBonus } from '../wornEffects.js';
 const MARCH_BUDGET_MIN = 8 * 60; // SRD: 8 hours of travel/day before fatigue risk
 
 // The plain-move line: a campaign's `travelMove` narrative pool (one line
-// picked at random, `{distance}` substituted — overland in miles, town/local
-// in feet) when authored; the engine's stock sentence otherwise.
+// picked at random) when authored; the engine's stock sentence otherwise.
+// Tokens: `{distance}` (overland in miles, town/local in feet) and `{hours}`
+// (time the move actually cost — meaningful overland, "0 hours" indoors).
+// A line that spends `{hours}` owns the time report, so the engine's
+// automatic " (N hr of travel.)" suffix stands down for it.
 function travelMoveLine(
   context: Context,
   grid: { level: string; feetPerSquare: number } | null,
-  squares: number
-): string {
+  squares: number,
+  hours: number
+): { text: string; consumedHours: boolean } {
   const pool = context.narratives.travelMove;
-  if (!pool || pool.length === 0) return ' The party moves across the map.';
+  if (!pool || pool.length === 0) {
+    return { text: ' The party moves across the map.', consumedHours: false };
+  }
+  const line = pick(pool);
   const distance = formatTravelDistance(grid?.level, squares, grid?.feetPerSquare ?? 5);
-  return ` ${pick(pool).replace(/\{distance\}/g, distance)}`;
+  return {
+    text: ` ${line.replace(/\{distance\}/g, distance).replace(/\{hours\}/g, formatTravelHours(hours))}`,
+    consumedHours: /\{hours\}/.test(line),
+  };
 }
 
 /**
@@ -168,10 +179,15 @@ export const handleMarkerMove: ActionHandler<{ type: 'marker_move'; to: GridPos 
         ctx.context,
         res.enteredRoomFirst ?? false
       )
-    : res.narrative || travelMoveLine(ctx.context, gridBefore, res.squaresMoved);
-  ctx.narrative = (ctx.narrative ?? '') + arrival;
-  // Regional travel-time flavor (whole-hour granularity reads cleanly).
-  if (res.elapsedHours >= 1) {
+    : res.narrative || null;
+  const travel =
+    arrival === null
+      ? travelMoveLine(ctx.context, gridBefore, res.squaresMoved, res.elapsedHours)
+      : null;
+  ctx.narrative = (ctx.narrative ?? '') + (arrival ?? travel!.text);
+  // Regional travel-time flavor (whole-hour granularity reads cleanly) —
+  // unless the authored travel line already spent the {hours} token.
+  if (res.elapsedHours >= 1 && !travel?.consumedHours) {
     ctx.narrative += ` (${Math.round(res.elapsedHours)} hr of travel.)`;
   }
   if (res.fatigueNote) ctx.narrative += res.fatigueNote;

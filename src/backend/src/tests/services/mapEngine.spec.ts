@@ -8,6 +8,7 @@ import {
   ENCOUNTER_ROOM_ID,
   activeGrid,
   formatTravelDistance,
+  formatTravelHours,
   initMapState,
   regionEnterNarration,
   resolveMarkerMove,
@@ -801,5 +802,12 @@ describe('formatTravelDistance — the travelMove {distance} token', () => {
     expect(formatTravelDistance('town', 3, 25)).toBe('75 ft');
     expect(formatTravelDistance('local', 2, 5)).toBe('10 ft');
     expect(formatTravelDistance(undefined, 4, 5)).toBe('20 ft');
+  });
+
+  it('formats {hours}: one trimmed decimal, singular at exactly 1', () => {
+    expect(formatTravelHours(1)).toBe('1 hour');
+    expect(formatTravelHours(1.5)).toBe('1.5 hours');
+    expect(formatTravelHours(2 / 3)).toBe('0.7 hours');
+    expect(formatTravelHours(0)).toBe('0 hours');
   });
 });

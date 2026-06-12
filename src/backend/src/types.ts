@@ -2036,7 +2036,9 @@ export interface Context {
     shortRest?: string[]; // flavor before HP numbers; {name} {hpGained} {hpNow} {hpMax} substituted
     longRest?: string[]; // flavor before per-character HP summary; {party} substituted
     // Plain map move ("The party moves across the map." when unset);
-    // {distance} substituted — overland in miles, town/local in feet.
+    // {distance} substituted (overland in miles, town/local in feet) and
+    // {hours} (time the move cost — a line that spends it suppresses the
+    // engine's automatic " (N hr of travel.)" suffix).
     travelMove?: string[];
   };
 }
