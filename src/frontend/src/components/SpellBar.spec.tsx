@@ -83,4 +83,31 @@ describe('SpellBar', () => {
     fireEvent.click(getByTestId('spell-guiding_bolt'));
     expect(onChoose).toHaveBeenCalledWith(guiding);
   });
+
+  it('renders per-level slot pips: remaining filled, spent hollow, zero-max levels skipped', () => {
+    const { getByTestId } = render(
+      <SpellBar
+        choices={[spellChoice('guiding_bolt', 'Cast Guiding Bolt (Lvl 1) → Goblin', 1)]}
+        onChoose={() => {}}
+        slots={{ max: { 1: 3, 2: 1, 3: 0 }, used: { 1: 2 } }}
+      />
+    );
+    const pips = getByTestId('spell-slot-pips');
+    // L1: 1 of 3 left → ●○○; L2 untouched → ●; L3 max 0 → absent.
+    expect(pips.textContent).toContain('L1 ●○○');
+    expect(pips.textContent).toContain('L2 ●');
+    expect(pips.textContent).not.toContain('L3');
+    // Screen readers get the counts in words.
+    expect(pips.querySelector('[aria-label="Level 1 slots: 1 of 3 remaining"]')).toBeTruthy();
+  });
+
+  it('omits the pips without a slots prop or when every level has max 0 (pure cantrip casters)', () => {
+    const choice = spellChoice('sacred_flame', 'Cast Sacred Flame (cantrip) → Goblin', 0);
+    const a = render(<SpellBar choices={[choice]} onChoose={() => {}} />);
+    expect(a.queryByTestId('spell-slot-pips')).toBeNull();
+    const b = render(
+      <SpellBar choices={[choice]} onChoose={() => {}} slots={{ max: { 1: 0 }, used: {} }} />
+    );
+    expect(b.queryByTestId('spell-slot-pips')).toBeNull();
+  });
 });

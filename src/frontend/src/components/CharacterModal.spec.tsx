@@ -75,6 +75,22 @@ describe('CharacterModal', () => {
     expect(queryByText('EQUIPMENT')).toBeNull();
   });
 
+  it('shows remaining/max spell slots per level; slotless casters skip the line', () => {
+    const caster = makeChar({
+      ...hero,
+      spell_slots_max: { 1: 4, 2: 2, 3: 0 },
+      spell_slots_used: { 1: 1 },
+    });
+    const first = render(<CharacterModal char={caster} ctx={ctx} onClose={vi.fn()} />);
+    // L1 3 of 4 left, L2 untouched, L3 (max 0) omitted entirely.
+    expect(first.getByText(/L1 3\/4, L2 2\/2/)).toBeTruthy();
+    first.unmount();
+    // A known-spells character with no slot table (e.g. pure cantrips) shows
+    // no Slots line.
+    const cantripper = render(<CharacterModal char={hero} ctx={ctx} onClose={vi.fn()} />);
+    expect(cantripper.queryByText(/Slots:/)).toBeNull();
+  });
+
   it('closes on Escape via the Dialog shell', () => {
     const onClose = vi.fn();
     const { getByTestId } = render(<CharacterModal char={hero} ctx={ctx} onClose={onClose} />);

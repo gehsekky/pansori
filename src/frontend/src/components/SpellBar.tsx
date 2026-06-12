@@ -26,6 +26,10 @@ interface Props {
   choices: GameChoice[];
   onChoose: (choice: GameChoice) => void;
   disabled?: boolean;
+  // The active caster's slot budget (Character.spell_slots_max / _used) —
+  // rendered as per-level pips at the bar's edge so the spend decision is
+  // made against a visible budget, not a hover tooltip.
+  slots?: { max: Record<number, number>; used: Record<number, number> };
 }
 
 // rpg-awesome icon names (without the `ra-` prefix). Add a new entry
@@ -111,7 +115,44 @@ function extractSpellName(label: string): string {
   return label.replace(/^Cast\s+/, '');
 }
 
-function SpellBar({ choices, onChoose, disabled }: Props) {
+// Per-level slot pips: ● = a slot still available, ○ = spent. Levels with no
+// slots at all (max 0) don't render. SRD slot tables top out at 4 per level,
+// so the row stays short.
+function SlotPips({ slots }: { slots: NonNullable<Props['slots']> }) {
+  const levels = Object.keys(slots.max)
+    .map(Number)
+    .filter((lvl) => (slots.max[lvl] ?? 0) > 0)
+    .sort((a, b) => a - b);
+  if (levels.length === 0) return null;
+  return (
+    <span
+      data-testid="spell-slot-pips"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: '0.62rem',
+        color: 'var(--t-dim)',
+        whiteSpace: 'nowrap',
+        padding: '0 4px',
+      }}
+    >
+      {levels.map((lvl) => {
+        const max = slots.max[lvl] ?? 0;
+        const left = Math.max(0, max - (slots.used[lvl] ?? 0));
+        return (
+          <span key={lvl} aria-label={`Level ${lvl} slots: ${left} of ${max} remaining`}>
+            L{lvl}{' '}
+            <span style={{ color: 'var(--t-primary)', letterSpacing: 1 }}>{'●'.repeat(left)}</span>
+            <span style={{ letterSpacing: 1 }}>{'○'.repeat(max - left)}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function SpellBar({ choices, onChoose, disabled, slots }: Props) {
   const groups = groupSpells(choices);
   if (groups.length === 0) return null;
   return (
@@ -140,6 +181,7 @@ function SpellBar({ choices, onChoose, disabled }: Props) {
           </button>
         );
       })}
+      {slots && <SlotPips slots={slots} />}
     </div>
   );
 }

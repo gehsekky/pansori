@@ -1347,6 +1347,14 @@ export default function App() {
                                                 <SpellBar
                                                   choices={spellBarChoices}
                                                   onChoose={chooseWithPicker}
+                                                  slots={
+                                                    activeChar
+                                                      ? {
+                                                          max: activeChar.spell_slots_max,
+                                                          used: activeChar.spell_slots_used,
+                                                        }
+                                                      : undefined
+                                                  }
                                                 />
                                                 {hasSpells && hasAbilities && (
                                                   <span

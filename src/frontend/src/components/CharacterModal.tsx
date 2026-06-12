@@ -161,6 +161,21 @@ function CharacterModal({ char, ctx, onClose }: Props) {
         <Section title="SPELLS">
           {profLine('Known', char.spells_known)}
           {profLine('Prepared', char.prepared_spells)}
+          {/* Remaining/max per slot level — the rest-planning view of the
+              same budget the combat SpellBar shows as pips. */}
+          {profLine(
+            'Slots',
+            Object.keys(char.spell_slots_max ?? {})
+              .map(Number)
+              .filter((lvl) => (char.spell_slots_max?.[lvl] ?? 0) > 0)
+              .sort((a, b) => a - b)
+              .map((lvl) => {
+                const max = char.spell_slots_max[lvl];
+                const left = Math.max(0, max - (char.spell_slots_used?.[lvl] ?? 0));
+                return `L${lvl} ${left}/${max}`;
+              }),
+            false
+          )}
         </Section>
       )}
     </Dialog>
