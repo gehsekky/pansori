@@ -1,7 +1,7 @@
 import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
 import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import AboutModal from './components/AboutModal.tsx';
 import AdminScreen from './components/AdminScreen.tsx';
 import AdventureLogPanel from './components/AdventureLogPanel.tsx';
@@ -42,6 +42,27 @@ import { clampCombatDim } from './types.ts';
 import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
+
+// The first-person grid crawler (3D experiment v2) — lazy so three.js stays
+// out of the main bundle until a local room actually renders in 3D.
+const Crawler3DView = lazy(() => import('./components/Crawler3DView.tsx'));
+
+// The crawler-by-default preference for local rooms. e2e/CI opts out via
+// localStorage; WebGL-less browsers fall back inside the component itself.
+function preferCrawler(): boolean {
+  try {
+    return localStorage.getItem('pansori_crawler') !== 'off';
+  } catch {
+    return true;
+  }
+}
+function persistPreferCrawler(on: boolean): void {
+  try {
+    localStorage.setItem('pansori_crawler', on ? 'on' : 'off');
+  } catch {
+    // private mode etc. — preference just won't stick
+  }
+}
 
 // The FE ships ONE code context — the base donor. Every campaign (creator-built)
 // resolves as DB rows: CharScreen synthesizes its card over this donor from the
@@ -168,6 +189,9 @@ export default function App() {
     Array<{ kind: 'region' | 'town' | 'room'; mapId: string }>
   >([]);
   const [mapOpen, setMapOpen] = useState(false);
+  // Local rooms render as the first-person grid crawler by default (3D
+  // experiment v2); the 2D grid stays one toggle away.
+  const [crawler3d, setCrawler3d] = useState(preferCrawler);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   // Which party member's character sheet modal is open (null = closed).
@@ -955,64 +979,115 @@ export default function App() {
                           convHere ||
                           shopHere ||
                           !!gameState.active_leveling;
-                        return (
-                          <GridMapView
-                            grid={grid}
-                            markerPos={gameState.marker_pos}
-                            revealed={revealed}
-                            readOnly={mapReadOnly}
-                            terrainArt={seed?.terrain_art}
-                            // A surfaced Attack choice means a hostile is here
-                            // pre-combat — show the red enemy marker.
-                            enemyPresent={choices.some((c) => c.kind === 'attack')}
-                            // Clicking the red dot engages — dispatch the
-                            // out-of-combat Attack choice to drop into combat.
-                            onEnemyClick={() => {
-                              const atk = choices.find((c) => c.kind === 'attack');
-                              if (atk) handleChoice(atk);
+                        // Local rooms default to the first-person grid crawler
+                        // (one keypress = one marker_move; the engine stays the
+                        // movement model). The 2D grid is the toggle fallback —
+                        // and the only view for regional/town until the town
+                        // crawler lands.
+                        const crawlerHere = grid.level === 'local';
+                        const crawlerToggle = crawlerHere && (
+                          <button
+                            className={styles.signOutBtn}
+                            style={{ position: 'absolute', right: 6, top: 6, zIndex: 5 }}
+                            onClick={() => {
+                              setCrawler3d((v) => {
+                                persistPreferCrawler(!v);
+                                return !v;
+                              });
                             }}
-                            npcs={npcTokens}
-                            onNpcClick={(npcId) => {
-                              const tc = talkByNpc.get(npcId);
-                              if (tc) handleChoice(tc);
-                            }}
-                            loot={lootTokens}
-                            onLootClick={(key) => {
-                              // Adjacent already? Pick it up. Otherwise walk up to
-                              // it; the Pick-up choice surfaces next.
-                              const pick = pickupByKey.get(key);
-                              if (pick) {
-                                handleChoice(pick);
-                                return;
-                              }
-                              const tok = lootTokens.find((l) => l.key === key);
-                              if (tok)
-                                handleChoice({
-                                  label: `Approach the ${tok.name}`,
-                                  action: { type: 'approach', pos: tok.pos },
-                                });
-                            }}
-                            objects={objectTokens}
-                            onObjectClick={(id) => {
-                              const it = interactById.get(id);
-                              if (it) {
-                                handleChoice(it);
-                                return;
-                              }
-                              const tok = objectTokens.find((o) => o.id === id);
-                              if (tok)
-                                handleChoice({
-                                  label: `Approach the ${tok.name}`,
-                                  action: { type: 'approach', pos: tok.pos },
-                                });
-                            }}
-                            onMarkerMove={(to) =>
-                              handleChoice({
-                                label: `Travel to (${to.x},${to.y})`,
-                                action: { type: 'marker_move', to },
-                              })
+                            aria-label={
+                              crawler3d ? 'Switch to the 2D map' : 'Switch to the 3D view'
                             }
-                          />
+                            data-testid="crawler-3d-toggle"
+                          >
+                            {crawler3d ? '2D MAP' : '3D VIEW'}
+                          </button>
+                        );
+                        if (crawlerHere && crawler3d) {
+                          return (
+                            <div style={{ position: 'relative' }}>
+                              {crawlerToggle}
+                              <Suspense
+                                fallback={
+                                  <div className={styles.card} style={{ height: 440 }}>
+                                    Loading the crawler…
+                                  </div>
+                                }
+                              >
+                                <Crawler3DView
+                                  gameState={gameState}
+                                  seed={seed}
+                                  grid={grid}
+                                  choices={choices}
+                                  loading={loading}
+                                  readOnly={mapReadOnly}
+                                  onChoice={handleChoice}
+                                />
+                              </Suspense>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div style={{ position: 'relative' }}>
+                            {crawlerToggle}
+                            <GridMapView
+                              grid={grid}
+                              markerPos={gameState.marker_pos}
+                              revealed={revealed}
+                              readOnly={mapReadOnly}
+                              terrainArt={seed?.terrain_art}
+                              // A surfaced Attack choice means a hostile is here
+                              // pre-combat — show the red enemy marker.
+                              enemyPresent={choices.some((c) => c.kind === 'attack')}
+                              // Clicking the red dot engages — dispatch the
+                              // out-of-combat Attack choice to drop into combat.
+                              onEnemyClick={() => {
+                                const atk = choices.find((c) => c.kind === 'attack');
+                                if (atk) handleChoice(atk);
+                              }}
+                              npcs={npcTokens}
+                              onNpcClick={(npcId) => {
+                                const tc = talkByNpc.get(npcId);
+                                if (tc) handleChoice(tc);
+                              }}
+                              loot={lootTokens}
+                              onLootClick={(key) => {
+                                // Adjacent already? Pick it up. Otherwise walk up to
+                                // it; the Pick-up choice surfaces next.
+                                const pick = pickupByKey.get(key);
+                                if (pick) {
+                                  handleChoice(pick);
+                                  return;
+                                }
+                                const tok = lootTokens.find((l) => l.key === key);
+                                if (tok)
+                                  handleChoice({
+                                    label: `Approach the ${tok.name}`,
+                                    action: { type: 'approach', pos: tok.pos },
+                                  });
+                              }}
+                              objects={objectTokens}
+                              onObjectClick={(id) => {
+                                const it = interactById.get(id);
+                                if (it) {
+                                  handleChoice(it);
+                                  return;
+                                }
+                                const tok = objectTokens.find((o) => o.id === id);
+                                if (tok)
+                                  handleChoice({
+                                    label: `Approach the ${tok.name}`,
+                                    action: { type: 'approach', pos: tok.pos },
+                                  });
+                              }}
+                              onMarkerMove={(to) =>
+                                handleChoice({
+                                  label: `Travel to (${to.x},${to.y})`,
+                                  action: { type: 'marker_move', to },
+                                })
+                              }
+                            />
+                          </div>
                         );
                       }
                     }
