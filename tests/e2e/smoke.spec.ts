@@ -291,6 +291,10 @@ test('session resume: state survives a page reload', async ({ page, request }) =
 // the next run); CI/`test:e2e:stack` brings up a fresh stack per run, so it
 // can't occur there, and retries:2 covers the rest.
 test('combat: enter a fight and resolve an attack', async ({ page, request }) => {
+  // The drive-loop's worst case (80 iterations, each rendering the 3D combat
+  // diorama under software GL) sits right at the global 60s timeout on a
+  // loaded machine — give the fight room to breathe.
+  test.setTimeout(120_000);
   // Re-login as a fresh test user so this test is independent of the smoke.
   const email = `e2e-combat-${Date.now()}@pansori.local`;
   const loginRes = await request.post(`${BACKEND_URL}/api/auth/test-login`, {
