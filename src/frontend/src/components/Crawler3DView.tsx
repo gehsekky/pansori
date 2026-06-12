@@ -93,14 +93,25 @@ const hudBox: React.CSSProperties = {
 // always takes the short way around. A torch light rides along. ─────────────
 function CameraRig({ target, yawTarget }: { target: { x: number; z: number }; yawTarget: number }) {
   const light = useRef<THREE.PointLight>(null);
+  // The rig OWNS the camera. r3f's default camera arrives with a lookAt-style
+  // orientation whose YXZ reinterpretation carries a nonzero ROLL — leaving z
+  // untouched baked a permanent horizon tilt into the view (varying with the
+  // spawn cell, so every re-entry tilted differently). Snap to a clean frame
+  // on the first tick, then keep pitch and roll pinned at zero.
+  const initialized = useRef(false);
   useFrame(({ camera }, dt) => {
+    if (!initialized.current) {
+      initialized.current = true;
+      camera.rotation.set(0, yawTarget, 0, 'YXZ');
+      camera.position.set(target.x, EYE, target.z);
+    }
     const k = Math.min(1, dt * 7);
     camera.position.x += (target.x - camera.position.x) * k;
     camera.position.z += (target.z - camera.position.z) * k;
     camera.position.y = EYE;
-    camera.rotation.order = 'YXZ';
     camera.rotation.y += (yawTarget - camera.rotation.y) * Math.min(1, dt * 9);
     camera.rotation.x = 0;
+    camera.rotation.z = 0;
     if (light.current) {
       light.current.position.set(camera.position.x, EYE + 0.5, camera.position.z);
     }
@@ -550,12 +561,10 @@ function Crawler3DView({
       }}
     >
       <Canvas
-        camera={{
-          fov: 70,
-          near: 0.1,
-          far: 80,
-          position: [marker.x * CRAWL_CELL, EYE, marker.y * CRAWL_CELL],
-        }}
+        // No `position` here: the rig owns the camera entirely (it snaps to
+        // the marker on the first frame). A position prop would be re-applied
+        // on re-renders, teleport-fighting the step tween.
+        camera={{ fov: 70, near: 0.1, far: 80 }}
         dpr={[1, 1.75]}
       >
         <color attach="background" args={['#05070a']} />
