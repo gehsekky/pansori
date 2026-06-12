@@ -22,6 +22,7 @@ import InviteDialog from './components/InviteDialog.tsx';
 import LevelingPanel from './components/LevelingPanel.tsx';
 import LoginScreen from './components/LoginScreen.tsx';
 import MoveDPad from './components/MoveDPad.tsx';
+import NarrativeModal from './components/NarrativeModal.tsx';
 import NarrativeText from './components/NarrativeText.tsx';
 import OptionPickerDialog from './components/OptionPickerDialog.tsx';
 import PartyRail from './components/PartyRail.tsx';
@@ -253,6 +254,8 @@ export default function App() {
     escaped,
     roomLog,
     participantsVersion,
+    introText,
+    dismissIntro,
     handleNewGame,
     handleResumeSession,
     handleEquip,
@@ -457,6 +460,9 @@ export default function App() {
       const allDead = !!gameState && gameState.characters.every((c) => c.dead);
       if (view !== 'game' || loading || escaped || allDead || gameState?.campaign_outcome) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // The game-start narrative modal owns the moment — no hotkeys layering
+      // other modals over it (it closes via CONTINUE / Escape / backdrop).
+      if (introText) return;
       // 'i' toggles inventory modal
       if (e.key === 'i' || e.key === 'I') {
         e.preventDefault();
@@ -493,6 +499,7 @@ export default function App() {
     mapOpen,
     sheetCharId,
     questLogOpen,
+    introText,
     chooseWithPicker,
   ]);
 
@@ -1111,6 +1118,7 @@ export default function App() {
                                     inventoryOpen ||
                                     mapOpen ||
                                     questLogOpen ||
+                                    !!introText ||
                                     !!sheetCharId
                                   }
                                   onChoice={handleChoice}
@@ -1720,6 +1728,13 @@ export default function App() {
                   meta={campaignMeta}
                   onClose={() => setQuestLogOpen(false)}
                 />
+              )}
+
+              {/* Game-start narration, front and center (once per new
+                  adventure — useGame only sets introText on handleNewGame).
+                  The same text stays in the narrative pane behind it. */}
+              {introText && (
+                <NarrativeModal title={worldName} text={introText} onClose={dismissIntro} />
               )}
 
               {sheetCharId &&

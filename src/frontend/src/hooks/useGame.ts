@@ -38,6 +38,12 @@ export interface UseGameReturn {
   // leave / ownership-changed). InviteDialog uses it as a useEffect
   // dep so it can re-fetch the participants list without polling.
   participantsVersion: number;
+  // The game-start narration (the first run_log entry — gameStart pool pick
+  // + act opening + starter quests), set ONLY by handleNewGame so the
+  // narrative modal opens once per new adventure, not on resume/reload.
+  // The same text stays in the narrative pane; this is presentation only.
+  introText: string | null;
+  dismissIntro: () => void;
 
   handleNewGame: (characters: CharacterInput[], contextId: string) => Promise<void>;
   handleResumeSession: (id: string) => Promise<void>;
@@ -58,6 +64,7 @@ export function useGame(): UseGameReturn {
   const [loading, setLoading] = useState(false);
   const [escaped, setEscaped] = useState(false);
   const [roomLog, setRoomLog] = useState<string[]>([]);
+  const [introText, setIntroText] = useState<string | null>(null);
   const [participantsVersion, setParticipantsVersion] = useState(0);
   // Local mirror of game_sessions.turn_seq — included with every
   // takeAction so the server can detect stale writes (multiplayer
@@ -139,6 +146,7 @@ export function useGame(): UseGameReturn {
       setRoomLog(result.state.room_log || []);
       setChoices(result.state.last_choices || []);
       setTurnSeq(result.session.turn_seq ?? 0);
+      setIntroText(result.state.run_log?.[0]?.narrative ?? null);
       window.history.pushState(null, '', `/game/${result.session.id}`);
     } finally {
       setLoading(false);
@@ -257,6 +265,7 @@ export function useGame(): UseGameReturn {
     setHistory([]);
     setEscaped(false);
     setRoomLog([]);
+    setIntroText(null);
   }
 
   return {
@@ -270,6 +279,8 @@ export function useGame(): UseGameReturn {
     escaped,
     roomLog,
     participantsVersion,
+    introText,
+    dismissIntro: () => setIntroText(null),
     handleNewGame,
     handleResumeSession,
     handleEquip,

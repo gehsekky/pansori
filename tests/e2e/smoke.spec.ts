@@ -30,6 +30,16 @@ const TEST_EMAIL = `e2e-${Date.now()}@pansori.local`;
 
 // Plant (or refresh) the throwaway campaign. Idempotent (replace-all), gated to
 // non-production + E2E_TEST_LOGIN_ENABLED. No auth required.
+// The game-start narrative modal opens over a FRESH adventure (new games
+// only — resume/reload stays quiet). Assert it appeared and dismiss it
+// before driving the UI; its backdrop would otherwise intercept clicks.
+async function dismissIntroModal(page: Page): Promise<void> {
+  const modal = page.getByTestId('narrative-modal');
+  await expect(modal).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('narrative-modal-continue').click();
+  await expect(modal).toHaveCount(0);
+}
+
 async function seedCampaign(request: import('@playwright/test').APIRequestContext): Promise<void> {
   const res = await request.post(`${BACKEND_URL}/api/test/seed-campaign`);
   expect(res.ok(), `seed-campaign failed: ${res.status()} ${await res.text()}`).toBe(true);
@@ -71,9 +81,11 @@ test('login → character creation → begin adventure', async ({ page, request 
   await expect(begin).toBeEnabled();
   await begin.click();
 
-  // 7. Game view should render with the narrative panel populated.
+  // 7. Game view should render with the narrative panel populated — and the
+  //    game-start narrative modal opens over it on a new adventure.
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
+  await dismissIntroModal(page);
   // Soft assertion so any future flavour text change doesn't break the smoke —
   // the structure check above is the load-bearing assertion.
   await expect(narrative).not.toBeEmpty();
@@ -231,6 +243,7 @@ test('session resume: state survives a page reload', async ({ page, request }) =
 
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
+  await dismissIntroModal(page);
   const initialText = (await narrative.textContent()) ?? '';
   expect(initialText.length).toBeGreaterThan(0);
 
@@ -281,6 +294,10 @@ test('session resume: state survives a page reload', async ({ page, request }) =
   // sector..." loading text, and the URL must still be the session URL.
   expect(resumedText).not.toMatch(/^Scanning sector/);
   expect(page.url()).toBe(sessionUrl);
+
+  // Resume is quiet: the game-start narrative modal greets NEW adventures
+  // only, never a reload of one in progress.
+  await expect(page.getByTestId('narrative-modal')).toHaveCount(0);
 });
 
 // RE-ENABLED 2026-06-09: skipped 2026-05-22 for a "click intercepted by parent
@@ -312,9 +329,10 @@ test('combat: enter a fight and resolve an attack', async ({ page, request }) =>
   await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
   await page.getByTestId('begin-adventure-btn').click();
 
-  // Wait for the game view to render.
+  // Wait for the game view to render, then clear the game-start modal.
   const narrative = page.getByTestId('game-narrative-panel');
   await expect(narrative).toBeVisible({ timeout: 15_000 });
+  await dismissIntroModal(page);
 
   // Travel to the practice ring (where the goblins wait) before driving combat.
   await clickTravelTo(page, 'The Practice Ring');
@@ -455,6 +473,7 @@ test('combat: initiative live + class-specific choices respect class', async ({
   await expect(page.getByTestId('begin-adventure-btn')).toBeEnabled();
   await page.getByTestId('begin-adventure-btn').click();
   await expect(page.getByTestId('game-narrative-panel')).toBeVisible({ timeout: 15_000 });
+  await dismissIntroModal(page);
 
   // 2. From the regional grid, enter the practice ring — the party lands in a
   //    Goblin-Warrior-occupied room; the engine blocks travelling on while an
