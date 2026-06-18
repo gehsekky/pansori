@@ -1976,7 +1976,29 @@ function computeEnemyAttack(
       bonusDmg = resistsBonus ? Math.ceil(rolled / 2) : rolled;
       if (bonusDmg > 0) bonusNote = ` (plus ${fmt.dmg(bonusDmg)} ${bt ?? ''})`.replace(' )', ')');
     }
-    const dmgResult = applyDamage(charAfterWard, st, postShdDmg + bonusDmg, {
+    // SRD charge rider — extra damage (+ optional Prone, resolved post-damage)
+    // when the enemy moved `afterFt`+ toward the target this turn (charged_ft
+    // stamped during the approach). Added to the FIRST connecting hit; included
+    // in the pre-reaction total so Deflect / Uncanny Dodge reduce it with the
+    // rest of the hit (it's part of the attack). `charged_ft` is zeroed below so
+    // a Multiattack adds it once.
+    let chargeDmg = 0;
+    let chargeNote = '';
+    const chargeRider = enemy.chargeRider;
+    const chargedFt = st.entities?.find((e) => e.id === enemy.id && e.isEnemy)?.charged_ft ?? 0;
+    const chargeApplies = !!chargeRider && chargedFt >= chargeRider.afterFt;
+    if (chargeRider && chargeApplies && chargeRider.bonusDamage) {
+      const ct = chargeRider.bonusType ?? enemy.damageType;
+      const rolled = rollDice(chargeRider.bonusDamage);
+      const resistsCharge =
+        isPetrified ||
+        (!!ct && (char.spell_resistances ?? []).includes(ct)) ||
+        speciesData?.resistances?.includes(ct ?? '') === true;
+      chargeDmg = resistsCharge ? Math.ceil(rolled / 2) : rolled;
+      if (chargeDmg > 0)
+        chargeNote = ` (charge: +${fmt.dmg(chargeDmg)} ${ct ?? ''})`.replace(' )', ')');
+    }
+    const dmgResult = applyDamage(charAfterWard, st, postShdDmg + bonusDmg + chargeDmg, {
       deferConcentrationIndomitable: true,
       // SRD Resistance cantrip — −1d4 if the PC chose this attack's damage type
       // (applied inside applyDamage, once per round).
@@ -1994,6 +2016,25 @@ function computeEnemyAttack(
     }
     let newSt = dmgResult.st;
     const hpLost = dmgResult.amountDealt;
+    // Consume the charge (zero charged_ft so the rider lands once per turn) and
+    // apply its Prone, if any. 2024 SRD: the Prone is automatic (no save); the
+    // size gate is ignored since PCs are Medium and always qualify.
+    if (chargeApplies) {
+      newSt = {
+        ...newSt,
+        entities: (newSt.entities ?? []).map((e) =>
+          e.id === enemy.id && e.isEnemy ? { ...e, charged_ft: 0 } : e
+        ),
+      };
+      if (
+        chargeRider!.prone &&
+        !updatedChar.conditions.includes('prone') &&
+        !conditionImmunitiesFor(updatedChar, st).has('prone')
+      ) {
+        updatedChar = { ...updatedChar, conditions: [...updatedChar.conditions, 'prone'] };
+        chargeNote += ` ${char.name} is knocked Prone by the charge!`;
+      }
+    }
     const tempHpNote =
       dmgResult.tempHpAbsorbed > 0
         ? ` (Temp HP absorbed ${dmgResult.tempHpAbsorbed} — temp HP: ${dmgResult.tempHpRemaining})`
@@ -2044,6 +2085,7 @@ function computeEnemyAttack(
       narrative += ` ${char.name} falls unconscious!`;
     }
     narrative += bonusNote;
+    narrative += chargeNote;
     narrative +=
       rageNote +
       petrNote +
@@ -8449,7 +8491,19 @@ export function attemptEnemyApproach(args: {
   // Skip the movement work entirely when resuming a multi-attack or
   // when already in reach. Caller falls through to the attack loop.
   if (resumeMi !== 0 || !needsToMove || !enemyEntPreMove || !targetEntPreMove) {
-    return { kind: 'proceed-to-attack', st, narrative, movementHeaderPrinted: false };
+    // SRD charge rider — a fresh turn (resumeMi 0) with no approach means no
+    // charge: clear any stale stamp so a prior turn's run-up can't trigger it.
+    // On a resume, preserve the charge stamped by this turn's earlier approach.
+    const clearedSt =
+      resumeMi === 0 && enemyEntPreMove?.charged_ft
+        ? {
+            ...st,
+            entities: (st.entities ?? []).map((e) =>
+              e.id === enemyId && e.isEnemy ? { ...e, charged_ft: 0 } : e
+            ),
+          }
+        : st;
+    return { kind: 'proceed-to-attack', st: clearedSt, narrative, movementHeaderPrinted: false };
   }
 
   narrative += `\n\n[${enemy.name}'s turn]`;
@@ -8497,11 +8551,13 @@ export function attemptEnemyApproach(args: {
     return { kind: 'skip-turn', st: nextSt, narrative };
   }
 
-  // Commit the new enemy position.
+  // Commit the new enemy position + stamp the charge distance (feet moved
+  // straight toward the target this turn — read by the charge rider in
+  // computeEnemyAttack).
   nextSt = {
     ...nextSt,
     entities: (nextSt.entities ?? []).map((e) =>
-      e.id === enemyId ? { ...e, pos: plan.newPos } : e
+      e.id === enemyId ? { ...e, pos: plan.newPos, charged_ft: stepsFt } : e
     ),
   };
   if (!plan.reached) {

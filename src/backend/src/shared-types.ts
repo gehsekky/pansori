@@ -646,6 +646,11 @@ export interface CombatEntity {
   // `false` ⇒ spent, re-rolled at the start of each of the creature's turns
   // (recharge on a d6 ≥ the weapon's `rechargeMin`). Set `false` when fired.
   breath_charged?: boolean;
+  // SRD charge rider — feet this enemy moved straight toward its target during
+  // its approach THIS turn (stamped in attemptEnemyApproach; reset each turn).
+  // computeEnemyAttack reads it: a hit after a ≥`afterFt` charge adds the rider,
+  // then zeroes this so the bonus applies once per turn (the first connecting hit).
+  charged_ft?: number;
   // SRD Vision & Light — bright-light radius (ft) this entity sheds as a light
   // source (the Light cantrip / a torch on a PC, Daylight, etc.). A cell within
   // this radius is brightly lit, and within 2× it is at least dimly lit — either

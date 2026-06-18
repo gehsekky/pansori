@@ -846,6 +846,16 @@ const EnemyTemplateSchema = z
     bloodiedFrenzy: z.boolean().optional(),
     bonusDamage: DICE.optional(),
     bonusDamageType: z.string().min(1).max(20).optional(),
+    // SRD movement-conditional charge rider (see ChargeRider in types.ts).
+    chargeRider: z
+      .object({
+        afterFt: z.number().int().min(1).max(120),
+        bonusDamage: DICE.optional(),
+        bonusType: z.string().min(1).max(20).optional(),
+        prone: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     undeadFortitude: z.boolean().optional(),
     lifeDrain: z.boolean().optional(),
     regeneration: z.number().int().min(1).max(40).optional(),

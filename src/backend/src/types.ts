@@ -134,6 +134,23 @@ export interface Room extends LevelNarrationHooks {
 
 // `ConditionName` is re-exported from ./shared-types (see src/shared/types.ts).
 
+// SRD movement-conditional charge rider — when a creature moves at least
+// `afterFt` straight toward its target this turn and then hits, the first
+// connecting hit deals extra `bonusDamage` (type `bonusType`, defaulting to the
+// attack's own type) and, if `prone` is set, gives the target the Prone
+// condition. Per the 2024 SRD the Prone is automatic (no save); its size gate
+// ("Large or smaller", etc.) is ignored since PCs are Medium and always qualify.
+// `bonusDamage` is optional — a few charges (Gorgon's Gore) only knock Prone.
+// pansori's enemy approach is target-directed, so the distance moved
+// (`charged_ft`, stamped during the approach) is taken as "straight toward".
+// Applied once per turn (the first connecting hit) in `computeEnemyAttack`.
+export interface ChargeRider {
+  afterFt: number;
+  bonusDamage?: string;
+  bonusType?: string;
+  prone?: boolean;
+}
+
 export interface OnHitEffect {
   condition: ConditionName;
   // Save to avoid the condition. Omit BOTH `ability` and `dc` for an automatic
@@ -294,6 +311,10 @@ export interface EnemyTemplate {
   // specific reductions; halved only if the target resists `bonusDamageType`.
   bonusDamage?: string; // dice expr, e.g. '2d8'
   bonusDamageType?: string;
+  // SRD charge rider (Boar, Rhinoceros, warhorse, ram, etc.) — extra damage +
+  // optional Prone after moving toward the target. See ChargeRider. Carried
+  // through materializeEnemy onto the Enemy and read in computeEnemyAttack.
+  chargeRider?: ChargeRider;
   // SRD Undead Fortitude (Zombie) — when damage would drop this creature to
   // 0 HP, it makes a CON save (DC 5 + the damage taken) and drops to 1 HP on a
   // success, UNLESS the damage is Radiant or from a Critical Hit. Routed
@@ -414,6 +435,8 @@ export interface Enemy {
   bloodiedFrenzy?: boolean;
   bonusDamage?: string;
   bonusDamageType?: string;
+  // SRD charge rider — see EnemyTemplate.chargeRider / ChargeRider.
+  chargeRider?: ChargeRider;
   undeadFortitude?: boolean;
   lifeDrain?: boolean;
   // SRD Regeneration — see EnemyTemplate.regeneration. `regen_blocked` is

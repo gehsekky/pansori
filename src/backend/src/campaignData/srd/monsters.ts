@@ -1010,7 +1010,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'piercing',
     // SRD: Bloodied Fury — Advantage on melee attacks while the boar is Bloodied.
     bloodiedFrenzy: true,
-    // SRD: charge rider (+2d6 + Prone after moving 20+ ft) deferred.
+    // SRD: 20+ ft charge → +2d6 Piercing and Prone (Tusk).
+    chargeRider: { afterFt: 20, bonusDamage: '2d6', bonusType: 'piercing', prone: true },
   },
   polar_bear: {
     name: 'Polar Bear',
@@ -2082,10 +2083,11 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   // ─── Animals appendix (SRD 5.2.1 pp. 344+) — batch 2026-06-07 ──────────────
   // The full SRD animal roster: wilderness fauna, mounts, swarms, dinosaurs.
-  // Stat lines machine-extracted from docs/srd-5.2.1.txt and spot-verified;
-  // movement-conditional charge riders ("moved 20+ feet straight toward")
-  // are deferred (no charge tracking) and noted per entry. Seahorse (no
-  // attack action) is skipped — not a combat template.
+  // Stat lines machine-extracted from docs/srd-5.2.1.txt and spot-verified.
+  // Movement-conditional charge riders ("moved 20+ feet straight toward") now
+  // ship via the `chargeRider` field (read in computeEnemyAttack). The CR-0 goat
+  // + giant seahorse use a damage-SWAP charge (not an additive rider) and stay
+  // deferred. Seahorse (no attack action) is skipped — not a combat template.
 
   baboon: {
     name: 'Baboon',
@@ -2712,7 +2714,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 40,
     darkvision_ft: 0, // no darkvision
     bloodiedFrenzy: true, // SRD: Bloodied Fury
-    // Simplification: gore charge rider deferred; Bloodied Fury below.
+    // SRD: 20+ ft charge → +1d6 Piercing and Prone (Gore).
+    chargeRider: { afterFt: 20, bonusDamage: '1d6', bonusType: 'piercing', prone: true },
   },
 
   draft_horse: {
@@ -2752,7 +2755,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 6,
     damageType: 'bludgeoning',
     speedFt: 50,
-    // Simplification: ram charge rider deferred.
+    // SRD: 20+ ft charge → +2d4 Bludgeoning and Prone (Ram).
+    chargeRider: { afterFt: 20, bonusDamage: '2d4', bonusType: 'bludgeoning', prone: true },
   },
 
   giant_badger: {
@@ -3077,7 +3081,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 6,
     damageType: 'bludgeoning',
     speedFt: 40,
-    // Simplification: ram charge rider deferred.
+    // SRD: 20+ ft charge → +2d4 Bludgeoning and Prone (Ram).
+    chargeRider: { afterFt: 20, bonusDamage: '2d4', bonusType: 'bludgeoning', prone: true },
   },
 
   giant_seahorse: {
@@ -3195,7 +3200,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'bludgeoning',
     speedFt: 60,
     darkvision_ft: 0, // no darkvision
-    // Simplification: hooves charge rider (+Prone) deferred.
+    // SRD: 20+ ft charge → +2d4 Bludgeoning and Prone (Hooves).
+    chargeRider: { afterFt: 20, bonusDamage: '2d4', bonusType: 'bludgeoning', prone: true },
   },
 
   giant_octopus: {
@@ -3314,7 +3320,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'piercing',
     speedFt: 60,
     darkvision_ft: 0, // no darkvision
-    // Simplification: claws charge rider (extra 2d6 + Prone) deferred.
+    // SRD: 30+ ft charge → Prone (Claws; the follow-up Bite is deferred).
+    chargeRider: { afterFt: 30, prone: true },
   },
 
   giant_elk: {
@@ -3339,7 +3346,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamage: '2d4',
     bonusDamageType: 'radiant',
     resistances: ['necrotic', 'radiant'],
-    // Simplification: charge rider (+Prone after 20+ ft) deferred.
+    // SRD: 20+ ft charge → +2d4 Bludgeoning and Prone (Ram).
+    chargeRider: { afterFt: 20, bonusDamage: '2d4', bonusType: 'bludgeoning', prone: true },
   },
 
   hunter_shark: {
@@ -3401,7 +3409,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'piercing',
     speedFt: 40,
     darkvision_ft: 0, // no darkvision
-    // Simplification: gore charge rider deferred.
+    // SRD: 20+ ft charge → +2d8 Piercing and Prone (Gore).
+    chargeRider: { afterFt: 20, bonusDamage: '2d8', bonusType: 'piercing', prone: true },
   },
 
   swarm_of_venomous_snakes: {
@@ -3521,7 +3530,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 2,
     speedFt: 40,
     darkvision_ft: 0, // no darkvision
-    // Simplification: gore charge rider (+Prone) deferred.
+    // SRD: 20+ ft charge → Prone (Gore; no extra damage).
+    chargeRider: { afterFt: 20, prone: true },
   },
 
   hippopotamus: {
@@ -3607,7 +3617,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 2,
     speedFt: 50,
     darkvision_ft: 0, // no darkvision
-    // Simplification: gore charge rider deferred.
+    // SRD: 20+ ft charge → +2d8 Piercing and Prone (Gore).
+    chargeRider: { afterFt: 20, bonusDamage: '2d8', bonusType: 'piercing', prone: true },
   },
 
   tyrannosaurus_rex: {
@@ -4622,7 +4633,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['poison'],
     vulnerabilities: ['bludgeoning'],
     condition_immunities: ['exhaustion', 'poisoned'],
-    // Simplification: gore charge rider deferred.
+    // SRD: 20+ ft charge → Prone (Hooves; no extra damage).
+    chargeRider: { afterFt: 20, prone: true },
   },
 
   ochre_jelly: {

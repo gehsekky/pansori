@@ -49,7 +49,16 @@ documented deferrals.
 > remaining per-monster specials need new engine support. Each is marked inline
 > with a `// Simplification:` comment (grep for the worklist).
 
-- [ ] Movement-conditional **charge riders** ("moved 20+ ft" → extra dice/Prone).
+- [x] Movement-conditional **charge riders** ("moved 20+ ft" → extra dice/Prone) —
+      shipped. An `Enemy.chargeRider` field ({ afterFt, bonusDamage?, bonusType?,
+      prone? }); the approach stamps `charged_ft` (feet moved toward the target),
+      and `computeEnemyAttack` adds the rider on the first connecting hit (included
+      pre-reaction so Deflect/Uncanny Dodge reduce it), 2024-SRD auto-Prone (no
+      save; size gate ignored since PCs are Medium), consumed once per turn. Wired
+      11 monsters (boar/giant boar, elk/giant elk, giant goat, warhorse, rhino,
+      elephant, triceratops, allosaurus, minotaur skeleton). Deferred: the CR-0
+      goat + giant seahorse (damage-*swap* charges, not additive) and Allosaurus's
+      follow-up Bite.
 - [ ] **Swallow / Engulf**; **petrifying-gaze ladders** (Restrained → Petrified).
 - [ ] Monster **utility spellcasting** (the Priest convention defers it);
       spell-based **legendary options + Legendary Resistance + lair actions**.

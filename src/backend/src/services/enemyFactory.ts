@@ -110,6 +110,7 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     bloodiedFrenzy: template.bloodiedFrenzy,
     bonusDamage: template.bonusDamage,
     bonusDamageType: template.bonusDamageType,
+    chargeRider: template.chargeRider,
     undeadFortitude: template.undeadFortitude,
     lifeDrain: template.lifeDrain,
     regeneration: template.regeneration,

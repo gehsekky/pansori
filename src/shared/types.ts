@@ -641,6 +641,11 @@ export interface CombatEntity {
   // `false` ⇒ spent, re-rolled at the start of each of the creature's turns
   // (recharge on a d6 ≥ the weapon's `rechargeMin`). Set `false` when fired.
   breath_charged?: boolean;
+  // SRD charge rider — feet this enemy moved straight toward its target during
+  // its approach THIS turn (stamped in attemptEnemyApproach; reset each turn).
+  // computeEnemyAttack reads it: a hit after a ≥`afterFt` charge adds the rider,
+  // then zeroes this so the bonus applies once per turn (the first connecting hit).
+  charged_ft?: number;
   // SRD Vision & Light — bright-light radius (ft) this entity sheds as a light
   // source (the Light cantrip / a torch on a PC, Daylight, etc.). A cell within
   // this radius is brightly lit, and within 2× it is at least dimly lit — either
@@ -1011,8 +1016,9 @@ export type StructuredAction =
   | { type: 'choose_mystic_arcanum'; spellId: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
-  // (may be the paladin). (RE-2.)
-  | { type: 'lay_on_hands'; targetCharId: string }
+  // (may be the paladin). `cure` spends 5 points to end the Poisoned condition
+  // instead of restoring HP (SRD: those points don't also restore HP). (RE-2.)
+  | { type: 'lay_on_hands'; targetCharId: string; cure?: boolean }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean; source?: 'inspiration' | 'stroke_of_luck' }
   // RAW player-command for a summoned creature (Animate Dead, etc.). On the

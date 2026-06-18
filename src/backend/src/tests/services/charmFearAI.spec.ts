@@ -174,7 +174,7 @@ describe('Frightened enemy — keeps distance from its fear source', () => {
     expect(result.narrative).toMatch(/frightened to advance/);
   });
 
-  it('a non-frightened enemy advances normally', () => {
+  it('a non-frightened enemy advances normally + stamps the charge distance', () => {
     const result = attemptEnemyApproach({
       enemy: ghoul,
       enemyId: 'e1',
@@ -187,6 +187,9 @@ describe('Frightened enemy — keeps distance from its fear source', () => {
       narrative: '',
     });
     expect(result.kind).toBe('proceed-to-attack');
+    // The approach records how far it closed — the SRD charge rider reads this.
+    const movedFt = result.st.entities?.find((e) => e.id === 'e1' && e.isEnemy)?.charged_ft ?? 0;
+    expect(movedFt).toBeGreaterThanOrEqual(20);
   });
 });
 
