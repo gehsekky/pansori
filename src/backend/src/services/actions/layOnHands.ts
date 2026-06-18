@@ -10,13 +10,18 @@ import { updatePcActor } from './actor.js';
  * rest) to restore HP. Heals the lesser of the target's missing HP and the
  * remaining pool, spending only what's used. A bonus action in combat
  * (self-managed so it stays usable out of combat); the pool is tracked as
- * points spent on `class_resource_uses.lay_on_hands`. The poison-cure use
- * (5 points to end Poisoned) is a deferred follow-up. (RE-2.)
+ * points spent on `class_resource_uses.lay_on_hands`. With `cure`, spends a
+ * flat 5 points to end the Poisoned condition instead of restoring HP (SRD:
+ * those points don't also restore Hit Points). (RE-2.)
  */
-export const handleLayOnHands: ActionHandler<{ type: 'lay_on_hands'; targetCharId: string }> = (
-  ctx,
-  action
-) => {
+// SRD: Lay On Hands poison-cure — a flat cost to end the Poisoned condition.
+const LAY_ON_HANDS_CURE_COST = 5;
+
+export const handleLayOnHands: ActionHandler<{
+  type: 'lay_on_hands';
+  targetCharId: string;
+  cure?: boolean;
+}> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use Lay on Hands.' };
   const { char } = ctx.actor;
   if (getClassLevel(char, 'paladin') < 1) {
@@ -31,6 +36,51 @@ export const handleLayOnHands: ActionHandler<{ type: 'lay_on_hands'; targetCharI
     ctx.narrative = 'Your Lay on Hands pool is empty (recovers on a long rest).';
     return;
   }
+
+  // Poison-cure branch: a flat 5 points ends Poisoned and restores no HP.
+  if (action.cure) {
+    if (remaining < LAY_ON_HANDS_CURE_COST) {
+      ctx.narrative = `Curing poison costs ${LAY_ON_HANDS_CURE_COST} HP from the pool — only ${remaining} left.`;
+      return;
+    }
+    const target = ctx.st.characters.find((c) => c.id === action.targetCharId && !c.dead);
+    if (!target) return { rejected: 'No such ally to cure.' };
+    if (!(target.conditions ?? []).includes('poisoned')) {
+      ctx.narrative = `${target.id === char.id ? 'You are' : `${target.name} is`} not Poisoned.`;
+      return;
+    }
+    const isSelf = target.id === char.id;
+    const curedConditions = (target.conditions ?? []).filter((c) => c !== 'poisoned');
+
+    const casterPatch: Partial<Character> = {
+      class_resource_uses: {
+        ...char.class_resource_uses,
+        lay_on_hands: (char.class_resource_uses?.lay_on_hands ?? 0) + LAY_ON_HANDS_CURE_COST,
+      },
+    };
+    if (ctx.st.combat_active) {
+      casterPatch.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    }
+    if (isSelf) casterPatch.conditions = curedConditions;
+    updatePcActor(ctx, casterPatch);
+
+    if (!isSelf) {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) =>
+          c.id === target.id ? { ...c, conditions: curedConditions } : c
+        ),
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === target.id && !e.isEnemy ? { ...e, conditions: curedConditions } : e
+        ),
+      };
+    }
+
+    const who = isSelf ? 'themselves' : target.name;
+    ctx.narrative = `${char.name} draws the poison out of ${who} — the Poisoned condition ends. (${remaining - LAY_ON_HANDS_CURE_COST} HP left in the pool)`;
+    return;
+  }
+
   const target = ctx.st.characters.find((c) => c.id === action.targetCharId && !c.dead);
   if (!target) return { rejected: 'No such ally to heal.' };
   const missing = target.max_hp - target.hp;

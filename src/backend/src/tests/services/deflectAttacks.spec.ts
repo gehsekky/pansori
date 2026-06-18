@@ -75,10 +75,18 @@ describe('Deflect Attacks — pause window opens on a B/P/S hit', () => {
     expect(doneTargetHp(c)).toBe(20); // full 20, no window
   });
 
-  it('does not open for non-B/P/S damage (control)', () => {
+  it('does not open for non-B/P/S damage below L13 (control)', () => {
     const c = ctxFor(monk(3), brute('fire'));
     handleEnemyAttack(c, attack);
-    expect(doneTargetHp(c)).toBe(20); // fire isn't deflectable
+    expect(doneTargetHp(c)).toBe(20); // fire isn't deflectable pre-Deflect Energy
+  });
+
+  it('Deflect Energy (L13): opens on ANY damage type — fire pauses the hit', () => {
+    const c = ctxFor(monk(13), brute('fire'));
+    handleEnemyAttack(c, attack);
+    expect(c.enemySubAttack?.outcome).toBe('paused');
+    expect(c.st.pending_reaction?.kind).toBe('deflect_attacks');
+    expect(c.st.characters[0].hp).toBe(40); // not yet committed
   });
 
   it('does not open when the reaction is already spent (control)', () => {

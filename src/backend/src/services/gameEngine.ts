@@ -4524,9 +4524,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       ];
     }
     if (pending.kind === 'deflect_attacks') {
+      // SRD: the L13 upgrade ("Deflect Energy") extends the same feature to any
+      // damage type — name it accordingly so the player knows it's the upgrade.
+      const deflectName = getClassLevel(char, 'monk') >= 13 ? 'Deflect Energy' : 'Deflect Attacks';
       return [
         {
-          label: `🥋 Deflect Attacks (reaction) — reduce the ${enemyForLabel}'s ${pending.proposedDamage} damage by 1d10 + DEX + Monk level`,
+          label: `🥋 ${deflectName} (reaction) — reduce the ${enemyForLabel}'s ${pending.proposedDamage} damage by 1d10 + DEX + Monk level`,
           action: { type: 'resolve_reaction', accept: true },
         },
         {
@@ -5386,6 +5389,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           kind: 'class_feature',
           requiresBonusAction: state.combat_active || undefined,
         });
+      }
+      // SRD poison-cure: a flat 5 points ends Poisoned (no HP restored) — one
+      // choice per Poisoned member, only when the pool can pay the flat cost.
+      if (lohPool >= 5) {
+        for (const member of state.characters) {
+          if (member.dead || !(member.conditions ?? []).includes('poisoned')) continue;
+          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+          const selfTag = member.id === char.id ? ' (self)' : '';
+          choices.push({
+            label: `Lay on Hands — cure poison${selfTag} → ${member.name} (5 HP from pool)`,
+            action: { type: 'lay_on_hands', targetCharId: member.id, cure: true },
+            kind: 'class_feature',
+            requiresBonusAction: state.combat_active || undefined,
+          });
+        }
       }
     }
   }
@@ -7559,9 +7577,13 @@ function isUncannyDodgeEligible(target: Character): boolean {
 // blinded gate. Eligibility is checked AFTER the attack proposal so the window
 // only opens on a damaging B/P/S hit with a Reaction available.
 function isDeflectAttacksEligible(target: Character, damageType: string | undefined): boolean {
-  if (getClassLevel(target, 'monk') < 3) return false;
+  const monkLevel = getClassLevel(target, 'monk');
+  if (monkLevel < 3) return false;
   if (!canReact(target)) return false;
   if (target.hp <= 0) return false;
+  // SRD Deflect Energy (Monk L13): Deflect Attacks now works against attacks
+  // dealing ANY damage type, not just Bludgeoning/Piercing/Slashing.
+  if (monkLevel >= 13) return true;
   return ['bludgeoning', 'piercing', 'slashing'].includes(damageType ?? 'bludgeoning');
 }
 

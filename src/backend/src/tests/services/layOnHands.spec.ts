@@ -98,3 +98,64 @@ describe('handleLayOnHands', () => {
     expect(ctx.actor.char.class_resource_uses.lay_on_hands ?? 0).toBe(0); // nothing spent
   });
 });
+
+describe('handleLayOnHands — poison-cure (SRD: 5 points to end Poisoned)', () => {
+  it('ends Poisoned on an ally for a flat 5 points, restoring no HP', () => {
+    const pal = makeChar({ id: 'pal', character_class: 'Paladin', level: 3, hp: 20, max_hp: 20 });
+    const ally = makeChar({
+      id: 'ally',
+      hp: 10,
+      max_hp: 20,
+      conditions: ['poisoned', 'prone'],
+    });
+    const ctx = ctxFor(pal, [pal, ally]);
+    handleLayOnHands(ctx, { type: 'lay_on_hands', targetCharId: 'ally', cure: true });
+    const after = ctx.st.characters.find((c) => c.id === 'ally');
+    expect(after?.conditions).toEqual(['prone']); // poisoned gone, prone kept
+    expect(after?.hp).toBe(10); // no HP restored
+    if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
+    expect(ctx.actor.char.class_resource_uses.lay_on_hands).toBe(5); // flat cost
+  });
+
+  it('cures self, syncing the caster conditions', () => {
+    const pal = makeChar({
+      id: 'pal',
+      character_class: 'Paladin',
+      level: 3,
+      hp: 20,
+      max_hp: 20,
+      conditions: ['poisoned'],
+    });
+    const ctx = ctxFor(pal, [pal]);
+    handleLayOnHands(ctx, { type: 'lay_on_hands', targetCharId: 'pal', cure: true });
+    if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
+    expect(ctx.actor.char.conditions).toEqual([]);
+    expect(ctx.actor.char.class_resource_uses.lay_on_hands).toBe(5);
+  });
+
+  it('no-ops when the target is not Poisoned', () => {
+    const pal = makeChar({ id: 'pal', character_class: 'Paladin', level: 3, hp: 20, max_hp: 20 });
+    const ally = makeChar({ id: 'ally', hp: 10, max_hp: 20, conditions: [] });
+    const ctx = ctxFor(pal, [pal, ally]);
+    handleLayOnHands(ctx, { type: 'lay_on_hands', targetCharId: 'ally', cure: true });
+    expect(ctx.narrative).toContain('not Poisoned');
+    if (ctx.actor.kind !== 'pc') throw new Error('expected pc actor');
+    expect(ctx.actor.char.class_resource_uses.lay_on_hands ?? 0).toBe(0); // nothing spent
+  });
+
+  it('refuses when the pool cannot pay the flat 5', () => {
+    const pal = makeChar({
+      id: 'pal',
+      character_class: 'Paladin',
+      level: 1, // pool = 5
+      hp: 20,
+      max_hp: 20,
+      class_resource_uses: { lay_on_hands: 2 }, // only 3 left
+    });
+    const ally = makeChar({ id: 'ally', hp: 10, max_hp: 20, conditions: ['poisoned'] });
+    const ctx = ctxFor(pal, [pal, ally]);
+    handleLayOnHands(ctx, { type: 'lay_on_hands', targetCharId: 'ally', cure: true });
+    expect(ctx.narrative).toMatch(/only 3 left/);
+    expect(ctx.st.characters.find((c) => c.id === 'ally')?.conditions).toEqual(['poisoned']);
+  });
+});

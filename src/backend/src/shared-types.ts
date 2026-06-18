@@ -1016,8 +1016,9 @@ export type StructuredAction =
   | { type: 'choose_mystic_arcanum'; spellId: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
-  // (may be the paladin). (RE-2.)
-  | { type: 'lay_on_hands'; targetCharId: string }
+  // (may be the paladin). `cure` spends 5 points to end the Poisoned condition
+  // instead of restoring HP (SRD: those points don't also restore HP). (RE-2.)
+  | { type: 'lay_on_hands'; targetCharId: string; cure?: boolean }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean; source?: 'inspiration' | 'stroke_of_luck' }
   // RAW player-command for a summoned creature (Animate Dead, etc.). On the
