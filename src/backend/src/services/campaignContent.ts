@@ -16,7 +16,10 @@
 // field replaces that field wholesale (no deep merge), so the editing
 // surface always reads/writes a whole section and the engine never sees a
 // half-merged structure. Section-level granularity is what the admin
-// section will edit anyway.
+// section will edit anyway. The ONE exception is `narratives`, a registry
+// of independent pools the editor never holds whole — it merges per-pool
+// over the base so a partial edit can't drop a pool the engine picks from
+// (see mergeContextWithOverlay).
 //
 // Applied once at startup (index.ts), after migrations + registry sync —
 // the campaigns table is guaranteed to exist by then, unlike at module
@@ -159,9 +162,44 @@ export function mergeContextWithOverlay(code: Context, overlay: Record<string, u
   for (const [key, value] of Object.entries(overlay)) {
     if (PROTECTED_FIELDS.has(key)) continue;
     if (value === null || value === undefined) continue;
+    // `narratives` is the one section that is a REGISTRY of independent pools
+    // (levelUp / genericArrival / combatHit / …), not a monolith the editor
+    // ever holds whole. A DB edit overrides per-pool; any pool the editor
+    // didn't round-trip falls back to the code/base pool. Without this top-level
+    // merge a partial narratives section wipes the missing base pools, and the
+    // engine crashes the moment it `pick()`s from a now-undefined pool — e.g.
+    // BEGIN ADVENTURE on a startingLevel>1 campaign level-ups the party and
+    // reads `narratives.levelUp` (gameEngine applyLevelUpForClass).
+    if (key === 'narratives' && isPlainObject(value) && isPlainObject(merged.narratives)) {
+      // `merged.narratives` is still the code/base narratives here (not yet
+      // overridden) — fold the DB pools over it so untouched pools survive.
+      // EMPTY pools (a `[]` / `{}` the creator persisted for a required field it
+      // never authored) are skipped so they fall back to base: the engine's
+      // `pick(pool)` needs at least one entry, and `pick([])` is `undefined` —
+      // which crashed BEGIN ADVENTURE on a saved-but-blank `levelUp`.
+      const overrides: Record<string, unknown> = {};
+      for (const [pool, lines] of Object.entries(value)) {
+        if (!isEmptyPool(lines)) overrides[pool] = lines;
+      }
+      merged.narratives = { ...merged.narratives, ...overrides };
+      continue;
+    }
     merged[key] = value;
   }
   return merged as unknown as Context;
+}
+
+// A non-array, non-null object — used to gate the per-pool narratives merge.
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+// A narrative pool with nothing to pick from: an empty list/map, or a blank.
+// Such a pool must NOT override the base — the engine `pick()`s from it.
+function isEmptyPool(v: unknown): boolean {
+  if (Array.isArray(v)) return v.length === 0;
+  if (isPlainObject(v)) return Object.keys(v).length === 0;
+  return v === null || v === undefined || v === '';
 }
 
 // ─── Regions (relational storage — campaign_regions) ────────────────────────

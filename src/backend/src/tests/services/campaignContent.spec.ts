@@ -632,6 +632,39 @@ describe('mergeContextWithOverlay', () => {
     expect(merged.classHitDie).toEqual({ wizard: 6 });
   });
 
+  it('merges narratives PER-POOL — a partial edit keeps the base pools', () => {
+    // Regression: a creator-saved narratives section carrying only the pools it
+    // round-trips must not wipe the others (e.g. `levelUp`), or the engine
+    // crashes on `pick(undefined).replace(...)` at the first level-up — which a
+    // startingLevel>1 campaign does at BEGIN ADVENTURE.
+    const codeWithPools = codeCtx({
+      id: 'demo_campaign',
+      narratives: { genericArrival: ['from code'], levelUp: ['Level up!'] } as never,
+    });
+    const merged = mergeContextWithOverlay(codeWithPools, {
+      narratives: { genericArrival: ['edited in db'] },
+    });
+    const n = merged.narratives as { genericArrival: string[]; levelUp: string[] };
+    expect(n.genericArrival).toEqual(['edited in db']); // edited pool wins
+    expect(n.levelUp).toEqual(['Level up!']); // untouched pool survives
+  });
+
+  it('treats an EMPTY narratives pool as "fall back to base" (no pick([]) crash)', () => {
+    // The creator persists required pools even when blank ([]). An empty pool
+    // can never satisfy the engine's pick() — so it must NOT override the base.
+    // (Regression: a saved-but-blank `levelUp: []` crashed BEGIN ADVENTURE.)
+    const codeWithPools = codeCtx({
+      id: 'demo_campaign',
+      narratives: { genericArrival: ['from code'], levelUp: ['Level up!'] } as never,
+    });
+    const merged = mergeContextWithOverlay(codeWithPools, {
+      narratives: { genericArrival: ['edited'], levelUp: [], combatHit: {} },
+    });
+    const n = merged.narratives as { genericArrival: string[]; levelUp: string[] };
+    expect(n.genericArrival).toEqual(['edited']); // non-empty edit wins
+    expect(n.levelUp).toEqual(['Level up!']); // empty [] falls back to base
+  });
+
   it('never overrides protected fields and skips null values', () => {
     const merged = mergeContextWithOverlay(code, { id: 'evil-rename', displayNoun: null });
     expect(merged.id).toBe('demo_campaign');

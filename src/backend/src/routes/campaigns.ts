@@ -307,6 +307,15 @@ async function sectionCodeFallback(campaignId: string, section: string): Promise
     const code = CODE_CONTEXTS[campaignId] ?? baseContextFor(campaignId);
     return code.campaign?.world_name ?? null;
   }
+  if (section === 'narratives') {
+    // Same never-null convention: a DB-born campaign (no code context) resolves
+    // its narrative pools over the base template, so the base pools ARE the
+    // effective value — serve them as the editing starting point. Without this
+    // the editor loaded all-empty pools and a SAVE persisted blank required
+    // pools (e.g. `levelUp: []`), which crashed the engine's `pick()` at runtime.
+    const code = CODE_CONTEXTS[campaignId] ?? baseContextFor(campaignId);
+    return code.narratives ?? null;
+  }
   if (section === 'quests' || section === 'factions') {
     // Campaign-block fields, not top-level Context keys — a code campaign's
     // quest/faction lists are the editing starting point.
