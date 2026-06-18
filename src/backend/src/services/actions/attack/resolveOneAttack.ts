@@ -993,7 +993,18 @@ export function resolveOneAttack(
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
             e.id === targetId && e.isEnemy
-              ? { ...e, conditions: [...e.conditions.filter((c) => c !== applied), applied] }
+              ? {
+                  ...e,
+                  conditions: [...e.conditions.filter((c) => c !== applied), applied],
+                  // SRD Daze — "on its next turn"; stamp a one-round duration so
+                  // the round-wrap enemy tick expires it (same model as Obscure's
+                  // Blinded) and the approach loop reads it while live. Knock Out
+                  // (Unconscious) runs on its own end-of-turn save, so no finite
+                  // duration here.
+                  ...(applied === 'dazed'
+                    ? { condition_durations: { ...e.condition_durations, dazed: 1 } }
+                    : {}),
+                }
               : e
           ),
         };

@@ -189,3 +189,45 @@ describe('Frightened enemy — keeps distance from its fear source', () => {
     expect(result.kind).toBe('proceed-to-attack');
   });
 });
+
+// ── Dazed enemy — SRD Thief Devious Strikes (Daze): only one of move/action ──
+// Enforced as 0 movement: a dazed enemy can't close, so it attacks only if a
+// target is already in reach (otherwise it does nothing) — never both.
+describe('Dazed enemy — moves OR attacks, never both', () => {
+  function dazedState(enemyPos: { x: number; y: number }, dazed: boolean): GameState {
+    return {
+      current_room: 'entry_hall',
+      characters: [makeChar({ id: 'pc-1', hp: 30, max_hp: 30 })],
+      entities: [
+        ent({ id: 'e1', pos: enemyPos, conditions: dazed ? ['dazed'] : [] }),
+        ent({ id: 'pc-1', isEnemy: false, pos: { x: 1, y: 1 } }),
+      ],
+    } as unknown as GameState;
+  }
+
+  const approach = (st: GameState) =>
+    attemptEnemyApproach({
+      enemy: ghoul,
+      enemyId: 'e1',
+      target: makeChar({ id: 'pc-1', hp: 30, max_hp: 30 }),
+      st,
+      seed: { rooms: [] } as unknown as Seed,
+      resumeMi: 0,
+      context: ctx,
+      roomObstacleCells: [],
+      narrative: '',
+    });
+
+  it('a dazed enemy out of reach cannot close — skip-turn (no attack)', () => {
+    // (6,6) is 25 ft from the PC at (1,1); speed 30 would normally close, but
+    // dazed zeroes movement.
+    expect(approach(dazedState({ x: 6, y: 6 }, true)).kind).toBe('skip-turn');
+    // Control: the same enemy un-dazed advances and attacks.
+    expect(approach(dazedState({ x: 6, y: 6 }, false)).kind).toBe('proceed-to-attack');
+  });
+
+  it('a dazed enemy already in reach still attacks (its one action)', () => {
+    // Adjacent (1,2) → 5 ft = reach; no movement needed, so it attacks.
+    expect(approach(dazedState({ x: 1, y: 2 }, true)).kind).toBe('proceed-to-attack');
+  });
+});

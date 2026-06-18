@@ -53,6 +53,17 @@ describe('tickEnemyConditions — round-wrap decrement', () => {
     expect(e.condition_durations.blinded).toBeUndefined();
   });
 
+  it('expires dazed after its one round (Devious Strikes Daze self-clears)', () => {
+    // Regression: Daze used to stamp no duration, so the marker was permanent.
+    // It now stamps dazed: 1, so the round-wrap tick clears it.
+    const st = {
+      entities: [enemyEnt({ conditions: ['dazed'], condition_durations: { dazed: 1 } })],
+    } as unknown as GameState;
+    const e = tickEnemyConditions(st).st.entities![0];
+    expect(e.conditions).not.toContain('dazed');
+    expect(e.condition_durations.dazed).toBeUndefined();
+  });
+
   it('leaves turn-loop-managed conditions (commanded) untouched', () => {
     const st = {
       entities: [enemyEnt({ conditions: ['commanded'], condition_durations: { commanded: 1 } })],

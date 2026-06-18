@@ -67,13 +67,16 @@ documented deferrals.
 - [~] **Truesight / Dimensional Travel / Night Spirit boons** — the +1 ability +
       Truesight's see-through-magical-darkness half ship; remaining: see-Invisible /
       shapechanger halves, Dimensional Travel positioning, Night Spirit. Narrated.
-- [ ] Minor markers: Devious Strikes' Daze restriction, Use Magic Device
-      scroll/charge sub-features.
+- [ ] Minor markers: Use Magic Device scroll/charge sub-features (needs a
+      magic-item-charges + scroll-casting system).
       (Done: **Lay on Hands poison-cure** — 5 points from the pool ends Poisoned,
       restores no HP; surfaced as a per-Poisoned-member choice. **Deflect Energy**
       (Monk L13) — Deflect Attacks now opens against any damage type, not just
       B/P/S; the reaction is labeled "Deflect Energy" at L13. **Thief Jumper**
-      (Second-Story Work, L3) — Long Jump distance uses max(STR, DEX).)
+      (Second-Story Work, L3) — Long Jump distance uses max(STR, DEX).
+      **Devious Strikes' Daze** — a dazed enemy gets 0 movement (attacks only if
+      already in reach), so it never both moves and attacks; the condition now
+      stamps a duration and self-clears on the round-wrap tick.)
 
 ## Combat / exploration subsystems (bounded)
 

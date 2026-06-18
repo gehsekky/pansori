@@ -8433,8 +8433,14 @@ export function attemptEnemyApproach(args: {
     target.id === enemyEntPreMove.frightened_by;
   // SRD Barbarian Hamstring Blow (Brutal Strike) — −15 ft Speed.
   const hamstrungFt = enemyEntPreMove?.conditions?.includes('hamstrung') ? 15 : 0;
+  // SRD Thief Devious Strikes (Daze) — on its next turn the target does ONLY
+  // ONE of move / action / bonus action. Simplified: a dazed enemy forgoes its
+  // movement and so attacks only if a target is already in reach (otherwise it
+  // does nothing) — it never both closes AND attacks. The condition self-clears
+  // on the round-wrap enemy tick.
+  const dazedHeld = enemyEntPreMove?.conditions?.includes('dazed') ?? false;
   const effectiveEnemySpeedFt =
-    enemyImmobile || fearHeld ? 0 : Math.max(0, baseSpeedFt - hamstrungFt);
+    enemyImmobile || fearHeld || dazedHeld ? 0 : Math.max(0, baseSpeedFt - hamstrungFt);
   const needsToMove =
     !!enemyEntPreMove &&
     !!targetEntPreMove &&

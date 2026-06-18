@@ -163,8 +163,10 @@ const defs: ConditionDef[] = [
   },
   { id: 'incapacitated', duration: 1 },
   // SRD Thief Devious Strikes (Daze) — the target can take only one of move /
-  // action / bonus action on its next turn. pansori carries it as a marker for
-  // narrative + future enforcement (the per-turn restriction isn't gated yet).
+  // action / bonus action on its next turn. Enforced for enemies in
+  // attemptEnemyApproach: a dazed enemy gets 0 movement (attacks only if already
+  // in reach), so it never both moves and attacks. Self-clears on the round-wrap
+  // enemy tick (stamped condition_durations.dazed = 1 where it's applied).
   { id: 'dazed', duration: 1 },
   { id: 'grappled', duration: 1, blocksMovement: true },
   // SRD Banishment — target removed from combat to a harmless
