@@ -31,8 +31,12 @@ documented deferrals.
       shield +1/+2/+3. Authors can mint more via `magicBonus` in the item schema.
       The catalog now holds 114 SRD items; the worn-effect system covers
       `save_bonus` / `ac_bonus` / `set_ability` / `light`.
-- [ ] **Per-campaign spell curation** — `spellTable` loads the whole SRD catalog
-      everywhere; no `srdSpells(…)` selector (cf. `srdItems`) for low-magic settings.
+- [x] **Per-campaign spell curation** — shipped. `srdSpells(...ids)` (cf. `srdItems`)
+      selects a curated, id-keyed `spellTable` sub-record so a low-magic / themed
+      setting lists only the spells it wants instead of spreading the whole
+      `SRD_SPELLS` catalog. Spread to layer campaign customs on top
+      (`{ ...srdSpells('fire_bolt'), my_spell }`); throws on an unknown id at load.
+      `ALL_SRD_SPELL_IDS` enumerates the full catalog.
 - [ ] **Mounts, vehicles, trade goods** — rest of the SRD equipment chapter; not modeled.
 - [ ] **Caltrops / ball bearings** — area-denial consumables; need a
       movement-triggered ground-effect mechanic (thrown splash weapons exist; these don't).
@@ -74,10 +78,10 @@ documented deferrals.
       Verticality is the architectural gap (flat grid, no elevation/ledges).
 - [ ] **Somatic spell components** — RAW needs a free hand → a hand-state model;
       no spell carries a `somatic` flag yet. Also unlocks focus-substitutes-for-material.
-- [ ] **Forced-march death at Exhaustion 6** — fatigue ships (`applyForcedMarch`)
-      but only raises `exhaustion_level`; the level-6 = death rule fires in a
-      separate flow. Wire the death check into the march path (and/or centralize
-      exhaustion-gain).
+- [x] **Forced-march death at Exhaustion 6** — shipped. `applyForcedMarch`
+      (`markerMove.ts`) caps Exhaustion at 6 and kills on reaching it, for every
+      marcher in place; a collapse halts the party AT the square it happens on
+      (the `applyFatigue` `died` flag stops the march). Covered by `forcedMarch.spec`.
 - [ ] **Out-of-combat systems** — Downtime, Bastions, Crafting (potions / scrolls
       / items), Vehicles. Lowest urgency.
 

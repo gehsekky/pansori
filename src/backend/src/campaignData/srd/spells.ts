@@ -6471,3 +6471,31 @@ export const SRD_SPELLS: Record<string, Spell> = {
     spellList: ['arcane'],
   },
 };
+
+/** Every SRD spell id, for contexts that want the full catalog. */
+export const ALL_SRD_SPELL_IDS: string[] = Object.keys(SRD_SPELLS);
+
+/**
+ * Select canonical SRD spells by id into a curated `spellTable`. This is how a
+ * campaign limits which SRD magic exists in its world — a low-magic or themed
+ * setting lists only the ids it wants instead of spreading the whole catalog.
+ * Mirrors `srdItems` for the `lootTable`, but returns a keyed `Record` because
+ * `spellTable` is id-keyed (not an array): assign it directly, or spread it to
+ * layer campaign-specific spells on top —
+ *   `spellTable: { ...srdSpells('fire_bolt', 'cure_wounds'), my_spell }`.
+ * Throws on an unknown id so a typo (or a since-removed spell) fails loudly at
+ * load time instead of silently dropping the spell from the table.
+ */
+export function srdSpells(...ids: string[]): Record<string, Spell> {
+  const table: Record<string, Spell> = {};
+  for (const id of ids) {
+    const spell = SRD_SPELLS[id];
+    if (!spell) {
+      throw new Error(
+        `srdSpells: unknown SRD spell id "${id}". Known ids: ${ALL_SRD_SPELL_IDS.join(', ')}`
+      );
+    }
+    table[id] = spell;
+  }
+  return table;
+}

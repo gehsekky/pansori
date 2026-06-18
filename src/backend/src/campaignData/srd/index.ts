@@ -2,7 +2,7 @@
 // future reorganization of the underlying files doesn't require touching
 // every context.
 
-export { SRD_SPELLS } from './spells.js';
+export { SRD_SPELLS, ALL_SRD_SPELL_IDS, srdSpells } from './spells.js';
 export {
   SRD_CLASS_HIT_DIE,
   SRD_CLASS_ARMOR_PROFICIENCIES,
