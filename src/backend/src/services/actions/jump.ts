@@ -12,9 +12,9 @@
 import { SQUARE_SIZE, chebyshev, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
 import { combatGridDims, effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import { d20TestPenalty, resolveEnemyAttack, skillCheck } from '../rulesEngine.js';
+import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
-import { hasEscapeTheHorde } from '../multiclass.js';
 import { longJumpDistance } from '../jump.js';
 import { updatePcActor } from './actor.js';
 
@@ -59,7 +59,11 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
   const usedFt = ctx.st.movement_used?.[char.id] ?? 0;
   const hasRunUp = usedFt >= 10;
   const jumpFt = chebyshev(charEntity.pos, to) * SQUARE_SIZE;
-  const maxJumpFt = longJumpDistance(char.str, hasRunUp);
+  // SRD Thief Second-Story Work (L3) — Jumper: determine jump distance using
+  // Dexterity rather than Strength. It's a "can" (optional), so use whichever
+  // is higher — the feature never shortens a jump.
+  const jumpScore = hasSecondStoryWork(char) ? Math.max(char.str, char.dex) : char.str;
+  const maxJumpFt = longJumpDistance(jumpScore, hasRunUp);
   if (jumpFt > maxJumpFt) {
     const stand = hasRunUp ? '' : ' (standing — no 10-ft run-up)';
     ctx.narrative = `Too far to jump${stand}: ${jumpFt} ft, max ${maxJumpFt} ft.`;

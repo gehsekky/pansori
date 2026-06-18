@@ -983,7 +983,8 @@ export function hasRetaliation(char: Character): boolean {
 }
 
 /** SRD Thief Second-Story Work (Rogue L3) — Climber: a Climb Speed equal to
- *  your Speed (so climbing costs no extra movement). */
+ *  your Speed (so climbing costs no extra movement); Jumper: jump distance may
+ *  use Dexterity instead of Strength (see actions/jump.ts). */
 export function hasSecondStoryWork(char: Character): boolean {
   return char.subclass === 'thief' && getClassLevel(char, 'rogue') >= 3;
 }

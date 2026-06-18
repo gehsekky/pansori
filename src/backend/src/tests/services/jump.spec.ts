@@ -34,6 +34,10 @@ const ROOM = 'entry_hall';
 
 function jumpState(opts: {
   str?: number;
+  dex?: number;
+  characterClass?: string;
+  subclass?: string;
+  level?: number;
   movementUsed?: number;
   obstacles?: GridPos[];
   difficultTerrain?: GridPos[];
@@ -41,12 +45,14 @@ function jumpState(opts: {
 }) {
   const pc = makeChar({
     id: 'pc-1',
-    character_class: 'Fighter',
-    level: 5,
+    character_class: opts.characterClass ?? 'Fighter',
+    level: opts.level ?? 5,
     str: opts.str ?? 16,
     hp: 30,
     max_hp: 30,
     speed: 30,
+    ...(opts.dex !== undefined ? { dex: opts.dex } : {}),
+    ...(opts.subclass !== undefined ? { subclass: opts.subclass } : {}),
   });
   const entities = [
     {
@@ -112,6 +118,34 @@ describe('jump action — distance', () => {
     expect(r.newState.entities?.find((e) => e.id === 'pc-1')?.pos).toEqual({ x: 1, y: 3 });
     // 10 (run-up) + 10 (jump) ft spent.
     expect(r.newState.movement_used?.['pc-1']).toBe(20);
+  });
+});
+
+describe('jump action — Thief Second-Story Work (Jumper)', () => {
+  // A Thief (L3+) determines jump distance with DEX rather than STR. With
+  // STR 8 the run-up jump is only 8 ft (1 square); DEX 18 unlocks 18 ft.
+  const thiefOpts = {
+    characterClass: 'Rogue',
+    subclass: 'thief',
+    level: 3,
+    str: 8,
+    dex: 18,
+    movementUsed: 10,
+  };
+
+  it('a Thief uses DEX for the jump — a leap STR alone could not make', async () => {
+    // (1,1)→(1,3) is 10 ft; STR 8 caps at 8 ft, but DEX 18 allows 18 ft.
+    const r = await jump(jumpState(thiefOpts), { x: 1, y: 3 });
+    expect(r.narrative).toMatch(/leaps 10 ft to \(1, 3\)/);
+    expect(r.newState.entities?.find((e) => e.id === 'pc-1')?.pos).toEqual({ x: 1, y: 3 });
+  });
+
+  it('control: a non-Thief with the same STR 8 / DEX 18 cannot make the leap', async () => {
+    const r = await jump(
+      jumpState({ characterClass: 'Rogue', level: 3, str: 8, dex: 18, movementUsed: 10 }),
+      { x: 1, y: 3 }
+    );
+    expect(r.narrative).toMatch(/Too far to jump/);
   });
 });
 

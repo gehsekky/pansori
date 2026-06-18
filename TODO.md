@@ -68,11 +68,12 @@ documented deferrals.
       Truesight's see-through-magical-darkness half ship; remaining: see-Invisible /
       shapechanger halves, Dimensional Travel positioning, Night Spirit. Narrated.
 - [ ] Minor markers: Devious Strikes' Daze restriction, Use Magic Device
-      scroll/charge sub-features, Thief Jumper.
+      scroll/charge sub-features.
       (Done: **Lay on Hands poison-cure** — 5 points from the pool ends Poisoned,
       restores no HP; surfaced as a per-Poisoned-member choice. **Deflect Energy**
       (Monk L13) — Deflect Attacks now opens against any damage type, not just
-      B/P/S; the reaction is labeled "Deflect Energy" at L13.)
+      B/P/S; the reaction is labeled "Deflect Energy" at L13. **Thief Jumper**
+      (Second-Story Work, L3) — Long Jump distance uses max(STR, DEX).)
 
 ## Combat / exploration subsystems (bounded)
 
