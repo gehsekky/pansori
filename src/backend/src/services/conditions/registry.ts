@@ -153,10 +153,11 @@ const defs: ConditionDef[] = [
     duration: 'permanent',
     // SRD Petrified — Incapacitated (the enemy-turn skip + concentration gate
     // read the incap set), attacks against it have Advantage, auto-fails STR/DEX
-    // saves, can't move. Deferred: "Resistance to all damage" — the damage
-    // pipeline keys off a type-list `resistances`, not conditions, and no SRD
-    // content in pansori applies Petrified yet (no Flesh to Stone), so it has no
-    // live trigger; wire an all-type resistance when a petrify source ships.
+    // saves, can't move. Applied to PCs by the petrification ladder (Cockatrice
+    // bite, Basilisk / Medusa / Gorgon gaze; see resolvePetrifyLadder), curable
+    // by Greater Restoration. Deferred: "Resistance to all damage" — the damage
+    // pipeline keys off a type-list `resistances`, not conditions, so a petrified
+    // PC doesn't yet halve incoming damage; wire an all-type resistance here.
     grantsAdvantageToAttackers: true,
     autoFailSaves: ['str', 'dex'],
     blocksMovement: true,

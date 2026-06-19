@@ -737,6 +737,18 @@ const OnHitEffectSchema = z
     ability: AbilityKeySchema.optional(),
     dc: z.number().int().min(1).max(30).optional(),
     escapeDc: z.number().int().min(1).max(30).optional(),
+    // SRD Petrifying Bite — seeds the Restrained→Petrified ladder (see OnHitEffect).
+    petrify: z.boolean().optional(),
+  })
+  .strict();
+
+// SRD Petrifying Gaze / Breath — recharge cone seeding the petrification ladder.
+const PetrifyingGazeSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    savingThrow: AbilityKeySchema,
+    saveDC: z.number().int().min(1).max(30),
+    rechargeMin: z.number().int().min(2).max(6).optional(),
   })
   .strict();
 
@@ -813,6 +825,21 @@ const BreathWeaponSchema = z
   })
   .strict();
 
+// SRD Death Burst (Magmin / elemental Mephits) — on-death AoE save. Mirrors
+// BreathWeaponSchema minus the recharge (death is the trigger); see DeathBurst.
+const DeathBurstSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    dice: DICE,
+    damageType: z.string().min(1).max(20),
+    savingThrow: AbilityKeySchema,
+    saveDC: z.number().int().min(1).max(30),
+    radiusFt: z.number().int().min(1).max(120).optional(),
+    condition: ConditionNameSchema.optional(),
+    conditionDuration: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
 const AbilityScore = z.number().int().min(1).max(30);
 
 const EnemyTemplateSchema = z
@@ -865,6 +892,8 @@ const EnemyTemplateSchema = z
     rampage: z.boolean().optional(),
     aura: MonsterAuraSchema.optional(),
     breathWeapon: BreathWeaponSchema.optional(),
+    deathBurst: DeathBurstSchema.optional(),
+    petrifyingGaze: PetrifyingGazeSchema.optional(),
     spells: z.array(z.string().min(1).max(60)).optional(),
     castChance: z.number().min(0).max(1).optional(),
     spellSaveDC: z.number().int().min(1).max(30).optional(),

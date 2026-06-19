@@ -59,12 +59,31 @@ documented deferrals.
       elephant, triceratops, allosaurus, minotaur skeleton). Deferred: the CR-0
       goat + giant seahorse (damage-*swap* charges, not additive) and Allosaurus's
       follow-up Bite.
-- [ ] **Swallow / Engulf**; **petrifying-gaze ladders** (Restrained → Petrified).
+- [~] **Swallow / Engulf** still deferred. (Done: **petrifying-gaze ladders**
+      (Restrained → Petrified) — a `Character.petrify_save` two-stage state machine.
+      A failed CON save Restrains the PC (stamped without a timed entry so the
+      ladder, not `tickConditions`, owns it) and seeds the marker; at the PC's
+      turn start `resolvePetrifyLadder` runs the repeat save (first afflicted turn
+      free, via an `acted` gate mirroring enemy `save_ends_acted`): a success
+      shakes free, a failure turns the PC to stone (Petrified, curable by Greater
+      Restoration). Two delivery vectors: the Cockatrice's on-hit Petrifying Bite
+      (`OnHitEffect.petrify`) and a recharge cone (`Enemy.petrifyingGaze` +
+      `maybeFirePetrifyingGaze`, mirroring the breath-weapon recharge/AoE) wired to
+      the Basilisk (DC 12 R4-6), Medusa (DC 13 R5-6), and Gorgon (DC 15 R5-6).
+      The 30-ft cone is abstracted to the whole party; the reflection clause and
+      Petrified's all-damage resistance stay deferred.)
 - [ ] Monster **utility spellcasting** (the Priest convention defers it);
       spell-based **legendary options + Legendary Resistance + lair actions**.
-- [ ] Shape-shifters / lycanthropy infection; ooze **splits + death bursts**;
-      ability-score drain (Shadow); no-damage utility breaths; target-state traits
-      (Blood Frenzy, Bloodied-tier damage).
+- [~] Shape-shifters / lycanthropy infection; ooze **splits**; ability-score drain
+      (Shadow); no-damage utility breaths; target-state traits (Blood Frenzy,
+      Bloodied-tier damage). (Done: **Death Burst** — a `deathBurst` field
+      (BreathWeapon-shaped, no recharge) + a once-per-creature
+      `CombatEntity.death_burst_fired` latch. A creature that hits 0 HP explodes
+      via `applyDeathBursts`, a post-action sweep in `takeAction` that fires the
+      save-for-half party AoE through `applyAoeSaveToParty` — keyed on real death,
+      so a parley'd / banished creature (hp > 0) doesn't blow up. Wired the Magmin
+      (10-ft 2d6 fire) + Steam/Magma/Dust Mephits (5-ft 2d4/2d6). Like every
+      monster AoE, the emanation is abstracted to the whole party.)
 
 ## Documented engine deferrals (depend on missing content / infra)
 

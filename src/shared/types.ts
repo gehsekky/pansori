@@ -641,6 +641,16 @@ export interface CombatEntity {
   // `false` ⇒ spent, re-rolled at the start of each of the creature's turns
   // (recharge on a d6 ≥ the weapon's `rechargeMin`). Set `false` when fired.
   breath_charged?: boolean;
+  // SRD Petrifying Gaze / Breath (Basilisk, Medusa, Gorgon) — the recharge state
+  // for this entity's `petrifyingGaze`, mirroring `breath_charged`. `undefined` ⇒
+  // available (fresh combat / re-seed); `false` ⇒ spent, re-rolled at each of the
+  // creature's turn starts (d6 ≥ the gaze's `rechargeMin`). Set `false` on fire.
+  gaze_charged?: boolean;
+  // SRD Death Burst (Magmin / elemental Mephits) — once-per-creature latch so the
+  // on-death AoE blast (see `applyDeathBursts`) fires exactly once. `undefined` ⇒
+  // not yet burst; `true` ⇒ already exploded. Set when the burst fires; never
+  // refreshed (death is final).
+  death_burst_fired?: boolean;
   // SRD charge rider — feet this enemy moved straight toward its target during
   // its approach THIS turn (stamped in attemptEnemyApproach; reset each turn).
   // computeEnemyAttack reads it: a hit after a ≥`afterFt` charge adds the rider,

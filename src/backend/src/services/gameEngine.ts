@@ -2212,6 +2212,23 @@ function computeEnemyAttack(
         if (sourceCond === 'charmed') {
           updatedChar = { ...updatedChar, charmer_id: enemy.id };
         }
+        // SRD Petrifying Bite (Cockatrice) — a failed save Restrains AND seeds the
+        // petrification ladder, so the re-save at the PC's turn start can escalate
+        // to Petrified. Strip Restrained's timed entry so the ladder owns it (cf.
+        // applyPetrifyLadderToParty). A later save-reroll that strips Restrained
+        // also unwinds this via resolvePetrifyLadder's "no longer Restrained" arm.
+        if (enemy.onHitEffect.petrify && sourceCond === 'restrained' && !updatedChar.petrify_save) {
+          const { restrained: _drop, ...durs } = updatedChar.condition_durations ?? {};
+          updatedChar = {
+            ...updatedChar,
+            condition_durations: durs,
+            petrify_save: {
+              dc: enemy.onHitEffect.dc as number,
+              ability: enemy.onHitEffect.ability as AbilityKey,
+              acted: false,
+            },
+          };
+        }
         if (updatedChar.conditions.length > beforeConds) {
           narrative += ` ${char.name} is ${sourceCond}!`;
         }
@@ -2932,6 +2949,241 @@ export function maybeFireBreathWeapon(args: {
     ...st,
     entities: (st.entities ?? []).map((e) =>
       e.id === args.enemyId && e.isEnemy ? { ...e, breath_charged: false } : e
+    ),
+  };
+  return { fired: true, st, narrative };
+}
+
+/**
+ * SRD Death Burst (Magmin, the elemental Mephits) — when a creature with a
+ * `deathBurst` drops to 0 HP it explodes, forcing an AoE save (via
+ * `applyAoeSaveToParty`, the same whole-party machinery breath weapons use). A
+ * once-per-creature `death_burst_fired` latch on the entity guarantees the blast
+ * resolves exactly once no matter which of the ~20 kill sites felled it, and a
+ * post-action sweep (called from `takeAction`) is where it lands.
+ *
+ * The trigger is the entity actually being at 0 HP — NOT mere membership in
+ * `enemies_killed`, which a parley / Turn Undead removal also stamps. A creature
+ * talked down or banished (hp > 0) does not explode.
+ *
+ * Simplification: like every other monster AoE in pansori, the emanation geometry
+ * is abstracted to "the whole party" — the burst's `radiusFt` is narration only.
+ * Ordering: deaths during the player's action and during the ensuing enemy turns
+ * are all swept here, so a burst lands after the round's enemy actions rather than
+ * at the exact instant of death; acceptable at this fidelity.
+ */
+export function applyDeathBursts(
+  st: GameState,
+  seed: Seed,
+  context: Context
+): { st: GameState; narrative: string } {
+  let workingSt = st;
+  let narrative = '';
+  for (const ent of st.entities ?? []) {
+    if (!ent.isEnemy || ent.hp > 0 || ent.death_burst_fired) continue;
+    const enemy = getEnemyById(seed, ent.id);
+    const burst = enemy?.deathBurst;
+    if (!burst) continue;
+    // Latch first so a re-entrant sweep (or a TPK mid-burst) can't double-fire.
+    workingSt = {
+      ...workingSt,
+      entities: (workingSt.entities ?? []).map((e) =>
+        e.id === ent.id && e.isEnemy ? { ...e, death_burst_fired: true } : e
+      ),
+    };
+    const res = applyAoeSaveToParty(workingSt, context, {
+      dice: burst.dice,
+      damageType: burst.damageType,
+      savingThrow: burst.savingThrow,
+      saveDC: burst.saveDC,
+      condition: burst.condition,
+      conditionDuration: burst.conditionDuration,
+    });
+    workingSt = res.st;
+    narrative +=
+      `\n\n💥 ${enemy?.name ?? 'The creature'} explodes in a ${burst.name}!` + res.narrative;
+  }
+  return { st: workingSt, narrative };
+}
+
+/**
+ * SRD petrification ladder — STAGE 1. Roll the save vs a Petrifying Gaze/Breath
+ * for every living PC; a failure Restrains them and seeds `petrify_save` so the
+ * two-stage escalation runs at their turn start (`resolvePetrifyLadder`). The
+ * Restrained condition is stamped WITHOUT a duration entry so `tickConditions`
+ * leaves it standing — the ladder, not the timer, owns its lifetime.
+ *
+ * A PC already on the ladder (or already Petrified) is skipped; a PC immune to
+ * Restrained can't enter stage 1 at all. Mirrors `applyAoeSaveToParty`'s save
+ * machinery (proficiency, worn save bonus, d20 penalties).
+ */
+export function applyPetrifyLadderToParty(
+  st: GameState,
+  context: Context,
+  opts: { savingThrow: AbilityKey; saveDC: number }
+): { st: GameState; narrative: string } {
+  const scoreKey = opts.savingThrow;
+  let workingSt = st;
+  let narrative = '';
+  for (const origC of st.characters) {
+    if (origC.dead) continue;
+    const immun = conditionImmunitiesFor(origC, workingSt);
+    // The ladder begins with Restrained; a creature immune to it (or already
+    // turned to stone / mid-ladder) shrugs the gaze off.
+    if (immun.has('restrained') || origC.conditions.includes('petrified') || origC.petrify_save) {
+      narrative += ` ${origC.name}: unaffected.`;
+      continue;
+    }
+    const score = (origC[scoreKey] ?? 10) as number;
+    const proficient = hasSaveProficiency(origC, scoreKey, context);
+    const dc = opts.saveDC - wornSaveBonus(origC, scoreKey, context.lootTable);
+    const saveFailed = rollConditionSave(
+      scoreKey,
+      score,
+      dc,
+      proficient,
+      origC.level,
+      0,
+      origC.conditions ?? [],
+      false,
+      false,
+      d20TestPenalty(origC)
+    );
+    if (!saveFailed) {
+      narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${opts.saveDC} — resists the gaze.`;
+      continue;
+    }
+    let afflicted = inflictCondition(origC, 'restrained');
+    // Drop the timed entry so Restrained persists until the re-save resolves it.
+    const { restrained: _drop, ...durs } = afflicted.condition_durations ?? {};
+    afflicted = {
+      ...afflicted,
+      condition_durations: durs,
+      petrify_save: { dc: opts.saveDC, ability: scoreKey, acted: false },
+    };
+    workingSt = commitCharacter(workingSt, afflicted);
+    narrative += ` ${origC.name}: ${scoreKey.toUpperCase()} save vs DC ${opts.saveDC} — fails; stone creeps across their skin (Restrained).`;
+  }
+  return { st: workingSt, narrative };
+}
+
+/**
+ * SRD petrification ladder — STAGE 2, run at the petrifying PC's turn start
+ * (alongside `tickConditions` / `applyMonsterAuras`). Resolves the repeat save:
+ *
+ *   - first afflicted turn (`acted` false) → no save yet, just flip `acted`;
+ *   - Restrained lifted by other means (cured, save-reroll strip) → clear marker;
+ *   - re-save made → shake free (Restrained + marker cleared);
+ *   - re-save failed → turn to stone (Petrified replaces Restrained), UNLESS the
+ *     PC is immune to Petrified, in which case they stay Restrained and keep
+ *     re-saving each turn.
+ *
+ * Returns the updated character + a narrative fragment; the caller commits it.
+ */
+export function resolvePetrifyLadder(
+  char: Character,
+  st: GameState,
+  context: Context
+): { char: Character; narrative: string } {
+  const ps = char.petrify_save;
+  if (!ps) return { char, narrative: '' };
+  if (!char.conditions.includes('restrained')) {
+    // Restrained ended by some other effect — the petrification fizzles.
+    return { char: { ...char, petrify_save: undefined }, narrative: '' };
+  }
+  if (!ps.acted) {
+    return { char: { ...char, petrify_save: { ...ps, acted: true } }, narrative: '' };
+  }
+  const score = (char[ps.ability] ?? 10) as number;
+  const proficient = hasSaveProficiency(char, ps.ability, context);
+  const dc = ps.dc - wornSaveBonus(char, ps.ability, context.lootTable);
+  const saveFailed = rollConditionSave(
+    ps.ability,
+    score,
+    dc,
+    proficient,
+    char.level,
+    0,
+    char.conditions ?? [],
+    false,
+    false,
+    d20TestPenalty(char)
+  );
+  if (!saveFailed) {
+    const cleared: Character = {
+      ...char,
+      conditions: char.conditions.filter((c) => c !== 'restrained'),
+      petrify_save: undefined,
+    };
+    return {
+      char: cleared,
+      narrative: ` ${fmt.note(`[Petrification] ${char.name} breaks free before the stone sets (${ps.ability.toUpperCase()} save vs DC ${ps.dc}).`)}`,
+    };
+  }
+  if (conditionImmunitiesFor(char, st).has('petrified')) {
+    // Can't be petrified — stays Restrained and re-saves next turn.
+    return {
+      char,
+      narrative: ` ${fmt.note(`[Petrification] ${char.name} fails the save but cannot be turned to stone — still Restrained.`)}`,
+    };
+  }
+  const stoned = inflictCondition(
+    {
+      ...char,
+      conditions: char.conditions.filter((c) => c !== 'restrained'),
+      petrify_save: undefined,
+    },
+    'petrified'
+  );
+  return {
+    char: stoned,
+    narrative: ` ${fmt.note(`[Petrification] ${char.name} fails the save and turns to stone — Petrified!`)}`,
+  };
+}
+
+/**
+ * SRD recharge Petrifying Gaze / Breath resolution for one enemy's turn, mirroring
+ * `maybeFireBreathWeapon`: when charged (`gaze_charged !== false`) it fires the
+ * ladder's stage 1 across the party (via `applyPetrifyLadderToParty`), goes on
+ * cooldown, and `fired: true` tells the turn loop the gaze WAS the turn (skip the
+ * normal attack). When spent it rolls a d6 ≥ `rechargeMin` first. A no-op for any
+ * enemy without a gaze (or one already at 0 HP).
+ */
+export function maybeFirePetrifyingGaze(args: {
+  enemy: Enemy;
+  enemyId: string;
+  st: GameState;
+  context: Context;
+  narrative: string;
+}): { fired: boolean; st: GameState; narrative: string } {
+  const gaze = args.enemy.petrifyingGaze;
+  if (!gaze) return { fired: false, st: args.st, narrative: args.narrative };
+  let st = args.st;
+  const ent = st.entities?.find((e) => e.id === args.enemyId && e.isEnemy);
+  if (!ent || ent.hp <= 0) return { fired: false, st, narrative: args.narrative };
+
+  let narrative = args.narrative;
+  let turnHeaderShown = false;
+  if (ent.gaze_charged === false) {
+    const roll = rollDice('1d6');
+    if (roll < (gaze.rechargeMin ?? 5)) {
+      return { fired: false, st, narrative }; // still spent — fall through to melee
+    }
+    narrative += `\n\n[${args.enemy.name}'s turn] ${gaze.name} recharges!`;
+    turnHeaderShown = true;
+  }
+
+  const res = applyPetrifyLadderToParty(st, args.context, {
+    savingThrow: gaze.savingThrow,
+    saveDC: gaze.saveDC,
+  });
+  if (!turnHeaderShown) narrative += `\n\n[${args.enemy.name}'s turn]`;
+  narrative += ` 🗿 ${args.enemy.name} fixes the party with its ${gaze.name}!` + res.narrative;
+  st = res.st;
+  st = {
+    ...st,
+    entities: (st.entities ?? []).map((e) =>
+      e.id === args.enemyId && e.isEnemy ? { ...e, gaze_charged: false } : e
     ),
   };
   return { fired: true, st, narrative };
@@ -10256,6 +10508,28 @@ export async function runEnemyTurns(args: {
             continue;
           }
 
+          // ── Petrifying Gaze / Breath (recharge cone) ─ fires as the whole turn
+          // A charged Petrifying Gaze (Basilisk, Medusa, Gorgon) replaces the
+          // attack: every PC saves vs the petrification ladder's stage 1. It then
+          // goes on cooldown until it recharges at a later turn start.
+          const gazeRes = maybeFirePetrifyingGaze({
+            enemy: rm,
+            enemyId: eEntry.id,
+            st,
+            context: args.context,
+            narrative,
+          });
+          if (gazeRes.fired) {
+            st = gazeRes.st;
+            narrative = gazeRes.narrative;
+            resumeMi = 0;
+            const prevAdvIdxGaze = advIdx;
+            advIdx = (advIdx + 1) % orderLen;
+            if (advIdx === 0 && prevAdvIdxGaze !== 0) roundWrapped = true;
+            if (advIdx === args.initialCurrentIdx) break;
+            continue;
+          }
+
           // ── Spell-cast intent ─ delegated to `attemptEnemySpellCast` ──────
           const spellResult = await attemptEnemySpellCast({
             enemy: rm,
@@ -11114,6 +11388,11 @@ export async function takeAction({
           ticked = auraRes.char;
           st = auraRes.st;
           narrative += auraRes.narrative;
+          // SRD petrification ladder — the Restrained PC repeats its save as its
+          // turn begins (first afflicted turn is free); a failure turns it to stone.
+          const petrifyRes = resolvePetrifyLadder(ticked, st, context);
+          ticked = petrifyRes.char;
+          narrative += petrifyRes.narrative;
           st = { ...st, characters: st.characters.map((c, i) => (i === nextCharIdx ? ticked : c)) };
           st.active_character_id = ticked.id;
         }
@@ -11142,6 +11421,18 @@ export async function takeAction({
     escaped = true;
     const { _rule_escape: _, ...restFlags } = st.flags;
     st = { ...st, flags: restFlags };
+  }
+
+  // SRD Death Burst — any creature that hit 0 HP this action (player attack,
+  // spell AoE, or an opportunity attack during the enemy turns above) and carries
+  // a `deathBurst` explodes now. Folded into `narrative` before the LLM-
+  // enhancement pass so the blast's damage/save facts get enhanced + preserved.
+  {
+    const burstRes = applyDeathBursts(st, seed, context);
+    if (burstRes.narrative) {
+      st = burstRes.st;
+      narrative += burstRes.narrative;
+    }
   }
 
   // Speaker prefix for multi-PC parties — prepend "[CharName] " so the

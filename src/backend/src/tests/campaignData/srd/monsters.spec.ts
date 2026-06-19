@@ -671,11 +671,12 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.warrior_veteran.parry).toBe(true);
   });
 
-  it('Cockatrice models the first petrification stage (CON 11 → Restrained)', () => {
+  it('Cockatrice seeds the petrification ladder (CON 11 → Restrained → Petrified)', () => {
     expect(SRD_MONSTERS.cockatrice.onHitEffect).toEqual({
       condition: 'restrained',
       ability: 'con',
       dc: 11,
+      petrify: true,
     });
     expect(SRD_MONSTERS.cockatrice.condition_immunities).toContain('petrified');
   });

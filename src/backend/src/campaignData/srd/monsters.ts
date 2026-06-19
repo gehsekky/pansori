@@ -1772,10 +1772,10 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'piercing',
     speedFt: 20,
     condition_immunities: ['petrified'],
-    // Simplification: RAW Petrifying Bite is two-staged (CON DC 11:
-    // Restrained on first failure, Petrified on the second). Modeled as the
-    // first stage — a save-or-Restrained rider on the bite.
-    onHitEffect: { condition: 'restrained', ability: 'con', dc: 11 },
+    // SRD Petrifying Bite — CON DC 11: Restrained on the first failure, then the
+    // PC re-saves at its next turn start, turning to stone (Petrified) on a
+    // second failure (the `petrify` flag seeds the ladder; see petrify_save).
+    onHitEffect: { condition: 'restrained', ability: 'con', dc: 11, petrify: true },
   },
   crocodile: {
     name: 'Crocodile',
@@ -4207,9 +4207,17 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       saveDC: 10,
       rechargeMin: 6,
     },
+    deathBurst: {
+      name: 'Death Burst',
+      dice: '2d4',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 10,
+      radiusFt: 5,
+    },
     immunities: ['fire', 'poison'],
     condition_immunities: ['exhaustion', 'poisoned'],
-    // Simplification: Blurred Form (attackers at Disadvantage) + Death Burst + the breath slow rider deferred.
+    // Simplification: Blurred Form (attackers at Disadvantage) + the breath slow rider deferred.
   },
 
   violet_fungus: {
@@ -4276,7 +4284,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['poison'],
     vulnerabilities: ['fire'],
     condition_immunities: ['exhaustion', 'poisoned'],
-    // Simplification: Blinding Breath (no-damage cone) + Death Burst + 1/Day Sleep deferred.
+    deathBurst: {
+      name: 'Death Burst',
+      dice: '2d4',
+      damageType: 'bludgeoning',
+      savingThrow: 'dex',
+      saveDC: 10,
+      radiusFt: 5,
+    },
+    // Simplification: Blinding Breath (no-damage cone) + 1/Day Sleep deferred.
   },
 
   gray_ooze: {
@@ -4337,10 +4353,17 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       saveDC: 11,
       rechargeMin: 6,
     },
+    deathBurst: {
+      name: 'Death Burst',
+      dice: '2d6',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 11,
+      radiusFt: 5,
+    },
     immunities: ['fire', 'poison'],
     vulnerabilities: ['cold'],
     condition_immunities: ['exhaustion', 'poisoned'],
-    // Simplification: Death Burst deferred.
   },
 
   magmin: {
@@ -4360,7 +4383,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 10,
     damageType: 'fire',
     immunities: ['fire'],
-    // Simplification: Death Burst (2d6 fire on death) + ignite deferred.
+    deathBurst: {
+      name: 'Death Burst',
+      dice: '2d6',
+      damageType: 'fire',
+      savingThrow: 'dex',
+      saveDC: 11,
+      radiusFt: 10,
+    },
+    // Simplification: the on-hit ignite (catch-fire) rider deferred.
   },
 
   rust_monster: {
@@ -4783,7 +4814,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 20,
     bonusDamage: '2d6',
     bonusDamageType: 'poison',
-    // Simplification: Petrifying Gaze (Recharge 4-6 cone, Restrained→Petrified ladder) deferred.
+    // SRD Petrifying Gaze (Recharge 4-6) — CON DC 12 cone; Restrained → Petrified
+    // ladder (see PetrifyingGaze). The reflection clause is not modeled.
+    petrifyingGaze: {
+      name: 'Petrifying Gaze',
+      savingThrow: 'con',
+      saveDC: 12,
+      rechargeMin: 4,
+    },
   },
 
   green_hag: {
@@ -5111,7 +5149,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 7,
     damageType: 'piercing',
     speedFt: 40,
-    // Simplification: Petrifying Breath (no-damage Recharge cone) + trampling charge deferred.
+    // SRD Petrifying Breath (Recharge 5-6) — CON DC 15 cone; Restrained →
+    // Petrified ladder (see PetrifyingGaze).
+    petrifyingGaze: {
+      name: 'Petrifying Breath',
+      savingThrow: 'con',
+      saveDC: 15,
+      rechargeMin: 5,
+    },
+    // Simplification: Trample (Prone-target bonus action) deferred.
   },
 
   half_dragon: {
@@ -5414,7 +5460,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     darkvision_ft: 150,
     bonusDamage: '1d6',
     bonusDamageType: 'poison',
-    // Simplification: RAW two Claws + Snake Hair (1d4+3 plus 4d6 poison) — averaged as Claw ×3 with a 1d6 poison rider; Petrifying Gaze deferred.
+    // SRD Petrifying Gaze (Recharge 5-6) — CON DC 13 cone; Restrained → Petrified
+    // ladder (see PetrifyingGaze). The reflection clause is not modeled.
+    petrifyingGaze: {
+      name: 'Petrifying Gaze',
+      savingThrow: 'con',
+      saveDC: 13,
+      rechargeMin: 5,
+    },
+    // Simplification: RAW two Claws + Snake Hair (1d4+3 plus 4d6 poison) — averaged as Claw ×3 with a 1d6 poison rider.
   },
 
   cloaker: {

@@ -165,6 +165,29 @@ export interface OnHitEffect {
   // STR(Athletics)/DEX(Acrobatics) check against it. (SRD: Griffon — escape
   // DC 14 from both front claws.)
   escapeDc?: number;
+  // SRD Petrifying Bite (Cockatrice) — when set with `condition: 'restrained'`,
+  // a failed save seeds the petrification ladder (see DeathBurst's sibling
+  // `PetrifyingGaze` + `Character.petrify_save`): the struck PC is Restrained and
+  // re-saves at the start of its next turn — clearing on a success, turning to
+  // stone (Petrified) on a second failure.
+  petrify?: boolean;
+}
+
+// SRD Petrifying Gaze / Breath (Basilisk, Medusa, Gorgon) — a recharge cone that
+// seeds the petrification ladder on the whole party (no damage). Mirrors the
+// `BreathWeapon` recharge/AoE shape; the per-PC two-stage escalation rides on
+// `Character.petrify_save`. Always a CON save in the SRD, but the ability is kept
+// explicit for symmetry with the other save shapes.
+//
+// Simplification: like every monster AoE in pansori, the 30-ft cone is abstracted
+// to "the whole party" (the same simplification BreathWeapon makes). The RAW
+// reflection clause (a Basilisk/Medusa seeing its own reflection must save) is
+// not modeled — there are no mirror surfaces on the grid.
+export interface PetrifyingGaze {
+  name: string;
+  savingThrow: AbilityKey;
+  saveDC: number;
+  rechargeMin?: number; // recharge on a d6 ≥ this (default 5)
 }
 
 // Boss phase changes. When the boss's hp drops below `hpPct` of its max,
@@ -269,6 +292,28 @@ export interface BreathWeapon {
   conditionDuration?: number;
 }
 
+// SRD Death Burst (Magmin, the elemental Mephits) — when the creature dies it
+// explodes, forcing a save vs an AoE blast on the surrounding creatures. Mirrors
+// the `BreathWeapon` save-for-half shape, but is triggered by death rather than a
+// turn/recharge, so it carries no `rechargeMin`. Fired once per creature via the
+// `CombatEntity.death_burst_fired` latch (see `applyDeathBursts`).
+//
+// Simplification: RAW the burst is an Emanation centered on the dying creature
+// (5 ft for the Mephits, 10 ft for the Magmin). pansori abstracts monster AoEs
+// to "the whole party" — the same simplification BreathWeapon makes — so the
+// `radiusFt` is recorded for flavor/narration only and not used to filter targets.
+export interface DeathBurst {
+  name: string;
+  dice: string; // damage dice expr, e.g. '2d6'
+  damageType: string;
+  savingThrow: AbilityKey;
+  saveDC: number;
+  radiusFt?: number; // emanation size for narration; not used to filter targets
+  // Optional rider condition applied to a PC who fails the save, like BreathWeapon.
+  condition?: ConditionName;
+  conditionDuration?: number;
+}
+
 export interface EnemyTemplate {
   name: string;
   cr: number;
@@ -357,6 +402,11 @@ export interface EnemyTemplate {
   // SRD recharge AoE (Fire Breath, Boulder Toss) — fires as the whole turn when
   // charged; see `BreathWeapon`.
   breathWeapon?: BreathWeapon;
+  // SRD Death Burst (Magmin / elemental Mephits) — on-death AoE save. See DeathBurst.
+  deathBurst?: DeathBurst;
+  // SRD Petrifying Gaze / Breath (Basilisk, Medusa, Gorgon) — recharge cone that
+  // seeds the petrification ladder on the party. See PetrifyingGaze.
+  petrifyingGaze?: PetrifyingGaze;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -456,6 +506,13 @@ export interface Enemy {
   // SRD recharge AoE (Fire Breath, Boulder Toss) — see EnemyTemplate.breathWeapon.
   // Mirrored here + carried through procgen; fired in `runEnemyTurns`.
   breathWeapon?: BreathWeapon;
+  // SRD Death Burst — see EnemyTemplate.deathBurst. Mirrored here + carried
+  // through materializeEnemy; fired post-action in `applyDeathBursts`.
+  deathBurst?: DeathBurst;
+  // SRD Petrifying Gaze / Breath — see EnemyTemplate.petrifyingGaze. Mirrored
+  // here + carried through materializeEnemy; fired on the enemy turn in
+  // `maybeFirePetrifyingGaze`.
+  petrifyingGaze?: PetrifyingGaze;
   // SRD darkvision range (ft) — see EnemyTemplate.darkvision_ft. Undefined
   // defaults to 60 in the combat-visibility check; carried through procgen.
   darkvision_ft?: number;
@@ -1311,6 +1368,19 @@ export interface Character {
     rounds_left: number; // duration; decremented on round wrap, cleared at 0
     concentration?: boolean; // cleared by breakConcentration when set
   } | null;
+  // SRD petrification ladder (Cockatrice bite, Basilisk / Medusa / Gorgon gaze).
+  // Set when a failed petrify save Restrains this PC; the re-save resolves at the
+  // PC's turn start (`resolvePetrifyLadder`). `acted` gates the first afflicted
+  // turn (no save yet), mirroring enemy `save_ends_acted`: once it has passed a
+  // turn, a successful CON re-save ends the effect (clears Restrained + this
+  // marker), a failure turns the PC to stone (Petrified, curable by Greater
+  // Restoration). Cleared automatically if the Restrained condition is lifted by
+  // any other means (e.g. an Indomitable save reroll strips it).
+  petrify_save?: {
+    dc: number;
+    ability: AbilityKey;
+    acted: boolean;
+  };
   // SRD Time Stop — banked extra turns the caster takes in a row while everyone
   // else is frozen. Set by the spell (1d4+1); the turn-advance hook refreshes the
   // caster's turn instead of passing to others while this is > 0, decrementing

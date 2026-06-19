@@ -122,6 +122,11 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     // Recharge AoE — previously dropped here, so wilderness-encounter and
     // DB-placed breath monsters lost their breath weapon entirely.
     breathWeapon: template.breathWeapon,
+    // On-death AoE — same carry-through reasoning as breathWeapon above; without
+    // this, DB-placed / wilderness-encounter Mephits + Magmin lose their burst.
+    deathBurst: template.deathBurst,
+    // Petrifying Gaze / Breath — same carry-through reasoning.
+    petrifyingGaze: template.petrifyingGaze,
     legendary_actions: template.legendary_actions,
     legendary_pool: template.legendary_pool,
     legendary_action_points: template.legendary_actions
