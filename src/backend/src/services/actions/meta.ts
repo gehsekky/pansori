@@ -16,6 +16,7 @@ import {
 } from '../gameEngine.js';
 import {
   canMulticlassInto,
+  casterSpellOptionsByLevel,
   evocationSavantBudget,
   expertiseEligibleSkills,
   expertiseSlots,
@@ -24,6 +25,7 @@ import {
   hunterFeatureOptions,
   isEvocationSpell,
   knowsMetamagic,
+  maxSpellLevelForLevel,
   metamagicOptions,
   metamagicSlots,
 } from '../multiclass.js';
@@ -627,6 +629,63 @@ export const handleChooseWeaponMastery: ActionHandler<{
     weapon_mastery_pending: remaining,
   });
   ctx.narrative = `${char.name} masters the ${weapon.name} — ${weapon.mastery} property unlocked.`;
+  clearLevelingIfDone(ctx);
+};
+
+/**
+ * `learn_spell`: spend one pending known-caster spell pick (granted on a
+ * Wizard/Sorcerer/Bard/Warlock level-up) on an eligible class spell — one that
+ * is on the class spell list, at or below the legal spell level, and not already
+ * known. Out-of-combat, no action cost. Server-side eligibility validation is
+ * the security boundary (the route body is `.passthrough()`): an off-list /
+ * over-level / already-known / over-cap `spellId` is rejected before any
+ * mutation. `spellId === ''` is the "nothing eligible" escape — clears a slot.
+ */
+export const handleLearnSpell: ActionHandler<{
+  type: 'learn_spell';
+  spellId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can learn spells.' };
+  const { char } = ctx.actor;
+  // Defense-in-depth: the cascade is only reachable out of combat, but reject
+  // explicitly here too (mirrors handlePrepareSpells).
+  if (ctx.st.combat_active) {
+    return { rejected: 'You cannot learn spells during combat.' };
+  }
+  if ((char.spells_to_learn ?? 0) <= 0) {
+    return { rejected: 'You have no spell to learn right now.' };
+  }
+  const remaining = Math.max(0, (char.spells_to_learn ?? 1) - 1);
+  // Empty spellId is the "nothing eligible" escape — just clear a slot.
+  if (!action.spellId) {
+    updatePcActor(ctx, { spells_to_learn: remaining });
+    ctx.narrative = `${char.name} has no eligible spell to learn.`;
+    clearLevelingIfDone(ctx);
+    return;
+  }
+  // Eligibility: must be on the class list, at/below the legal spell level, and
+  // not already known. Build the eligible set the same way the picker does.
+  const byLevel = casterSpellOptionsByLevel(
+    char.character_class,
+    ctx.context.spellTable ?? {},
+    maxSpellLevelForLevel(char.level ?? 1)
+  );
+  const eligible = new Set<string>();
+  for (let lvl = 1; lvl <= maxSpellLevelForLevel(char.level ?? 1); lvl++) {
+    for (const id of byLevel[lvl] ?? []) eligible.add(id);
+  }
+  if ((char.spells_known ?? []).includes(action.spellId)) {
+    return { rejected: 'You already know that spell.' };
+  }
+  if (!eligible.has(action.spellId)) {
+    return { rejected: 'That spell is not one your class can learn at this level.' };
+  }
+  const spellName = ctx.context.spellTable?.[action.spellId]?.name ?? action.spellId;
+  updatePcActor(ctx, {
+    spells_known: [...(char.spells_known ?? []), action.spellId],
+    spells_to_learn: remaining,
+  });
+  ctx.narrative = `${char.name} learns ${spellName}.`;
   clearLevelingIfDone(ctx);
 };
 
