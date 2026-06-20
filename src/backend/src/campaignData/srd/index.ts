@@ -30,6 +30,8 @@ export {
   resolveCasterSpells,
 } from './classes.js';
 export type { EquipmentPackage } from './classes.js';
+export { LEVEL_RECOMMENDATIONS } from './levelRecommendations.js';
+export type { LevelRecommendation } from './levelRecommendations.js';
 export { BEAST_FORMS, maxBeastCRForLevel, availableBeastForms } from './beast_forms.js';
 export { SRD_MONSTERS } from './monsters.js';
 export { REINCARNATE_SPECIES, SRD_SPECIES } from './species.js';
