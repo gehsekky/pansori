@@ -54,8 +54,22 @@ function LevelingPanel({ mode, memberName, choices, onChoose }: Props) {
               data-action-type={c.action.type}
               className={styles.choiceBtn}
               onClick={() => onChoose(c)}
+              style={c.rationale ? { display: 'flex', flexDirection: 'column' } : undefined}
             >
-              {c.label}
+              <span>
+                {c.recommended && (
+                  // The ★ glyph carries the accent; the visible word
+                  // "Recommended" carries the meaning for screen readers
+                  // (UI-SPEC accessibility — don't rely on the glyph alone).
+                  <span style={{ color: 'var(--t-primary)' }}>★ Recommended </span>
+                )}
+                {c.label}
+              </span>
+              {c.rationale && (
+                <small style={{ color: 'var(--t-dim)', fontSize: '0.7rem', fontWeight: 400 }}>
+                  {c.rationale}
+                </small>
+              )}
             </button>
           </li>
         ))}
