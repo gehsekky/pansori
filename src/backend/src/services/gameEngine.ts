@@ -118,6 +118,7 @@ import {
   knowsMetamagic,
   layOnHandsRemaining,
   levelUpClassOptions,
+  maxSpellLevelForLevel,
   metamagicOptions,
   metamagicSlots,
   piercesMagicalDarkness,
@@ -4742,6 +4743,49 @@ function masteryChoicesFor(char: Character, context: Context): GameChoice[] {
   }));
 }
 
+// Known-caster spell picks for a character owing a `spells_to_learn` pick.
+// Mirrors masteryChoicesFor: a flat list of eligible (in-list, at/below legal
+// level, not-already-known) spells, each a `learn_spell` choice, flagging
+// exactly one ★ recommended option from the static LEVEL_RECOMMENDATIONS table.
+// Empty eligible list → a single escape ("continue") choice so the cascade
+// can't get stuck.
+function spellChoicesFor(char: Character, context: Context): GameChoice[] {
+  const spellTable = context.spellTable ?? {};
+  const byLevel = casterSpellOptionsByLevel(
+    char.character_class,
+    spellTable,
+    maxSpellLevelForLevel(char.level ?? 1)
+  );
+  const already = new Set(char.spells_known ?? []);
+  // Only leveled spells (skip cantrips at level 0 — they aren't "learned" via
+  // this known-pool pick); dedupe against the already-known set.
+  const eligible: string[] = [];
+  for (let lvl = 1; lvl <= maxSpellLevelForLevel(char.level ?? 1); lvl++) {
+    for (const id of byLevel[lvl] ?? []) {
+      if (!already.has(id)) eligible.push(id);
+    }
+  }
+  if (eligible.length === 0) {
+    return [
+      {
+        label: 'No eligible spells to learn — continue.',
+        action: { type: 'learn_spell', spellId: '' },
+      },
+    ];
+  }
+  // Flag exactly one option as the guided default: the first table-listed spell
+  // that appears in the eligible set. Missing entry / no match → flag nothing.
+  const rec = LEVEL_RECOMMENDATIONS[char.character_class];
+  const recId = rec?.spells?.find((id) => eligible.includes(id));
+  return eligible.map((id) => ({
+    label: `Learn ${spellTable[id]?.name ?? id}`,
+    action: { type: 'learn_spell' as const, spellId: id },
+    ...(rec && recId && id === recId
+      ? { recommended: true, rationale: rec.spellReason ?? '' }
+      : {}),
+  }));
+}
+
 export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   const char =
     state.characters.find((c) => c.id === state.active_character_id) ?? state.characters[0];
@@ -5014,7 +5058,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
             ? levelClassChoices(m)
             : work === 'asi'
               ? asiChoicesFor(m, context)
-              : masteryChoicesFor(m, context);
+              : work === 'spells'
+                ? spellChoicesFor(m, context)
+                : masteryChoicesFor(m, context);
         return [
           ...steps.map((c) => ({ ...c, kind: 'leveling' as const })),
           {
