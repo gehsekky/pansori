@@ -19,6 +19,7 @@ function stepLabel(choices: GameChoice[]): string {
   if (t === 'level_up_class') return 'Choose a class to advance';
   if (t === 'apply_asi' || t === 'take_feat') return 'Ability Score Improvement';
   if (t === 'choose_weapon_mastery') return 'Weapon Mastery';
+  if (t === 'learn_spell') return 'CHOOSE A SPELL TO LEARN';
   return 'Leveling';
 }
 
