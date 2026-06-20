@@ -93,6 +93,7 @@ import {
   applyMulticlassProfGrants,
   canCountercharm,
   canRitualCast,
+  casterSpellOptionsByLevel,
   elementalAffinityType,
   evocationSavantBudget,
   expertiseEligibleSkills,
@@ -113,6 +114,7 @@ import {
   huntersPrey,
   indomitableRemaining,
   isEvocationSpell,
+  knownSpellTargetForLevel,
   knowsMetamagic,
   layOnHandsRemaining,
   levelUpClassOptions,
@@ -3983,6 +3985,23 @@ export function applyLevelUpForClass(char: Character, className: string, context
     out += ` ${className} level ${newClassLevel}: Weapon Mastery — choose ${gained} more weapon${gained === 1 ? '' : 's'} to master!`;
   }
 
+  // Known-caster spells-on-level-gain (Wizard/Sorcerer/Bard/Warlock). When the
+  // class's known/spellbook target grows, surface the new pick(s) as a pending
+  // counter resolved via `learn_spell`. NO auto-fill (D-06) — the player picks.
+  // Prepared casters (Cleric/Druid/Paladin/Ranger) return null here and accrue
+  // nothing; they prepare from the full list. The owed delta counts only the
+  // current non-cantrip known pool against the new target.
+  const knownTarget = knownSpellTargetForLevel(className, newClassLevel);
+  if (knownTarget !== null && context.spellTable) {
+    const cantrips = new Set(casterSpellOptionsByLevel(className, context.spellTable, 0)[0] ?? []);
+    const currentKnown = (char.spells_known ?? []).filter((id) => !cantrips.has(id)).length;
+    const owed = Math.max(0, knownTarget - currentKnown - (char.spells_to_learn ?? 0));
+    if (owed > 0) {
+      char.spells_to_learn = (char.spells_to_learn ?? 0) + owed;
+      out += ` ${className} level ${newClassLevel}: learn ${owed} new spell${owed === 1 ? '' : 's'}!`;
+    }
+  }
+
   // SRD Barbarian Primal Champion (L20 capstone): Strength and Constitution
   // each increase by 4, to a maximum of 30. The CON increase raises max HP
   // retroactively (same convention as an ASI CON bump). hpRoll above already
@@ -4619,10 +4638,12 @@ export function xpForLevel(level: number): number {
 // ── Player-driven leveling (the leveling pane) ──────────────────────────────
 // What level-up work a character has, in resolution order. Pending picks
 // (ASI / weapon mastery from a prior advance) resolve BEFORE advancing again.
-export function levelUpWorkFor(char: Character): 'advance' | 'asi' | 'mastery' | null {
+export function levelUpWorkFor(char: Character): 'advance' | 'asi' | 'mastery' | 'spells' | null {
   if (char.dead) return null;
   if (char.asi_pending) return 'asi';
   if ((char.weapon_mastery_pending ?? 0) > 0) return 'mastery';
+  // Pending known-caster spell pick(s) resolve before advancing again.
+  if ((char.spells_to_learn ?? 0) > 0) return 'spells';
   const level = char.level ?? 1;
   if (level < 20 && (char.xp ?? 0) >= xpForLevel(level + 1)) return 'advance';
   return null;

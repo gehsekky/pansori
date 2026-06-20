@@ -991,6 +991,11 @@ export type StructuredAction =
   // to master (Fighter L4/10/16, Barbarian L4/10). `weaponId` is the chosen
   // weapon. Out-of-combat, no action cost.
   | { type: 'choose_weapon_mastery'; weaponId: string }
+  // Known-caster spell pick on level-up (Wizard/Sorcerer/Bard/Warlock): learn
+  // one eligible class spell at/below the legal spell level. `spellId` is the
+  // chosen spell; '' is the escape/continue when no eligible spell remains.
+  // Out-of-combat, no action cost. Server validates eligibility (RE-2.)
+  | { type: 'learn_spell'; spellId: string }
   // SRD 5.2.1 Ranger Hunter "feature option" pick (Hunter's Prey L3, Defensive
   // Tactics L7): choose one of two options, swappable on a rest. Out-of-combat,
   // no action cost. (RE-2.)

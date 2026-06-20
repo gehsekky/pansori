@@ -1259,6 +1259,12 @@ export interface Character {
   // weapons the player must still pick; generateChoices surfaces the picks and
   // `choose_weapon_mastery` decrements it.
   weapon_mastery_pending?: number;
+  // Known-caster spell picks owed on level-up. Set by applyLevelUpForClass for
+  // Wizard/Sorcerer/Bard/Warlock when their known/spellbook target grows; the
+  // leveling cascade surfaces a guided picker and `learn_spell` decrements it.
+  // Prepared casters (Cleric/Druid/Paladin/Ranger) never accrue this (they
+  // prepare from the full list). No auto-fill — the player chooses (D-06).
+  spells_to_learn?: number;
   // Bardic Inspiration die granted by a Bard (SRD / 2024). The
   // die is stored as a dice expression ('d6', 'd8', ...) and consumed on
   // the next d20 test (attack/save/check). SRD expands what the die

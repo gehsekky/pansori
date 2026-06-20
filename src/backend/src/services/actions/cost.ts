@@ -71,6 +71,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   choose_fighting_style: 'managed',
   choose_expertise: 'managed',
   choose_weapon_mastery: 'managed',
+  learn_spell: 'managed',
   choose_hunter_option: 'managed',
   choose_metamagic: 'managed',
   choose_elemental_affinity: 'managed',
