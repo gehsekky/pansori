@@ -5,6 +5,7 @@
 
 import type { GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { casterSpellOptionsByLevel, knownSpellTargetForLevel } from '../../services/multiclass.js';
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
 import { makeChar, makeState } from '../../test-fixtures.js';
 import { context as ctx } from '../fixtures/testContext.js';
@@ -61,6 +62,18 @@ describe('leveling roster gate', () => {
 });
 
 describe('enter_leveling → cascade → auto-drop', () => {
+  // Seed a full L4 Wizard spellbook so the L3→L4 advance owes NO known-caster
+  // spell pick — the ASI→auto-drop flow under test isolates the ASI step. (A
+  // Wizard with an empty book would accrue `spells_to_learn` on advance, which
+  // is its own cascade step covered by midCampaignLevelUp.spec.ts.)
+  const fullBook = (() => {
+    const byLevel = casterSpellOptionsByLevel('Wizard', ctx.spellTable ?? {}, 9);
+    const leveled: string[] = [];
+    for (let l = 1; l <= 9; l++) for (const id of byLevel[l] ?? []) leveled.push(id);
+    const target = knownSpellTargetForLevel('Wizard', 4) ?? 12;
+    return leveled.slice(0, target);
+  })();
+
   // All-15 stats so the multiclass prereqs for other classes are met (the
   // class-pick step should then offer multiclass options, not just Wizard).
   const wizard = () =>
@@ -70,6 +83,7 @@ describe('enter_leveling → cascade → auto-drop', () => {
       character_class: 'Wizard',
       level: 3,
       xp: 2700,
+      spells_known: [...fullBook],
       str: 15,
       dex: 15,
       con: 15,
