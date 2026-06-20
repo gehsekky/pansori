@@ -1145,6 +1145,14 @@ export interface GameChoice {
     title: string;
     options: { id: string; label: string; sub?: string }[];
   };
+  // Optional UI hint: this option is the guided default for its choice step
+  // (D-02). At most one option per step carries it; the FE renders a `★
+  // Recommended` tag + the `rationale` sub-line. Additive and backward-
+  // compatible — existing renderers ignore both fields. The recommendation
+  // never forces a pick (D-01).
+  recommended?: boolean;
+  // One-line "why" shown under a recommended option's label (D-02).
+  rationale?: string;
 }
 
 // ─── Combat-log events (parallel to prose narrative) ─────────────────

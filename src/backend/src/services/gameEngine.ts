@@ -55,6 +55,7 @@ import type {
 import { type ActionContext, dispatchAction } from './actions/index.js';
 import {
   BEAST_FORMS,
+  LEVEL_RECOMMENDATIONS,
   SRD_SPECIES,
   SRD_SUBCLASS_FOR_CLASS,
   availableBeastForms,
@@ -4657,9 +4658,13 @@ function asiChoicesFor(char: Character, context: Context): GameChoice[] {
     wis: 'WIS',
     cha: 'CHA',
   };
+  // Flag exactly one ASI option as the guided default from the static table
+  // (D-02/D-03). Missing entry → flag nothing; never throw, never flag >1.
+  const rec = LEVEL_RECOMMENDATIONS[char.character_class];
   const choices: GameChoice[] = (Object.keys(statLabels) as AbilityKey[]).map((stat) => ({
     label: `Ability Score Improvement: +2 ${statLabels[stat]} (currently ${char[stat]})`,
     action: { type: 'apply_asi' as const, stat },
+    ...(rec && stat === rec.asi ? { recommended: true, rationale: rec.asiReason } : {}),
   }));
   // SRD level-19 Epic Boon: take a boon feat in place of the ASI; the +1 auto-
   // targets the best eligible ability (the boon's power is the meaningful pick).
@@ -4702,9 +4707,17 @@ function masteryChoicesFor(char: Character, context: Context): GameChoice[] {
       },
     ];
   }
+  // Flag exactly one mastery option as the guided default: the first offered
+  // weapon whose id is in the static table's masteries list (D-02/D-03).
+  // Missing entry / no match → flag nothing; never throw, never flag >1.
+  const rec = LEVEL_RECOMMENDATIONS[char.character_class];
+  const recId = rec?.masteries?.find((id) => options.some((w) => w.id === id));
   return options.map((w) => ({
     label: `Weapon Mastery: master ${w.name} (${w.mastery})`,
     action: { type: 'choose_weapon_mastery' as const, weaponId: w.id },
+    ...(rec && recId && w.id === recId
+      ? { recommended: true, rationale: rec.masteryReason ?? '' }
+      : {}),
   }));
 }
 
