@@ -2885,7 +2885,10 @@ export const SRD_SPELLS: Record<string, Spell> = {
     desc: 'Up to 6 creatures within 60 ft regain 1d4 + casting mod HP. +1d4 per slot above 3rd.',
     rangeKind: 'ranged',
     rangeFt: 60,
-    spellList: ['divine'],
+    // SRD: Mass Healing Word is on both the Bard and Cleric spell lists. The
+    // engine maps Bard→arcane and Cleric→divine, so the tag must carry both —
+    // a 'divine'-only tag wrongly excludes Bard (who lists it at level 3).
+    spellList: ['arcane', 'divine'],
   },
   mass_cure_wounds: {
     id: 'mass_cure_wounds',
