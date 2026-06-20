@@ -93,9 +93,21 @@ function xpForLevel(level: number): number {
   return XP_FOR_LEVEL[Math.min(20, level)] ?? XP_FOR_LEVEL[20];
 }
 
+// True when a member has ANY level-up work the player can resolve out of
+// combat — mirroring the backend `levelUpWorkFor` non-null states so the +LVL
+// badge fires for "finish leveling" (a pending ASI / weapon-mastery / spell
+// pick from a prior advance) as well as a fresh XP-threshold advance. The
+// in-combat, dead, and level-20 guards are preserved (leveling never surfaces
+// in combat — UI-SPEC / D-05).
 export function levelUpAvailable(char: Character, inCombat: boolean): boolean {
   if (char.dead) return false;
   if (inCombat) return false;
   if ((char.level ?? 1) >= 20) return false;
+  // Pending picks from a prior advance still owe work (backend levelUpWorkFor
+  // resolves these before advancing again).
+  if (char.asi_pending) return true;
+  if ((char.weapon_mastery_pending ?? 0) > 0) return true;
+  if ((char.spells_to_learn ?? 0) > 0) return true;
+  // Otherwise, eligible when the XP threshold for the next level is met.
   return (char.xp ?? 0) >= xpForLevel((char.level ?? 1) + 1);
 }

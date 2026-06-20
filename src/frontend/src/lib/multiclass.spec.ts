@@ -95,4 +95,39 @@ describe('levelUpAvailable', () => {
     const char = makeChar({ level: 1, xp: 500, dead: true });
     expect(levelUpAvailable(char, false)).toBe(false);
   });
+
+  // D-05: the +LVL badge also fires for "finish leveling" — a pending pick from
+  // a prior advance — mirroring the backend `levelUpWorkFor` non-null states.
+  it('returns true for a pending ASI even below the XP threshold (out of combat)', () => {
+    const char = makeChar({ level: 4, xp: 0, asi_pending: true });
+    expect(levelUpAvailable(char, false)).toBe(true);
+  });
+
+  it('returns true for a pending weapon-mastery pick (out of combat)', () => {
+    const char = makeChar({ level: 5, xp: 0, weapon_mastery_pending: 1 });
+    expect(levelUpAvailable(char, false)).toBe(true);
+  });
+
+  it('returns true for a pending spell pick (out of combat)', () => {
+    const char = makeChar({ level: 5, xp: 0, spells_to_learn: 1 });
+    expect(levelUpAvailable(char, false)).toBe(true);
+  });
+
+  it('returns false for any pending pick while IN combat (badge never in combat)', () => {
+    const asi = makeChar({ level: 4, xp: 0, asi_pending: true });
+    const mastery = makeChar({ level: 5, xp: 0, weapon_mastery_pending: 1 });
+    const spell = makeChar({ level: 5, xp: 0, spells_to_learn: 1 });
+    expect(levelUpAvailable(asi, true)).toBe(false);
+    expect(levelUpAvailable(mastery, true)).toBe(false);
+    expect(levelUpAvailable(spell, true)).toBe(false);
+  });
+
+  it('returns false for a pending pick when dead or at level cap', () => {
+    expect(levelUpAvailable(makeChar({ level: 5, spells_to_learn: 1, dead: true }), false)).toBe(
+      false
+    );
+    expect(levelUpAvailable(makeChar({ level: 20, xp: 999999, asi_pending: true }), false)).toBe(
+      false
+    );
+  });
 });

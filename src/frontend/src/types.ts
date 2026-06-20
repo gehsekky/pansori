@@ -197,6 +197,10 @@ export interface Character {
   armor_proficiencies: string[];
   weapon_proficiencies: string[];
   weapon_masteries?: string[];
+  // Pending level-up picks owed (server-set; the FE badge mirrors them so an
+  // eligible member is discoverable). `asi_pending` (above) is the ASI case.
+  weapon_mastery_pending?: number;
+  spells_to_learn?: number;
   bardic_inspiration_die?: string;
   wild_shape_form?: string;
   attuned_items: string[]; // instance_ids of attuned magic items (max 3)
