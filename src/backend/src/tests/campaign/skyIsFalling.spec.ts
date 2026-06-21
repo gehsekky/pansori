@@ -9,8 +9,9 @@
 // either bug fails here instead of in someone's playthrough.
 
 import type { CampaignRegion, CampaignRoom, CampaignTown } from '../../services/campaignContent.js';
+import type { GameRule, Quest } from '../../types.js';
 import { describe, expect, it } from 'vitest';
-import type { GameRule } from '../../types.js';
+import { QUESTS_ACT2 } from '../../campaignData/skyIsFalling/questsAct2.js';
 import { REGIONS } from '../../campaignData/skyIsFalling/regions.js';
 import { REGIONS_ACT2 } from '../../campaignData/skyIsFalling/regionsAct2.js';
 import { ROOMS } from '../../campaignData/skyIsFalling/rooms.js';
@@ -274,5 +275,31 @@ describe('The Sky Is Falling — store_flip rule integrity', () => {
     expect(ratIds.sort()).toEqual(
       Array.from({ length: ratCount }, (_, i) => `store_room#${i}`).sort()
     );
+  });
+});
+
+// ─── Act II slice 1: the court-arrival friction beat ──────────────────────────
+// Reads a flag key off a QuestStep.condition ({fact:'flags', path:'$.x', …}) —
+// mirrors the flag() helper shape the quest modules author.
+function stepFlagKey(condition: object): string | undefined {
+  const c = condition as { fact?: string; path?: string };
+  if (c.fact !== 'flags' || typeof c.path !== 'string') return undefined;
+  const m = c.path.match(/^\$\.(.+)$/);
+  return m?.[1];
+}
+
+describe('Act II — q_act2_open (court arrival)', () => {
+  const quest = (QUESTS_ACT2 as Quest[]).find((q) => q.id === 'q_act2_open');
+
+  it('q_act2_open is a startActive act2 quest given by Vane', () => {
+    expect(quest, 'QUESTS_ACT2 must contain q_act2_open').toBeDefined();
+    expect(quest!.startActive).toBe(true);
+    expect(quest!.actId).toBe('act2');
+    expect(quest!.giverNpcId).toBe('npc_vane');
+  });
+
+  it('q_act2_open has a step whose condition keys on the met_quentin flag', () => {
+    const flagKeys = (quest?.steps ?? []).map((s) => stepFlagKey(s.condition));
+    expect(flagKeys).toContain('met_quentin');
   });
 });
