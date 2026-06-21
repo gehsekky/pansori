@@ -22,8 +22,10 @@ import type { EditableSection } from '../../services/campaignContent.js';
 import { FACTIONS } from './factions.js';
 import { ITEMS } from './items.js';
 import { MONSTERS } from './monsters.js';
+import { MONSTERS_ACT2 } from './monstersAct2.js';
 import { QUESTS } from './quests.js';
 import { REGIONS } from './regions.js';
+import { REGIONS_ACT2 } from './regionsAct2.js';
 import { ROOMS } from './rooms.js';
 import { RULES } from './rules.js';
 import { TOWNS } from './towns.js';
@@ -73,12 +75,15 @@ export const SKY_CAMPAIGN_SECTIONS: { section: EditableSection; value: unknown }
   { section: 'recommendedParty', value: RECOMMENDED_PARTY },
   // Leaf data first — geography / quests / rules / acts reference it by id/name.
   { section: 'factions', value: FACTIONS },
-  { section: 'customMonsters', value: MONSTERS },
+  // Act I + Act II content is concatenated into the SAME section arrays (one
+  // section per content type) — putCampaignSection applies them in array order,
+  // so leaf data (monsters) precedes geography (regions) which precedes acts.
+  { section: 'customMonsters', value: [...MONSTERS, ...MONSTERS_ACT2] },
   { section: 'customItems', value: ITEMS },
   { section: 'rooms', value: ROOMS },
   { section: 'towns', value: TOWNS },
-  { section: 'regions', value: REGIONS },
+  { section: 'regions', value: [...REGIONS, ...REGIONS_ACT2] },
   { section: 'quests', value: QUESTS },
   { section: 'rules', value: RULES },
-  { section: 'acts', value: ACTS },
+  { section: 'acts', value: ACTS }, // act2 already appended in acts.ts
 ];

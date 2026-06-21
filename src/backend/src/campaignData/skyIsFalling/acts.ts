@@ -62,4 +62,23 @@ export const ACTS: Act[] = [
         'The Sky Is Falling — Act I complete. To be continued…',
     },
   },
+  // Act II — a MINIMAL loadable stub this phase (D-13): startingRegionId +
+  // startPos + an opening crawl, so the Valerion heartland is directly
+  // enterable and testable now. The Act I→II carry/branch transitions and the
+  // Act III handoff ending stub are Phase 5 — deliberately NO `transitions` and
+  // NO `ending` here. startingRegionId points at REGIONS_ACT2's region id;
+  // startPos matches that region's startPos (a passable kingsroad cell).
+  {
+    id: 'act2',
+    name: 'Act II — Decoding the Coordinates',
+    startingRegionId: 'valerion_heartland',
+    startPos: { x: 1, y: 6 },
+    onStart: [
+      'The borderlands fall away behind you and the Valerion heartland opens ' +
+        'wide — kingsroads, hedged fields, the capital’s white towers on the ' +
+        'horizon. The relic you carried out of the Sunder-Carr hums on, patient ' +
+        'and cold, and somewhere ahead in Lady Elara’s Grand Library are the ' +
+        'coordinates that will tell you what it is truly listening for.',
+    ],
+  },
 ];

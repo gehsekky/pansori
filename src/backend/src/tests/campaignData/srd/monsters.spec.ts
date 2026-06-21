@@ -1211,18 +1211,19 @@ describe('Act II reskin roster — clones', () => {
     expect(names.sort()).toEqual(CLONE_BASES.map(([n]) => n).sort());
   });
 
-  it('Test 2 (clone guard): each entry deep-matches its SRD base on every field but name/desc', () => {
+  it('Test 2 (clone guard): each entry deep-matches its SRD base on every field but name', () => {
     for (const [flavorName, baseId] of CLONE_BASES) {
       const clone = MONSTERS_ACT2.find((m) => m.name === flavorName);
       expect(clone, `clone "${flavorName}" present`).toBeDefined();
       const base = SRD_MONSTERS[baseId];
-      // Strip the two fields a clone is allowed to override; the rest MUST be
-      // byte-for-byte the SRD base (proving it's a clone, not a tuned variant).
-      const { name: _cn, desc: _cd, ...cloneRest } = clone as Record<string, unknown>;
-      const { name: _bn, desc: _bd, ...baseRest } = base as Record<string, unknown>;
+      // Strip the one field a clone is allowed to override (EnemyTemplate has no
+      // desc field — flavor lives in comments); the rest MUST be byte-for-byte
+      // the SRD base (proving it's a clone, not a tuned variant).
+      const { name: _cn, ...cloneRest } = clone as unknown as Record<string, unknown>;
+      const { name: _bn, ...baseRest } = base as unknown as Record<string, unknown>;
       expect(cloneRest, `"${flavorName}" mechanical fields == ${baseId}`).toEqual(baseRest);
       // …and it really did re-flavor (name differs from the base's SRD name).
-      expect((clone as { name: string }).name).not.toBe((base as { name: string }).name);
+      expect(clone!.name).not.toBe(base.name);
     }
   });
 
