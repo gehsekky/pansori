@@ -21,7 +21,7 @@
 // carry an in-bounds pos off the entry/exit cells (the room-object-placement
 // spec enforces it).
 
-import { QUENTIN, VANE_ACT2 } from './npcsAct2.js';
+import { ELARA, QUENTIN, VANE_ACT2 } from './npcsAct2.js';
 import type { CampaignRoom } from '../../services/campaignContent.js';
 
 // A w×h grid of empty cells; callers overwrite specific cells for terrain
@@ -119,6 +119,13 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     floor: 'cobblestone',
     lighting: 'bright',
     entryPos: { x: 5, y: 9 },
+    // The decode mood: the long lamp-lit table where Mythic Geometry gets solved.
+    onEnter: [
+      'The Grand Library swallows the city’s noise whole. Galleries of vellum ' +
+        'climb tier on tier into the dome, and at the long decoding-table in the ' +
+        'center a grey-eyed woman is already watching you come — Lady Elara ' +
+        'Aurellion, who reads the things the court would rather stayed buried.',
+    ],
     // The descent anchor (D-09): a `toRoomId` exit leads down a hidden stair into
     // the Weaver-cell undercroft (NOT an `ascends`/`descends` flag — it returns
     // to a specific room). The ascends-exit back to the district stays in place.
@@ -131,6 +138,11 @@ export const ROOMS_ACT2: CampaignRoom[] = [
         label: 'Down the hidden stair, into the undercroft',
       },
     ],
+    // Lady Elara at the central decoding-table (D-11) — slice-2 anchor. Placed at
+    // an upper-central cell, in-bounds on the 11×10 grid, off the entry (5,9) and
+    // off the descent-exit (0,0) (Pitfall 4). The descent exits above are kept
+    // intact — slice 2 must not break Phase 2's undercroft chain.
+    npcs: [{ ...ELARA, pos: { x: 5, y: 2 } }],
   },
   {
     id: 'valerion_market_room',

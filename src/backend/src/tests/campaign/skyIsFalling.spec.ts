@@ -594,3 +594,40 @@ describe('Act II — q_library quest shape + flag-linkage', () => {
     }
   });
 });
+
+describe('Act II — grand_library_room (Elara embedded, descent intact)', () => {
+  const library = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'grand_library_room');
+
+  it('the library room embeds Elara on a valid, non-colliding, in-bounds cell', () => {
+    expect(library, 'grand_library_room must exist').toBeDefined();
+    const w = library!.grid[0]?.length ?? 0;
+    const h = library!.grid.length;
+    const blocked = new Set<string>([`${library!.entryPos.x},${library!.entryPos.y}`]);
+    for (const ex of library!.exits ?? []) blocked.add(`${ex.pos.x},${ex.pos.y}`);
+
+    const elara = (library!.npcs ?? []).find((n) => n.id === 'npc_elara');
+    expect(elara, 'grand_library_room must embed npc_elara').toBeDefined();
+    const p = elara!.pos!;
+    expect(p, 'Elara must have an authored pos').toBeDefined();
+    expect(
+      p.x >= 0 && p.x < w && p.y >= 0 && p.y < h,
+      `Elara pos (${p.x},${p.y}) out of bounds on the ${w}×${h} grid`
+    ).toBe(true);
+    expect(
+      blocked.has(`${p.x},${p.y}`),
+      `Elara sits on the entry (${library!.entryPos.x},${library!.entryPos.y}) or a descent-exit cell`
+    ).toBe(false);
+  });
+
+  it('the library keeps BOTH exits — the ascends-out AND the undercroft descent (D-09)', () => {
+    const exits = library!.exits ?? [];
+    expect(
+      exits.some((ex) => ex.ascends === true),
+      'the ascends-out exit must remain'
+    ).toBe(true);
+    expect(
+      exits.some((ex) => ex.toRoomId === 'library_undercroft_approach'),
+      'the toRoomId descent into the undercroft must remain (Phase 2 chain)'
+    ).toBe(true);
+  });
+});
