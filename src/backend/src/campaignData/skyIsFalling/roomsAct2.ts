@@ -21,6 +21,7 @@
 // carry an in-bounds pos off the entry/exit cells (the room-object-placement
 // spec enforces it).
 
+import { QUENTIN, VANE_ACT2 } from './npcsAct2.js';
 import type { CampaignRoom } from '../../services/campaignContent.js';
 
 // A w×h grid of empty cells; callers overwrite specific cells for terrain
@@ -64,6 +65,22 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     entryPos: { x: 4, y: 7 },
     grid: grid(9, 8),
     exits: [{ pos: { x: 4, y: 7 }, ascends: true, label: 'Out to the Court District' }],
+    // The court-arrival friction tableau (D-07): the duo presented to a hall
+    // that has already decided what it thinks of them.
+    onEnter: [
+      'The herald’s call dies into a silence that is not quite respect. The ' +
+        'ministers in the colonnades turn as one to watch you cross the long ' +
+        'Valerion floor — frontier law come to a court that measures everything ' +
+        'by its lineage and finds you wanting. Lucian Vane waits at the foot of ' +
+        'the dais with the patience of a man who expects to win, and somewhere ' +
+        'off to the side a young Vance is already smiling at a joke you have not ' +
+        'yet heard. Whatever the Gavel sent you to find, you will have to find it ' +
+        'here, among people who would rather you did not.',
+    ],
+    npcs: [
+      { ...VANE_ACT2, pos: { x: 3, y: 1 } },
+      { ...QUENTIN, pos: { x: 6, y: 1 } },
+    ],
   },
   {
     id: 'valerion_ball_room',

@@ -24,6 +24,7 @@ import { REGIONS_ACT2 } from '../../campaignData/skyIsFalling/regionsAct2.js';
 import { ROOMS } from '../../campaignData/skyIsFalling/rooms.js';
 import { ROOMS_ACT2 } from '../../campaignData/skyIsFalling/roomsAct2.js';
 import { RULES } from '../../campaignData/skyIsFalling/rules.js';
+import { SKY_CAMPAIGN_SECTIONS } from '../../campaignData/skyIsFalling/index.js';
 import { TERRAIN } from '../../types.js';
 import { TOWNS } from '../../campaignData/skyIsFalling/towns.js';
 import { TOWNS_ACT2 } from '../../campaignData/skyIsFalling/townsAct2.js';
@@ -373,5 +374,53 @@ describe('Act II — court NPCs (Vane + Quentin)', () => {
   it('VANE_ACT2 authors no silverford_outcome / war-state responses (deferred to Phase 5)', () => {
     const json = JSON.stringify(VANE_ACT2);
     expect(json.includes('silverford_outcome')).toBe(false);
+  });
+});
+
+describe('Act II — valerion_court_room (the friction tableau)', () => {
+  const court = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'valerion_court_room');
+
+  it('the court room plays a non-empty onEnter friction tableau', () => {
+    expect(court, 'valerion_court_room must exist').toBeDefined();
+    const onEnter = Array.isArray(court!.onEnter)
+      ? court!.onEnter
+      : court!.onEnter
+        ? [court!.onEnter]
+        : [];
+    expect(onEnter.length).toBeGreaterThan(0);
+    expect(onEnter.every((line) => line.trim().length > 0)).toBe(true);
+  });
+
+  it('the court room embeds Vane + Quentin on valid, non-colliding, in-bounds cells', () => {
+    const w = court!.grid[0]?.length ?? 0;
+    const h = court!.grid.length;
+    const blocked = new Set<string>([`${court!.entryPos.x},${court!.entryPos.y}`]);
+    for (const ex of court!.exits ?? []) blocked.add(`${ex.pos.x},${ex.pos.y}`);
+
+    const ids = (court!.npcs ?? []).map((n) => n.id);
+    expect(ids).toContain('npc_vane');
+    expect(ids).toContain('npc_quentin');
+
+    for (const n of court!.npcs ?? []) {
+      expect(n.pos, `court npc "${n.id}" has no pos`).toBeDefined();
+      const p = n.pos!;
+      expect(p.x >= 0 && p.x < w && p.y >= 0 && p.y < h, `court npc "${n.id}" out of bounds`).toBe(
+        true
+      );
+      expect(
+        blocked.has(`${p.x},${p.y}`),
+        `court npc "${n.id}" sits on an entry/exit/other-npc cell`
+      ).toBe(false);
+      blocked.add(`${p.x},${p.y}`); // npcs must not stack either
+    }
+  });
+});
+
+describe('Act II — index.ts quests-section wiring (Pitfall 2)', () => {
+  it('the seeded quests section concatenates QUESTS_ACT2 (q_act2_open is present)', () => {
+    const questsSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'quests');
+    expect(questsSection, 'a quests section must be seeded').toBeDefined();
+    const quests = questsSection!.value as Quest[];
+    expect(quests.some((q) => q.id === 'q_act2_open')).toBe(true);
   });
 });
