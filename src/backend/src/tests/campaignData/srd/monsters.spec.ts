@@ -2,6 +2,8 @@
 // SRD 5.2.1 core stat line + the effect fields the engine honors.
 
 import { describe, expect, it } from 'vitest';
+import { MONSTERS_ACT2 } from '../../../campaignData/skyIsFalling/monstersAct2.js';
+import { MONSTERS as SKY_MONSTERS } from '../../../campaignData/skyIsFalling/monsters.js';
 import { SRD_MONSTERS } from '../../../campaignData/srd/monsters.js';
 import { readFileSync } from 'fs';
 
@@ -1184,5 +1186,71 @@ describe('Planar + top-end batch — effect fields', () => {
   it('Clay Golem fists drain the HP maximum via the Life Drain hook', () => {
     expect(SRD_MONSTERS.clay_golem.lifeDrain).toBe(true);
     expect(SRD_MONSTERS.clay_golem.bonusDamageType).toBe('acid');
+  });
+});
+
+describe('Act II reskin roster — clones', () => {
+  // Phase 2 (Valerion heartland) reskin discipline: every Act II enemy is a
+  // campaign-level CLONE of an SRD stat block — `{ ...SRD_MONSTERS.<base>, name,
+  // desc }` — overriding ONLY flavor (name/desc), never a stat tune and never a
+  // bestiary rename. These guards fail any future edit that drifts a clone off
+  // its SRD base. (D-10/D-11/D-12, CLAUDE.md "Bestiary naming".)
+
+  // Each clone, paired with the SRD base id it must deep-match.
+  const CLONE_BASES: Array<[string, keyof typeof SRD_MONSTERS]> = [
+    ['Weaver Adept', 'cult_fanatic'],
+    ['Weaver Magus', 'mage'],
+    ['Subverted Vanguard', 'warrior_veteran'],
+    ['Subverted Sentry', 'guard'],
+  ];
+
+  it('Test 1: MONSTERS_ACT2 holds exactly four uniquely-named clones', () => {
+    expect(MONSTERS_ACT2).toHaveLength(4);
+    const names = MONSTERS_ACT2.map((m) => m.name);
+    expect(new Set(names).size).toBe(4); // all unique
+    expect(names.sort()).toEqual(CLONE_BASES.map(([n]) => n).sort());
+  });
+
+  it('Test 2 (clone guard): each entry deep-matches its SRD base on every field but name/desc', () => {
+    for (const [flavorName, baseId] of CLONE_BASES) {
+      const clone = MONSTERS_ACT2.find((m) => m.name === flavorName);
+      expect(clone, `clone "${flavorName}" present`).toBeDefined();
+      const base = SRD_MONSTERS[baseId];
+      // Strip the two fields a clone is allowed to override; the rest MUST be
+      // byte-for-byte the SRD base (proving it's a clone, not a tuned variant).
+      const { name: _cn, desc: _cd, ...cloneRest } = clone as Record<string, unknown>;
+      const { name: _bn, desc: _bd, ...baseRest } = base as Record<string, unknown>;
+      expect(cloneRest, `"${flavorName}" mechanical fields == ${baseId}`).toEqual(baseRest);
+      // …and it really did re-flavor (name differs from the base's SRD name).
+      expect((clone as { name: string }).name).not.toBe((base as { name: string }).name);
+    }
+  });
+
+  it('Test 3 (not-a-rename): no clone name collides with an SRD stat-block name or the Act I Trooper', () => {
+    const srdNames = new Set(Object.values(SRD_MONSTERS).map((m) => m.name));
+    for (const m of MONSTERS_ACT2) {
+      expect(srdNames.has(m.name), `"${m.name}" must not equal an SRD stat-block name`).toBe(false);
+    }
+    // The Act I 'Subverted Trooper' (warrior_veteran, ac15/hp52 tune) is left
+    // untouched — Act II adds fresh, separately-named entries, never an edit.
+    const act1Trooper = SKY_MONSTERS.find((m) => m.name === 'Subverted Trooper');
+    expect(act1Trooper, 'Act I Subverted Trooper intact').toBeDefined();
+    expect(act1Trooper).toMatchObject({ ac: 15, hp: 52 });
+    expect(MONSTERS_ACT2.some((m) => m.name === 'Subverted Trooper')).toBe(false);
+  });
+
+  it('Test 4 (base-name resolution): the SRD bases each clone spreads from exist in the SRD txt', () => {
+    const srdText = readFileSync(
+      new URL('../../../../../../docs/srd-5.2.1.txt', import.meta.url),
+      'utf-8'
+    );
+    const lines = srdText.split('\n').map((l) => l.trim());
+    // SRD 5.2.1 names: 'Cultist Fanatic', 'Mage', 'Warrior Veteran', 'Guard'.
+    for (const [, baseId] of CLONE_BASES) {
+      const baseName = SRD_MONSTERS[baseId].name;
+      expect(lines.includes(baseName), `SRD base "${baseName}" present in srd-5.2.1.txt`).toBe(
+        true
+      );
+    }
   });
 });
