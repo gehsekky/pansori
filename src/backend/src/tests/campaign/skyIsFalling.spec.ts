@@ -12,6 +12,7 @@ import type { CampaignRegion, CampaignRoom } from '../../services/campaignConten
 import { describe, expect, it } from 'vitest';
 import type { GameRule } from '../../types.js';
 import { REGIONS } from '../../campaignData/skyIsFalling/regions.js';
+import { REGIONS_ACT2 } from '../../campaignData/skyIsFalling/regionsAct2.js';
 import { ROOMS } from '../../campaignData/skyIsFalling/rooms.js';
 import { RULES } from '../../campaignData/skyIsFalling/rules.js';
 import { TERRAIN } from '../../types.js';
@@ -53,7 +54,10 @@ function reachableCells(region: CampaignRegion): Set<string> {
 
 describe('The Sky Is Falling — region navigability', () => {
   it('every region site is reachable from the start position (no terrain wall strands a site)', () => {
-    for (const region of REGIONS as CampaignRegion[]) {
+    // Both Act I (REGIONS) and Act II (REGIONS_ACT2 — the Valerion heartland)
+    // are held to the no-strand invariant: every authored site must be BFS-
+    // reachable from its region's startPos over passable cells.
+    for (const region of [...REGIONS, ...REGIONS_ACT2] as CampaignRegion[]) {
       const reachable = reachableCells(region);
       for (const site of region.sites ?? []) {
         expect(
