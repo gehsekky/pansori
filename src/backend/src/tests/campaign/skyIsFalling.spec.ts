@@ -8,8 +8,15 @@
 // These assert over the authored fixture, so a future edit that reintroduces
 // either bug fails here instead of in someone's playthrough.
 
-import type { CampaignRegion, CampaignRoom, CampaignTown } from '../../services/campaignContent.js';
+import type {
+  CampaignRegion,
+  CampaignRoom,
+  CampaignRoomNpc,
+  CampaignRoomNpcResponse,
+  CampaignTown,
+} from '../../services/campaignContent.js';
 import type { GameRule, Quest } from '../../types.js';
+import { QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
 import { describe, expect, it } from 'vitest';
 import { QUESTS_ACT2 } from '../../campaignData/skyIsFalling/questsAct2.js';
 import { REGIONS } from '../../campaignData/skyIsFalling/regions.js';
@@ -301,5 +308,70 @@ describe('Act II — q_act2_open (court arrival)', () => {
   it('q_act2_open has a step whose condition keys on the met_quentin flag', () => {
     const flagKeys = (quest?.steps ?? []).map((s) => stepFlagKey(s.condition));
     expect(flagKeys).toContain('met_quentin');
+  });
+
+  it('every q_act2_open step flag has a matching set_flag site in the court NPCs (flag-linkage)', () => {
+    // Pitfall 3: a QuestStep.condition flag with no setting site never completes.
+    // Collect set_flag keys across the court duo, then assert each step flag is set.
+    const setFlagKeys = collectSetFlagKeys([VANE_ACT2, QUENTIN]);
+    for (const step of quest?.steps ?? []) {
+      const key = stepFlagKey(step.condition);
+      if (!key) continue;
+      expect(
+        setFlagKeys.has(key),
+        `q_act2_open step "${step.id}" flag "${key}" has no set_flag site in the court NPCs`
+      ).toBe(true);
+    }
+  });
+});
+
+// Walk an NPC's response tree (responses may nest) and a check node's
+// onSuccess/onFail, collecting every { type:'set_flag', key } target — the
+// setting-site half of the flag-linkage contract.
+function collectSetFlagKeys(npcs: CampaignRoomNpc[]): Set<string> {
+  const keys = new Set<string>();
+  const eat = (cons: Array<Record<string, unknown>> | undefined) => {
+    for (const c of cons ?? []) {
+      if (c.type === 'set_flag' && typeof c.key === 'string') keys.add(c.key);
+    }
+  };
+  const walk = (responses: CampaignRoomNpcResponse[] | undefined) => {
+    for (const r of responses ?? []) {
+      eat(r.consequences);
+      const check = r.check as
+        | { onSuccess?: Array<Record<string, unknown>>; onFail?: Array<Record<string, unknown>> }
+        | undefined;
+      eat(check?.onSuccess);
+      eat(check?.onFail);
+      walk(r.responses);
+    }
+  };
+  for (const npc of npcs) walk(npc.responses);
+  return keys;
+}
+
+describe('Act II — court NPCs (Vane + Quentin)', () => {
+  it('VANE_ACT2 reuses npc_vane and QUENTIN is npc_quentin, both friendly', () => {
+    expect(VANE_ACT2.id).toBe('npc_vane');
+    expect(VANE_ACT2.attitude).toBe('friendly');
+    expect(QUENTIN.id).toBe('npc_quentin');
+    expect(QUENTIN.attitude).toBe('friendly');
+  });
+
+  it('QUENTIN’s opening response sets met_quentin (meeting him is the trigger)', () => {
+    const setFlagKeys = collectSetFlagKeys([QUENTIN]);
+    expect(setFlagKeys.has('met_quentin')).toBe(true);
+  });
+
+  it('no court-NPC check converts a quest-giver to hostile on failure (retry-friendly)', () => {
+    // Lorien incident discipline: a failed check must NOT set_npc_attitude→hostile.
+    const json = JSON.stringify([VANE_ACT2, QUENTIN]);
+    const hostileFlip = /"type"\s*:\s*"set_npc_attitude"[^}]*"attitude"\s*:\s*"hostile"/.test(json);
+    expect(hostileFlip, 'court NPCs must not flip to hostile on a failed check').toBe(false);
+  });
+
+  it('VANE_ACT2 authors no silverford_outcome / war-state responses (deferred to Phase 5)', () => {
+    const json = JSON.stringify(VANE_ACT2);
+    expect(json.includes('silverford_outcome')).toBe(false);
   });
 });
