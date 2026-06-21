@@ -164,6 +164,100 @@ describe('The Sky Is Falling — Act II venue wiring (region → town → room)'
   });
 });
 
+describe('Act II — Weaver-cell undercroft connectivity', () => {
+  // Guards the GEO-03 raid chain (D-06/D-08/D-09): the descent from the Grand
+  // Library resolves, no undercroft toRoomId dangles, every chain room is
+  // reachable from the approach room, and the approach links back up to the
+  // Library. A future edit that strands a raid room or breaks the descent fails
+  // here instead of in a playthrough (the exits are by string id, no
+  // compile-time link).
+  const rooms = ROOMS_ACT2 as CampaignRoom[];
+  const allRoomIds = new Set([...(ROOMS as CampaignRoom[]), ...rooms].map((r) => r.id));
+  const byId = new Map(rooms.map((r) => [r.id, r]));
+
+  const LIBRARY_ID = 'grand_library_room';
+  const APPROACH_ID = 'library_undercroft_approach';
+  const UNDERCROFT_IDS = rooms
+    .filter((r) => r.id.startsWith('library_undercroft_'))
+    .map((r) => r.id);
+
+  it('the Grand Library room has a descent exit targeting a real undercroft room (D-09)', () => {
+    const library = byId.get(LIBRARY_ID);
+    expect(library, `room "${LIBRARY_ID}" must exist as the descent anchor`).toBeDefined();
+    const descent = (library!.exits ?? []).find(
+      (ex) => ex.toRoomId && ex.toRoomId.startsWith('library_undercroft_')
+    );
+    expect(
+      descent,
+      `room "${LIBRARY_ID}" must have a toRoomId descent into the undercroft`
+    ).toBeDefined();
+    expect(
+      descent!.toRoomId === APPROACH_ID && allRoomIds.has(descent!.toRoomId),
+      `descent target "${descent?.toRoomId}" must be the undercroft approach room`
+    ).toBe(true);
+  });
+
+  it('the undercroft is a chain of at least three rooms', () => {
+    expect(UNDERCROFT_IDS.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('every undercroft toRoomId exit targets a real room (no dangling exits)', () => {
+    for (const id of UNDERCROFT_IDS) {
+      const room = byId.get(id)!;
+      for (const ex of room.exits ?? []) {
+        if (!ex.toRoomId) continue;
+        expect(
+          allRoomIds.has(ex.toRoomId),
+          `undercroft room "${id}" exit toRoomId "${ex.toRoomId}" has no matching room`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('every undercroft room is reachable from the approach room (no stranded raid room)', () => {
+    // BFS over the room graph's toRoomId exits, restricted to the undercroft set.
+    const undercroft = new Set(UNDERCROFT_IDS);
+    const seen = new Set<string>([APPROACH_ID]);
+    const queue = [APPROACH_ID];
+    while (queue.length) {
+      const room = byId.get(queue.shift()!)!;
+      for (const ex of room.exits ?? []) {
+        const next = ex.toRoomId;
+        if (next && undercroft.has(next) && !seen.has(next)) {
+          seen.add(next);
+          queue.push(next);
+        }
+      }
+    }
+    for (const id of UNDERCROFT_IDS) {
+      expect(seen.has(id), `undercroft room "${id}" is unreachable from the approach room`).toBe(
+        true
+      );
+    }
+  });
+
+  it('the approach room links back up to the Grand Library (the return path, D-09)', () => {
+    const approach = byId.get(APPROACH_ID);
+    expect(approach, `room "${APPROACH_ID}" must exist`).toBeDefined();
+    const back = (approach!.exits ?? []).find((ex) => ex.toRoomId === LIBRARY_ID);
+    expect(
+      back,
+      `room "${APPROACH_ID}" must have a toRoomId exit back to "${LIBRARY_ID}"`
+    ).toBeDefined();
+  });
+
+  it('no undercroft room places enemies or npcs (empty-but-ready, D-08)', () => {
+    for (const id of UNDERCROFT_IDS) {
+      const room = byId.get(id)! as CampaignRoom & { enemies?: unknown[]; npcs?: unknown[] };
+      expect(
+        room.enemies,
+        `undercroft room "${id}" must not place enemies yet (Phase 4)`
+      ).toBeUndefined();
+      expect(room.npcs, `undercroft room "${id}" must not place npcs yet`).toBeUndefined();
+    }
+  });
+});
+
 describe('The Sky Is Falling — store_flip rule integrity', () => {
   it('the store_flip rule lists exactly one id per Giant Rat in store_room', () => {
     const store = (ROOMS as CampaignRoom[]).find((r) => r.id === 'store_room');
