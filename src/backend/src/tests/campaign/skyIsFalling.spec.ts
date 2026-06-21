@@ -561,3 +561,36 @@ describe('Act II — q_library gating + the Mythic Geometry decode (ELARA)', () 
     ).toBeGreaterThan(0);
   });
 });
+
+describe('Act II — q_library quest shape + flag-linkage', () => {
+  const quest = (QUESTS_ACT2 as Quest[]).find((q) => q.id === 'q_library');
+
+  it('q_library is an Elara-given act2 quest that is NOT startActive', () => {
+    expect(quest, 'QUESTS_ACT2 must contain q_library').toBeDefined();
+    expect(quest!.title).toBe('Mythic Geometry');
+    expect(quest!.actId).toBe('act2');
+    expect(quest!.giverNpcId).toBe('npc_elara');
+    // Started by Elara's start_quest, NOT seeded active at act entry.
+    expect(quest!.startActive).not.toBe(true);
+  });
+
+  it('q_library has a final step whose condition keys on coords_decoded', () => {
+    const steps = quest?.steps ?? [];
+    expect(steps.length).toBeGreaterThan(0);
+    const finalKey = stepFlagKey(steps[steps.length - 1].condition);
+    expect(finalKey).toBe('coords_decoded');
+  });
+
+  it('every q_library step flag has a matching set_flag site in ELARA (flag-linkage)', () => {
+    // Pitfall 3: a QuestStep.condition flag with no setting site never completes.
+    const setFlagKeys = collectSetFlagKeys([ELARA]);
+    for (const step of quest?.steps ?? []) {
+      const key = stepFlagKey(step.condition);
+      if (!key) continue;
+      expect(
+        setFlagKeys.has(key),
+        `q_library step "${step.id}" flag "${key}" has no set_flag site in ELARA`
+      ).toBe(true);
+    }
+  });
+});
