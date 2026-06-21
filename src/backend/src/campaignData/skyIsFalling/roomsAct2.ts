@@ -33,6 +33,23 @@ const grid = (w: number, h: number) =>
     )
   );
 
+// An undercroft grid: empty, with a regular scatter of pillars for a caster-
+// heavy fight (D-07). Pillars use the MECHANICAL `m: 'cover'` flag — they grant
+// half/three-quarters cover but are PASSABLE, so the room never strands a cell
+// (the load-bearing rooms.ts terrain rule: a cosmetic impassable `t:` tile would
+// wall the room; `m:` flags never do). Deterministic: a pillar every 3rd column
+// on the interior even rows, away from the grid edges so entry/exit lanes stay
+// clear. (mirrors the marshGrid scatter idiom in rooms.ts L31-41)
+function undercroftGrid(w: number, h: number) {
+  const g = grid(w, h);
+  for (let y = 2; y < h - 1; y += 2) {
+    for (let x = 2; x < w - 1; x += 3) {
+      g[y][x] = { t: 'rubble', m: 'cover' }; // a fallen-stone pillar: cover, passable
+    }
+  }
+  return g;
+}
+
 export const ROOMS_ACT2: CampaignRoom[] = [
   // ── Capital venue interiors ────────────────────────────────────────────────
   {
@@ -85,11 +102,18 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     floor: 'cobblestone',
     lighting: 'bright',
     entryPos: { x: 5, y: 9 },
-    // The descent anchor (D-09): Plan 03 adds a `toRoomId` exit from here down
-    // into the Weaver-cell undercroft. The ascends-exit back to the district
-    // stays in place.
+    // The descent anchor (D-09): a `toRoomId` exit leads down a hidden stair into
+    // the Weaver-cell undercroft (NOT an `ascends`/`descends` flag — it returns
+    // to a specific room). The ascends-exit back to the district stays in place.
     grid: grid(11, 10),
-    exits: [{ pos: { x: 5, y: 9 }, ascends: true, label: 'Out to the Library District' }],
+    exits: [
+      { pos: { x: 5, y: 9 }, ascends: true, label: 'Out to the Library District' },
+      {
+        pos: { x: 0, y: 0 },
+        toRoomId: 'library_undercroft_approach',
+        label: 'Down the hidden stair, into the undercroft',
+      },
+    ],
   },
   {
     id: 'valerion_market_room',
@@ -130,5 +154,85 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     entryPos: { x: 3, y: 6 },
     grid: grid(8, 7),
     exits: [{ pos: { x: 3, y: 6 }, ascends: true, label: 'Back to the heartland' }],
+  },
+
+  // ── Weaver-cell undercroft: the fuel-cell raid chain ───────────────────────
+  // A three-room catacomb chain beneath the Grand Library (D-06/D-07), reached by
+  // the descent exit on grand_library_room above (D-09). Dim/dark interior floor
+  // with pillar cover for a caster-heavy fight. EMPTY-but-ready (D-08): valid
+  // grid/entryPos/exits/lighting but NO `enemies` and NO `npcs` — Phase 4 places
+  // the q_fuel_cell encounter (the Weaver Adepts/Magus from monstersAct2.ts).
+  // The chain links approach ↔ inner ↔ core; the approach room's "go back up"
+  // exit is a `toRoomId` back to grand_library_room (NOT `ascends`, since it
+  // returns to a specific room, D-09).
+  {
+    id: 'library_undercroft_approach',
+    name: 'The Undercroft Stair',
+    desc:
+      'The hidden stair lets out into a low vaulted gallery of damp grey stone, ' +
+      'older than the Library above it. Broken pillars march into the gloom, and ' +
+      'somewhere ahead a faint, rhythmic hum carries on the still air — the ' +
+      'Weaver-cell at its work.',
+    floor: 'cobblestone',
+    lighting: 'dim',
+    entryPos: { x: 4, y: 8 },
+    grid: undercroftGrid(9, 9),
+    exits: [
+      {
+        pos: { x: 4, y: 0 },
+        toRoomId: 'library_undercroft_inner',
+        label: 'Deeper into the undercroft',
+      },
+      {
+        pos: { x: 4, y: 8 },
+        toRoomId: 'grand_library_room',
+        label: 'Back up the stair to the Library',
+      },
+    ],
+  },
+  {
+    id: 'library_undercroft_inner',
+    name: 'The Reliquary Catacombs',
+    desc:
+      'Burial-niches honeycomb the walls, their saints’ bones long since cleared ' +
+      'to make room for crates of stolen apparatus. Cabling snakes between the ' +
+      'pillars toward a sealed inner door, and the hum is louder here, almost a ' +
+      'voice.',
+    floor: 'cobblestone',
+    lighting: 'dim',
+    entryPos: { x: 5, y: 9 },
+    grid: undercroftGrid(11, 10),
+    exits: [
+      {
+        pos: { x: 5, y: 0 },
+        toRoomId: 'library_undercroft_core',
+        label: 'Through to the cell core',
+      },
+      {
+        pos: { x: 5, y: 9 },
+        toRoomId: 'library_undercroft_approach',
+        label: 'Back toward the stair',
+      },
+    ],
+  },
+  {
+    id: 'library_undercroft_core',
+    name: 'The Weaver-Cell Core',
+    desc:
+      'The catacomb opens into a great pillared crypt, pitch-dark but for the ' +
+      'cold blue glow of the apparatus at its heart — the cradle where the ' +
+      'star-metal’s fuel-cell will be wrung open. This is the raid’s end, and ' +
+      'whatever guards it will make its stand among the pillars.',
+    floor: 'cobblestone',
+    lighting: 'dark',
+    entryPos: { x: 6, y: 11 },
+    grid: undercroftGrid(13, 12),
+    exits: [
+      {
+        pos: { x: 6, y: 11 },
+        toRoomId: 'library_undercroft_inner',
+        label: 'Back into the catacombs',
+      },
+    ],
   },
 ];
