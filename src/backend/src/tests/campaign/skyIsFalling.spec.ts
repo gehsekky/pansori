@@ -15,8 +15,8 @@ import type {
   CampaignRoomNpcResponse,
   CampaignTown,
 } from '../../services/campaignContent.js';
+import { ELARA, QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
 import type { GameRule, Quest } from '../../types.js';
-import { QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
 import { describe, expect, it } from 'vitest';
 import { QUESTS_ACT2 } from '../../campaignData/skyIsFalling/questsAct2.js';
 import { REGIONS } from '../../campaignData/skyIsFalling/regions.js';
@@ -422,5 +422,142 @@ describe('Act II — index.ts quests-section wiring (Pitfall 2)', () => {
     expect(questsSection, 'a quests section must be seeded').toBeDefined();
     const quests = questsSection!.value as Quest[];
     expect(quests.some((q) => q.id === 'q_act2_open')).toBe(true);
+  });
+});
+
+// ─── Act II slice 2: the "Mythic Geometry" library decode ─────────────────────
+// Flatten an NPC's response tree (responses may nest) into a single array so the
+// decode guards can scan every authored node, not just top-level ones.
+function flattenResponses(npc: CampaignRoomNpc): CampaignRoomNpcResponse[] {
+  const out: CampaignRoomNpcResponse[] = [];
+  const walk = (responses: CampaignRoomNpcResponse[] | undefined) => {
+    for (const r of responses ?? []) {
+      out.push(r);
+      walk(r.responses);
+    }
+  };
+  walk(npc.responses);
+  return out;
+}
+
+// Does a response (its consequences and/or a check's onSuccess/onFail) fire a
+// set_flag for `key`? — the setting-site test the decode guards lean on.
+function setsFlag(r: CampaignRoomNpcResponse, key: string): boolean {
+  const hit = (cons: Array<Record<string, unknown>> | undefined) =>
+    (cons ?? []).some((c) => c.type === 'set_flag' && c.key === key);
+  const check = r.check as
+    | { onSuccess?: Array<Record<string, unknown>>; onFail?: Array<Record<string, unknown>> }
+    | undefined;
+  return hit(r.consequences) || hit(check?.onSuccess) || hit(check?.onFail);
+}
+
+// Collect the leaf conditions of a response.condition (handles {all}/{any}/{not}
+// nesting) — lets a guard ask "does this line reference flag X / item Y at all?".
+function leafConditions(condition: unknown): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  const walk = (c: unknown) => {
+    if (c === null || typeof c !== 'object') return;
+    const obj = c as Record<string, unknown>;
+    if (Array.isArray(obj.all)) return obj.all.forEach(walk);
+    if (Array.isArray(obj.any)) return obj.any.forEach(walk);
+    if (obj.not !== undefined) return walk(obj.not);
+    out.push(obj);
+  };
+  walk(condition);
+  return out;
+}
+
+// Does a response's condition reference the chrono_shard party-item (any path
+// to a `party_items … chrono_shard` leaf)? — used to prove the safety net.
+function gatesOnChronoShard(r: CampaignRoomNpcResponse): boolean {
+  return leafConditions(r.condition).some(
+    (leaf) => leaf.fact === 'party_items' && leaf.value === 'chrono_shard'
+  );
+}
+
+// Does a response's condition reference the martha_hint flag at all?
+function gatesOnMarthaHint(r: CampaignRoomNpcResponse): boolean {
+  return leafConditions(r.condition).some(
+    (leaf) => leaf.fact === 'flags' && leaf.path === '$.martha_hint'
+  );
+}
+
+describe('Act II — q_library gating + the Mythic Geometry decode (ELARA)', () => {
+  const responses = flattenResponses(ELARA);
+
+  it('ELARA is npc_elara, friendly', () => {
+    expect(ELARA.id).toBe('npc_elara');
+    expect(ELARA.attitude).toBe('friendly');
+  });
+
+  it('ELARA grants library_access + starts q_library, gated on met_quentin', () => {
+    const grant = responses.find((r) =>
+      (r.consequences ?? []).some((c) => c.type === 'start_quest' && c.questId === 'q_library')
+    );
+    expect(grant, 'ELARA must fire start_quest q_library on some response').toBeDefined();
+    // The grant is gated on met_quentin (slice-1 flag).
+    expect(
+      leafConditions(grant!.condition).some(
+        (leaf) =>
+          leaf.fact === 'flags' &&
+          leaf.path === '$.met_quentin' &&
+          leaf.operator === 'equal' &&
+          leaf.value === true
+      ),
+      'the q_library grant must be gated on met_quentin === true'
+    ).toBe(true);
+    // It also sets library_access.
+    expect(setsFlag(grant!, 'library_access'), 'the grant must set library_access').toBe(true);
+  });
+
+  it('every decode check rolls persuasion (never arcana/history/investigation)', () => {
+    // The check.skill union is CHA-only; an arcana/history/investigation skill
+    // would silently roll off Charisma (Pitfall 1). Assert each check's skill is
+    // persuasion, and that none of the wrong skills appear as a check.skill.
+    const checks = responses
+      .map((r) => r.check as { skill?: string } | undefined)
+      .filter((c): c is { skill?: string } => !!c);
+    expect(checks.length, 'ELARA must author at least one decode check').toBeGreaterThan(0);
+    for (const c of checks) {
+      expect(c.skill, `decode check skill "${c.skill}" must be persuasion`).toBe('persuasion');
+    }
+  });
+
+  it('no decode check flips Elara to hostile on failure (retry-friendly, LORIEN idiom)', () => {
+    const json = JSON.stringify(ELARA);
+    const hostileFlip = /"type"\s*:\s*"set_npc_attitude"[^}]*"attitude"\s*:\s*"hostile"/.test(json);
+    expect(hostileFlip, 'ELARA must not flip to hostile on a failed decode check').toBe(false);
+    // And no decode check carries `once` — they must be retriable.
+    for (const r of responses) {
+      if (r.check) {
+        expect(r.once, `decode check "${r.id}" must not be once (retry-friendly)`).not.toBe(true);
+      }
+    }
+  });
+
+  it('coords_decoded is set on BOTH a martha_hint-gated line and a neutral line (both-paths)', () => {
+    const setters = responses.filter((r) => setsFlag(r, 'coords_decoded'));
+    expect(setters.length, 'at least two lines must set coords_decoded').toBeGreaterThanOrEqual(2);
+    const marthaLine = setters.find((r) => gatesOnMarthaHint(r));
+    const neutralLine = setters.find((r) => !gatesOnMarthaHint(r));
+    expect(
+      marthaLine,
+      'a martha_hint-gated line must set coords_decoded (Act I callback)'
+    ).toBeDefined();
+    expect(
+      neutralLine,
+      'a neutral (no-martha_hint) line must also set coords_decoded'
+    ).toBeDefined();
+  });
+
+  it('coords_decoded is reachable WITHOUT the chrono_shard (safety net)', () => {
+    // At least one coords_decoded setter must NOT gate on chrono_shard, and its
+    // whole condition chain must be shard-free — so a shard-less party reaches it.
+    const setters = responses.filter((r) => setsFlag(r, 'coords_decoded'));
+    const shardFree = setters.filter((r) => !gatesOnChronoShard(r));
+    expect(
+      shardFree.length,
+      'a coords_decoded path must exist that does not gate on chrono_shard'
+    ).toBeGreaterThan(0);
   });
 });
