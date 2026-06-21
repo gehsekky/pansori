@@ -27,8 +27,10 @@ import { QUESTS } from './quests.js';
 import { REGIONS } from './regions.js';
 import { REGIONS_ACT2 } from './regionsAct2.js';
 import { ROOMS } from './rooms.js';
+import { ROOMS_ACT2 } from './roomsAct2.js';
 import { RULES } from './rules.js';
 import { TOWNS } from './towns.js';
+import { TOWNS_ACT2 } from './townsAct2.js';
 
 export const SKY_CAMPAIGN_ID = 'the-sky-is-falling';
 export const SKY_CAMPAIGN_NAME = 'The Sky Is Falling';
@@ -80,8 +82,8 @@ export const SKY_CAMPAIGN_SECTIONS: { section: EditableSection; value: unknown }
   // so leaf data (monsters) precedes geography (regions) which precedes acts.
   { section: 'customMonsters', value: [...MONSTERS, ...MONSTERS_ACT2] },
   { section: 'customItems', value: ITEMS },
-  { section: 'rooms', value: ROOMS },
-  { section: 'towns', value: TOWNS },
+  { section: 'rooms', value: [...ROOMS, ...ROOMS_ACT2] },
+  { section: 'towns', value: [...TOWNS, ...TOWNS_ACT2] },
   { section: 'regions', value: [...REGIONS, ...REGIONS_ACT2] },
   { section: 'quests', value: QUESTS },
   { section: 'rules', value: RULES },

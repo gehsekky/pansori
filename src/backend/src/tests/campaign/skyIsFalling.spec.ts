@@ -8,14 +8,17 @@
 // These assert over the authored fixture, so a future edit that reintroduces
 // either bug fails here instead of in someone's playthrough.
 
-import type { CampaignRegion, CampaignRoom } from '../../services/campaignContent.js';
+import type { CampaignRegion, CampaignRoom, CampaignTown } from '../../services/campaignContent.js';
 import { describe, expect, it } from 'vitest';
 import type { GameRule } from '../../types.js';
 import { REGIONS } from '../../campaignData/skyIsFalling/regions.js';
 import { REGIONS_ACT2 } from '../../campaignData/skyIsFalling/regionsAct2.js';
 import { ROOMS } from '../../campaignData/skyIsFalling/rooms.js';
+import { ROOMS_ACT2 } from '../../campaignData/skyIsFalling/roomsAct2.js';
 import { RULES } from '../../campaignData/skyIsFalling/rules.js';
 import { TERRAIN } from '../../types.js';
+import { TOWNS } from '../../campaignData/skyIsFalling/towns.js';
+import { TOWNS_ACT2 } from '../../campaignData/skyIsFalling/townsAct2.js';
 
 // BFS over the region's passable cells (overland `water`/`mountain` etc. block;
 // an unknown cosmetic type is treated passable, matching the engine guard).
@@ -75,7 +78,9 @@ describe('The Sky Is Falling — room object placement', () => {
     // get auto-placed by the view, but the flagship campaign places them
     // deliberately so the flavor text and the spot agree (the Brine Barrels
     // incident, 2026-06-13: no pos → invisible in the 3D den).
-    for (const room of ROOMS as CampaignRoom[]) {
+    // Both Act I (ROOMS) and Act II (ROOMS_ACT2 — the capital venue + flavor-
+    // site interiors) are held to the deliberate-placement invariant.
+    for (const room of [...ROOMS, ...ROOMS_ACT2] as CampaignRoom[]) {
       const w = room.grid[0]?.length ?? 0;
       const h = room.grid.length;
       const blocked = new Set<string>([`${room.entryPos.x},${room.entryPos.y}`]);
@@ -93,6 +98,68 @@ describe('The Sky Is Falling — room object placement', () => {
         ).toBe(false);
         blocked.add(`${p.x},${p.y}`); // objects must not stack either
       }
+    }
+  });
+});
+
+describe('The Sky Is Falling — Act II venue wiring (region → town → room)', () => {
+  // Guards the GEO-02 chain: a player must be able to walk from the heartland
+  // region into a capital district town and step into each of its venue rooms.
+  // A future edit that renames a town, drops a gate, or strands a venue room
+  // fails here instead of in a playthrough (the region→town→room references are
+  // by string id and have no compile-time link).
+  const townsAct2 = TOWNS_ACT2 as CampaignTown[];
+  const allTowns = [...(TOWNS as CampaignTown[]), ...townsAct2];
+  const allRoomIds = new Set(
+    [...(ROOMS as CampaignRoom[]), ...(ROOMS_ACT2 as CampaignRoom[])].map((r) => r.id)
+  );
+  const townIds = new Set(allTowns.map((t) => t.id));
+
+  it('every Act II region kind:"town" site townId resolves to a real town', () => {
+    for (const region of REGIONS_ACT2 as CampaignRegion[]) {
+      for (const site of region.sites ?? []) {
+        if (site.kind !== 'town') continue;
+        expect(
+          site.townId && townIds.has(site.townId),
+          `region "${region.id}" town-site "${site.id}" townId "${site.townId}" has no matching town`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('every Act II region kind:"local" site entryRoomId resolves to a real room', () => {
+    for (const region of REGIONS_ACT2 as CampaignRegion[]) {
+      for (const site of region.sites ?? []) {
+        if (site.kind !== 'local') continue;
+        expect(
+          site.entryRoomId && allRoomIds.has(site.entryRoomId),
+          `region "${region.id}" local-site "${site.id}" entryRoomId "${site.entryRoomId}" has no matching room`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('every Act II town kind:"interior" venue entryRoomId resolves to a real room', () => {
+    for (const town of townsAct2) {
+      for (const venue of town.venues ?? []) {
+        if (venue.kind !== 'interior') continue;
+        expect(
+          venue.entryRoomId && allRoomIds.has(venue.entryRoomId),
+          `town "${town.id}" venue "${venue.id}" entryRoomId "${venue.entryRoomId}" has no matching room`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('every Act II district town has exactly one kind:"gate" venue back to the region', () => {
+    for (const town of townsAct2) {
+      const gates = (town.venues ?? []).filter((v) => v.kind === 'gate');
+      expect(gates.length, `town "${town.id}" must have exactly one gate venue`).toBe(1);
+      // A gate is a region exit, not a room — it must NOT carry an entryRoomId.
+      expect(
+        gates[0]?.entryRoomId,
+        `town "${town.id}" gate "${gates[0]?.id}" must not carry an entryRoomId`
+      ).toBeUndefined();
     }
   });
 });
