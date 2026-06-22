@@ -30,6 +30,7 @@ import { REGIONS_ACT2 } from './regionsAct2.js';
 import { ROOMS } from './rooms.js';
 import { ROOMS_ACT2 } from './roomsAct2.js';
 import { RULES } from './rules.js';
+import { RULES_ACT2 } from './rulesAct2.js';
 import { TOWNS } from './towns.js';
 import { TOWNS_ACT2 } from './townsAct2.js';
 
@@ -87,6 +88,6 @@ export const SKY_CAMPAIGN_SECTIONS: { section: EditableSection; value: unknown }
   { section: 'towns', value: [...TOWNS, ...TOWNS_ACT2] },
   { section: 'regions', value: [...REGIONS, ...REGIONS_ACT2] },
   { section: 'quests', value: [...QUESTS, ...QUESTS_ACT2] },
-  { section: 'rules', value: RULES },
+  { section: 'rules', value: [...RULES, ...RULES_ACT2] },
   { section: 'acts', value: ACTS }, // act2 already appended in acts.ts
 ];

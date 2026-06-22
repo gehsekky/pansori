@@ -24,6 +24,7 @@ import { REGIONS_ACT2 } from '../../campaignData/skyIsFalling/regionsAct2.js';
 import { ROOMS } from '../../campaignData/skyIsFalling/rooms.js';
 import { ROOMS_ACT2 } from '../../campaignData/skyIsFalling/roomsAct2.js';
 import { RULES } from '../../campaignData/skyIsFalling/rules.js';
+import { RULES_ACT2 } from '../../campaignData/skyIsFalling/rulesAct2.js';
 import { SKY_CAMPAIGN_SECTIONS } from '../../campaignData/skyIsFalling/index.js';
 import { TERRAIN } from '../../types.js';
 import { TOWNS } from '../../campaignData/skyIsFalling/towns.js';
@@ -629,5 +630,90 @@ describe('Act II — grand_library_room (Elara embedded, descent intact)', () =>
       exits.some((ex) => ex.toRoomId === 'library_undercroft_approach'),
       'the toRoomId descent into the undercroft must remain (Phase 2 chain)'
     ).toBe(true);
+  });
+});
+
+// ─── Act II slice (Plan 04-01): the q_fuel_cell raid — RULES_ACT2 ──────────────
+// The combat→flag wiring for the Weaver-cell raid. Each undercroft room's clear
+// rule keys on its named enemy ids (enemies_killed contains 'roomId#name') and
+// sets the room-clear flag; the core rule writes relic_fuel_cell='party'. Without
+// this module seeded into the rules section, every raid clear silently no-ops
+// (RESEARCH Pitfall 2). These guards mirror the store_flip integrity model.
+
+// Collect the set_flag consequences (key + value) a rule fires.
+function ruleSetFlags(rule: GameRule | undefined): Array<{ key: string; value: unknown }> {
+  return (rule?.consequences ?? [])
+    .filter(
+      (c): c is Extract<GameRule['consequences'][number], { type: 'set_flag' }> =>
+        c.type === 'set_flag'
+    )
+    .map((c) => ({ key: c.key, value: c.value }));
+}
+
+// Collect the enemies_killed id strings a rule's conditions require.
+function ruleKilledIds(rule: GameRule | undefined): string[] {
+  const conds = (rule?.conditions as { all?: Array<Record<string, unknown>> })?.all ?? [];
+  return conds
+    .filter((c) => c.fact === 'enemies_killed' && c.operator === 'contains')
+    .map((c) => c.value)
+    .filter((v): v is string => typeof v === 'string');
+}
+
+describe('Act II — RULES_ACT2 raid-clear rules (Plan 04-01)', () => {
+  const byName = new Map(RULES_ACT2.map((r) => [r.name, r] as const));
+
+  it('exports the three raid-clear rules', () => {
+    expect(byName.has('fuel_cell_approach_clear')).toBe(true);
+    expect(byName.has('fuel_cell_inner_clear')).toBe(true);
+    expect(byName.has('fuel_cell_core_clear')).toBe(true);
+  });
+
+  it('the approach rule sets undercroft_approach_clear, once', () => {
+    const r = byName.get('fuel_cell_approach_clear');
+    expect(r!.once).toBe(true);
+    expect(
+      ruleSetFlags(r).some((f) => f.key === 'undercroft_approach_clear' && f.value === true)
+    ).toBe(true);
+  });
+
+  it('the inner rule sets undercroft_inner_clear, once', () => {
+    const r = byName.get('fuel_cell_inner_clear');
+    expect(r!.once).toBe(true);
+    expect(
+      ruleSetFlags(r).some((f) => f.key === 'undercroft_inner_clear' && f.value === true)
+    ).toBe(true);
+  });
+
+  it('the core rule writes relic_fuel_cell = string "party", once', () => {
+    const r = byName.get('fuel_cell_core_clear');
+    expect(r!.once).toBe(true);
+    const relic = ruleSetFlags(r).find((f) => f.key === 'relic_fuel_cell');
+    expect(relic, 'core rule must set relic_fuel_cell').toBeDefined();
+    expect(relic!.value).toBe('party');
+  });
+
+  it('the core rule keys on the three named core enemies (no positional #0/#1 ids)', () => {
+    const ids = ruleKilledIds(byName.get('fuel_cell_core_clear'));
+    expect(ids.sort()).toEqual(
+      [
+        'library_undercroft_core#adept1',
+        'library_undercroft_core#adept2',
+        'library_undercroft_core#magus',
+      ].sort()
+    );
+  });
+});
+
+describe('Act II — index.ts rules-section wiring (Pitfall 2)', () => {
+  it('the seeded rules section concatenates RULES_ACT2 AND keeps Act I rules', () => {
+    const rulesSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'rules');
+    expect(rulesSection, 'a rules section must be seeded').toBeDefined();
+    const rules = rulesSection!.value as GameRule[];
+    // Act II raid rules present…
+    expect(rules.some((r) => r.name === 'fuel_cell_approach_clear')).toBe(true);
+    expect(rules.some((r) => r.name === 'fuel_cell_inner_clear')).toBe(true);
+    expect(rules.some((r) => r.name === 'fuel_cell_core_clear')).toBe(true);
+    // …and the Act I rules still seeded (concat, not replace).
+    expect(rules.some((r) => r.name === 'store_flip')).toBe(true);
   });
 });
