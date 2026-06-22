@@ -256,14 +256,62 @@ describe('Act II — Weaver-cell undercroft connectivity', () => {
     ).toBeDefined();
   });
 
-  it('no undercroft room places enemies or npcs (empty-but-ready, D-08)', () => {
+  // Plan 04-01 INVERTS the old empty-but-ready guard (D-08 → D-04): the raid is
+  // now placed. Each undercroft room is a fightable encounter; none places npcs.
+  it('every undercroft room now places a non-empty enemies encounter (the raid, D-04)', () => {
     for (const id of UNDERCROFT_IDS) {
       const room = byId.get(id)! as CampaignRoom & { enemies?: unknown[]; npcs?: unknown[] };
       expect(
-        room.enemies,
-        `undercroft room "${id}" must not place enemies yet (Phase 4)`
-      ).toBeUndefined();
-      expect(room.npcs, `undercroft room "${id}" must not place npcs yet`).toBeUndefined();
+        room.enemies && room.enemies.length > 0,
+        `undercroft room "${id}" must place a raid encounter (Plan 04-01)`
+      ).toBe(true);
+      expect(room.npcs, `undercroft room "${id}" must not place npcs`).toBeUndefined();
+    }
+  });
+
+  it('the core room places exactly one Weaver Magus + two Weaver Adept, named for the clear rule', () => {
+    const core = byId.get('library_undercroft_core')!;
+    const placements = core.enemies ?? [];
+    const magus = placements.filter((e) => e.name === 'Weaver Magus');
+    const adepts = placements.filter((e) => e.name === 'Weaver Adept');
+    expect(magus.length).toBe(1);
+    expect((magus[0].count ?? 1) === 1).toBe(true);
+    expect(magus[0].id).toBe('library_undercroft_core#magus');
+    expect(adepts.length).toBe(2);
+    expect(adepts.every((a) => (a.count ?? 1) === 1)).toBe(true);
+    expect(adepts.map((a) => a.id).sort()).toEqual([
+      'library_undercroft_core#adept1',
+      'library_undercroft_core#adept2',
+    ]);
+  });
+
+  // Mirrors the store_flip rule-integrity model (L270+): each clear rule's
+  // enemies_killed id list must equal the placed named-id set in its room — so a
+  // future edit that drifts the rule ids from the placement fails here, not in a
+  // silently-never-clearing playthrough (RESEARCH Pitfall 1).
+  it('each raid-clear rule keys exactly on the named placed enemies in its room', () => {
+    const ruleByRoom: Array<[string, string]> = [
+      ['library_undercroft_approach', 'fuel_cell_approach_clear'],
+      ['library_undercroft_inner', 'fuel_cell_inner_clear'],
+      ['library_undercroft_core', 'fuel_cell_core_clear'],
+    ];
+    const ruleNamed = new Map(RULES_ACT2.map((r) => [r.name, r] as const));
+    for (const [roomId, ruleName] of ruleByRoom) {
+      const room = byId.get(roomId)!;
+      const placedIds = (room.enemies ?? [])
+        .filter((e) => (e.count ?? 1) === 1 && typeof e.id === 'string')
+        .map((e) => e.id as string)
+        .sort();
+      const rule = ruleNamed.get(ruleName)!;
+      const conds = (rule.conditions as { all?: Array<Record<string, unknown>> }).all ?? [];
+      const ruleIds = conds
+        .filter((c) => c.fact === 'enemies_killed' && c.operator === 'contains')
+        .map((c) => c.value as string)
+        .sort();
+      expect(
+        ruleIds,
+        `rule "${ruleName}" id list must equal the named placements in "${roomId}"`
+      ).toEqual(placedIds);
     }
   });
 });

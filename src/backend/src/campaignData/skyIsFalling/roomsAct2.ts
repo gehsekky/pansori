@@ -218,6 +218,15 @@ export const ROOMS_ACT2: CampaignRoom[] = [
         label: 'Back up the stair to the Library',
       },
     ],
+    // The raid's opening pressure (D-04): a Subverted Sentry watch at the
+    // stair-foot. The clear rule (rulesAct2 fuel_cell_approach_clear) keys on the
+    // two named sentries; a third unnamed sentry adds body to the line without
+    // gating the clear (RESEARCH Pitfall 1 — clear targets are count-1 named ids).
+    // FULL SRD-default Guard numbers, no tuning (D-10).
+    enemies: [
+      { name: 'Subverted Sentry', id: 'library_undercroft_approach#sentry1' },
+      { name: 'Subverted Sentry', id: 'library_undercroft_approach#sentry2' },
+    ],
   },
   {
     id: 'library_undercroft_inner',
@@ -243,6 +252,15 @@ export const ROOMS_ACT2: CampaignRoom[] = [
         label: 'Back toward the stair',
       },
     ],
+    // Escalation (D-04): a Subverted Vanguard line holding the catacombs with one
+    // Weaver Adept directing them. The clear rule (rulesAct2 fuel_cell_inner_clear)
+    // keys on all three named instances. FULL SRD-default Veteran/Cult-Fanatic
+    // numbers, no tuning (D-10).
+    enemies: [
+      { name: 'Subverted Vanguard', id: 'library_undercroft_inner#vanguard1' },
+      { name: 'Subverted Vanguard', id: 'library_undercroft_inner#vanguard2' },
+      { name: 'Weaver Adept', id: 'library_undercroft_inner#adept' },
+    ],
   },
   {
     id: 'library_undercroft_core',
@@ -262,6 +280,15 @@ export const ROOMS_ACT2: CampaignRoom[] = [
         toRoomId: 'library_undercroft_inner',
         label: 'Back into the catacombs',
       },
+    ],
+    // The climactic stand (D-04): the Weaver Magus working the cradle, flanked by
+    // two Weaver Adepts. The core-clear rule (rulesAct2 fuel_cell_core_clear) keys
+    // on all three named instances → relic_fuel_cell='party'. FULL SRD-default
+    // Mage/Cult-Fanatic numbers, no tuning (D-10).
+    enemies: [
+      { name: 'Weaver Magus', id: 'library_undercroft_core#magus' },
+      { name: 'Weaver Adept', id: 'library_undercroft_core#adept1' },
+      { name: 'Weaver Adept', id: 'library_undercroft_core#adept2' },
     ],
   },
 ];
