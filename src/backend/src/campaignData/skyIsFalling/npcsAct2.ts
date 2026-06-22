@@ -328,5 +328,31 @@ export const ELARA: CampaignRoomNpc = {
         { type: 'set_flag', key: 'coords_decoded', value: true },
       ],
     },
+    // 4. Fuel-cell raid hand-off (D-03). Once the decode resolves (coords_decoded),
+    // Elara reads where the coordinates point — DOWN, into the undercroft beneath
+    // her own library — and fires `start_quest q_fuel_cell`, revealing the descent
+    // (the grand_library_room → library_undercroft_approach exit, authored in
+    // Phase 2). `once` so the hand-off fires a single time; gated purely on
+    // coords_decoded so it appears the moment the gauntlet closes.
+    // Flag vocabulary note: this beat starts q_fuel_cell, whose step flags
+    // (undercroft_approach_clear / undercroft_inner_clear / relic_fuel_cell) are
+    // written by RULES_ACT2's raid-clear rules — NOT here. (See rulesAct2.ts.)
+    {
+      id: 'elara_fuel_cell_handoff',
+      label: 'Ask Elara what the coordinates actually point to.',
+      say: 'We have the place, Lady. Where is it — what are we walking into?',
+      condition: { fact: 'flags', path: '$.coords_decoded', operator: 'equal', value: true },
+      once: true,
+      reply:
+        'Elara’s eyes go to the floor between you, then to the deep stacks behind her. ' +
+        '"That is the part I have been dreading," she says quietly. "The coordinates ' +
+        'do not point out across Utgard. They point *down*. There is an undercroft ' +
+        'beneath this very library — older than the Grand Library, sealed for ' +
+        'centuries. The Heart of the Saint is down there, and so, I think, is whoever ' +
+        'has been listening on that cold frequency. If they reach the cradle first, ' +
+        'they wring the fuel-cell open and the sky finishes falling. Go. The hidden ' +
+        'stair is in the corner — I will hold the door behind you."',
+      consequences: [{ type: 'start_quest', questId: 'q_fuel_cell' }],
+    },
   ],
 };

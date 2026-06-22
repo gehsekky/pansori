@@ -765,3 +765,89 @@ describe('Act II — index.ts rules-section wiring (Pitfall 2)', () => {
     expect(rules.some((r) => r.name === 'store_flip')).toBe(true);
   });
 });
+
+// The set_flag keys any RULES_ACT2 rule writes — the rule half of the
+// flag-linkage contract (the raid flags are set by rules, not dialogue).
+function rulesAct2SetFlagKeys(): Set<string> {
+  const keys = new Set<string>();
+  for (const r of RULES_ACT2) {
+    for (const c of r.consequences ?? []) {
+      if (c.type === 'set_flag') keys.add(c.key);
+    }
+  }
+  return keys;
+}
+
+describe('Act II — q_fuel_cell quest shape + flag-linkage (Plan 04-01)', () => {
+  const quest = (QUESTS_ACT2 as Quest[]).find((q) => q.id === 'q_fuel_cell');
+
+  it('q_fuel_cell is an Elara-given act2 quest that is NOT startActive', () => {
+    expect(quest, 'QUESTS_ACT2 must contain q_fuel_cell').toBeDefined();
+    expect(quest!.title).toBe('The Heart of the Saint');
+    expect(quest!.actId).toBe('act2');
+    expect(quest!.giverNpcId).toBe('npc_elara');
+    expect(quest!.startActive).not.toBe(true);
+  });
+
+  it('q_fuel_cell has a final step keyed on relic_fuel_cell', () => {
+    const steps = quest?.steps ?? [];
+    expect(steps.length).toBeGreaterThanOrEqual(3);
+    const finalKey = stepFlagKey(steps[steps.length - 1].condition);
+    expect(finalKey).toBe('relic_fuel_cell');
+  });
+
+  it('every q_fuel_cell step flag has a writing site (ELARA dialogue OR a RULES_ACT2 rule)', () => {
+    // Pitfall 3 (flag-linkage): the raid flags are written by RULES_ACT2, so the
+    // setting-site set spans both ELARA's tree and the rules module.
+    const setSites = new Set<string>([...collectSetFlagKeys([ELARA]), ...rulesAct2SetFlagKeys()]);
+    for (const step of quest?.steps ?? []) {
+      const key = stepFlagKey(step.condition);
+      if (!key) continue;
+      expect(
+        setSites.has(key),
+        `q_fuel_cell step "${step.id}" flag "${key}" has no writing site (dialogue or rule)`
+      ).toBe(true);
+    }
+  });
+});
+
+describe('Act II — ELARA hands off q_fuel_cell on coords_decoded (D-03)', () => {
+  const responses = flattenResponses(ELARA);
+
+  it('ELARA fires start_quest q_fuel_cell gated on coords_decoded', () => {
+    const handoff = responses.find((r) =>
+      (r.consequences ?? []).some((c) => c.type === 'start_quest' && c.questId === 'q_fuel_cell')
+    );
+    expect(handoff, 'ELARA must fire start_quest q_fuel_cell on some response').toBeDefined();
+    expect(
+      leafConditions(handoff!.condition).some(
+        (leaf) =>
+          leaf.fact === 'flags' &&
+          leaf.path === '$.coords_decoded' &&
+          leaf.operator === 'equal' &&
+          leaf.value === true
+      ),
+      'the q_fuel_cell handoff must be gated on coords_decoded === true'
+    ).toBe(true);
+  });
+});
+
+describe('Act II — relic_fuel_cell outcome contract (Task 4, A4 resolution)', () => {
+  it('the ONLY authored relic_fuel_cell value across Act II content is "party" (no "sect" write)', () => {
+    // D-02 / A4: the engine surfaces a game-over on TPK/retreat — it does NOT
+    // auto-write relic_fuel_cell='sect'. So `party` is the sole authored write
+    // (the core-clear rule); `sect` is the read-as-NOT-'party' fallback the
+    // Phase-5 ending interprets. Scan all Act II content for any 'sect' write.
+    const blob = JSON.stringify([RULES_ACT2, QUESTS_ACT2, ELARA, QUENTIN, VANE_ACT2]);
+    const sectWrite = /"key"\s*:\s*"relic_fuel_cell"[\s\S]{0,40}?"value"\s*:\s*"sect"/.test(blob);
+    expect(sectWrite, 'no Act II rule or dialogue may write relic_fuel_cell="sect"').toBe(false);
+
+    // And confirm the only authored value is 'party'.
+    const partyWrite = RULES_ACT2.some((r) =>
+      (r.consequences ?? []).some(
+        (c) => c.type === 'set_flag' && c.key === 'relic_fuel_cell' && c.value === 'party'
+      )
+    );
+    expect(partyWrite, 'the core-clear rule must write relic_fuel_cell="party"').toBe(true);
+  });
+});

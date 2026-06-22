@@ -16,6 +16,18 @@
 //   coords_decoded — the "Mythic Geometry" decode is solved (set on Elara's
 //                    final decode beat, both the martha_hint and neutral paths;
 //                    D-04/D-05). The closing step of q_library keys on it.
+//   undercroft_approach_clear — bool; the raid's approach gallery is cleared
+//                    (set by RULES_ACT2 fuel_cell_approach_clear). q_fuel_cell
+//                    step s_approach keys on it.
+//   undercroft_inner_clear — bool; the reliquary catacombs are cleared (set by
+//                    RULES_ACT2 fuel_cell_inner_clear). step s_inner keys on it.
+//   relic_fuel_cell — string 'party'; the cell core is cleared and the Heart of
+//                    the Saint is the party's (set by RULES_ACT2
+//                    fuel_cell_core_clear; D-01/D-05). q_fuel_cell's closing step
+//                    keys on it. SECT CONTRACT (D-02/A4): there is NO authored
+//                    'sect' write — the engine surfaces a game-over on TPK/retreat
+//                    rather than writing 'sect'. The Phase-5 ending reads
+//                    `sect` = "relic_fuel_cell is NOT 'party'" (read-as-absence).
 
 import type { Quest } from '../../types.js';
 
@@ -99,6 +111,52 @@ export const QUESTS_ACT2: Quest[] = [
           'The coordinates hold steady on the vellum, plain at last — a place the sky ' +
           'has been naming all along. Whatever waits there, you finally know where to ' +
           'point the Gavel’s long road next.',
+      },
+    ],
+  },
+  // ── The fuel-cell raid — "The Heart of the Saint" (MQ-03) ───────────────────
+  // NOT startActive: Elara hands it off once the decode resolves — her tree fires
+  // `start_quest q_fuel_cell` gated on coords_decoded (D-03), revealing that the
+  // coordinates point DOWN, into the undercroft beneath her own library. The three
+  // steps track the raid room-by-room; the flags they key on are written by
+  // RULES_ACT2 (combat→flag, the store_flip idiom), NOT by dialogue (D-05/D-06).
+  // The closing step keys on relic_fuel_cell='party' — the core-clear outcome.
+  {
+    id: 'q_fuel_cell',
+    title: 'The Heart of the Saint',
+    desc:
+      'The coordinates point down — into a hidden undercroft beneath the Grand ' +
+      'Library, where a Weaver cell is wringing the star-metal’s fuel-cell open. ' +
+      'Descend through the catacombs, fight the cell room by room, and reach the ' +
+      'cradle before they finish. The Heart of the Saint must not be theirs.',
+    actId: 'act2',
+    giverNpcId: 'npc_elara',
+    // No startActive — Elara's coords_decoded handoff activates it (D-03).
+    steps: [
+      {
+        id: 's_approach',
+        desc: 'Clear the undercroft stair-gallery of the Weaver-cell’s sentries.',
+        condition: flag('undercroft_approach_clear'),
+      },
+      {
+        id: 's_inner',
+        desc: 'Fight through the reliquary catacombs to the sealed inner door.',
+        condition: flag('undercroft_inner_clear'),
+      },
+      {
+        id: 's_core',
+        desc: 'Break the cell’s last stand at the cradle and seize the fuel-cell.',
+        condition: flag('relic_fuel_cell', 'party'),
+      },
+    ],
+    rewards: [
+      { type: 'give_xp', amount: 800 },
+      {
+        type: 'add_narrative',
+        text:
+          'The cradle is dark and the undercroft is silent. The Heart of the Saint ' +
+          'is in your keeping now — and whatever the sky has been falling toward, ' +
+          'the cell will not be the ones to meet it.',
       },
     ],
   },
