@@ -42,6 +42,21 @@
 //                    — but ONLY the hostile path ever raises the ambush, so this
 //                    step is gated so a peaceful (allied/wary) outcome still
 //                    closes the quest (see q_jarek below).
+//   quentin_thread_started — bool; the party accepted Quentin's "Old Money" thread
+//                    (set on QUENTIN's once start_quest beat, gated on met_quentin;
+//                    D-12). The start_quest q_quentin_thread is the activation, so
+//                    the quest is NOT startActive.
+//   quentin_evidence_ledger — bool; the three retry-friendly CHA evidence beats in
+//   quentin_evidence_witness   QUENTIN's tree (npcsAct2.ts; D-10/D-13). Each set on
+//   quentin_evidence_seal      a check's onSuccess (ledger/witness) or a both-paths
+//                    flavor line (seal: a julian_in_party callback + a neutral
+//                    sibling, both reaching the same set). q_quentin_thread's three
+//                    intermediate steps key on them in order.
+//   quentin_exposed — bool; the exposé closes — the Weaver Magus lieutenant in the
+//                    Vance-estate cellar is down and the master ledger is secured
+//                    (set by RULES_ACT2 quentin_lieutenant_down on the named
+//                    lieutenant kill; D-10). NOT dialogue-set — the final step keys
+//                    on it; the Phase-5 ending branches on it.
 
 import type { Quest } from '../../types.js';
 
@@ -226,6 +241,68 @@ export const QUESTS_ACT2: Quest[] = [
           'Whatever passed between you and the inquisitor under the chandeliers, the ' +
           'measure is taken now. Jarek knows what you carry — and you know what he ' +
           'will do about it when the sky finishes falling.',
+      },
+    ],
+  },
+  // ── "Old Money" — the Quentin exposé (MQ-05 / NPC-03) ───────────────────────
+  // NOT startActive: Quentin's extended tree fires start_quest q_quentin_thread
+  // (gated on met_quentin; D-12). The investigation-with-teeth shape (D-10): three
+  // intermediate steps track the evidence gauntlet (ledger → witness → seal, each
+  // set on a retry-friendly CHA beat in QUENTIN's tree), and the FINAL step keys
+  // on quentin_exposed — written NOT by dialogue but by RULES_ACT2's
+  // quentin_lieutenant_down rule when the Vance-cellar Weaver Magus lieutenant is
+  // down (D-10). Every step flag has a writing site (dialogue evidence beats OR the
+  // lieutenant-kill rule) — the flag-linkage contract (Pitfall 3). The master
+  // ledger is the NARRATIVE payoff (the quentin_lieutenant_down rule's beat + this
+  // quest's completion prose) rather than a give_item: there is no modelled
+  // `vance_master_ledger` inventory item, and a give_item reward for an itemId
+  // absent from the loot table silently no-ops (quest.ts L73-80) — that would be a
+  // phantom-item stub. The proof is the exposed flag + the prose, which is what the
+  // Phase-5 ending actually reads.
+  {
+    id: 'q_quentin_thread',
+    title: 'Old Money',
+    desc:
+      'Quentin Vance watches everyone — and someone has been paying the Weavers in ' +
+      'old Vance coin. Pull the thread: lean on a counting-house clerk, coax a ' +
+      'frightened witness, and match the Vance wax-seal on the Sect’s bills. The ' +
+      'trail runs down into the estate’s counting-house cellar, where a Weaver ' +
+      'lieutenant keeps the master ledger. Put it down, seize the ledger, and expose ' +
+      'the banker behind the conspiracy — the reckoning the court friction promised.',
+    actId: 'act2',
+    giverNpcId: 'npc_quentin',
+    // No startActive — QUENTIN's once "Old Money" beat fires start_quest (D-12).
+    steps: [
+      {
+        id: 's_evidence_ledger',
+        desc: 'Get a counting-house clerk to name the account behind the grey-scrap bills.',
+        condition: flag('quentin_evidence_ledger'),
+      },
+      {
+        id: 's_evidence_witness',
+        desc: 'Coax a frightened witness into placing Quentin at the cellar handoffs.',
+        condition: flag('quentin_evidence_witness'),
+      },
+      {
+        id: 's_evidence_seal',
+        desc: 'Match the Vance wax-seal on the foreclosures to the seal on the Sect’s bills.',
+        condition: flag('quentin_evidence_seal'),
+      },
+      {
+        id: 's_exposed',
+        desc: 'Put down the Weaver lieutenant in the Vance cellar and seize the master ledger.',
+        condition: flag('quentin_exposed'),
+      },
+    ],
+    rewards: [
+      { type: 'give_xp', amount: 700 },
+      {
+        type: 'add_narrative',
+        text:
+          'The master ledger is in your hands, and with it the whole shape of the thing: ' +
+          'Quentin Vance, the Sect’s quiet banker, his old-money signature on every ' +
+          'consignment that fed the cell beneath the Library. The court will not be able ' +
+          'to look away from this — and a ruined wizard’s family will finally have its name.',
       },
     ],
   },

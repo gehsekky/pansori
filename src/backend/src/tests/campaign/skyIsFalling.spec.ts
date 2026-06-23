@@ -1332,3 +1332,83 @@ describe('Act II — vance_cellar_room lieutenant fight + venue wiring (Plan 04-
     expect(gates.length, 'the Court District must keep exactly one gate venue').toBe(1);
   });
 });
+
+// ─── Act II slice (Plan 04-03): quentin_lieutenant_down rule + q_quentin_thread (Task 3) ─
+describe('Act II — quentin_lieutenant_down rule integrity (Plan 04-03, Task 3)', () => {
+  const byName = new Map(RULES_ACT2.map((r) => [r.name, r] as const));
+
+  it('quentin_lieutenant_down is appended to RULES_ACT2 (alongside the prior rules)', () => {
+    expect(byName.has('quentin_lieutenant_down')).toBe(true);
+    // The earlier Act II rules are still present (append, not replace).
+    expect(byName.has('fuel_cell_core_clear')).toBe(true);
+    expect(byName.has('jarek_ambush_clear')).toBe(true);
+  });
+
+  it('quentin_lieutenant_down sets quentin_exposed=true, once', () => {
+    const r = byName.get('quentin_lieutenant_down');
+    expect(r!.once).toBe(true);
+    expect(
+      ruleSetFlags(r).some((f) => f.key === 'quentin_exposed' && f.value === true),
+      'must set quentin_exposed=true'
+    ).toBe(true);
+  });
+
+  it('quentin_lieutenant_down keys exactly on the placed Vance-cellar lieutenant id (store_flip integrity)', () => {
+    // The rule's id list must equal the room's count-1 named lieutenant placement —
+    // so a drift between rule and placement fails here, not in a silently-
+    // never-clearing playthrough (RESEARCH Pitfall 1).
+    const cellar = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'vance_cellar_room') as
+      | (CampaignRoom & { enemies?: Array<{ name: string; count?: number; id?: string }> })
+      | undefined;
+    const lieutenant = (cellar!.enemies ?? []).find((e) => e.id === 'vance_cellar_room#lieutenant');
+    expect(lieutenant, 'the cellar must place the named lieutenant').toBeDefined();
+    const ruleIds = ruleKilledIds(byName.get('quentin_lieutenant_down'));
+    expect(ruleIds).toEqual(['vance_cellar_room#lieutenant']);
+  });
+
+  it('the seeded rules section concatenates quentin_lieutenant_down (Pitfall 2)', () => {
+    const rulesSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'rules');
+    const rules = rulesSection!.value as GameRule[];
+    expect(rules.some((r) => r.name === 'quentin_lieutenant_down')).toBe(true);
+  });
+});
+
+describe('Act II — q_quentin_thread quest shape + flag-linkage (Plan 04-03, Task 3)', () => {
+  const quest = (QUESTS_ACT2 as Quest[]).find((q) => q.id === 'q_quentin_thread');
+
+  it('q_quentin_thread is a Quentin-given act2 quest that is NOT startActive', () => {
+    expect(quest, 'QUESTS_ACT2 must contain q_quentin_thread').toBeDefined();
+    expect(quest!.title).toBe('Old Money');
+    expect(quest!.actId).toBe('act2');
+    expect(quest!.giverNpcId).toBe('npc_quentin');
+    expect(quest!.startActive).not.toBe(true);
+  });
+
+  it('q_quentin_thread has a final step keyed on quentin_exposed', () => {
+    const steps = quest?.steps ?? [];
+    expect(steps.length).toBeGreaterThanOrEqual(2);
+    const finalKey = stepFlagKey(steps[steps.length - 1].condition);
+    expect(finalKey).toBe('quentin_exposed');
+  });
+
+  it('every q_quentin_thread step flag has a writing site (QUENTIN dialogue OR a RULES_ACT2 rule)', () => {
+    // Pitfall 3 (flag-linkage): the evidence flags are written by QUENTIN's
+    // gauntlet; quentin_exposed is written by the lieutenant-kill rule. The
+    // setting-site set spans both.
+    const setSites = new Set<string>([...collectSetFlagKeys([QUENTIN]), ...rulesAct2SetFlagKeys()]);
+    for (const step of quest?.steps ?? []) {
+      const key = stepFlagKey(step.condition);
+      if (!key) continue;
+      expect(
+        setSites.has(key),
+        `q_quentin_thread step "${step.id}" flag "${key}" has no writing site (dialogue or rule)`
+      ).toBe(true);
+    }
+  });
+
+  it('the seeded quests section concatenates q_quentin_thread (Pitfall 2)', () => {
+    const questsSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'quests');
+    const quests = questsSection!.value as Quest[];
+    expect(quests.some((q) => q.id === 'q_quentin_thread')).toBe(true);
+  });
+});

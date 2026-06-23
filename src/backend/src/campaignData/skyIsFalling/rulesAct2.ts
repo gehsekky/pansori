@@ -32,6 +32,17 @@
 //                               This rule marks the ambush resolved ONLY; it does
 //                               NOT touch jarek_stance (no authored hostility on
 //                               the quest-giver — the stance is set in dialogue).
+//   quentin_exposed           — bool; the Quentin "Old Money" exposé closes — the
+//                               Weaver Magus lieutenant in the Vance-estate cellar
+//                               (roomsAct2 vance_cellar_room#lieutenant) is down
+//                               and the master ledger is secured, proving Quentin's
+//                               Sect funding (Plan 04-03, D-10). Set by
+//                               quentin_lieutenant_down below, keyed on the named
+//                               lieutenant kill. NOT set in dialogue — the evidence
+//                               gauntlet (quentin_evidence_* in npcsAct2.ts) gathers
+//                               proof, but the lieutenant kill is the payoff that
+//                               writes quentin_exposed. q_quentin_thread's final
+//                               step keys on it; the Phase-5 ending branches on it.
 
 import type { GameRule } from '../../types.js';
 
@@ -137,6 +148,32 @@ export const RULES_ACT2: GameRule[] = [
           'the ballroom is suddenly, ringingly quiet but for the swing of a cracked ' +
           'chandelier. The inquisitor himself is gone — slipped out under the cover of ' +
           'his own ambush. You have his measure now, and his enmity.',
+      },
+    ],
+  },
+
+  // ── Exposé clear: the Vance-cellar lieutenant (Plan 04-03, D-10) ────────────
+  // Quentin's Weaver Magus LIEUTENANT, guarding the master ledger in the
+  // Vance-estate counting-house, is down. Keyed on its count-1 named id (roomsAct2
+  // vance_cellar_room#lieutenant). Sets quentin_exposed=true + a narrative beat
+  // (the ledger secured, the Sect funding proven) → q_quentin_thread's final step
+  // closes. once:true. The evidence gauntlet (npcsAct2 quentin_evidence_*) gathers
+  // the trail, but THIS kill is the payoff that writes the exposed flag.
+  {
+    name: 'quentin_lieutenant_down',
+    once: true,
+    conditions: {
+      all: [killed('vance_cellar_room#lieutenant')],
+    },
+    consequences: [
+      { type: 'set_flag', key: 'quentin_exposed', value: true },
+      {
+        type: 'add_narrative',
+        text:
+          'The Weaver lieutenant crumples across the strongroom table, and the master ' +
+          'ledger lies open beneath its outflung hand — every diverted consignment, ' +
+          'every Sect payment, signed in Quentin Vance’s own measured hand. The proof ' +
+          'is yours now. Old money has a paper trail after all, and you are holding it.',
       },
     ],
   },
