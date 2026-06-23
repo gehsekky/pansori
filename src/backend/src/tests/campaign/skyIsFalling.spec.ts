@@ -8,6 +8,7 @@
 // These assert over the authored fixture, so a future edit that reintroduces
 // either bug fails here instead of in someone's playthrough.
 
+import type { Act, GameRule, Quest } from '../../types.js';
 import type {
   CampaignRegion,
   CampaignRoom,
@@ -16,8 +17,8 @@ import type {
   CampaignTown,
 } from '../../services/campaignContent.js';
 import { ELARA, JAREK, QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
-import type { GameRule, Quest } from '../../types.js';
 import { describe, expect, it } from 'vitest';
+import { ACTS } from '../../campaignData/skyIsFalling/acts.js';
 import { QUESTS_ACT2 } from '../../campaignData/skyIsFalling/questsAct2.js';
 import { REGIONS } from '../../campaignData/skyIsFalling/regions.js';
 import { REGIONS_ACT2 } from '../../campaignData/skyIsFalling/regionsAct2.js';
@@ -1410,5 +1411,103 @@ describe('Act II — q_quentin_thread quest shape + flag-linkage (Plan 04-03, Ta
     const questsSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'quests');
     const quests = questsSection!.value as Quest[];
     expect(quests.some((q) => q.id === 'q_quentin_thread')).toBe(true);
+  });
+});
+
+// ── Helpers for the act-graph close specs (Plan 05-01) ───────────────────────
+// Walk an act-edge `when` composite down to its leaf conditions (the same {all}/
+// {any}/{not} shape evalCondition reads), so a guard can ask "does this edge
+// gate on flag/quest X?" structurally rather than string-matching the JSON.
+function edgeLeaves(when: unknown): Array<Record<string, unknown>> {
+  return leafConditions(when);
+}
+// Does an edge's `when` carry a leaf matching (fact, path?, operator, value)?
+function hasLeaf(
+  when: unknown,
+  match: { fact: string; path?: string; operator?: string; value?: unknown }
+): boolean {
+  return edgeLeaves(when).some(
+    (leaf) =>
+      leaf.fact === match.fact &&
+      (match.path === undefined || leaf.path === match.path) &&
+      (match.operator === undefined || leaf.operator === match.operator) &&
+      (match.value === undefined || leaf.value === match.value)
+  );
+}
+
+describe('Act II — act-graph close + branched ending (Plan 05-01)', () => {
+  const act2 = (ACTS as Act[]).find((a) => a.id === 'act2');
+  const secured = (ACTS as Act[]).find((a) => a.id === 'act2_end_secured');
+  const lost = (ACTS as Act[]).find((a) => a.id === 'act2_end_lost');
+
+  it('act2 now carries a transitions array of exactly two edges', () => {
+    expect(act2, 'ACTS must contain act2').toBeDefined();
+    expect(act2!.transitions, 'act2 must have transitions').toBeDefined();
+    expect(act2!.transitions!.length).toBe(2);
+  });
+
+  it('first-match-wins order: relic-gated → act2_end_secured at index 0, bare fallback → act2_end_lost at index 1', () => {
+    const edges = act2!.transitions!;
+    expect(edges[0].to).toBe('act2_end_secured');
+    expect(edges[1].to).toBe('act2_end_lost');
+    // The index-0 edge is the relic-ownership branch (relic_fuel_cell == party).
+    expect(
+      hasLeaf(edges[0].when, {
+        fact: 'flags',
+        path: '$.relic_fuel_cell',
+        operator: 'equal',
+        value: 'party',
+      }),
+      'edge 0 (act2_end_secured) must gate on relic_fuel_cell == party'
+    ).toBe(true);
+    // The fallback edge does NOT carry the relic gate (absence-of-party read).
+    expect(
+      hasLeaf(edges[1].when, { fact: 'flags', path: '$.relic_fuel_cell' }),
+      'edge 1 (act2_end_lost) must NOT gate on relic_fuel_cell (bare fallback)'
+    ).toBe(false);
+  });
+
+  it('both edges are an `all` composite carrying q_fuel_cell + coords_decoded + act2_departed', () => {
+    for (const edge of act2!.transitions!) {
+      const when = edge.when as Record<string, unknown>;
+      expect(
+        Array.isArray(when.all),
+        `edge → ${edge.to} `.concat('must be an `all` composite')
+      ).toBe(true);
+      expect(
+        hasLeaf(when, { fact: 'quests_completed', operator: 'contains', value: 'q_fuel_cell' }),
+        `edge → ${edge.to} must require quests_completed contains q_fuel_cell`
+      ).toBe(true);
+      expect(
+        hasLeaf(when, { fact: 'flags', path: '$.coords_decoded', operator: 'equal', value: true }),
+        `edge → ${edge.to} must require flags.coords_decoded == true`
+      ).toBe(true);
+      expect(
+        hasLeaf(when, { fact: 'flags', path: '$.act2_departed', operator: 'equal', value: true }),
+        `edge → ${edge.to} must require flags.act2_departed == true`
+      ).toBe(true);
+    }
+  });
+
+  it('act2_end_secured and act2_end_lost are terminal ending acts with a non-empty static text', () => {
+    for (const term of [secured, lost]) {
+      expect(term, 'both terminal acts must exist in ACTS').toBeDefined();
+      expect(term!.ending, `${term!.id} must be a terminal ending act`).toBeDefined();
+      expect(typeof term!.ending!.outcome).toBe('string');
+      expect(
+        term!.ending!.outcome.length,
+        `${term!.id} ending.outcome must be set`
+      ).toBeGreaterThan(0);
+      expect(typeof term!.ending!.text).toBe('string');
+      expect(
+        (term!.ending!.text ?? '').length,
+        `${term!.id} ending.text must be non-empty`
+      ).toBeGreaterThan(0);
+      // The handoff stub ends on "To be continued… Act III".
+      expect(
+        /To be continued.*Act III/.test(term!.ending!.text ?? ''),
+        `${term!.id} ending.text must hand off to Act III`
+      ).toBe(true);
+    }
   });
 });
