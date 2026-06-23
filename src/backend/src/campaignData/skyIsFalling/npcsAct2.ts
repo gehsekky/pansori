@@ -28,6 +28,25 @@
 //                    ambush; D-08). A FAILED check sets nothing (retry-friendly).
 //                    q_jarek's stance step keys on it; the Phase-5 ending branches
 //                    on it.
+//   quentin_thread_started — bool; the party has accepted Quentin's "Old Money"
+//                    thread. Set on QUENTIN's once start_quest beat (D-12), gated
+//                    on met_quentin. Gates the investigation gauntlet so the
+//                    evidence beats only appear once the thread is live.
+//   quentin_evidence_ledger — bool; the party has talked a counting-house clerk
+//   quentin_evidence_witness   into confirming a name (persuasion), pried a
+//   quentin_evidence_seal      frightened witness's account loose (deception/
+//                    intimidation framing as Quentin's tree, never investigation),
+//                    and matched the Vance wax-seal on the diverted bills. The
+//                    three retry-friendly CHA evidence beats (D-10, the q_library
+//                    decode-gauntlet shape). Set on each evidence check's
+//                    onSuccess. Read by q_quentin_thread's intermediate steps and
+//                    by the lieutenant-room reveal line below.
+//   quentin_exposed — bool; the exposé closes — the Weaver Magus lieutenant in
+//                    the Vance-estate cellar is down and the ledger is secured,
+//                    proving Quentin's Sect funding (D-10). NOT set in dialogue:
+//                    written by RULES_ACT2's quentin_lieutenant_down rule on the
+//                    named lieutenant kill (see rulesAct2.ts). q_quentin_thread's
+//                    final step keys on it; the Phase-5 ending branches on it.
 //
 // Flags READ but never re-set by this module (Act I carry threads):
 //   martha_hint    — set in Act I by Sister Martha touching the Chrono-Shard
@@ -145,6 +164,176 @@ export const QUENTIN: CampaignRoomNpc = {
         'old doors that stay locked. Lady Elara could tell you more than I — she reads ' +
         'everything, that one. Me? I only watch. It’s remarkable what people forget ' +
         'they’ve let slip, with a glass in their hand and a frontier nobody listening."',
+    },
+    // ── "Old Money" — start the exposé thread (D-12) ─────────────────────────
+    // The Phase-3 cameo becomes a reckoning: once the party has crossed the court
+    // and met Quentin (met_quentin), this `once` beat fires start_quest
+    // q_quentin_thread and sets quentin_thread_started (the gauntlet's gate).
+    // Player-driven: the rivalry the court friction established becomes the hook.
+    {
+      id: 'quentin_old_money',
+      label: 'Press the needling back — ask whose old debts pay the Vance bills now.',
+      say:
+        'You watch everyone, Vance. So watch this: a house this gilded, this quiet about ' +
+        'its ledgers, in a heartland the Weavers are hollowing from below? Old money has ' +
+        'to come from somewhere new. We mean to find out where yours does.',
+      condition: { fact: 'flags', path: '$.met_quentin', operator: 'equal', value: true },
+      once: true,
+      reply:
+        'For the first time the wine cup goes still. The languid smile thins to ' +
+        'something colder and far older. "Careful, frontier. People who go looking ' +
+        'into Vance accounts tend to find the accounting looks back." A beat — then ' +
+        'the mask slides up again, lazy as ever. "But by all means. Pull the thread. ' +
+        'You’ll only hang yourselves in it. The clerks, the witnesses, the seals — ' +
+        'they all answer to old money in the end. Even you will, eventually."',
+      consequences: [
+        { type: 'set_flag', key: 'quentin_thread_started', value: true },
+        { type: 'start_quest', questId: 'q_quentin_thread' },
+      ],
+    },
+    // ── Investigation gauntlet — three retry-friendly CHA evidence beats (D-10) ─
+    // The q_library decode-gauntlet shape: CHA-only checks (persuasion / deception
+    // / intimidation — NEVER investigation/history/arcana, which would silently
+    // roll off Charisma), each onFail: [] (never hostile), failReply invites a
+    // retry, NO `once` on the check nodes. Each onSuccess sets one evidence
+    // sub-flag. Gated forward in order on quentin_thread_started → ledger →
+    // witness, so the trail resolves layer by layer. The party-wide skill-check
+    // discipline (D-13): the rolls are never Julian-specific — Julian's family
+    // ruin pays off as condition-gated FLAVOR below, never as a gated roll.
+    // SRD: Ability Checks — DC 13/14/15 (an escalating heartland-court trail).
+    {
+      id: 'quentin_evidence_clerk',
+      label: 'Lean on a Vance counting-house clerk for the name on the diverted bills.',
+      say: 'A frontier nobody buys a clerk a drink, friend. Whose name is on the grey-scrap bills?',
+      condition: {
+        fact: 'flags',
+        path: '$.quentin_thread_started',
+        operator: 'equal',
+        value: true,
+      },
+      check: {
+        skill: 'persuasion',
+        dc: 13,
+        successReply:
+          'The clerk’s nerve folds over the third cup. "...The relic consignments. ' +
+          'Routed through a holding account, signed off downstairs — the old cellar ' +
+          'counting-house under the estate. I never saw the buyer’s face, only the ' +
+          'seal." A Vance seal, on bills paying for star-metal. The first thread holds.',
+        failReply:
+          'The clerk catches himself and sets the cup down. "I’ve said nothing, and ' +
+          'I’ll keep saying it." No matter — there are other cups, other nights. ' +
+          'Buy another round and try the approach again.',
+        onSuccess: [{ type: 'set_flag', key: 'quentin_evidence_ledger', value: true }],
+        onFail: [],
+      },
+    },
+    {
+      id: 'quentin_evidence_witness',
+      label: 'Coax a frightened witness into placing Quentin at the cellar handoffs.',
+      say:
+        'You saw who came down to the counting-house, didn’t you. We can keep your name ' +
+        'out of it — but only if you give us his.',
+      condition: {
+        fact: 'flags',
+        path: '$.quentin_evidence_ledger',
+        operator: 'equal',
+        value: true,
+      },
+      check: {
+        skill: 'deception',
+        dc: 14,
+        successReply:
+          'You promise a protection you may not be able to give, and it loosens the ' +
+          'witness’s tongue. "Young master Quentin. Always Quentin, down the cellar ' +
+          'stair past midnight, with the hooded ones who hum. He signs, they carry it ' +
+          'off." Quentin’s own hand on the Sect’s payments. The second thread holds.',
+        failReply:
+          'The witness shrinks back, unconvinced. "You can’t protect anyone from the ' +
+          'Vances. No one can." Not yet, at least — soften the angle and try the ' +
+          'promise again.',
+        onSuccess: [{ type: 'set_flag', key: 'quentin_evidence_witness', value: true }],
+        onFail: [],
+      },
+    },
+    // ── Julian's family-ruin callback (D-13): the martha_hint BOTH-PATHS idiom ──
+    // Felt in WORDS, like martha_hint pays off in Elara's decode — NEVER a hard
+    // gate, NEVER a Julian-specific roll. TWO sibling lines, BOTH gated on the
+    // witness evidence (the trail's progress) and BOTH reaching the SAME outcome
+    // (set quentin_evidence_seal):
+    //   • the callback line additionally gated on `julian_in_party` (a party-wide
+    //     presence flavor flag, NOT a roll) — it lands the personal blow, tying the
+    //     Vance fraud to the house Julian's family lost.
+    //   • a neutral sibling gated ONLY on the witness evidence — so a party without
+    //     Julian (or with him downed) reaches the exact same seal-match outcome.
+    // Robust for any composition: the seal match (and the lieutenant reveal it
+    // unlocks) is never blocked on the optional Julian thread.
+    {
+      id: 'quentin_evidence_seal_julian',
+      label: 'Match the Vance seal — and name the house it once ruined (Julian).',
+      say:
+        'This is the seal that broke a wizard’s family a decade gone — Julian’s house, ' +
+        'bled white by a Vance "loan" that was never meant to be repaid. The same seal ' +
+        'is on the Sect’s bills. You didn’t just fund them, Vance. You practiced on us first.',
+      condition: {
+        all: [
+          { fact: 'flags', path: '$.quentin_evidence_witness', operator: 'equal', value: true },
+          { fact: 'flags', path: '$.julian_in_party', operator: 'equal', value: true },
+        ],
+      },
+      reply:
+        'Julian lays the old foreclosure beside the new bills, and the wax matches ' +
+        'tooth for tooth — the same seal that gutted his family now stamped across the ' +
+        'Sect’s star-metal payments. "Ten years," he says quietly. "Ten years I told ' +
+        'myself it was just money." It was never just money. The seal is proof, and ' +
+        'it is personal now. The trail points one place: the cellar counting-house.',
+      consequences: [{ type: 'set_flag', key: 'quentin_evidence_seal', value: true }],
+    },
+    {
+      id: 'quentin_evidence_seal_neutral',
+      label: 'Match the Vance wax-seal on the foreclosures to the seal on the Sect’s bills.',
+      say:
+        'Pull every Vance foreclosure of the last decade and lay them beside the ' +
+        'grey-scrap bills. If the wax matches, the man who funds the Weavers signs ' +
+        'his own ruin into every ledger he touches.',
+      // Neutral path: gated ONLY on the witness evidence, NOT on julian_in_party,
+      // so a party that lacks Julian still reaches quentin_evidence_seal (D-13).
+      condition: {
+        fact: 'flags',
+        path: '$.quentin_evidence_witness',
+        operator: 'equal',
+        value: true,
+      },
+      reply:
+        'You lay a decade of Vance foreclosures beside the grey-scrap bills, and the ' +
+        'wax tells on itself — the same seal that ruined a dozen heartland houses now ' +
+        'stamped across the Sect’s star-metal payments. Proof, in cold wax. The trail ' +
+        'points one place: the old cellar counting-house under the estate.',
+      consequences: [{ type: 'set_flag', key: 'quentin_evidence_seal', value: true }],
+    },
+    // ── The lieutenant-room reveal (narrative only) ──────────────────────────
+    // Once all three evidence threads hold (ledger + witness + seal), this `once`
+    // beat names the place the exposé must be carried — the Vance-estate cellar
+    // counting-house, where Quentin's Weaver Magus lieutenant guards the master
+    // ledger. It sets NO flag (quentin_exposed is written by the lieutenant kill,
+    // RULES_ACT2 quentin_lieutenant_down) — it is the prose handoff into the fight.
+    {
+      id: 'quentin_lieutenant_reveal',
+      label: 'Follow the trail down — into the Vance-estate counting-house.',
+      say: 'The bills, the witness, the seal — they all run downstairs. We finish this in the cellar.',
+      condition: {
+        all: [
+          { fact: 'flags', path: '$.quentin_evidence_ledger', operator: 'equal', value: true },
+          { fact: 'flags', path: '$.quentin_evidence_witness', operator: 'equal', value: true },
+          { fact: 'flags', path: '$.quentin_evidence_seal', operator: 'equal', value: true },
+        ],
+      },
+      once: true,
+      reply:
+        'The paper trail ends at a single iron-bound door beneath the Vance estate — ' +
+        'the old counting-house cellar, where the master ledger is kept and a hooded ' +
+        'Weaver lieutenant keeps it. "Quentin won’t be there," you say. "Men like him ' +
+        'never are. But his ledger will be, and the thing he set to guard it." Take the ' +
+        'cellar stair. Put the lieutenant down, seize the ledger, and the exposé is done.',
     },
   ],
 };

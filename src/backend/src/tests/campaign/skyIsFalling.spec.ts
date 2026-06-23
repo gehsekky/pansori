@@ -1184,3 +1184,98 @@ describe('Act II — q_jarek quest shape + flag-linkage (Plan 04-02, Task 3)', (
     expect(quests.some((q) => q.id === 'q_jarek')).toBe(true);
   });
 });
+
+// ─── Act II slice (Plan 04-03): the Quentin "Old Money" tree (Task 1) ─────────
+describe('Act II — QUENTIN "Old Money" tree (start_quest + retry-friendly gauntlet)', () => {
+  const responses = flattenResponses(QUENTIN);
+
+  it('QUENTIN is still npc_quentin, friendly, and still sets met_quentin (cameo intact)', () => {
+    // Mirror the Phase-3 cameo guards: extending the tree must not break the
+    // friendly attitude or the meeting-is-the-trigger met_quentin set.
+    expect(QUENTIN.id).toBe('npc_quentin');
+    expect(QUENTIN.attitude).toBe('friendly');
+    expect(collectSetFlagKeys([QUENTIN]).has('met_quentin')).toBe(true);
+  });
+
+  it('QUENTIN fires start_quest q_quentin_thread on a once beat gated on met_quentin (D-12)', () => {
+    const starter = responses.find((r) =>
+      (r.consequences ?? []).some(
+        (c) => c.type === 'start_quest' && c.questId === 'q_quentin_thread'
+      )
+    );
+    expect(
+      starter,
+      'QUENTIN must fire start_quest q_quentin_thread on some response'
+    ).toBeDefined();
+    expect(starter!.once, 'the quest-start beat must be once').toBe(true);
+    expect(
+      leafConditions(starter!.condition).some(
+        (leaf) =>
+          leaf.fact === 'flags' &&
+          leaf.path === '$.met_quentin' &&
+          leaf.operator === 'equal' &&
+          leaf.value === true
+      ),
+      'the q_quentin_thread start must be gated on met_quentin === true'
+    ).toBe(true);
+  });
+
+  it('every QUENTIN investigation check rolls a CHA skill, onFail: [], no once, no hostile-flip', () => {
+    // CHA-only union (persuasion/deception/intimidation) — never investigation/
+    // history/arcana (which would silently roll off Charisma). Retry-friendly per
+    // the LORIEN idiom: onFail: [], no `once` on the check node, no hostile flip.
+    const CHA = new Set(['persuasion', 'deception', 'intimidation']);
+    const json = JSON.stringify(QUENTIN);
+    const hostileFlip = /"type"\s*:\s*"set_npc_attitude"[^}]*"attitude"\s*:\s*"hostile"/.test(json);
+    expect(hostileFlip, 'QUENTIN must not flip to hostile on a failed check').toBe(false);
+
+    const checkResponses = responses.filter((r) => r.check);
+    expect(
+      checkResponses.length,
+      'QUENTIN must author at least one investigation check'
+    ).toBeGreaterThan(0);
+    for (const r of checkResponses) {
+      const check = r.check as { skill?: string; onFail?: unknown[] };
+      expect(
+        CHA.has(check.skill ?? ''),
+        `check "${r.id}" skill "${check.skill}" must be CHA-only`
+      ).toBe(true);
+      expect(r.once, `check "${r.id}" must not be once (retry-friendly)`).not.toBe(true);
+      expect(
+        (check.onFail ?? []).length,
+        `check "${r.id}" onFail must be empty (a failed roll decides nothing)`
+      ).toBe(0);
+    }
+  });
+
+  it('the Julian family-ruin callback is condition-gated with a neutral fallback (both-paths, D-13)', () => {
+    // Mirror the martha_hint both-paths guard: quentin_evidence_seal must be set on
+    // BOTH a julian_in_party-gated callback line AND a neutral sibling, NEITHER
+    // hard-gating the trail on the optional Julian thread, and NEITHER a roll.
+    const setters = responses.filter((r) => setsFlag(r, 'quentin_evidence_seal'));
+    expect(
+      setters.length,
+      'at least two lines must set quentin_evidence_seal (both-paths)'
+    ).toBeGreaterThanOrEqual(2);
+    const gatesOnJulian = (r: CampaignRoomNpcResponse) =>
+      leafConditions(r.condition).some(
+        (leaf) => leaf.fact === 'flags' && leaf.path === '$.julian_in_party'
+      );
+    const julianLine = setters.find((r) => gatesOnJulian(r));
+    const neutralLine = setters.find((r) => !gatesOnJulian(r));
+    expect(
+      julianLine,
+      'a julian_in_party-gated callback must set quentin_evidence_seal'
+    ).toBeDefined();
+    expect(
+      neutralLine,
+      'a neutral (no-julian) line must also set quentin_evidence_seal'
+    ).toBeDefined();
+    // Neither both-paths line is a check — the Julian payoff is flavor, never a roll.
+    expect(
+      julianLine!.check,
+      'the Julian callback must not be a check (never a Julian-specific roll)'
+    ).toBeUndefined();
+    expect(neutralLine!.check, 'the neutral seal line must not be a check').toBeUndefined();
+  });
+});
