@@ -421,9 +421,95 @@ describe('Act II — court NPCs (Vane + Quentin)', () => {
     expect(hostileFlip, 'court NPCs must not flip to hostile on a failed check').toBe(false);
   });
 
-  it('VANE_ACT2 authors no silverford_outcome / war-state responses (deferred to Phase 5)', () => {
-    const json = JSON.stringify(VANE_ACT2);
-    expect(json.includes('silverford_outcome')).toBe(false);
+  it('VANE_ACT2 now authors silverford_outcome-gated flavor leaves (Phase 5 delivered), with no consequences', () => {
+    // Inversion of the former deferral test: Phase 5 (Plan 05-02) delivers the
+    // war-state carry flavor. VANE_ACT2 must now expose at least one
+    // silverford_outcome-gated leaf, and those leaves must be flavor-only — no
+    // `consequences` anywhere (BR-02: no mechanical/faction impact this cycle).
+    const gated = flattenResponses(VANE_ACT2).filter((r) =>
+      leafConditions(r.condition).some(
+        (leaf) => leaf.fact === 'flags' && leaf.path === '$.silverford_outcome'
+      )
+    );
+    expect(
+      gated.length,
+      'VANE_ACT2 must author at least one silverford_outcome-gated leaf'
+    ).toBeGreaterThan(0);
+    for (const r of gated) {
+      expect(
+        (r.consequences ?? []).length,
+        `silverford_outcome leaf "${r.id}" must carry no consequences (flavor-only)`
+      ).toBe(0);
+    }
+  });
+});
+
+// Does a response's condition reference silverford_outcome === `value`?
+function gatesOnSilverford(r: CampaignRoomNpcResponse, value: 'truce' | 'war'): boolean {
+  return leafConditions(r.condition).some(
+    (leaf) =>
+      leaf.fact === 'flags' &&
+      leaf.path === '$.silverford_outcome' &&
+      leaf.operator === 'equal' &&
+      leaf.value === value
+  );
+}
+
+// Does a response's condition reference silverford_outcome at all (any value)?
+function gatesOnSilverfordAny(r: CampaignRoomNpcResponse): boolean {
+  return leafConditions(r.condition).some(
+    (leaf) => leaf.fact === 'flags' && leaf.path === '$.silverford_outcome'
+  );
+}
+
+describe('Act II — Act I carry flavor: silverford_outcome lines (Plan 05-02)', () => {
+  const vaneResponses = flattenResponses(VANE_ACT2);
+  const jarekResponses = flattenResponses(JAREK);
+
+  it('VANE_ACT2 court-arrival branch exposes a truce-gated AND a war-gated leaf (BR-01)', () => {
+    const truce = vaneResponses.filter((r) => gatesOnSilverford(r, 'truce'));
+    const war = vaneResponses.filter((r) => gatesOnSilverford(r, 'war'));
+    expect(truce.length, 'VANE_ACT2 must have a silverford_outcome==truce leaf').toBeGreaterThan(0);
+    expect(war.length, 'VANE_ACT2 must have a silverford_outcome==war leaf').toBeGreaterThan(0);
+  });
+
+  it('VANE_ACT2 still presents a NEUTRAL (un-gated) arrival/greeting path (D-07 no dead end)', () => {
+    // A flagless party (didn't finish Act I cleanly) must not be dead-ended: at
+    // least one VANE_ACT2 response carries NO silverford_outcome condition, and
+    // the NPC's greeting/firstGreeting prose is unconditional.
+    const neutral = vaneResponses.filter((r) => !gatesOnSilverfordAny(r));
+    expect(
+      neutral.length,
+      'VANE_ACT2 must retain at least one response with no silverford_outcome gate'
+    ).toBeGreaterThan(0);
+    const greeting = Array.isArray(VANE_ACT2.greeting) ? VANE_ACT2.greeting : [];
+    expect(greeting.length, 'VANE_ACT2 keeps an unconditional greeting').toBeGreaterThan(0);
+  });
+
+  it('VANE_ACT2 silverford_outcome leaves are flavor-only (no consequences) (BR-02)', () => {
+    const gated = vaneResponses.filter((r) => gatesOnSilverfordAny(r));
+    expect(gated.length, 'VANE_ACT2 must author silverford_outcome leaves').toBeGreaterThan(0);
+    for (const r of gated) {
+      expect(
+        (r.consequences ?? []).length,
+        `VANE_ACT2 leaf "${r.id}" must carry no consequences`
+      ).toBe(0);
+    }
+  });
+
+  it('JAREK exposes a silverford_outcome-gated war-state flavor leaf, no consequences (BR-02)', () => {
+    const gated = jarekResponses.filter((r) => gatesOnSilverfordAny(r));
+    expect(gated.length, 'JAREK must author at least one silverford_outcome leaf').toBeGreaterThan(
+      0
+    );
+    // The war-state line: a war-gated leaf must exist.
+    const war = jarekResponses.filter((r) => gatesOnSilverford(r, 'war'));
+    expect(war.length, 'JAREK must have a silverford_outcome==war leaf').toBeGreaterThan(0);
+    for (const r of gated) {
+      expect((r.consequences ?? []).length, `JAREK leaf "${r.id}" must carry no consequences`).toBe(
+        0
+      );
+    }
   });
 });
 
