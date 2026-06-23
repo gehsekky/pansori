@@ -1946,3 +1946,102 @@ describe('Act II — side-quest texture layer (Plan 05-03 / SQ-01)', () => {
     ).toBe(true);
   });
 });
+
+// ─── Act II — giver-room reachability after the SQ-01 relocation (Plan 05-04) ──
+// The Phase-05 verification gap: two of the three optional capital side-quest
+// givers shared rooms with always-present room enemies, so the engine's
+// !enemyAlive Talk gate (gameEngine.ts) suppressed their friendly Talk on entry.
+// Plan 05-04 is a DATA-ONLY relocation: every giver now sits in an enemy-free
+// room while the combat side quest's named-id clear contract stays intact. These
+// tests prove the reachability invariant against the authored fixture.
+describe('Act II — side-quest giver reachability (Plan 05-04 / SQ-01 gap closure)', () => {
+  const roomById = new Map((ROOMS_ACT2 as CampaignRoom[]).map((r) => [r.id, r] as const));
+
+  // The three giver ids, each expected to sit in an enemy-free room on entry.
+  const GIVER_IDS = ['npc_dowager', 'npc_bookseller', 'npc_steward'];
+
+  const roomEnemies = (room: CampaignRoom | undefined) =>
+    (room?.enemies ?? []) as Array<{ id?: string; name?: string }>;
+
+  it('every side-quest giver sits in an enemy-free room (no !enemyAlive Talk suppression)', () => {
+    for (const giverId of GIVER_IDS) {
+      const hostRoom = (ROOMS_ACT2 as CampaignRoom[]).find((room) =>
+        (room.npcs ?? []).some((n) => n.id === giverId)
+      );
+      expect(hostRoom, `${giverId} must be embedded in a room`).toBeDefined();
+      expect(
+        roomEnemies(hostRoom).length,
+        `${giverId}'s room (${hostRoom!.id}) must have ZERO enemies so Talk is reachable on entry`
+      ).toBe(0);
+    }
+  });
+
+  it('valerion_market_room is enemy-free (BOOKSELLER reachable — WR-01 closed)', () => {
+    const market = roomById.get('valerion_market_room');
+    expect(market, 'valerion_market_room must exist').toBeDefined();
+    expect(roomEnemies(market).length, 'valerion_market_room must have no enemies').toBe(0);
+    expect(
+      (market!.npcs ?? []).some((n) => n.id === 'npc_bookseller'),
+      'BOOKSELLER must still be in the market room'
+    ).toBe(true);
+  });
+
+  it('STEWARD is embedded in an enemy-free venue room, not the ambush ball room (WR-02 closed)', () => {
+    const ball = roomById.get('valerion_ball_room')!;
+    const inn = roomById.get('valerion_inn_room')!;
+    expect(
+      (ball.npcs ?? []).some((n) => n.id === 'npc_steward'),
+      'STEWARD must NOT be in the ambush ball room'
+    ).toBe(false);
+    expect(
+      (inn.npcs ?? []).some((n) => n.id === 'npc_steward'),
+      'STEWARD must be in the enemy-free inn room'
+    ).toBe(true);
+    expect(roomEnemies(inn).length, 'valerion_inn_room must have no enemies').toBe(0);
+  });
+
+  it('the relocated market straggler lives in a giver-free room the clear rule targets (named-id contract)', () => {
+    // The clear rule is the one whose set_flags include market_straggler_cleared.
+    const rule = (RULES_ACT2 as GameRule[]).find((r) =>
+      ruleSetFlags(r).some((f) => f.key === 'market_straggler_cleared' && f.value === true)
+    );
+    expect(rule, 'a clear rule must write market_straggler_cleared').toBeDefined();
+
+    const ids = ruleKilledIds(rule);
+    expect(ids.length, 'the clear rule must key on exactly one named enemy').toBe(1);
+    expect(ids[0], 'the clear rule must target the relocated straggler id').toBe(
+      'kingsroad_inn_room#straggler'
+    );
+
+    // The room holding that placement has NO friendly givers and is the reskin clone.
+    const home = roomById.get('kingsroad_inn_room')!;
+    expect(
+      (home.npcs ?? []).length,
+      'kingsroad_inn_room must be giver-free (no friendly npcs)'
+    ).toBe(0);
+    const placement = roomEnemies(home).find((e) => e.id === 'kingsroad_inn_room#straggler');
+    expect(
+      placement,
+      'kingsroad_inn_room must hold the relocated straggler placement'
+    ).toBeDefined();
+    expect(placement!.name, 'the straggler must be the Subverted Sentry reskin clone').toBe(
+      'Subverted Sentry'
+    );
+  });
+
+  it('no other room re-introduces the old valerion_market_room#straggler id (re-coupling guard)', () => {
+    for (const room of ROOMS_ACT2 as CampaignRoom[]) {
+      for (const e of roomEnemies(room)) {
+        expect(e.id, `room ${room.id} must not re-introduce the old straggler id`).not.toBe(
+          'valerion_market_room#straggler'
+        );
+      }
+    }
+    for (const rule of RULES_ACT2 as GameRule[]) {
+      expect(
+        ruleKilledIds(rule).includes('valerion_market_room#straggler'),
+        `rule ${rule.name} must not reference the old straggler id`
+      ).toBe(false);
+    }
+  });
+});
