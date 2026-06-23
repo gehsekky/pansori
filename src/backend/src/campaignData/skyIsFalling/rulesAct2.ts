@@ -180,17 +180,20 @@ export const RULES_ACT2: GameRule[] = [
 
   // ── Side-quest clear: the market straggler (Plan 05-03 / SQ-01) ─────────────
   // The OPTIONAL light-combat capital side quest (q_market_straggler): the turned
-  // Sect straggler casing the Scholars' Market is down. Keyed on its count-1 named
-  // id (roomsAct2 valerion_market_room#straggler), the same store_flip idiom as the
-  // raid clears. Sets market_straggler_cleared=true (q_market_straggler's single
-  // step reads it) + a narrative beat. once:true. This is an OPTIONAL errand — it
-  // gates no main-spine beat and no act transition; the steward (npcsAct2 STEWARD)
-  // gives it and the household purse pays out via the quest reward.
+  // Sect straggler is down. Keyed on its count-1 named id (the RELOCATED placement
+  // in roomsAct2 kingsroad_inn_room — Plan 05-04 SQ-01 gap closure: the straggler
+  // moved OFF the BOOKSELLER's market room into the giver-free kingsroad inn so the
+  // social giver stays reachable on entry). Same
+  // store_flip idiom as the raid clears. Sets market_straggler_cleared=true
+  // (q_market_straggler's single step reads it) + a narrative beat. once:true. This
+  // is an OPTIONAL errand — it gates no main-spine beat and no act transition; the
+  // steward (npcsAct2 STEWARD) gives it and the household purse pays out via the
+  // quest reward.
   {
     name: 'market_straggler_clear',
     once: true,
     conditions: {
-      all: [killed('valerion_market_room#straggler')],
+      all: [killed('kingsroad_inn_room#straggler')],
     },
     consequences: [
       { type: 'set_flag', key: 'market_straggler_cleared', value: true },
