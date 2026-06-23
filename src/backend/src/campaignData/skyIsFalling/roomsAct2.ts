@@ -98,14 +98,13 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     // High Inquisitor Jarek at the ball (D-09): the social high-wire's stage. Placed
     // upper-central on the 11×9 grid, in-bounds and off the entry/exit cell (5,8)
     // (Pitfall 4). q_jarek activates on encountering him here (D-09).
-    // Jarek (the spine NPC) plus Steward Halbrook, the side-quest giver who points
-    // the party at the market straggler (Plan 05-03 / SQ-01). The steward is
-    // upper-right, in-bounds on the 11×9 grid, off the entry/exit cell (5,8) and
-    // clear of Jarek (5,2) (Pitfall 4 placement discipline).
-    npcs: [
-      { ...JAREK, pos: { x: 5, y: 2 } },
-      { ...STEWARD, pos: { x: 8, y: 3 } },
-    ],
+    // STEWARD (the market-straggler side-quest giver) was REMOVED from this room in
+    // Plan 05-04 (SQ-01 gap closure, WR-02): the ball is a room-placed ambush, so a
+    // giver co-located here is unreachable on entry (the engine's !enemyAlive gate
+    // suppresses friendly Talk while the ambush troopers live). STEWARD now lives in
+    // the enemy-free valerion_inn_room so q_market_straggler can be accepted
+    // independent of the Jarek ambush resolution. Only JAREK (the spine NPC) remains.
+    npcs: [{ ...JAREK, pos: { x: 5, y: 2 } }],
     // The room-placed ambush (D-08; engine read, Plan 04-02 Task 1): the Subverted
     // troopers are present as room enemies the WHOLE time — Jarek's hostile dialogue
     // path only cues them to draw (it sets jarek_stance='hostile' + a narrative, NOT
@@ -134,8 +133,15 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     exits: [{ pos: { x: 3, y: 5 }, ascends: true, label: 'Out to the Court District' }],
     // Marchioness Adelheid, the old-money side-quest giver (Plan 05-03 / SQ-01),
     // holding court at the best settle: upper-central on the 7×6 grid, off the
-    // entry/exit cell (3,5) (Pitfall 4).
-    npcs: [{ ...DOWAGER, pos: { x: 3, y: 2 } }],
+    // entry/exit cell (3,5) (Pitfall 4). STEWARD joined her here in Plan 05-04
+    // (SQ-01 gap closure, WR-02): relocated off the ambush ball room into this
+    // enemy-free venue so q_market_straggler is reachable on entry independent of
+    // the Jarek spine outcome. (5,2) is in-bounds on the 7×6 grid, off the
+    // entry/exit cell (3,5), and clear of DOWAGER at (3,2) (placement discipline).
+    npcs: [
+      { ...DOWAGER, pos: { x: 3, y: 2 } },
+      { ...STEWARD, pos: { x: 5, y: 2 } },
+    ],
   },
   {
     id: 'grand_library_room',
@@ -189,14 +195,13 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     // chart stall: upper-left on the 8×7 grid, off the entry/exit cell (4,6) and
     // well clear of the straggler placement below (Pitfall 4).
     npcs: [{ ...BOOKSELLER, pos: { x: 2, y: 2 } }],
-    // The light-combat side quest (q_market_straggler, Plan 05-03 / SQ-01): one
-    // turned Sect straggler casing the market, drawn from the EXISTING Phase-2
-    // reskin roster (Subverted Sentry — the lighter subverted-soldier variant),
-    // FULL SRD-default Guard numbers, NO tuning. The count-1 NAMED id
-    // (valerion_market_room#straggler) is the clear target the RULES_ACT2
-    // market_straggler_clear rule keys on (named-id contract — never positional).
-    // Optional fight on an EXISTING room: no new monster, no new room (D-11).
-    enemies: [{ name: 'Subverted Sentry', id: 'valerion_market_room#straggler' }],
+    // ENEMY-FREE on entry (Plan 05-04 / SQ-01 gap closure, WR-01): the optional
+    // light-combat straggler that used to case this market has been RELOCATED to
+    // kingsroad_inn_room so BOOKSELLER's friendly Talk is reachable on entry — the
+    // engine's !enemyAlive gate (gameEngine.ts) suppresses every friendly-NPC Talk
+    // while any room enemy lives. The relocated straggler keeps the named-id
+    // contract with RULES_ACT2 market_straggler_clear (now keyed on the kingsroad
+    // placement id).
   },
   // ── Heartland flavor-site rooms ────────────────────────────────────────────
   {
@@ -211,6 +216,18 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     entryPos: { x: 4, y: 6 },
     grid: grid(8, 7),
     exits: [{ pos: { x: 4, y: 6 }, ascends: true, label: 'Back to the kingsroad' }],
+    // The RELOCATED market straggler (Plan 05-04 / SQ-01 gap closure, WR-01): the
+    // optional light-combat Sect straggler moved here OFF the BOOKSELLER's
+    // valerion_market_room so the social giver's friendly Talk stays reachable on
+    // entry (the engine's !enemyAlive gate suppresses friendly Talk while any room
+    // enemy lives). This room has NO friendly quest-giver, so the straggler's
+    // presence cannot suppress any giver. Drawn from the EXISTING Phase-2 reskin
+    // roster (Subverted Sentry), FULL SRD-default Guard numbers, NO tuning. Its
+    // count-1 NAMED id (below) is the clear target the RULES_ACT2
+    // market_straggler_clear rule keys on (named-id contract — never positional).
+    // No new monster, no new room (strict SRD).
+    // SRD: Guard
+    enemies: [{ name: 'Subverted Sentry', id: 'kingsroad_inn_room#straggler' }],
   },
   {
     id: 'hollowing_orchard_room',
