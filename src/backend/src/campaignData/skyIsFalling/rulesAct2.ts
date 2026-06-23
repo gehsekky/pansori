@@ -25,6 +25,13 @@
 //                               `sect` is the read-as-NOT-'party' fallback the
 //                               Phase-5 ending reads — there is NO authored
 //                               'sect' write (D-02; verified in Task 4's spec).
+//   jarek_ambush_cleared      — bool; the ballroom ambush is resolved — the two
+//                               named Subverted troopers (roomsAct2
+//                               valerion_ball_room#trooper1/2) are down (Plan
+//                               04-02, D-08). Set by jarek_ambush_clear below.
+//                               This rule marks the ambush resolved ONLY; it does
+//                               NOT touch jarek_stance (no authored hostility on
+//                               the quest-giver — the stance is set in dialogue).
 
 import type { GameRule } from '../../types.js';
 
@@ -105,6 +112,31 @@ export const RULES_ACT2: GameRule[] = [
       {
         type: 'add_narrative',
         text: 'The cradle goes dark. The Heart of the Saint is yours.',
+      },
+    ],
+  },
+
+  // ── Ambush clear: the Jarek ballroom ambush (Plan 04-02, D-08) ──────────────
+  // The two named Subverted troopers Jarek loosed at the ball are down. Keyed on
+  // their count-1 named ids (roomsAct2 valerion_ball_room#trooper1/2). Sets
+  // jarek_ambush_cleared=true + a narrative beat. This rule marks the ambush
+  // RESOLVED only — it does NOT write jarek_stance (the stance is decided in
+  // dialogue; no authored hostility-on-the-quest-giver). once:true.
+  {
+    name: 'jarek_ambush_clear',
+    once: true,
+    conditions: {
+      all: [killed('valerion_ball_room#trooper1'), killed('valerion_ball_room#trooper2')],
+    },
+    consequences: [
+      { type: 'set_flag', key: 'jarek_ambush_cleared', value: true },
+      {
+        type: 'add_narrative',
+        text:
+          'The last of Jarek’s Subverted folds across an overturned banquet table, and ' +
+          'the ballroom is suddenly, ringingly quiet but for the swing of a cracked ' +
+          'chandelier. The inquisitor himself is gone — slipped out under the cover of ' +
+          'his own ambush. You have his measure now, and his enmity.',
       },
     ],
   },

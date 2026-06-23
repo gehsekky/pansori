@@ -1059,3 +1059,128 @@ describe('Act II — valerion_ball_room (Jarek embedded, ambush room-placed)', (
     }
   });
 });
+
+// ─── Act II slice (Plan 04-02): jarek_ambush_clear rule + q_jarek (Task 3) ────
+
+// Pull every leaf condition that references the jarek_stance flag out of a quest
+// step's (possibly all/any/not-nested) condition — used to prove a step keys on
+// the stance even when it's an `any`-of-values shape (which stepFlagKey can't read).
+function stepReferencesFlag(condition: unknown, key: string): boolean {
+  return leafConditions(condition).some(
+    (leaf) => leaf.fact === 'flags' && leaf.path === `$.${key}`
+  );
+}
+
+describe('Act II — jarek_ambush_clear rule integrity (Plan 04-02, Task 3)', () => {
+  const byName = new Map(RULES_ACT2.map((r) => [r.name, r] as const));
+
+  it('jarek_ambush_clear is appended to RULES_ACT2 (alongside the fuel-cell rules)', () => {
+    expect(byName.has('jarek_ambush_clear')).toBe(true);
+    // The Plan 01 fuel-cell rules are still present (append, not replace).
+    expect(byName.has('fuel_cell_core_clear')).toBe(true);
+  });
+
+  it('jarek_ambush_clear sets jarek_ambush_cleared=true, once, and does NOT touch jarek_stance', () => {
+    const r = byName.get('jarek_ambush_clear');
+    expect(r!.once).toBe(true);
+    expect(
+      ruleSetFlags(r).some((f) => f.key === 'jarek_ambush_cleared' && f.value === true),
+      'must set jarek_ambush_cleared=true'
+    ).toBe(true);
+    // No authored hostility on the quest-giver: the rule never writes jarek_stance.
+    expect(
+      ruleSetFlags(r).some((f) => f.key === 'jarek_stance'),
+      'the ambush-clear rule must not write jarek_stance (stance is dialogue-only)'
+    ).toBe(false);
+  });
+
+  it('jarek_ambush_clear keys exactly on the two named ball troopers placed in the room', () => {
+    // store_flip integrity: the rule's id list must equal the room's count-1 named
+    // placements — so a drift between rule and placement fails here, not in a
+    // silently-never-clearing playthrough (RESEARCH Pitfall 1).
+    const ball = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'valerion_ball_room') as
+      | (CampaignRoom & { enemies?: Array<{ name: string; count?: number; id?: string }> })
+      | undefined;
+    const placedIds = (ball!.enemies ?? [])
+      .filter((e) => (e.count ?? 1) === 1 && typeof e.id === 'string')
+      .map((e) => e.id as string)
+      .sort();
+    const ruleIds = ruleKilledIds(byName.get('jarek_ambush_clear')).sort();
+    expect(ruleIds).toEqual(placedIds);
+  });
+
+  it('the seeded rules section concatenates jarek_ambush_clear (Pitfall 2)', () => {
+    const rulesSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'rules');
+    const rules = rulesSection!.value as GameRule[];
+    expect(rules.some((r) => r.name === 'jarek_ambush_clear')).toBe(true);
+  });
+});
+
+describe('Act II — q_jarek quest shape + flag-linkage (Plan 04-02, Task 3)', () => {
+  const quest = (QUESTS_ACT2 as Quest[]).find((q) => q.id === 'q_jarek');
+
+  it('q_jarek is a Jarek-given act2 quest that is NOT startActive', () => {
+    expect(quest, 'QUESTS_ACT2 must contain q_jarek').toBeDefined();
+    expect(quest!.title).toBe('The Inquisitor’s Suspicion');
+    expect(quest!.actId).toBe('act2');
+    expect(quest!.giverNpcId).toBe('npc_jarek');
+    expect(quest!.startActive).not.toBe(true);
+  });
+
+  it('q_jarek has a step keyed on jarek_stance', () => {
+    const steps = quest?.steps ?? [];
+    expect(steps.length).toBeGreaterThan(0);
+    expect(
+      steps.some((s) => stepReferencesFlag(s.condition, 'jarek_stance')),
+      'q_jarek must have a step whose condition keys on jarek_stance'
+    ).toBe(true);
+  });
+
+  it('the jarek_stance step covers all three authored stance values (allied/wary/hostile)', () => {
+    // The `any`-of-values shape closes the quest on whichever outcome the player
+    // reached — so every JAREK-set stance value must be a completing condition.
+    const step = (quest?.steps ?? []).find((s) => stepReferencesFlag(s.condition, 'jarek_stance'));
+    const stanceValues = leafConditions(step!.condition)
+      .filter((leaf) => leaf.fact === 'flags' && leaf.path === '$.jarek_stance')
+      .map((leaf) => leaf.value as string)
+      .sort();
+    expect(stanceValues).toEqual(['allied', 'hostile', 'wary']);
+  });
+
+  it('every q_jarek stance value has a matching set_flag site in JAREK (flag-linkage)', () => {
+    // Pitfall 3: a step value with no dialogue writer never completes. Collect the
+    // (key,value) jarek_stance writes JAREK authors and assert each step value is set.
+    const writtenStances = new Set<string>();
+    const eat = (cons: Array<Record<string, unknown>> | undefined) => {
+      for (const c of cons ?? []) {
+        if (c.type === 'set_flag' && c.key === 'jarek_stance' && typeof c.value === 'string') {
+          writtenStances.add(c.value);
+        }
+      }
+    };
+    for (const r of flattenResponses(JAREK)) {
+      eat(r.consequences);
+      const check = r.check as
+        | { onSuccess?: Array<Record<string, unknown>>; onFail?: Array<Record<string, unknown>> }
+        | undefined;
+      eat(check?.onSuccess);
+      eat(check?.onFail);
+    }
+    const step = (quest?.steps ?? []).find((s) => stepReferencesFlag(s.condition, 'jarek_stance'));
+    const stepValues = leafConditions(step!.condition)
+      .filter((leaf) => leaf.fact === 'flags' && leaf.path === '$.jarek_stance')
+      .map((leaf) => leaf.value as string);
+    for (const v of stepValues) {
+      expect(
+        writtenStances.has(v),
+        `q_jarek step value jarek_stance="${v}" has no set_flag site in JAREK`
+      ).toBe(true);
+    }
+  });
+
+  it('the seeded quests section concatenates q_jarek (Pitfall 2)', () => {
+    const questsSection = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'quests');
+    const quests = questsSection!.value as Quest[];
+    expect(quests.some((q) => q.id === 'q_jarek')).toBe(true);
+  });
+});

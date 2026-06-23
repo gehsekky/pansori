@@ -28,6 +28,20 @@
 //                    'sect' write — the engine surfaces a game-over on TPK/retreat
 //                    rather than writing 'sect'. The Phase-5 ending reads
 //                    `sect` = "relic_fuel_cell is NOT 'party'" (read-as-absence).
+//   jarek_stance   — string ('allied' | 'wary' | 'hostile'); the outcome of the
+//                    Jarek ball negotiation (set in JAREK's tree, npcsAct2.ts;
+//                    D-07). q_jarek's stance step keys on it being set to ANY of
+//                    the three values (an `any`-of-values condition) — the quest
+//                    closes the moment the negotiation resolves, whichever way.
+//                    The quest is NOT startActive: jarek_stance being set is also
+//                    the auto-accept trigger (D-09 — encountering Jarek IS the
+//                    activation; the negotiation is the encounter).
+//   jarek_ambush_cleared — bool; the ballroom ambush is resolved (set by
+//                    RULES_ACT2 jarek_ambush_clear when the two named ball
+//                    troopers are down; D-08). q_jarek's ambush step keys on it
+//                    — but ONLY the hostile path ever raises the ambush, so this
+//                    step is gated so a peaceful (allied/wary) outcome still
+//                    closes the quest (see q_jarek below).
 
 import type { Quest } from '../../types.js';
 
@@ -157,6 +171,61 @@ export const QUESTS_ACT2: Quest[] = [
           'The cradle is dark and the undercroft is silent. The Heart of the Saint ' +
           'is in your keeping now — and whatever the sky has been falling toward, ' +
           'the cell will not be the ones to meet it.',
+      },
+    ],
+  },
+  // ── The Inquisitor's Suspicion — "q_jarek" (MQ-04 / NPC-02) ──────────────────
+  // NOT startActive: encountering High Inquisitor Jarek at the ball IS the
+  // activation (D-09). Mechanically, the auto-accept trigger and the completing
+  // step are the SAME beat — jarek_stance being set to any of its three values.
+  // The negotiation is the encounter: the instant the player resolves Jarek's
+  // tree (talk him down → allied, demur → wary, or provoke him → hostile), the
+  // stance flag is written, the quest auto-accepts AND its single step closes.
+  // The step keys on jarek_stance via an `any`-of-values condition (D-07): a
+  // quest that simply RECORDS the negotiation outcome for the Phase-5 ending,
+  // whichever way it went. The hostile-path ballroom ambush is tracked
+  // separately by RULES_ACT2 jarek_ambush_clear (jarek_ambush_cleared) — it is
+  // NOT a completion gate here, so an allied/wary party (who never fight) still
+  // closes the quest cleanly.
+  {
+    id: 'q_jarek',
+    title: 'The Inquisitor’s Suspicion',
+    desc:
+      'High Inquisitor Jarek of Malgovia stalks the heartland’s grand ball, certain ' +
+      'the star-metal you carry is the arcane plague his order was raised to burn. ' +
+      'Convince him you are the cure’s cartographers, not its carriers — talk him into ' +
+      'an ally, leave him wary, or push him too far and answer his Subverted under the ' +
+      'chandeliers. However it ends, the inquisitor will remember it.',
+    actId: 'act2',
+    giverNpcId: 'npc_jarek',
+    // No startActive — resolving Jarek's negotiation (any stance) activates AND
+    // completes it (D-09; the negotiation is the encounter).
+    steps: [
+      {
+        id: 's_stance',
+        desc: 'Settle the High Inquisitor’s suspicion at the ball — for good or ill.',
+        // Keyed on jarek_stance being set to ANY of its three authored values, so
+        // the quest closes on whichever outcome the player reached. A flat
+        // `flag('jarek_stance', x)` couldn't cover all three; the `any` does — and
+        // an unset jarek_stance matches none of them, so the quest never
+        // auto-accepts before the player has actually met and resolved Jarek.
+        condition: {
+          any: [
+            flag('jarek_stance', 'allied'),
+            flag('jarek_stance', 'wary'),
+            flag('jarek_stance', 'hostile'),
+          ],
+        },
+      },
+    ],
+    rewards: [
+      { type: 'give_xp', amount: 500 },
+      {
+        type: 'add_narrative',
+        text:
+          'Whatever passed between you and the inquisitor under the chandeliers, the ' +
+          'measure is taken now. Jarek knows what you carry — and you know what he ' +
+          'will do about it when the sky finishes falling.',
       },
     ],
   },
