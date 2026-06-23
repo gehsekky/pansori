@@ -1011,3 +1011,171 @@ export const JAREK: CampaignRoomNpc = {
     },
   ],
 };
+
+// ── Capital side-quest givers (Plan 05-03 / SQ-01) ───────────────────────────
+// Small townsperson NPCs in the Act I dockhand/storekeeper idiom (npcs.ts
+// DOCKHAND/LOGGER_WIFE): attitude:'friendly' (no CHA gate to open), a modest
+// cameo stat block, a `once` start_quest response. They give the OPTIONAL capital
+// side quests (D-10/D-11/D-12) — none gate Act II's resolution. The spine NPCs
+// (Elara/Vane/Quentin/Jarek) are NOT loaded with errand-giver duty (D-12).
+//
+// Each giver embeds into one of the inn/market/ball venue rooms (roomsAct2.ts).
+// Glyph `icon` keys are redistributable game-icons already used in the campaign,
+// so the free tier renders without the painted-art overlay.
+//
+// Side-quest sub-flags written here (the social quests; the combat one is
+// rule-written in rulesAct2.ts):
+//   dowager_favor_done   — bool; the party carried the dowager Marchioness's
+//                          sealed letter of introduction to the right ear at
+//                          court (a retry-friendly persuasion beat). Closes
+//                          q_dowager_favor. Set on the DOWAGER deliver line.
+//   market_folio_done    — bool; the party talked a tight-fisted bookseller's
+//                          rival into releasing the misfiled star-charts folio
+//                          (a retry-friendly persuasion beat). Closes
+//                          q_market_folio. Set on the BOOKSELLER recover line.
+
+// The Gilded Lantern inn — a faded old-money dowager with a court favor to ask.
+export const DOWAGER: CampaignRoomNpc = {
+  id: 'npc_dowager',
+  name: 'Marchioness Adelheid',
+  proper_noun: true,
+  attitude: 'friendly',
+  icon: 'fancy',
+  hp: 9,
+  ac: 10,
+  damage: '1d4',
+  toHit: 2,
+  xp: 0,
+  greeting: [
+    'A silver-haired dowager holds court alone in the inn’s best settle, a cooling ' +
+      'pot of chocolate before her and a name older than the throne behind her. ' +
+      '"Frontier law, in the Gilded Lantern? How novel. Sit — old houses keep no ' +
+      'secrets from people who can keep one for them."',
+  ],
+  responses: [
+    {
+      id: 'dowager_hear_favor',
+      label: 'Hear the Marchioness out.',
+      say: 'You have a favor to ask, my lady. Name it.',
+      once: true,
+      reply:
+        '"A small thing, and a delicate one. My house has fallen out of fashion — and ' +
+        'a letter of introduction in my hand no longer opens the doors it should. But ' +
+        'in yours, fresh and unplaceable, it might. Carry my sealed letter to the ' +
+        'Chamberlain at court, and say the right words, and an old name is owed a new ' +
+        'one. Will you?"',
+      consequences: [{ type: 'start_quest', questId: 'q_dowager_favor' }],
+    },
+    {
+      id: 'dowager_deliver',
+      label: 'Deliver the letter to the Chamberlain — and say the right words.',
+      // The completion beat: a retry-friendly persuasion read at court. A clean
+      // read lands the introduction; a fumble simply invites another try (the
+      // LORIEN discipline — no hostility, no once on the check, CHA-only).
+      say: 'Your letter, Chamberlain — and a word, if you’ll hear it, on the house that sent me.',
+      check: {
+        skill: 'persuasion',
+        dc: 12,
+        successReply:
+          'The Chamberlain breaks the wax, reads, and inclines his head a careful ' +
+          'degree. "The Marchioness is… remembered. Tell her the door is ajar again." ' +
+          'A small thing — and in this court, small things are the whole of it.',
+        failReply:
+          'The Chamberlain’s glance slides off you like rain off glass. "The house of ' +
+          'whom?" Not a refusal — merely a man who needs the introduction made better. ' +
+          'You can square your shoulders and try the words again.',
+        onSuccess: [{ type: 'set_flag', key: 'dowager_favor_done', value: true }],
+        onFail: [],
+      },
+    },
+  ],
+};
+
+// The Scholars' Market — a bookseller missing a folio to a pricklier rival.
+export const BOOKSELLER: CampaignRoomNpc = {
+  id: 'npc_bookseller',
+  name: 'Corwin Vell',
+  proper_noun: true,
+  attitude: 'friendly',
+  icon: 'book',
+  hp: 9,
+  ac: 10,
+  damage: '1d4',
+  toHit: 2,
+  xp: 0,
+  greeting: [
+    'A stooped bookseller squints up from a stall of fair-copied charts, ink to the ' +
+      'elbow. "Buying or browsing? Either way — you’ve the look of people who can ' +
+      'pry a thing loose. I’ve a thing wants prying."',
+  ],
+  responses: [
+    {
+      id: 'bookseller_hear_folio',
+      label: 'Ask what needs prying loose.',
+      say: 'We’ve pried looser things than charts. What is it?',
+      once: true,
+      reply:
+        '"A folio of old sky-charts — star-metal projections, the kind Lady Elara’s ' +
+        'people prize. Misfiled into Hesta’s lot two stalls down, and now she swears ' +
+        'they were always hers. They weren’t. Talk her into letting them go and I’ll ' +
+        'cut you a fair copy of anything I have, free and clear."',
+      consequences: [{ type: 'start_quest', questId: 'q_market_folio' }],
+    },
+    {
+      id: 'bookseller_recover',
+      label: 'Talk Hesta into releasing the misfiled folio.',
+      say: 'The sky-charts in your lot, Hesta — they’re Corwin’s misfile, and you know it. Let them go.',
+      check: {
+        skill: 'persuasion',
+        dc: 12,
+        successReply:
+          'Hesta sucks her teeth, then shoves the folio across with bad grace. "Take ' +
+          'the wretched things. Tell Vell he owes me a civil word." The charts are ' +
+          'Corwin’s again — and the market keeps its fragile peace.',
+        failReply:
+          'Hesta folds her arms over the folio. "Mine. Always were." Not a wall — just ' +
+          'a woman who hasn’t heard the right argument yet. You can find a better one.',
+        onSuccess: [{ type: 'set_flag', key: 'market_folio_done', value: true }],
+        onFail: [],
+      },
+    },
+  ],
+};
+
+// The Grand Ballroom — a harried steward who needs a Sect straggler dealt with.
+// This is the LIGHT-COMBAT side quest's giver (q_market_straggler): the steward
+// points the party at a turned watcher casing the Scholars' Market. The quest's
+// completion flag (market_straggler_cleared) is written by the RULES_ACT2
+// market_straggler_clear rule on the named market placement — NOT in dialogue.
+export const STEWARD: CampaignRoomNpc = {
+  id: 'npc_steward',
+  name: 'Steward Halbrook',
+  proper_noun: true,
+  attitude: 'friendly',
+  icon: 'person',
+  hp: 9,
+  ac: 10,
+  damage: '1d4',
+  toHit: 2,
+  xp: 0,
+  greeting: [
+    'A sweating steward in ballroom livery catches your sleeve between courses. ' +
+      '"You’re the Gavel’s people — the ones who fight. Thank every star. I’ve a ' +
+      'problem I cannot put on a silver tray and serve to my lord."',
+  ],
+  responses: [
+    {
+      id: 'steward_hear_straggler',
+      label: 'Hear the steward out.',
+      say: 'Quietly, then. What’s the problem?',
+      once: true,
+      reply:
+        '"One of those glass-eyed turned ones — a Weaver’s leavings — has been haunting ' +
+        'the Scholars’ Market two streets over, frightening the booksellers, casing ' +
+        'Lady Elara’s charts. The watch won’t touch it; they say it isn’t breaking any ' +
+        'law. But it will. Put it down before the ball spills out past it, and I’ll see ' +
+        'you paid from the household purse — no questions, no ledger."',
+      consequences: [{ type: 'start_quest', questId: 'q_market_straggler' }],
+    },
+  ],
+};

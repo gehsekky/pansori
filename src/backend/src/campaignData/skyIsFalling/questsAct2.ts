@@ -306,4 +306,114 @@ export const QUESTS_ACT2: Quest[] = [
       },
     ],
   },
+  // ── Capital side-quest texture (Plan 05-03 / SQ-01) ─────────────────────────
+  // 2-3 OPTIONAL single-step capital errands, giving Valerion the lived-in
+  // high-society texture Silverford's marsh has (D-10/D-11). NONE are startActive
+  // and NONE gate Act II's resolution — each is activated by a small townsperson
+  // giver's `once` start_quest (npcsAct2.ts DOWAGER/BOOKSELLER/STEWARD) and closes
+  // by setting its own sub-flag. The two social quests close on a retry-friendly
+  // CHA beat in their giver's tree; the one light-combat quest closes on the
+  // RULES_ACT2 market_straggler_clear rule (the store_flip idiom) when the named
+  // market straggler is down. No give_item rewards (no modelled side-quest item →
+  // a give_item would silently no-op) — XP/gold + a sub-flag + completion prose.
+
+  // q_dowager_favor — an old-money inn errand (social): carry a faded dowager's
+  // letter of introduction to the court Chamberlain (D-11 social/fetch).
+  {
+    id: 'q_dowager_favor',
+    title: 'An Old Name’s Favor',
+    desc:
+      'Marchioness Adelheid — a name older than the throne and twice as out of ' +
+      'fashion — has asked you to carry her sealed letter of introduction to the ' +
+      'court Chamberlain, and say the right words, so an old house is owed a new one.',
+    actId: 'act2',
+    giverNpcId: 'npc_dowager',
+    // No startActive — the Marchioness's `once` line fires start_quest.
+    steps: [
+      {
+        id: 's_deliver',
+        desc: 'Carry the Marchioness’s letter to the court Chamberlain and make the introduction.',
+        condition: flag('dowager_favor_done'),
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 50 },
+      { type: 'give_xp', amount: 75 },
+      {
+        type: 'add_narrative',
+        text:
+          'The Marchioness receives the news with a small, satisfied tilt of her head. ' +
+          '"An old name, opened again. You have done a faded house a kindness the court ' +
+          'will not see — which is the only kindness worth the doing."',
+      },
+    ],
+  },
+  // q_market_folio — a scholars'-market fetch/skill-check (social): talk a rival
+  // bookseller into releasing a misfiled folio of star-charts (D-11).
+  {
+    id: 'q_market_folio',
+    title: 'The Misfiled Folio',
+    desc:
+      'Corwin Vell, a bookseller in the Scholars’ Market, has lost a folio of ' +
+      'star-metal sky-charts to a rival’s lot two stalls down. Talk Hesta into ' +
+      'releasing what was never hers — and keep the market’s fragile peace.',
+    actId: 'act2',
+    giverNpcId: 'npc_bookseller',
+    // No startActive — Corwin's `once` line fires start_quest.
+    steps: [
+      {
+        id: 's_recover',
+        desc: 'Persuade Hesta to release the misfiled folio of sky-charts to Corwin.',
+        condition: flag('market_folio_done'),
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 35 },
+      { type: 'give_xp', amount: 75 },
+      {
+        type: 'add_narrative',
+        text:
+          'Corwin runs an ink-stained thumb down the recovered charts and exhales. ' +
+          '"Whole, and where they belong. Take any fair copy you like, friend — the ' +
+          'market remembers a good turn longer than it remembers a grudge."',
+      },
+    ],
+  },
+  // q_market_straggler — the ONE light-combat side quest (D-11): the ball steward
+  // points the party at a turned Sect straggler casing the Scholars' Market. The
+  // completing flag (market_straggler_cleared) is written by RULES_ACT2's
+  // market_straggler_clear rule on the named count-1 placement in valerion_market_room
+  // (reskin roster only, full SRD numbers, no tuning) — NOT in dialogue (D-05/D-06
+  // combat→flag idiom). The fight is optional and on an EXISTING room (no new room,
+  // no new monster).
+  {
+    id: 'q_market_straggler',
+    title: 'A Glass-Eyed Watcher',
+    desc:
+      'Steward Halbrook of the grand ball has begged you, quietly, to deal with a ' +
+      'turned Weaver straggler haunting the Scholars’ Market — glass-eyed, casing ' +
+      'Lady Elara’s charts, and a law unto itself until it isn’t. Put it down before ' +
+      'the ball spills past it.',
+    actId: 'act2',
+    giverNpcId: 'npc_steward',
+    // No startActive — Halbrook's `once` line fires start_quest.
+    steps: [
+      {
+        id: 's_clear',
+        desc: 'Put down the glass-eyed straggler casing the Scholars’ Market.',
+        condition: flag('market_straggler_cleared'),
+      },
+    ],
+    rewards: [
+      { type: 'give_gold', amount: 60 },
+      { type: 'give_xp', amount: 150 },
+      {
+        type: 'add_narrative',
+        text:
+          'The straggler folds among the overturned stalls and goes finally, fully ' +
+          'still. The booksellers creep back to their charts, and Halbrook’s household ' +
+          'purse opens without a single question — the ball, and the market, breathe again.',
+      },
+    ],
+  },
 ];
