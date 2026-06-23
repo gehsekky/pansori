@@ -69,8 +69,16 @@ import type { CampaignRoomNpc } from '../../services/campaignContent.js';
 // commander the party tangled with at Silverford now receives them at the
 // Valerion court. Friendly attitude so dialogue opens with no CHA gate — his
 // polished contempt is all in the lines. This Act II beat sets NO new flags
-// (it's tone/texture); the silverford_outcome truce/war flavor options are
-// deferred to Phase 5 (D-12) and intentionally NOT authored here.
+// (it's tone/texture).
+//
+// Act I carry flavor (Phase 5, Plan 05-02 — BR-01/BR-02): Vane carries the
+// silverford_outcome echo. His court-arrival WELCOME shifts in COLOR with the
+// war the party left in the Sunder-Carr (truce vs war), and he exposes one
+// war-state read on the conflict — but ALL of it is flavor-only. These leaves
+// carry NO consequences (no flag/faction write — BR-02 "no mechanical impact
+// this cycle"); the un-gated greeting + the un-gated court questions remain so a
+// flagless party (didn't finish Act I cleanly) is never dead-ended (D-07).
+// silverford_outcome is READ here, never WRITTEN.
 export const VANE_ACT2: CampaignRoomNpc = {
   id: 'npc_vane',
   name: 'Commander Lucian Vane',
@@ -117,6 +125,88 @@ export const VANE_ACT2: CampaignRoomNpc = {
         'find you soon enough; he finds everyone. And Lady Elara keeps the great ' +
         'Library, if your business runs to dusty things. Mine runs to keeping this ' +
         'court from embarrassing itself. Do not make my work harder."',
+    },
+    // ── BR-01: the court-arrival welcome, COLORED by silverford_outcome ────────
+    // Two sibling leaves (truce vs war) tint the welcome with the war the party
+    // left in the Sunder-Carr. Both are flavor-only (NO consequences) and the
+    // story converges either way — the un-gated greeting/firstGreeting and the
+    // court-question leaves above carry the spine, so a flagless party simply
+    // never sees these and is never dead-ended (D-06/D-07). silverford_outcome is
+    // READ, never written.
+    {
+      id: 'vane_welcome_truce',
+      label: 'Let him take your measure as the ones who brokered the Silverford truce.',
+      condition: {
+        fact: 'flags',
+        path: '$.silverford_outcome',
+        operator: 'equal',
+        value: 'truce',
+      },
+      say: 'You’ll have heard, Commander. Silverford holds. Two armies stood down rather than bleed.',
+      reply:
+        'Vane’s smile thins to something colder. "Oh, the heartland heard. A truce ' +
+        'brokered by circuit Justiciars over the heads of two standing armies — yes, ' +
+        'that travelled. There are ministers in this hall who lost a tidy war to your ' +
+        'meddling, and they have long memories and longer dinners. You bought peace ' +
+        'in the marsh and a great many quiet enemies in the capital. Wear it well."',
+    },
+    {
+      id: 'vane_welcome_war',
+      label: 'Let him take your measure as the ones who came from the burning of Silverford.',
+      condition: {
+        fact: 'flags',
+        path: '$.silverford_outcome',
+        operator: 'equal',
+        value: 'war',
+      },
+      say: 'You’ll have heard, Commander. Silverford burned. The armies met before anyone could stop it.',
+      reply:
+        'For an instant the polish leaves Vane’s face and something older shows ' +
+        'through. "The Battle of Silverford. Yes. We heard the courier lists read out ' +
+        'in this very hall — name after name after name." The mask returns. "Do not ' +
+        'imagine that buys you sympathy here. A frontier that burns is a frontier the ' +
+        'heartland need no longer pretend to respect. You arrive trailing smoke, ' +
+        'Justiciars. See that you do not bring it indoors."',
+    },
+    // ── BR-02: Vane's one war-state READ on the conflict (truce/war siblings) ──
+    // The Imperium noble's private read on the war he half-owns — pure tone, NO
+    // consequences (D-08/D-09: one gated line each, flavor-only). Distinct beat
+    // from the arrival welcome above: this is him talking ABOUT the war when
+    // asked, not greeting the party with it.
+    {
+      id: 'vane_warread_truce',
+      label: 'Ask the Commander what the heartland makes of a frontier that chose peace.',
+      condition: {
+        fact: 'flags',
+        path: '$.silverford_outcome',
+        operator: 'equal',
+        value: 'truce',
+      },
+      say: 'And what does Valerion make of a truce in the Sunder-Carr, Commander — honestly?',
+      reply:
+        '"Honestly." He says the word like a rare coin. "It makes the capital nervous. ' +
+        'A frontier that can make its own peace is a frontier that has stopped needing ' +
+        'us — and nothing frightens old money like being unneeded. Half this court ' +
+        'would have preferred the war; a war they could sell. You took that from them. ' +
+        'I find I do not much mind. But I am not the half you should worry about."',
+    },
+    {
+      id: 'vane_warread_war',
+      label: 'Ask the Commander what the heartland makes of the war in the Sunder-Carr.',
+      condition: {
+        fact: 'flags',
+        path: '$.silverford_outcome',
+        operator: 'equal',
+        value: 'war',
+      },
+      say: 'And what does Valerion make of the war in the Sunder-Carr, Commander — honestly?',
+      reply:
+        '"Honestly? It makes the capital comfortable." His voice is very even. "A ' +
+        'burning frontier is a frontier that still needs the heartland’s armies, the ' +
+        'heartland’s coin, the heartland’s permission. There are men in this hall who ' +
+        'will dine well on that war for a decade. I am not certain I am one of them — ' +
+        'but I have learned not to say so over the soup. You lit no fire, Justiciars. ' +
+        'Remember that, when the comfortable men in this room try to hand you the ash."',
     },
   ],
 };
@@ -874,6 +964,50 @@ export const JAREK: CampaignRoomNpc = {
             'the chandeliers, and the only way past it is through.',
         },
       ],
+    },
+    // ── BR-02: Jarek's silverford_outcome carry read (truce/war siblings) ──────
+    // The war the party left in the Sunder-Carr feeds the Malgovian inquisitor's
+    // arcane-plague paranoia — a frontier in flames is, to him, a frontier where
+    // the plague spreads unwatched. Pure flavor: NO consequences, no jarek_stance
+    // write, no faction effect (D-08/D-09 — flavor-only, BR-02). silverford_outcome
+    // is READ, never written. These are available whatever his stance: tone, not
+    // a gate. The war leaf is the load-bearing one (the Phase-5 spec asserts it);
+    // the truce sibling keeps the carry-echo symmetric.
+    {
+      id: 'jarek_silverford_truce',
+      label: 'Tell the Inquisitor the Sunder-Carr stands down — a truce, not a fire.',
+      condition: {
+        fact: 'flags',
+        path: '$.silverford_outcome',
+        operator: 'equal',
+        value: 'truce',
+      },
+      say: 'For what it’s worth, Inquisitor — the frontier we came from holds. We left a truce, not a pyre.',
+      reply:
+        'Jarek’s eyes narrow a fraction. "A truce. So the Sunder-Carr is quiet, and ' +
+        'watched, and counting its own. Good. The plague loves a battlefield — all ' +
+        'those bodies, no one to burn them clean, the sickness walking out of the ' +
+        'dead before the carrion birds do. You did my order a service and never knew ' +
+        'it. A quiet frontier is one I do not have to set alight myself. See that it ' +
+        'stays quiet."',
+    },
+    {
+      id: 'jarek_silverford_war',
+      label: 'Tell the Inquisitor the Sunder-Carr is burning — a war the party could not stop.',
+      condition: {
+        fact: 'flags',
+        path: '$.silverford_outcome',
+        operator: 'equal',
+        value: 'war',
+      },
+      say: 'For what it’s worth, Inquisitor — the frontier we came from is at war. Silverford burned.',
+      reply:
+        'Something cold and certain settles over Jarek’s face. "Then it is already ' +
+        'too late for that ground, and you have only confirmed what my order has ' +
+        'always known: where men make war, the plague makes harvest. A battlefield is ' +
+        'a thousand open doors, Justiciars, and no one to bar a single one. If your ' +
+        'star-metal truly reads the source, you had best read it fast — because every ' +
+        'corpse in the Sunder-Carr tonight is a candle I cannot reach to snuff."',
     },
   ],
 };
