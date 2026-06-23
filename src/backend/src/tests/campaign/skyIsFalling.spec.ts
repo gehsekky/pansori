@@ -851,3 +851,49 @@ describe('Act II — relic_fuel_cell outcome contract (Task 4, A4 resolution)', 
     expect(partyWrite, 'the core-clear rule must write relic_fuel_cell="party"').toBe(true);
   });
 });
+
+// ─── Act II slice (Plan 04-02): the Jarek ball ambush mechanism (Task 1) ──────
+// PLANNER-RESOLVED engine read (Open Q1 / RESEARCH Assumption A1, Pitfall 3):
+// combat begins ONLY via runCombatStart, which fires on a PC attack/spell against
+// an enemy already materialized in the current room (ctx.livingEnemiesInRoom). A
+// dialogue `spawn_enemy` consequence merely adds a stray grid entity (synthetic
+// id `${enemyId}@${roomId}#${Date.now()}`, hardcoded pos 5,5) and does NOT start
+// initiative — and its synthetic id can never be a clear-rule target. THEREFORE
+// the Jarek ambush is authored as ROOM-PLACED enemies in valerion_ball_room
+// (D-08), NOT via spawn_enemy-from-dialogue. This guard locks that decision: no
+// Act II NPC dialogue may drive the Jarek ambush through a spawn_enemy
+// consequence — the fragile path is forbidden by construction.
+// Scan an NPC's full response tree (incl. check onSuccess/onFail) for a
+// spawn_enemy consequence — the fragile-path detector the ambush guard leans on.
+function firesSpawnEnemy(npc: CampaignRoomNpc): boolean {
+  const hasSpawn = (cons: Array<Record<string, unknown>> | undefined): boolean =>
+    (cons ?? []).some((c) => c.type === 'spawn_enemy');
+  const walk = (responses: CampaignRoomNpcResponse[] | undefined): boolean => {
+    for (const r of responses ?? []) {
+      if (hasSpawn(r.consequences)) return true;
+      const check = r.check as
+        | { onSuccess?: Array<Record<string, unknown>>; onFail?: Array<Record<string, unknown>> }
+        | undefined;
+      if (hasSpawn(check?.onSuccess) || hasSpawn(check?.onFail)) return true;
+      if (walk(r.responses)) return true;
+    }
+    return false;
+  };
+  return walk(npc.responses);
+}
+
+describe('Act II — the Jarek ambush is room-placed, not dialogue spawn_enemy (Plan 04-02, Task 1)', () => {
+  it('no Act II NPC dialogue fires a spawn_enemy consequence (the ambush is room-placed)', () => {
+    // The ambush troopers live in the ball room's `enemies` array (combat starts
+    // the normal PC-attack way); a spawn_enemy in dialogue would be the fragile,
+    // never-clearing path the engine read rules out (Pitfall 3). This guard covers
+    // every authored Act II NPC and stays valid as the Jarek tree is added.
+    const act2Npcs: CampaignRoomNpc[] = [VANE_ACT2, QUENTIN, ELARA];
+    for (const npc of act2Npcs) {
+      expect(
+        firesSpawnEnemy(npc),
+        `Act II NPC "${npc.id}" must not drive an ambush via spawn_enemy (the Jarek ambush is room-placed; engine read, Pitfall 3)`
+      ).toBe(false);
+    }
+  });
+});
