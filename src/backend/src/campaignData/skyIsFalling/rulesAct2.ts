@@ -177,4 +177,31 @@ export const RULES_ACT2: GameRule[] = [
       },
     ],
   },
+
+  // ── Side-quest clear: the market straggler (Plan 05-03 / SQ-01) ─────────────
+  // The OPTIONAL light-combat capital side quest (q_market_straggler): the turned
+  // Sect straggler casing the Scholars' Market is down. Keyed on its count-1 named
+  // id (roomsAct2 valerion_market_room#straggler), the same store_flip idiom as the
+  // raid clears. Sets market_straggler_cleared=true (q_market_straggler's single
+  // step reads it) + a narrative beat. once:true. This is an OPTIONAL errand — it
+  // gates no main-spine beat and no act transition; the steward (npcsAct2 STEWARD)
+  // gives it and the household purse pays out via the quest reward.
+  {
+    name: 'market_straggler_clear',
+    once: true,
+    conditions: {
+      all: [killed('valerion_market_room#straggler')],
+    },
+    consequences: [
+      { type: 'set_flag', key: 'market_straggler_cleared', value: true },
+      {
+        type: 'add_narrative',
+        text:
+          'The glass-eyed watcher folds among the overturned chart-stalls and lies ' +
+          'finally still, the Weaver’s cold hum gone out of it. The Scholars’ Market ' +
+          'is the booksellers’ own again — and the steward at the ball will keep his ' +
+          'quiet word.',
+      },
+    ],
+  },
 ];

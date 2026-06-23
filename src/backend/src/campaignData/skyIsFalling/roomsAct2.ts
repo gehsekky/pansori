@@ -21,7 +21,7 @@
 // carry an in-bounds pos off the entry/exit cells (the room-object-placement
 // spec enforces it).
 
-import { ELARA, JAREK, QUENTIN, VANE_ACT2 } from './npcsAct2.js';
+import { BOOKSELLER, DOWAGER, ELARA, JAREK, QUENTIN, STEWARD, VANE_ACT2 } from './npcsAct2.js';
 import type { CampaignRoom } from '../../services/campaignContent.js';
 
 // A w×h grid of empty cells; callers overwrite specific cells for terrain
@@ -98,7 +98,14 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     // High Inquisitor Jarek at the ball (D-09): the social high-wire's stage. Placed
     // upper-central on the 11×9 grid, in-bounds and off the entry/exit cell (5,8)
     // (Pitfall 4). q_jarek activates on encountering him here (D-09).
-    npcs: [{ ...JAREK, pos: { x: 5, y: 2 } }],
+    // Jarek (the spine NPC) plus Steward Halbrook, the side-quest giver who points
+    // the party at the market straggler (Plan 05-03 / SQ-01). The steward is
+    // upper-right, in-bounds on the 11×9 grid, off the entry/exit cell (5,8) and
+    // clear of Jarek (5,2) (Pitfall 4 placement discipline).
+    npcs: [
+      { ...JAREK, pos: { x: 5, y: 2 } },
+      { ...STEWARD, pos: { x: 8, y: 3 } },
+    ],
     // The room-placed ambush (D-08; engine read, Plan 04-02 Task 1): the Subverted
     // troopers are present as room enemies the WHOLE time — Jarek's hostile dialogue
     // path only cues them to draw (it sets jarek_stance='hostile' + a narrative, NOT
@@ -125,6 +132,10 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     entryPos: { x: 3, y: 5 },
     grid: grid(7, 6),
     exits: [{ pos: { x: 3, y: 5 }, ascends: true, label: 'Out to the Court District' }],
+    // Marchioness Adelheid, the old-money side-quest giver (Plan 05-03 / SQ-01),
+    // holding court at the best settle: upper-central on the 7×6 grid, off the
+    // entry/exit cell (3,5) (Pitfall 4).
+    npcs: [{ ...DOWAGER, pos: { x: 3, y: 2 } }],
   },
   {
     id: 'grand_library_room',
@@ -174,6 +185,18 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     entryPos: { x: 4, y: 6 },
     grid: grid(8, 7),
     exits: [{ pos: { x: 4, y: 6 }, ascends: true, label: 'Out to the Library District' }],
+    // Corwin Vell, the market folio side-quest giver (Plan 05-03 / SQ-01), at his
+    // chart stall: upper-left on the 8×7 grid, off the entry/exit cell (4,6) and
+    // well clear of the straggler placement below (Pitfall 4).
+    npcs: [{ ...BOOKSELLER, pos: { x: 2, y: 2 } }],
+    // The light-combat side quest (q_market_straggler, Plan 05-03 / SQ-01): one
+    // turned Sect straggler casing the market, drawn from the EXISTING Phase-2
+    // reskin roster (Subverted Sentry — the lighter subverted-soldier variant),
+    // FULL SRD-default Guard numbers, NO tuning. The count-1 NAMED id
+    // (valerion_market_room#straggler) is the clear target the RULES_ACT2
+    // market_straggler_clear rule keys on (named-id contract — never positional).
+    // Optional fight on an EXISTING room: no new monster, no new room (D-11).
+    enemies: [{ name: 'Subverted Sentry', id: 'valerion_market_room#straggler' }],
   },
   // ── Heartland flavor-site rooms ────────────────────────────────────────────
   {
