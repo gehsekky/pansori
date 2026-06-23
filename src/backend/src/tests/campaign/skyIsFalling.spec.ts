@@ -15,7 +15,7 @@ import type {
   CampaignRoomNpcResponse,
   CampaignTown,
 } from '../../services/campaignContent.js';
-import { ELARA, QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
+import { ELARA, JAREK, QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
 import type { GameRule, Quest } from '../../types.js';
 import { describe, expect, it } from 'vitest';
 import { QUESTS_ACT2 } from '../../campaignData/skyIsFalling/questsAct2.js';
@@ -888,12 +888,174 @@ describe('Act II — the Jarek ambush is room-placed, not dialogue spawn_enemy (
     // the normal PC-attack way); a spawn_enemy in dialogue would be the fragile,
     // never-clearing path the engine read rules out (Pitfall 3). This guard covers
     // every authored Act II NPC and stays valid as the Jarek tree is added.
-    const act2Npcs: CampaignRoomNpc[] = [VANE_ACT2, QUENTIN, ELARA];
+    const act2Npcs: CampaignRoomNpc[] = [VANE_ACT2, QUENTIN, ELARA, JAREK];
     for (const npc of act2Npcs) {
       expect(
         firesSpawnEnemy(npc),
         `Act II NPC "${npc.id}" must not drive an ambush via spawn_enemy (the Jarek ambush is room-placed; engine read, Pitfall 3)`
       ).toBe(false);
+    }
+  });
+
+  it('the ball room places the Jarek ambush troopers as room enemies (the room-placed path)', () => {
+    // The mechanism's positive half: valerion_ball_room carries the ambush in its
+    // `enemies` array, so attacking a trooper starts combat the normal PC-attack way.
+    const ball = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'valerion_ball_room') as
+      | (CampaignRoom & { enemies?: Array<{ name: string; id?: string }> })
+      | undefined;
+    expect(ball, 'valerion_ball_room must exist').toBeDefined();
+    expect(
+      (ball!.enemies ?? []).length,
+      'the ball room must place the ambush troopers as room enemies'
+    ).toBeGreaterThan(0);
+  });
+});
+
+// ─── Act II slice (Plan 04-02): the Jarek negotiation tree (Task 2) ───────────
+describe('Act II — JAREK negotiation tree (allied/wary/hostile), retry-friendly', () => {
+  const responses = flattenResponses(JAREK);
+
+  it('JAREK is npc_jarek, friendly (the menu opens with no CHA gate)', () => {
+    expect(JAREK.id).toBe('npc_jarek');
+    expect(JAREK.attitude).toBe('friendly');
+  });
+
+  it('every JAREK check rolls persuasion (never arcana/investigation — CHA-only union)', () => {
+    const checks = responses
+      .map((r) => r.check as { skill?: string } | undefined)
+      .filter((c): c is { skill?: string } => !!c);
+    expect(checks.length, 'JAREK must author at least one negotiation check').toBeGreaterThan(0);
+    for (const c of checks) {
+      expect(c.skill, `JAREK check skill "${c.skill}" must be persuasion`).toBe('persuasion');
+    }
+  });
+
+  it('no JAREK check flips to hostile on failure and none is `once` (retry-friendly, LORIEN idiom)', () => {
+    // A failed roll must NOT set hostile and must NOT be the only path forward.
+    const json = JSON.stringify(JAREK);
+    const hostileFlip = /"type"\s*:\s*"set_npc_attitude"[^}]*"attitude"\s*:\s*"hostile"/.test(json);
+    expect(hostileFlip, 'JAREK must not flip to hostile via a check (set_npc_attitude)').toBe(
+      false
+    );
+    for (const r of responses) {
+      if (r.check) {
+        expect(r.once, `JAREK check "${r.id}" must not be once (retry-friendly)`).not.toBe(true);
+        // onFail must set NO flag — a failed roll never decides jarek_stance.
+        const onFail = (r.check as { onFail?: Array<Record<string, unknown>> }).onFail ?? [];
+        expect(
+          onFail.some((c) => c.type === 'set_flag'),
+          `JAREK check "${r.id}" onFail must not set any flag (a failed roll decides nothing)`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('the persuasion check sets jarek_stance=allied ONLY on success (onSuccess), never on fail', () => {
+    const checkResp = responses.find((r) => r.check);
+    expect(checkResp, 'JAREK must have a negotiation check').toBeDefined();
+    const check = checkResp!.check as {
+      onSuccess?: Array<Record<string, unknown>>;
+      onFail?: Array<Record<string, unknown>>;
+    };
+    expect(
+      (check.onSuccess ?? []).some(
+        (c) => c.type === 'set_flag' && c.key === 'jarek_stance' && c.value === 'allied'
+      ),
+      'the check onSuccess must set jarek_stance=allied'
+    ).toBe(true);
+    expect(
+      (check.onFail ?? []).some((c) => c.type === 'set_flag' && c.key === 'jarek_stance'),
+      'the check onFail must NOT set jarek_stance'
+    ).toBe(false);
+  });
+
+  it('jarek_stance is authored to all three values allied/wary/hostile across distinct paths', () => {
+    // Collect every (path, value) jarek_stance write across the tree.
+    const stanceValues = new Set<string>();
+    const eat = (cons: Array<Record<string, unknown>> | undefined) => {
+      for (const c of cons ?? []) {
+        if (c.type === 'set_flag' && c.key === 'jarek_stance' && typeof c.value === 'string') {
+          stanceValues.add(c.value);
+        }
+      }
+    };
+    for (const r of responses) {
+      eat(r.consequences);
+      const check = r.check as
+        | { onSuccess?: Array<Record<string, unknown>>; onFail?: Array<Record<string, unknown>> }
+        | undefined;
+      eat(check?.onSuccess);
+      eat(check?.onFail);
+    }
+    expect([...stanceValues].sort()).toEqual(['allied', 'hostile', 'wary']);
+  });
+
+  it('the hostile path is a SEPARATE player-chosen option (not the check), and cues the ambush', () => {
+    // hostile is set by a plain `consequences` option, NOT inside a check's
+    // onSuccess/onFail — so it can only be reached by deliberately picking it.
+    const hostileViaConsequences = responses.some(
+      (r) =>
+        !r.check &&
+        (r.consequences ?? []).some(
+          (c) => c.type === 'set_flag' && c.key === 'jarek_stance' && c.value === 'hostile'
+        )
+    );
+    expect(
+      hostileViaConsequences,
+      'jarek_stance=hostile must be a separate player-chosen option, not a check outcome'
+    ).toBe(true);
+    // And that same option adds an ambush narrative beat (the cue to draw steel).
+    const hostileOpt = responses.find((r) =>
+      (r.consequences ?? []).some(
+        (c) => c.type === 'set_flag' && c.key === 'jarek_stance' && c.value === 'hostile'
+      )
+    );
+    expect(
+      (hostileOpt!.consequences ?? []).some((c) => c.type === 'add_narrative'),
+      'the hostile option must add an ambush narrative beat'
+    ).toBe(true);
+  });
+});
+
+describe('Act II — valerion_ball_room (Jarek embedded, ambush room-placed)', () => {
+  const ball = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'valerion_ball_room') as
+    | (CampaignRoom & { enemies?: Array<{ name: string; count?: number; id?: string }> })
+    | undefined;
+
+  it('embeds Jarek on a valid, in-bounds cell off the entry/exit (Pitfall 4)', () => {
+    expect(ball, 'valerion_ball_room must exist').toBeDefined();
+    const w = ball!.grid[0]?.length ?? 0;
+    const h = ball!.grid.length;
+    const blocked = new Set<string>([`${ball!.entryPos.x},${ball!.entryPos.y}`]);
+    for (const ex of ball!.exits ?? []) blocked.add(`${ex.pos.x},${ex.pos.y}`);
+    const jarek = (ball!.npcs ?? []).find((n) => n.id === 'npc_jarek');
+    expect(jarek, 'valerion_ball_room must embed npc_jarek').toBeDefined();
+    const p = jarek!.pos!;
+    expect(p, 'Jarek must have an authored pos').toBeDefined();
+    expect(
+      p.x >= 0 && p.x < w && p.y >= 0 && p.y < h,
+      `Jarek pos (${p.x},${p.y}) out of bounds on the ${w}×${h} grid`
+    ).toBe(true);
+    expect(
+      blocked.has(`${p.x},${p.y}`),
+      `Jarek sits on the entry/exit cell (${ball!.entryPos.x},${ball!.entryPos.y})`
+    ).toBe(false);
+  });
+
+  it('places the ambush troopers with the two count-1 named ids the clear rule keys on, exact reskin names', () => {
+    const placements = ball!.enemies ?? [];
+    // The named, count-1 ids (clear-rule targets).
+    const namedIds = placements
+      .filter((e) => (e.count ?? 1) === 1 && typeof e.id === 'string')
+      .map((e) => e.id as string)
+      .sort();
+    expect(namedIds).toEqual(['valerion_ball_room#trooper1', 'valerion_ball_room#trooper2']);
+    // Every placement uses an exact Act II reskin clone name (never a bare SRD name).
+    const RESKIN = new Set(['Subverted Vanguard', 'Subverted Sentry']);
+    for (const e of placements) {
+      expect(RESKIN.has(e.name), `ambush enemy "${e.name}" must be an Act II reskin name`).toBe(
+        true
+      );
     }
   });
 });

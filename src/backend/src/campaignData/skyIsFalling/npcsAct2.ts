@@ -20,6 +20,14 @@
 //                    martha_hint callback line AND the neutral line (D-04/D-05).
 //                    Never hard-gated on chrono_shard (the decode proceeds
 //                    without it; D-06 safety net). Closes q_library.
+//   jarek_stance   — STRING ('allied' | 'wary' | 'hostile'): the outcome of the
+//                    High Inquisitor Jarek negotiation at the ball (D-07). Set in
+//                    JAREK's tree below — 'allied' on the persuasion check's
+//                    onSuccess, 'wary' on the neutral-exit line, 'hostile' on the
+//                    separate confrontational option (which trips the room-placed
+//                    ambush; D-08). A FAILED check sets nothing (retry-friendly).
+//                    q_jarek's stance step keys on it; the Phase-5 ending branches
+//                    on it.
 //
 // Flags READ but never re-set by this module (Act I carry threads):
 //   martha_hint    — set in Act I by Sister Martha touching the Chrono-Shard
@@ -353,6 +361,159 @@ export const ELARA: CampaignRoomNpc = {
         'they wring the fuel-cell open and the sky finishes falling. Go. The hidden ' +
         'stair is in the corner — I will hold the door behind you."',
       consequences: [{ type: 'start_quest', questId: 'q_fuel_cell' }],
+    },
+  ],
+};
+
+// ── High Inquisitor Jarek — the arcane-plague paranoiac · valerion_ball_room ──
+// NEW npc (`npc_jarek`). The act's tonal counterpoint (MQ-04 / NPC-02): a
+// Malgovian inquisitor met under the chandeliers of the high-society ball, whose
+// arcane-plague terror can be talked DOWN (allied), left UNSETTLED (wary), or
+// PROVOKED into a ballroom ambush (hostile). `attitude: 'friendly'` so the menu
+// opens with no CHA gate — his menace is in the lines, not a locked door.
+//
+// jarek_stance VOCABULARY (load-bearing — the flag the Phase-5 ending branches
+// on, D-07): a STRING flag with three authored values —
+//   allied  — set on the retry-friendly persuasion check's onSuccess (the party
+//             convinces him they are not plague-carriers). The warm outcome.
+//   wary    — set on the neutral/partial exit line's consequences (the default;
+//             he stays suspicious but holds his hand). The middle outcome.
+//   hostile — set on a SEPARATE, deliberate confrontational option's consequences
+//             (the player CHOOSES to push him over the edge). Trips the ambush.
+//
+// RETRY-FRIENDLY DISCIPLINE (Act I LORIEN incident, npcs.ts L193-200; D-08):
+// the persuasion check is a beat, NOT a gate. onFail: [] (NEVER hostile), the
+// failReply invites another attempt, and the check carries NO `once`. A FAILED
+// roll never sets jarek_stance and never turns him hostile — hostility is ONLY
+// reachable via the explicit confrontational option below. This honors the
+// "no looping hostility-on-fail check" rule: the dice never force a fight.
+//
+// AMBUSH MECHANISM (engine read, Plan 04-02 Task 1; D-08): the hostile option
+// sets jarek_stance='hostile' + an ambush NARRATIVE only — it does NOT fire a
+// spawn_enemy (a dialogue spawn_enemy adds a stray pos-(5,5) entity that never
+// starts initiative and whose synthetic id can't be a clear-rule target). The
+// ambush troopers are ROOM-PLACED in valerion_ball_room (roomsAct2.ts) with named
+// ids the jarek_ambush_clear rule (rulesAct2.ts) keys on; attacking one starts
+// combat the normal PC-attack way. The hostile narrative is the cue that the
+// already-present Subverted troopers draw their blades.
+//
+// Cameo stat block (Claude's Discretion, D-07): an inquisitor with a personal
+// guard's heft — NOT a pushover, but not a boss. He himself is not the ambush
+// (the named room troopers are); his block is the cameo-combat fallback.
+export const JAREK: CampaignRoomNpc = {
+  id: 'npc_jarek',
+  name: 'High Inquisitor Jarek',
+  attitude: 'friendly',
+  icon: 'pointy-hat',
+  hp: 39,
+  ac: 16,
+  damage: '1d8+2',
+  toHit: 5,
+  xp: 0,
+  greeting: [
+    'A tall man in Malgovian inquisitor’s black detaches himself from the dancers, ' +
+      'a silver plague-ward glinting at his throat. He does not bow. "The frontier ' +
+      'Justiciars. I am told you carry star-metal into a ballroom full of clean ' +
+      'people. You will forgive me if I do not applaud."',
+  ],
+  firstGreeting: [
+    'The music thins as a man in inquisitor’s black crosses the floor toward you, ' +
+      'and the dancers part for him the way a crowd parts from a held torch. A ' +
+      'silver ward hangs at his throat, etched against the arcane plague his order ' +
+      'was raised to burn. "High Inquisitor Jarek," he says, without warmth. "I ' +
+      'make it my business to know what walks into a room. And what walked into ' +
+      'this one is listening to a frequency that has killed cities. Convince me, ' +
+      'Justiciars, that I should let you keep breathing the same air as these ' +
+      'people — or do not, and we will resolve it another way."',
+  ],
+  goodbye: [
+    'Jarek watches you go without blinking, one hand never far from the ward at his throat.',
+  ],
+  responses: [
+    // 1. The negotiation — a retry-friendly persuasion check → jarek_stance=allied.
+    // CHA-only union (NEVER arcana/investigation — those would silently roll off
+    // Charisma, RESEARCH Anti-Pattern). onFail: [] (no hostility, no flag set), NO
+    // `once`, failReply invites a retry. SRD: Ability Checks — DC 15 (a hard sell:
+    // talking a plague-inquisitor off his fear).
+    {
+      id: 'jarek_reassure',
+      label: 'Make the case that the star-metal is the cure’s key, not the contagion.',
+      say:
+        'Inquisitor — we did not bring a plague into your ball. We brought the thing ' +
+        'that reads where the plague comes FROM. Burn us, and you burn the only map ' +
+        'to the source. Hear me out, fully, before you decide what we are.',
+      check: {
+        skill: 'persuasion',
+        dc: 15,
+        successReply:
+          'Jarek listens — truly listens, the way few of his order ever do — and the ' +
+          'hand at his ward slowly lowers. "...A map to the source," he says at last. ' +
+          '"Not carriers. Cartographers. I have hunted this thing for eleven years and ' +
+          'never once been offered its address." A thin, dangerous smile. "Very well. ' +
+          'You have an inquisitor’s ear, and his reach. Use them well — I will know if ' +
+          'you waste them."',
+        failReply:
+          'Jarek’s jaw tightens, but his hand stays at his side. "No. That is the ' +
+          'sound of clever people explaining a corpse. I am not yet convinced — but I ' +
+          'am not yet decided against you, either. Try again, Justiciars. Make me ' +
+          'believe it. My patience is longer than my mercy."',
+        onSuccess: [{ type: 'set_flag', key: 'jarek_stance', value: 'allied' }],
+        // No hostility, no flag, on a failed roll — the dice never force the issue
+        // (LORIEN idiom). Hostility is the explicit option below, never this check.
+        onFail: [],
+      },
+    },
+    // 2. The neutral/partial exit → jarek_stance='wary' (the default; D-07). A
+    // childless leaf: it plays its reply, sets the flag, and leaves the menu. The
+    // party can walk away without convincing OR provoking him — he simply keeps a
+    // cold eye on them. Safe to take at any time; sets wary so the Phase-5 ending
+    // has a middle outcome even for a party that never rolled the check.
+    {
+      id: 'jarek_demur',
+      label: 'Decline to argue it out — let him keep his suspicions, and go.',
+      say:
+        'We won’t talk circles under your chandeliers, Inquisitor. Believe what you ' +
+        'like of us. We have work below this city, and it will not wait on your ward.',
+      reply:
+        'Jarek inclines his head a precise degree, granting nothing. "Then we ' +
+        'understand each other imperfectly, which is the heartland’s native ' +
+        'condition. Go about your work, Justiciars. I will be watching it — and you ' +
+        '— with the particular attention I reserve for things I have not yet decided ' +
+        'to burn."',
+      consequences: [{ type: 'set_flag', key: 'jarek_stance', value: 'wary' }],
+    },
+    // 3. The SEPARATE confrontational path → jarek_stance='hostile' + ambush
+    // narrative (D-08). This is a DELIBERATE player choice, not a punished roll —
+    // it sets hostile and cues the already-room-placed Subverted troopers to draw.
+    // NO spawn_enemy (engine read, Task 1): the ambush is the room's `enemies`,
+    // attackable the normal way; this beat only sets the flag and tells the player
+    // the trap has sprung. Hidden behind no condition so it is always an available
+    // path, but it is its own option — a failed jarek_reassure never lands here.
+    {
+      id: 'jarek_provoke',
+      label: 'Call his crusade what it is — a butcher’s fear in a holy collar.',
+      say:
+        'Eleven years of burning the sick to feel clean, Inquisitor? That isn’t an ' +
+        'inquisition. It’s a frightened man with a torch and a title. We’ll find the ' +
+        'source with or without your blessing — and the bodies on your ledger are ' +
+        'yours, not the plague’s.',
+      reply:
+        'For one heartbeat Jarek does not move. Then he lifts two fingers, almost ' +
+        'gently — and across the ballroom the music dies as the liveried "servants" ' +
+        'set down their trays and draw steel from beneath them. "You mistake fear ' +
+        'for cowardice," he says, very quietly, backing into the crowd as his ' +
+        'Subverted close in around you. "It is the only sane response to what you ' +
+        'carry. Take them — and mind the chandeliers."',
+      consequences: [
+        { type: 'set_flag', key: 'jarek_stance', value: 'hostile' },
+        {
+          type: 'add_narrative',
+          text:
+            'The dancers scatter screaming for the doors. The trap was always set — ' +
+            'Jarek’s troopers were among the guests the whole time. Steel is out under ' +
+            'the chandeliers, and the only way past it is through.',
+        },
+      ],
     },
   ],
 };

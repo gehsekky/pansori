@@ -21,7 +21,7 @@
 // carry an in-bounds pos off the entry/exit cells (the room-object-placement
 // spec enforces it).
 
-import { ELARA, QUENTIN, VANE_ACT2 } from './npcsAct2.js';
+import { ELARA, JAREK, QUENTIN, VANE_ACT2 } from './npcsAct2.js';
 import type { CampaignRoom } from '../../services/campaignContent.js';
 
 // A w×h grid of empty cells; callers overwrite specific cells for terrain
@@ -88,12 +88,30 @@ export const ROOMS_ACT2: CampaignRoom[] = [
     desc:
       'A vast ballroom blazing with crystal chandeliers, the polished floor ' +
       'mirroring candlelight. Musicians tune in an alcove; the heartland’s elite ' +
-      'will gather here under a fortune in glass.',
+      'gather here under a fortune in glass — and somewhere among them, an ' +
+      'inquisitor in black is watching the doors.',
     floor: 'cobblestone',
     lighting: 'bright',
     entryPos: { x: 5, y: 8 },
     grid: grid(11, 9),
     exits: [{ pos: { x: 5, y: 8 }, ascends: true, label: 'Out to the Court District' }],
+    // High Inquisitor Jarek at the ball (D-09): the social high-wire's stage. Placed
+    // upper-central on the 11×9 grid, in-bounds and off the entry/exit cell (5,8)
+    // (Pitfall 4). q_jarek activates on encountering him here (D-09).
+    npcs: [{ ...JAREK, pos: { x: 5, y: 2 } }],
+    // The room-placed ambush (D-08; engine read, Plan 04-02 Task 1): the Subverted
+    // troopers are present as room enemies the WHOLE time — Jarek's hostile dialogue
+    // path only cues them to draw (it sets jarek_stance='hostile' + a narrative, NOT
+    // a spawn_enemy). Attacking one starts combat the normal PC-attack way. The
+    // jarek_ambush_clear rule (rulesAct2.ts) keys on the two count-1 NAMED ids; a
+    // third unnamed Sentry adds body to the line without gating the clear (the
+    // approach-room idiom: clear targets are count-1 named ids, RESEARCH Pitfall 1).
+    // FULL SRD-default Veteran/Guard numbers, no tuning (D-10).
+    enemies: [
+      { name: 'Subverted Vanguard', id: 'valerion_ball_room#trooper1' },
+      { name: 'Subverted Sentry', id: 'valerion_ball_room#trooper2' },
+      { name: 'Subverted Sentry' },
+    ],
   },
   {
     id: 'valerion_inn_room',
