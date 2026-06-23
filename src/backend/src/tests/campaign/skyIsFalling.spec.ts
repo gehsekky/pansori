@@ -9,6 +9,15 @@
 // either bug fails here instead of in someone's playthrough.
 
 import type { Act, GameRule, Quest } from '../../types.js';
+import {
+  BOOKSELLER,
+  DOWAGER,
+  ELARA,
+  JAREK,
+  QUENTIN,
+  STEWARD,
+  VANE_ACT2,
+} from '../../campaignData/skyIsFalling/npcsAct2.js';
 import type {
   CampaignRegion,
   CampaignRoom,
@@ -16,7 +25,6 @@ import type {
   CampaignRoomNpcResponse,
   CampaignTown,
 } from '../../services/campaignContent.js';
-import { ELARA, JAREK, QUENTIN, VANE_ACT2 } from '../../campaignData/skyIsFalling/npcsAct2.js';
 import { describe, expect, it } from 'vitest';
 import { ACTS } from '../../campaignData/skyIsFalling/acts.js';
 import { QUESTS_ACT2 } from '../../campaignData/skyIsFalling/questsAct2.js';
@@ -1707,5 +1715,234 @@ describe('Act II — Elara eve-of-departure debrief (Plan 05-01)', () => {
     expect(setsFlag(depart!, 'act2_departed'), 'elara_depart must set act2_departed').toBe(true);
     // The depart leaf is replayable-safe (not once-locked).
     expect(depart!.once, 'elara_depart must not be once-locked').not.toBe(true);
+  });
+});
+// ─── Act II — side-quest texture layer (Plan 05-03 / SQ-01) ───────────────────
+// 2-3 OPTIONAL capital side quests give Valerion the lived-in texture Silverford
+// has — an old-money inn favor, a scholars'-market folio fetch, and one light
+// optional fight (a Sect straggler casing the market). None are startActive; none
+// gate Act II's resolution. The combat quest completes via a named-id clear rule
+// on a count-1 placement, reusing the existing Phase-2 reskin roster on an
+// EXISTING room — no new monsters, no new room.
+describe('Act II — side-quest texture layer (Plan 05-03 / SQ-01)', () => {
+  // The three side quests this plan authors, paired with their giver + the
+  // completion sub-flag each single step reads.
+  const SIDE_QUESTS: Array<{ questId: string; giver: string; flag: string; combat?: boolean }> = [
+    { questId: 'q_dowager_favor', giver: 'npc_dowager', flag: 'dowager_favor_done' },
+    { questId: 'q_market_folio', giver: 'npc_bookseller', flag: 'market_folio_done' },
+    {
+      questId: 'q_market_straggler',
+      giver: 'npc_steward',
+      flag: 'market_straggler_cleared',
+      combat: true,
+    },
+  ];
+  const GIVERS: Record<string, CampaignRoomNpc> = {
+    npc_dowager: DOWAGER,
+    npc_bookseller: BOOKSELLER,
+    npc_steward: STEWARD,
+  };
+  // Venue rooms the givers embed into (inn / market / ball).
+  const VENUE_ROOMS = ['valerion_inn_room', 'valerion_market_room', 'valerion_ball_room'];
+  const SPINE_GIVERS = new Set(['npc_elara', 'npc_vane', 'npc_quentin', 'npc_jarek']);
+
+  const questById = new Map((QUESTS_ACT2 as Quest[]).map((q) => [q.id, q] as const));
+  const roomById = new Map((ROOMS_ACT2 as CampaignRoom[]).map((r) => [r.id, r] as const));
+
+  it('appends 2-3 new optional, single-step, giver-having act2 side quests (NOT startActive)', () => {
+    expect(SIDE_QUESTS.length).toBeGreaterThanOrEqual(2);
+    expect(SIDE_QUESTS.length).toBeLessThanOrEqual(3);
+    for (const sq of SIDE_QUESTS) {
+      const quest = questById.get(sq.questId);
+      expect(quest, `QUESTS_ACT2 must contain ${sq.questId}`).toBeDefined();
+      expect(quest!.actId, `${sq.questId} must be an act2 quest`).toBe('act2');
+      expect(quest!.startActive, `${sq.questId} must NOT be startActive (optional)`).not.toBe(true);
+      expect(quest!.giverNpcId, `${sq.questId} must have a giverNpcId`).toBe(sq.giver);
+      expect(quest!.steps?.length, `${sq.questId} must be single-step`).toBe(1);
+    }
+  });
+
+  it('each side quest step keys on its completion sub-flag', () => {
+    for (const sq of SIDE_QUESTS) {
+      const quest = questById.get(sq.questId)!;
+      const step = quest.steps[0];
+      expect(
+        stepReferencesFlag(step.condition, sq.flag),
+        `${sq.questId} step must read the ${sq.flag} flag`
+      ).toBe(true);
+    }
+  });
+
+  it('every side quest sub-flag has a writing site (giver set_flag, or the combat clear rule)', () => {
+    for (const sq of SIDE_QUESTS) {
+      if (sq.combat) {
+        // The combat sub-flag is written by a RULES_ACT2 clear rule, NOT dialogue.
+        const ruleWritesFlag = (RULES_ACT2 as GameRule[]).some((r) =>
+          ruleSetFlags(r).some((f) => f.key === sq.flag && f.value === true)
+        );
+        expect(
+          ruleWritesFlag,
+          `combat sub-flag ${sq.flag} must be set by a RULES_ACT2 clear rule`
+        ).toBe(true);
+      } else {
+        // The social sub-flags are written by the giver's own dialogue.
+        const giver = GIVERS[sq.giver];
+        const writes = flattenResponses(giver).some((r) => setsFlag(r, sq.flag));
+        expect(writes, `social sub-flag ${sq.flag} must be set in ${sq.giver}'s dialogue`).toBe(
+          true
+        );
+      }
+    }
+  });
+
+  it('the combat side quest clear rule keys EXACTLY on count-1 named placements in its room (named-id integrity)', () => {
+    const combat = SIDE_QUESTS.find((sq) => sq.combat)!;
+    // Find the clear rule that writes the combat sub-flag.
+    const rule = (RULES_ACT2 as GameRule[]).find((r) =>
+      ruleSetFlags(r).some((f) => f.key === combat.flag && f.value === true)
+    );
+    expect(rule, `a clear rule must write ${combat.flag}`).toBeDefined();
+    expect(rule!.once, 'the combat clear rule must be once:true').toBe(true);
+
+    const ruleIds = ruleKilledIds(rule).sort();
+    expect(ruleIds.length, 'the clear rule must key on at least one named enemy').toBeGreaterThan(
+      0
+    );
+
+    // Each rule id must be an EXPLICIT named id (roomId#name, never positional
+    // roomId#<digit>) that exists as a count-1 placement in exactly one room.
+    const allPlacedNamed = new Set<string>();
+    for (const room of ROOMS_ACT2 as CampaignRoom[]) {
+      for (const e of (room.enemies ?? []) as Array<{ id?: string; count?: number }>) {
+        if (typeof e.id === 'string' && (e.count ?? 1) === 1) allPlacedNamed.add(e.id);
+      }
+    }
+    for (const id of ruleIds) {
+      expect(/#\d+$/.test(id), `rule id "${id}" must not be a positional roomId#<n> id`).toBe(
+        false
+      );
+      expect(id.includes('#'), `rule id "${id}" must be a "<roomId>#<name>" named id`).toBe(true);
+      expect(
+        allPlacedNamed.has(id),
+        `rule id "${id}" must match a count-1 named placement in a room`
+      ).toBe(true);
+    }
+
+    // And the room that holds those placements draws ONLY from the existing reskin
+    // roster (no new monsters), full count-1 (no tuned counts on the named target).
+    const RESKIN = new Set([
+      'Weaver Adept',
+      'Weaver Magus',
+      'Subverted Vanguard',
+      'Subverted Sentry',
+    ]);
+    const roomWithTargets = (ROOMS_ACT2 as CampaignRoom[]).find((room) =>
+      (room.enemies ?? []).some((e) => typeof e.id === 'string' && ruleIds.includes(e.id as string))
+    );
+    expect(roomWithTargets, 'the named placements must live on an existing room').toBeDefined();
+    for (const e of roomWithTargets!.enemies ?? []) {
+      expect(
+        RESKIN.has(e.name),
+        `combat-room enemy "${e.name}" must be an existing reskin clone (no new monsters)`
+      ).toBe(true);
+    }
+  });
+
+  it('embeds each giver into an inn/market/ball venue room, friendly with a once start_quest response', () => {
+    for (const sq of SIDE_QUESTS) {
+      const giver = GIVERS[sq.giver];
+      expect(giver.attitude, `${sq.giver} must be friendly (no CHA gate to open)`).toBe('friendly');
+      // The giver is embedded in one of the three venue rooms.
+      const hostRoom = VENUE_ROOMS.map((id) => roomById.get(id)).find((room) =>
+        (room?.npcs ?? []).some((n) => n.id === sq.giver)
+      );
+      expect(
+        hostRoom,
+        `${sq.giver} must be embedded in an inn/market/ball venue room`
+      ).toBeDefined();
+      // A once response fires start_quest for this quest.
+      const startsQuest = flattenResponses(giver).some(
+        (r) =>
+          r.once === true &&
+          (r.consequences ?? []).some((c) => c.type === 'start_quest' && c.questId === sq.questId)
+      );
+      expect(startsQuest, `${sq.giver} must have a once start_quest for ${sq.questId}`).toBe(true);
+    }
+  });
+
+  it('no embedded giver is placed on its room entry or exit cell (placement discipline)', () => {
+    for (const roomId of VENUE_ROOMS) {
+      const room = roomById.get(roomId)!;
+      const entry = room.entryPos;
+      const exitCells = (room.exits ?? []).map((ex) => ex.pos);
+      for (const npc of room.npcs ?? []) {
+        const pos = (npc as { pos?: { x: number; y: number } }).pos;
+        if (!pos) continue;
+        expect(
+          pos.x === entry?.x && pos.y === entry?.y,
+          `${npc.id} in ${roomId} must not sit on the entry cell`
+        ).toBe(false);
+        for (const ex of exitCells) {
+          expect(
+            pos.x === ex.x && pos.y === ex.y,
+            `${npc.id} in ${roomId} must not sit on an exit cell`
+          ).toBe(false);
+        }
+        // In-bounds on the grid.
+        const h = room.grid.length;
+        const w = room.grid[0]?.length ?? 0;
+        expect(
+          pos.x >= 0 && pos.x < w && pos.y >= 0 && pos.y < h,
+          `${npc.id} must be in-bounds`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('no spine NPC (Elara/Vane/Quentin/Jarek) is a side-quest giver (D-12)', () => {
+    for (const sq of SIDE_QUESTS) {
+      expect(
+        SPINE_GIVERS.has(sq.giver),
+        `${sq.questId} giver ${sq.giver} must not be a spine NPC`
+      ).toBe(false);
+    }
+  });
+
+  it('any social side-quest giver check is retry-friendly (CHA-only, onFail:[], not once, no hostile)', () => {
+    const CHA_SKILLS = new Set(['persuasion', 'deception', 'intimidation']);
+    for (const sq of SIDE_QUESTS) {
+      for (const r of flattenResponses(GIVERS[sq.giver])) {
+        const check = r.check as
+          | { skill?: string; onFail?: unknown[]; onSuccess?: Array<Record<string, unknown>> }
+          | undefined;
+        if (!check) continue;
+        expect(CHA_SKILLS.has(check.skill ?? ''), `${sq.giver} check must be a CHA skill`).toBe(
+          true
+        );
+        expect((check.onFail ?? []).length, `${sq.giver} check onFail must be empty`).toBe(0);
+        expect(r.once, `${sq.giver} check node must not be once-locked`).not.toBe(true);
+        // No giver check ever turns the giver hostile.
+        const turnsHostile = (check.onSuccess ?? []).some(
+          (c) => c.type === 'set_npc_attitude' && c.attitude === 'hostile'
+        );
+        expect(turnsHostile, `${sq.giver} check must never set hostile`).toBe(false);
+      }
+    }
+  });
+
+  it('the seeded quests/rooms/rules sections concatenate the new side-quest content (Pitfall 2)', () => {
+    const quests = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'quests')!.value as Quest[];
+    for (const sq of SIDE_QUESTS) {
+      expect(
+        quests.some((q) => q.id === sq.questId),
+        `${sq.questId} must seed`
+      ).toBe(true);
+    }
+    const combat = SIDE_QUESTS.find((sq) => sq.combat)!;
+    const rules = SKY_CAMPAIGN_SECTIONS.find((s) => s.section === 'rules')!.value as GameRule[];
+    expect(
+      rules.some((r) => ruleSetFlags(r).some((f) => f.key === combat.flag)),
+      'the combat clear rule must seed'
+    ).toBe(true);
   });
 });
