@@ -62,12 +62,24 @@ export const ACTS: Act[] = [
         'The Sky Is Falling — Act I complete. To be continued…',
     },
   },
-  // Act II — a MINIMAL loadable stub this phase (D-13): startingRegionId +
-  // startPos + an opening crawl, so the Valerion heartland is directly
-  // enterable and testable now. The Act I→II carry/branch transitions and the
-  // Act III handoff ending stub are Phase 5 — deliberately NO `transitions` and
-  // NO `ending` here. startingRegionId points at REGIONS_ACT2's region id;
-  // startPos matches that region's startPos (a passable kingsroad cell).
+  // Act II — Decoding the Coordinates. The Valerion-heartland act resolves the
+  // campaign on a branched "To be continued…" handoff (Phase 5, MQ-06/MQ-07/
+  // BR-03). startingRegionId points at REGIONS_ACT2's region id; startPos
+  // matches that region's startPos (a passable kingsroad cell).
+  //
+  // CLOSE TRIGGER (D-01 composite): the act advances once the fuel-cell raid is
+  // resolved (q_fuel_cell complete), the coordinates are read (coords_decoded),
+  // AND the player has taken leave of Elara on the eve of departure
+  // (act2_departed — written by her debrief depart choice, npcsAct2.ts). The
+  // depart flag sequences the epilogue FIRST, so the debrief always plays before
+  // the ending screen.
+  //
+  // BRANCH (D-04, first-match-wins): edge 0 is the relic-won branch
+  // (relic_fuel_cell == 'party') → act2_end_secured; edge 1 is the bare fallback
+  // → act2_end_lost. Because edges evaluate in order and the first holding edge
+  // fires (advanceActIfTriggered), a party that never wrote relic_fuel_cell ==
+  // 'party' (the Sect-holds / absence read, Phase 4 D-02) skips edge 0 and lands
+  // on act2_end_lost.
   {
     id: 'act2',
     name: 'Act II — Decoding the Coordinates',
@@ -80,5 +92,70 @@ export const ACTS: Act[] = [
         'and cold, and somewhere ahead in Lady Elara’s Grand Library are the ' +
         'coordinates that will tell you what it is truly listening for.',
     ],
+    transitions: [
+      {
+        // Relic-won close: all three gates hold AND the party holds the fuel cell.
+        when: {
+          all: [
+            { fact: 'quests_completed', operator: 'contains', value: 'q_fuel_cell' },
+            { fact: 'flags', path: '$.coords_decoded', operator: 'equal', value: true },
+            { fact: 'flags', path: '$.act2_departed', operator: 'equal', value: true },
+            { fact: 'flags', path: '$.relic_fuel_cell', operator: 'equal', value: 'party' },
+          ],
+        },
+        to: 'act2_end_secured',
+      },
+      {
+        // Bare fallback: the same three gates, NO relic gate — the absence-of-
+        // 'party' read lands here (Phase 4 D-02: sect = read-as-not-party).
+        when: {
+          all: [
+            { fact: 'quests_completed', operator: 'contains', value: 'q_fuel_cell' },
+            { fact: 'flags', path: '$.coords_decoded', operator: 'equal', value: true },
+            { fact: 'flags', path: '$.act2_departed', operator: 'equal', value: true },
+          ],
+        },
+        to: 'act2_end_lost',
+      },
+    ],
+  },
+  // ── Terminal Act II endings (D-02/D-04) ──────────────────────────────────
+  // Entering either resolves the campaign (the FE shows the ending screen).
+  // `ending.text` is STATIC — the per-flag callbacks live in Elara's flag-gated
+  // departure debrief (npcsAct2.ts, D-05), NOT interpolated here. Both reuse the
+  // Act II region per the Act-I `act1_end_*` idiom. Each hands off to Act III.
+  {
+    id: 'act2_end_secured',
+    name: 'The Heart of the Saint',
+    startingRegionId: 'valerion_heartland',
+    startPos: { x: 1, y: 6 },
+    ending: {
+      outcome: 'The Fuel Cell Secured',
+      text:
+        'You ride out of Valerion with the Heart of the Saint wrapped against your ' +
+        'chest — the fuel-cell wrung free of the undercroft before the listeners ' +
+        'beneath the library could close their hand on it. The coordinates are read, ' +
+        'the relic is yours, and the cold patient note it carries now points the way ' +
+        'north, to the Sunder-Gate and whatever waits past it. Behind you the capital ' +
+        'keeps its secrets and its war; ahead, the sky waits to be answered.\n\n' +
+        'The Sky Is Falling — Act II complete. To be continued… Act III.',
+    },
+  },
+  {
+    id: 'act2_end_lost',
+    name: 'The Cradle Lost',
+    startingRegionId: 'valerion_heartland',
+    startPos: { x: 1, y: 6 },
+    ending: {
+      outcome: 'The Fuel Cell Lost',
+      text:
+        'You ride out of Valerion empty-handed. The Heart of the Saint stayed in the ' +
+        'cradle beneath the Grand Library, and whoever has been listening on that cold ' +
+        'frequency holds it now. You have the coordinates — that much you carry north — ' +
+        'but the relic that was the whole stake of this act is in another hand, and the ' +
+        'sky is no nearer to being silenced. The road to the Sunder-Gate runs on ahead, ' +
+        'and you ride it anyway, because there is nothing behind you but a lost cradle.' +
+        '\n\nThe Sky Is Falling — Act II complete. To be continued… Act III.',
+    },
   },
 ];
