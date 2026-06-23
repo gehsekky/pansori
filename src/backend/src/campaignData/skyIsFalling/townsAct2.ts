@@ -78,6 +78,20 @@ export const TOWNS_ACT2: CampaignTown[] = [
         entryRoomId: 'valerion_inn_room',
         desc: 'A genteel coaching inn off the court square — beds, board, and overheard gossip.',
       },
+      // The Vance estate — the Quentin "Old Money" exposé venue (Plan 04-03, D-11).
+      // An interior venue opening the counting-house cellar (vance_cellar_room),
+      // where Quentin's Weaver Magus lieutenant guards the master ledger. Placed at
+      // (10,8) — in-bounds on the 12×12 court grid, non-colliding with the other
+      // venues (3,2)/(9,2)/(2,7) and the gate (6,11). NOT a gate (the district keeps
+      // exactly one kind:'gate', valerion_court_gate).
+      {
+        id: 'vance_estate',
+        name: 'The Vance Estate',
+        pos: { x: 10, y: 8 },
+        kind: 'interior',
+        entryRoomId: 'vance_cellar_room',
+        desc: 'The gilded townhouse of the Vance family — and, beneath it, an old counting-house cellar best left unseen.',
+      },
       {
         id: 'valerion_court_gate',
         name: 'The Court Gate',

@@ -1279,3 +1279,56 @@ describe('Act II — QUENTIN "Old Money" tree (start_quest + retry-friendly gaun
     expect(neutralLine!.check, 'the neutral seal line must not be a check').toBeUndefined();
   });
 });
+
+// ─── Act II slice (Plan 04-03): the Vance-estate lieutenant room + venue (Task 2) ─
+describe('Act II — vance_cellar_room lieutenant fight + venue wiring (Plan 04-03, Task 2)', () => {
+  const cellar = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'vance_cellar_room') as
+    | (CampaignRoom & { enemies?: Array<{ name: string; count?: number; id?: string }> })
+    | undefined;
+
+  it('vance_cellar_room exists with an ascends-back exit', () => {
+    expect(cellar, 'vance_cellar_room must exist').toBeDefined();
+    expect(
+      (cellar!.exits ?? []).some((ex) => ex.ascends === true),
+      'the cellar must have an ascends-back exit to the district'
+    ).toBe(true);
+  });
+
+  it('places exactly one count-1 named Weaver Magus lieutenant (the clear-rule target)', () => {
+    const placements = cellar!.enemies ?? [];
+    const magus = placements.filter((e) => e.name === 'Weaver Magus');
+    expect(magus.length, 'exactly one Weaver Magus lieutenant').toBe(1);
+    expect((magus[0].count ?? 1) === 1, 'the lieutenant is count-1').toBe(true);
+    expect(magus[0].id).toBe('vance_cellar_room#lieutenant');
+  });
+
+  it('every cellar enemy uses an exact Act II reskin clone name, full SRD numbers (strict-SRD)', () => {
+    const RESKIN = new Set(['Weaver Magus', 'Subverted Vanguard', 'Subverted Sentry']);
+    for (const e of cellar!.enemies ?? []) {
+      expect(RESKIN.has(e.name), `cellar enemy "${e.name}" must be an Act II reskin name`).toBe(
+        true
+      );
+    }
+  });
+
+  it('the lieutenant is a DISTINCT instance from the undercroft core Magus (D-11)', () => {
+    const core = (ROOMS_ACT2 as CampaignRoom[]).find((r) => r.id === 'library_undercroft_core') as
+      | (CampaignRoom & { enemies?: Array<{ id?: string }> })
+      | undefined;
+    const coreIds = new Set((core!.enemies ?? []).map((e) => e.id));
+    expect(
+      coreIds.has('vance_cellar_room#lieutenant'),
+      'the lieutenant id must not collide with a core enemy id'
+    ).toBe(false);
+  });
+
+  it('a Court-District kind:"interior" venue resolves to vance_cellar_room; each district keeps one gate', () => {
+    const court = (TOWNS_ACT2 as CampaignTown[]).find((t) => t.id === 'valerion_court_district');
+    expect(court, 'the Court District must exist').toBeDefined();
+    const venue = (court!.venues ?? []).find((v) => v.entryRoomId === 'vance_cellar_room');
+    expect(venue, 'a Court-District venue must open vance_cellar_room').toBeDefined();
+    expect(venue!.kind, 'the Vance-estate venue must be kind:"interior"').toBe('interior');
+    const gates = (court!.venues ?? []).filter((v) => v.kind === 'gate');
+    expect(gates.length, 'the Court District must keep exactly one gate venue').toBe(1);
+  });
+});

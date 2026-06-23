@@ -309,4 +309,41 @@ export const ROOMS_ACT2: CampaignRoom[] = [
       { name: 'Weaver Adept', id: 'library_undercroft_core#adept2' },
     ],
   },
+
+  // ── The Vance-estate cellar: the Quentin lieutenant fight (Plan 04-03, D-11) ─
+  // A NEW small encounter room (D-11) — the old counting-house cellar beneath the
+  // Vance estate where the master ledger is kept. Reached from a Court-District
+  // interior venue (townsAct2.ts vance_cellar venue → this room). The exposé's
+  // combat payoff: Quentin's Weaver Magus LIEUTENANT (a DISTINCT instance from the
+  // undercroft core Magus, D-11) guards the ledger, flanked by a Subverted guard
+  // pair. Dim cellar with pillar cover for the caster fight. An `ascends`-back exit
+  // mirrors valerion_inn_room (returns to the Court District). The lieutenant is a
+  // count-1 NAMED id (vance_cellar_room#lieutenant) the quentin_lieutenant_down
+  // rule (rulesAct2.ts) keys on → quentin_exposed. FULL SRD-default Mage/Veteran
+  // /Guard numbers, exact reskin-clone names, no tuning (strict-SRD, D-10/D-11).
+  {
+    id: 'vance_cellar_room',
+    name: 'The Vance Counting-House Cellar',
+    desc:
+      'Below the estate’s gilded floors the air turns cold and close. Iron-bound ' +
+      'ledgers line a vaulted strongroom of old grey stone, and on the central ' +
+      'table the master account-book lies open beside a guttering lamp — the ' +
+      'paper proof of who has been paying the Weavers. A hooded figure rises from ' +
+      'the ledger as you enter, the relic’s cold hum already gathering at its hands.',
+    floor: 'cobblestone',
+    lighting: 'dim',
+    entryPos: { x: 4, y: 8 },
+    grid: undercroftGrid(9, 9),
+    exits: [
+      { pos: { x: 4, y: 8 }, ascends: true, label: 'Up the cellar stair to the Court District' },
+    ],
+    // The lieutenant stand (D-11): exactly ONE Weaver Magus as the count-1 named
+    // lieutenant (the clear-rule target), flanked by two named Subverted guards.
+    // The lieutenant is a separate instance from the undercroft core Magus (D-11).
+    enemies: [
+      { name: 'Weaver Magus', id: 'vance_cellar_room#lieutenant' },
+      { name: 'Subverted Vanguard', id: 'vance_cellar_room#guard1' },
+      { name: 'Subverted Sentry', id: 'vance_cellar_room#guard2' },
+    ],
+  },
 ];
