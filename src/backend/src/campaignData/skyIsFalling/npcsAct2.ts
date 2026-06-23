@@ -551,6 +551,177 @@ export const ELARA: CampaignRoomNpc = {
         'stair is in the corner — I will hold the door behind you."',
       consequences: [{ type: 'start_quest', questId: 'q_fuel_cell' }],
     },
+    // 5. EVE-OF-DEPARTURE DEBRIEF (D-03/D-05) — the carry/resolution beat. The
+    // opener is gated on the SAME double-flag the act-close trigger names
+    // (q_fuel_cell complete + coords_decoded), so it is reachable exactly when
+    // the act is about to resolve. Its CHILD leaves give each accumulated flag a
+    // felt, condition-gated callback (pure flavor — say + reply, NO consequences
+    // on the callbacks), and the elara_depart child writes act2_departed — the
+    // third edge gate — so the debrief always plays before the ending screen.
+    //
+    // No `once` on the opener: the debrief is replayable so the player can hear
+    // every callback before choosing to depart (the depart leaf itself is the
+    // point of no return — taking it trips the act-close transition).
+    {
+      id: 'elara_debrief',
+      label: 'Take leave of Lady Elara on the eve of departure.',
+      say:
+        'It’s done, Lady. The coordinates are read and the cradle is behind us, one ' +
+        'way or another. Before we ride for the Sunder-Gate — walk it back with us. ' +
+        'Tell us what we leave behind.',
+      condition: {
+        all: [
+          { fact: 'quests_completed', operator: 'contains', value: 'q_fuel_cell' },
+          { fact: 'flags', path: '$.coords_decoded', operator: 'equal', value: true },
+        ],
+      },
+      reply:
+        'Elara sets the brass rule down for the first time since you met her. "The eve ' +
+        'of a long road," she says. "Sit a moment. Let us count what this act cost, and ' +
+        'what it bought. Then go — the sky will not wait, and neither, I think, will ' +
+        'whatever you are riding toward."',
+      responses: [
+        // (1) relic_fuel_cell — BOTH a 'party'-gated callback AND a neutral/
+        // absence leaf (the no-dead-end both-paths pattern). 'party' is the only
+        // authored win value; its absence is the loss read (Phase 4 D-02).
+        {
+          id: 'elara_debrief_relic_secured',
+          label: 'The Heart of the Saint — we carry it out.',
+          condition: {
+            fact: 'flags',
+            path: '$.relic_fuel_cell',
+            operator: 'equal',
+            value: 'party',
+          },
+          say: 'The fuel-cell is ours, Lady. We pulled it from the cradle in time.',
+          reply:
+            '"You held it." Elara’s relief is a quiet, careful thing. "The Heart of the ' +
+            'Saint, out of the dark and in your keeping. Whatever it is truly listening ' +
+            'for, it listens for you now — guard it the way you would a loaded thing, ' +
+            'because that is what it is."',
+        },
+        {
+          id: 'elara_debrief_relic_lost',
+          // Neutral/absence leaf — reachable whenever relic_fuel_cell is NOT
+          // 'party' (the loss read). Plays its reply, sets nothing.
+          label: 'The cradle — we left it behind.',
+          condition: {
+            not: {
+              fact: 'flags',
+              path: '$.relic_fuel_cell',
+              operator: 'equal',
+              value: 'party',
+            },
+          },
+          say: 'We didn’t hold it, Lady. The cell stayed in the cradle — in another hand.',
+          reply:
+            'Elara is silent a long moment. "Then someone else carries the Heart of the ' +
+            'Saint, and they will have heard what you heard — where the sky points. We ' +
+            'are not ahead of them anymore. We are even, at best, and racing the same ' +
+            'cold note north. So be it. Even is not lost. Ride."',
+        },
+        // (2) quentin_exposed — a true-gated callback. No neutral sibling needed:
+        // the thread either closed (exposed) or it simply did not come up.
+        {
+          id: 'elara_debrief_quentin',
+          label: 'Quentin Vance — we unmasked him.',
+          condition: { fact: 'flags', path: '$.quentin_exposed', operator: 'equal', value: true },
+          say: 'The Vance heir was the leak, Lady. We have the proof of it now.',
+          reply:
+            '"So the old money was rotten at the root after all." Elara’s mouth thins. ' +
+            '"You did the court a service it will never thank you for. Quentin Vance ' +
+            'unmasked — that is one knife you will not feel in your back on the road. ' +
+            'Few enough can say the same of this city."',
+        },
+        // (3) jarek_stance — three sibling string-gated leaves (allied/wary/
+        // hostile), matching the Phase-4 stance vocabulary.
+        {
+          id: 'elara_debrief_jarek_allied',
+          label: 'High Inquisitor Jarek — we brought him to our side.',
+          condition: { fact: 'flags', path: '$.jarek_stance', operator: 'equal', value: 'allied' },
+          say: 'Jarek hears us now, Lady. The inquisitor rides with our purpose, not against it.',
+          reply:
+            '"You turned a plague-burner into an ally." Elara shakes her head, almost ' +
+            'admiring. "An inquisitor’s reach is long and his memory longer. You will be ' +
+            'glad of Jarek before the end — fear that has chosen a direction is a ' +
+            'formidable thing to have at your back rather than your throat."',
+        },
+        {
+          id: 'elara_debrief_jarek_wary',
+          label: 'High Inquisitor Jarek — we left him watching.',
+          condition: { fact: 'flags', path: '$.jarek_stance', operator: 'equal', value: 'wary' },
+          say: 'Jarek didn’t move against us, Lady — but he didn’t move with us either.',
+          reply:
+            '"A watching inquisitor." Elara nods slowly. "Not the worst outcome, nor the ' +
+            'best. He keeps his suspicion and his reach both, and you keep your road. ' +
+            'Mind that a man like Jarek does not stay neutral forever — the next time ' +
+            'you cross him, he will have decided. Pray he decides your way."',
+        },
+        {
+          id: 'elara_debrief_jarek_hostile',
+          label: 'High Inquisitor Jarek — we made an enemy under the chandeliers.',
+          condition: { fact: 'flags', path: '$.jarek_stance', operator: 'equal', value: 'hostile' },
+          say: 'We crossed Jarek, Lady. The ballroom ended in steel. He’ll not forget it.',
+          reply:
+            'Elara exhales. "Then you ride north with an inquisitor’s order behind you as ' +
+            'well as whatever waits ahead. Jarek does not forgive, and his crusade does ' +
+            'not lack for hands. Watch the road behind you as closely as the one in ' +
+            'front — fear that has been humiliated is the most patient hunter there is."',
+        },
+        // (4) silverford_outcome — truce/war sibling leaves (Elara's war callback
+        // is folded here per D-08, not given a separate war-state line).
+        {
+          id: 'elara_debrief_silverford_truce',
+          label: 'The Sunder-Carr — we left a truce behind us.',
+          condition: {
+            fact: 'flags',
+            path: '$.silverford_outcome',
+            operator: 'equal',
+            value: 'truce',
+          },
+          say: 'We left Silverford holding, Lady. Two armies standing down instead of bleeding.',
+          reply:
+            '"A truce in the marsh." Something eases in Elara’s grey eyes. "You bought the ' +
+            'borderlands time, and time is the rarest coin there is. Carry that with you. ' +
+            'When the road grows dark, remember you have already once made two empires ' +
+            'choose to wait instead of burn. It can be done. You have done it."',
+        },
+        {
+          id: 'elara_debrief_silverford_war',
+          label: 'The Sunder-Carr — we left a war burning.',
+          condition: {
+            fact: 'flags',
+            path: '$.silverford_outcome',
+            operator: 'equal',
+            value: 'war',
+          },
+          say: 'Silverford burned, Lady. The armies met before we could stop them. We carry that.',
+          reply:
+            'Elara’s face is grave. "The Battle of Silverford. I heard the couriers — two ' +
+            'armies bled white over a massacre neither committed, exactly as someone ' +
+            'planned. You could not stop it; few could have. But you carry the proof of ' +
+            'who lit it, and that proof is a war’s worth of leverage. Use it. Let the ' +
+            'dead in the marsh buy something with their deaths."',
+        },
+        // THE DEPART CHOICE (D-03) — writes act2_departed, the third edge gate.
+        // No `once`: replayable-safe, but taking it trips the act-close transition
+        // (the next action evaluates act2's edges and resolves the campaign).
+        {
+          id: 'elara_depart',
+          label: 'Set out for the Sunder-Gate.',
+          say:
+            'We’ve counted it, Lady. There’s nothing left here but the road. We ride for ' +
+            'the Sunder-Gate at first light — see what the sky was pointing at all along.',
+          reply:
+            'Elara stands and, for the first time, offers her hand. "Then go, Justiciars, ' +
+            'and go well. The Grand Library will keep your secret and your seat — come ' +
+            'back to it if the road allows. I do not think it will, for a long while. ' +
+            'Ride for the Sunder-Gate. Whatever answers the sky, answer it standing." She ' +
+            'releases your hand. "The eve is over. It is the road now."',
+          consequences: [{ type: 'set_flag', key: 'act2_departed', value: true }],
+        },
+      ],
+    },
   ],
 };
 

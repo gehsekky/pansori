@@ -1511,3 +1511,115 @@ describe('Act II — act-graph close + branched ending (Plan 05-01)', () => {
     }
   });
 });
+
+// Does a response's condition reference flag `key` with the given value (handles
+// the {all}/{any}/{not} composite shape via leafConditions)?
+function gatesOnFlagValue(r: CampaignRoomNpcResponse, key: string, value: unknown): boolean {
+  return leafConditions(r.condition).some(
+    (leaf) => leaf.fact === 'flags' && leaf.path === `$.${key}` && leaf.value === value
+  );
+}
+describe('Act II — Elara eve-of-departure debrief (Plan 05-01)', () => {
+  const responses = flattenResponses(ELARA);
+  const debrief = responses.find((r) => r.id === 'elara_debrief');
+
+  it('the debrief opener is gated on q_fuel_cell complete + coords_decoded', () => {
+    expect(debrief, 'ELARA must author an elara_debrief opener').toBeDefined();
+    const leaves = leafConditions(debrief!.condition);
+    expect(
+      leaves.some(
+        (l) =>
+          l.fact === 'quests_completed' && l.operator === 'contains' && l.value === 'q_fuel_cell'
+      ),
+      'debrief opener must require quests_completed contains q_fuel_cell'
+    ).toBe(true);
+    expect(
+      leaves.some((l) => l.fact === 'flags' && l.path === '$.coords_decoded' && l.value === true),
+      'debrief opener must require flags.coords_decoded == true'
+    ).toBe(true);
+  });
+
+  it('relic_fuel_cell has BOTH a positive party leaf AND a negated absence leaf (no dead end)', () => {
+    // The positive leaf gates directly on relic_fuel_cell == party (top-level
+    // equal). The absence leaf is a {not: relic_fuel_cell == party} composite —
+    // runtime-correct via evalCondition's `not`, and reachable whenever the
+    // party is NOT held. Distinguish them structurally by the top-level `not`,
+    // since leafConditions flattens both down to the same inner leaf.
+    const isNegatedRelic = (r: CampaignRoomNpcResponse): boolean => {
+      const c = r.condition as { not?: Record<string, unknown> } | undefined;
+      return (
+        !!c?.not &&
+        c.not.fact === 'flags' &&
+        c.not.path === '$.relic_fuel_cell' &&
+        c.not.value === 'party'
+      );
+    };
+    const isPositiveRelic = (r: CampaignRoomNpcResponse): boolean => {
+      const c = r.condition as { fact?: string; path?: string; value?: unknown } | undefined;
+      return c?.fact === 'flags' && c.path === '$.relic_fuel_cell' && c.value === 'party';
+    };
+    expect(
+      responses.some(isPositiveRelic),
+      'a positive relic_fuel_cell == party debrief leaf must exist'
+    ).toBe(true);
+    expect(
+      responses.some(isNegatedRelic),
+      'a negated {not: relic_fuel_cell == party} absence leaf must exist (no dead end)'
+    ).toBe(true);
+  });
+
+  it('quentin_exposed has a condition-gated callback leaf', () => {
+    expect(
+      responses.some((r) => gatesOnFlagValue(r, 'quentin_exposed', true)),
+      'a quentin_exposed == true debrief leaf must exist'
+    ).toBe(true);
+  });
+
+  it('jarek_stance has allied / wary / hostile sibling leaves', () => {
+    for (const stance of ['allied', 'wary', 'hostile']) {
+      expect(
+        responses.some((r) => gatesOnFlagValue(r, 'jarek_stance', stance)),
+        `a jarek_stance == ${stance} debrief leaf must exist`
+      ).toBe(true);
+    }
+  });
+
+  it('silverford_outcome has truce / war sibling leaves', () => {
+    for (const outcome of ['truce', 'war']) {
+      expect(
+        responses.some((r) => gatesOnFlagValue(r, 'silverford_outcome', outcome)),
+        `a silverford_outcome == ${outcome} debrief leaf must exist`
+      ).toBe(true);
+    }
+  });
+
+  it('the callback leaves are pure flavor — they write no flags', () => {
+    // Only elara_depart writes a flag; the four-flag callbacks set nothing.
+    const callbackIds = [
+      'elara_debrief_relic_secured',
+      'elara_debrief_relic_lost',
+      'elara_debrief_quentin',
+      'elara_debrief_jarek_allied',
+      'elara_debrief_jarek_wary',
+      'elara_debrief_jarek_hostile',
+      'elara_debrief_silverford_truce',
+      'elara_debrief_silverford_war',
+    ];
+    for (const id of callbackIds) {
+      const leaf = responses.find((r) => r.id === id);
+      expect(leaf, `callback leaf ${id} must exist`).toBeDefined();
+      expect(
+        (leaf!.consequences ?? []).length,
+        `callback leaf ${id} must carry no consequences (pure flavor)`
+      ).toBe(0);
+    }
+  });
+
+  it('elara_depart writes act2_departed (the third edge gate)', () => {
+    const depart = responses.find((r) => r.id === 'elara_depart');
+    expect(depart, 'an elara_depart choice must exist').toBeDefined();
+    expect(setsFlag(depart!, 'act2_departed'), 'elara_depart must set act2_departed').toBe(true);
+    // The depart leaf is replayable-safe (not once-locked).
+    expect(depart!.once, 'elara_depart must not be once-locked').not.toBe(true);
+  });
+});
