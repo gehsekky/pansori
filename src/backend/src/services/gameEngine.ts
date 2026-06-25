@@ -10966,6 +10966,11 @@ export async function takeAction({
   let escaped = false;
   // Track whether initiative was used this action (determines active_character advancement)
   let usedInitiative = false;
+  // Set when a 0-HP downed PC fully resolved its action (death_save / pass / a
+  // no-op use) in the dedicated block below and its turn is spent. Skips the
+  // action dispatch + legacy switch so the shared initiative-advance epilogue
+  // runs without re-handling the action. See combat-freeze-downed-member.
+  let downedTurnSpent = false;
 
   // ── Undetected trap fires on first action in room ─────────────────────────
   // (Detected traps offer a 'disarm_trap' choice instead; this handles the case
@@ -11090,15 +11095,20 @@ export async function takeAction({
       }
     }
     commitChar();
-    // Advance to next living character round-robin (death save = passive, not a true turn)
-    const living = st.characters.filter((c) => !c.dead);
-    if (living.length > 0) {
-      const idx = living.findIndex((c) => c.id === char.id);
-      st.active_character_id = living[(idx + 1) % living.length].id;
-    }
     st.run_log = [...(st.run_log || []), { character_id: char.id, action: action.type, narrative }];
-    st.last_choices = generateChoices(st, seed, context);
-    return { narrative, choices: st.last_choices, newState: st, seed, escaped: false, dead: false };
+    // The downed PC's turn is SPENT (rolling a death save, passing, quaffing a
+    // potion, or a Nat-20 recovery all consume the turn). Mark the action fully
+    // handled here and let control reach the SHARED initiative-advance epilogue
+    // below (which runs runEnemyTurns and promotes the next combatant) WITHOUT
+    // re-dispatching the action. The old code did a bespoke round-robin and
+    // returned early, skipping enemy turns entirely — that skip was the
+    // combat-freeze: a last-standing or stabilised required member (plot-armor,
+    // only revived at combat-end) had the spotlight rotate back onto itself with
+    // the enemies frozen, so the turn loop never advanced. See debug session
+    // combat-freeze-downed-member. SRD 5.2.1 — Death Saving Throws: the downed
+    // creature still holds its place in initiative; its turn is the save.
+    downedTurnSpent = true;
+    usedInitiative = true;
   }
 
   // Exhaustion level 6 = death (SRD)
@@ -11171,7 +11181,14 @@ export async function takeAction({
   // turn itself (a self spell, no enemy change) doesn't read as "affected".
   const preActionEnemySig = st.combat_active ? enemySignature(st) : '';
 
-  const dispatchResult = await dispatchAction(ctx, action);
+  // A downed PC's turn was already fully resolved in the 0-HP block above
+  // (narrative composed, char committed, turn spent). Skip dispatch + the
+  // legacy switch so the action isn't re-handled, and let control flow into the
+  // shared initiative-advance epilogue (which runs enemy turns + promotes the
+  // next combatant). See combat-freeze-downed-member.
+  const dispatchResult = downedTurnSpent
+    ? { handled: true as const }
+    : await dispatchAction(ctx, action);
   if (dispatchResult.handled && dispatchResult.replaceWith) {
     // Transformer: the handler staged pre-mutations into ctx (e.g. flipped
     // attitude); re-enter takeAction with the new action against the
@@ -11184,7 +11201,7 @@ export async function takeAction({
       context,
     });
   }
-  if (dispatchResult.handled) {
+  if (dispatchResult.handled && !downedTurnSpent) {
     // Render any structured fragments the handler pushed into ctx.fragments
     // (see services/narrative/compose.ts). For unmigrated handlers this is
     // a no-op; for migrated ones, the composer appends rendered prose to
