@@ -155,6 +155,16 @@ The backend will run the DB migrations automatically on first start.
 
 ## Step 4 — Set up Nginx as a reverse proxy
 
+> **Production today:** Pansori shares its instance with other sites, so the
+> proxy isn't part of Pansori. A shared `edge-nginx` container, defined in
+> `gehsekky-infra` under `host/edge/`, owns ports 80 and 443 and reaches
+> `pansori-frontend` and `pansori-backend` over the external `edge` Docker
+> network. Pansori's routing is its site file, `infra/nginx/pansori.conf`,
+> installed with `host/edge/push.sh` from gehsekky-infra. Certificates renew
+> through Certbot's webroot (`/var/www/certbot`) with a deploy hook that
+> reloads `edge-nginx`. The steps below describe the original single-site
+> setup.
+
 ```bash
 sudo apt-get install -y nginx
 ```
