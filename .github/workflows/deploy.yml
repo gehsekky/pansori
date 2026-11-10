@@ -84,14 +84,18 @@ jobs:
     name: Build → ECR → Deploy
     needs: [test, e2e]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # to fetch the OIDC token for the AWS role
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
+      # The pansori-deploy role (gehsekky-infra, pansori.tf) trusts only this
+      # repo's main branch: no stored AWS keys.
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to ECR
@@ -169,11 +173,14 @@ jobs:
           # `docker image prune -f` only removes *dangling* images, so the old
           # tagged ones were never collected and piled up until the host ran out
           # of space ("no space left on device" while extracting a layer).
-          # `system prune -af` drops every image not used by a running container
-          # (the live containers keep theirs) — but NOT volumes, so the Postgres
-          # data volume is safe. This both frees the backlog now and prevents
-          # future accumulation.
-          docker system prune -af || true
+          # Remove old Pansori images only: the host is shared, and a
+          # `docker system prune` would also delete other apps' stopped
+          # containers, rollback images and networks. `docker rmi` without -f
+          # refuses images a container still uses, so the live ones stay.
+          docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -E '/pansori-(backend|frontend):' \
+            | grep -v ":$IMAGE_TAG\$" \
+            | xargs -r docker rmi 2>/dev/null || true
           docker compose -f docker-compose.prod.yml --env-file .env pull backend frontend
           docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
           docker image prune -f
