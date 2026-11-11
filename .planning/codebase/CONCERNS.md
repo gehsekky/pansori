@@ -1,10 +1,35 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-06-20
+**Analysis Date:** 2026-06-20 (re-checked 2026-11-11)
+
+## New since June (2026-11-11 re-check)
+
+### Lost-update race on session state
+- `POST /session/:id/action` checks the client's `turn_seq` against the row it read, then later runs `UPDATE game_sessions ... WHERE id = $n` without `AND turn_seq = <read value>`. Two requests that read the same row both pass and both write; the second silently overwrites the first.
+- `equip`, `transfer`, `drop`, `reorder-inventory` and `assign-character` rewrite the whole `state` without checking or bumping `turn_seq`, so an inventory change racing an action can erase either one.
+- Reachable today in solo play from a second tab or the 3D view's movement sync, not only in multiplayer.
+- Fix: make the write conditional (`WHERE id = $1 AND turn_seq = $2`, 409 on 0 rows) and route every state write through one helper; or take `SELECT ... FOR UPDATE` in a transaction.
+
+### CI runs less than the documented gate
+- `.github/workflows/deploy.yml` runs backend unit tests, lint, typecheck, prettier, `npm audit` and e2e, but **not** the frontend unit suite (`npm run test:fe`), `npm run sync-types:check`, or `npm run check-migrations`. README and `scripts/sync-shared-types.ts` both say CI checks type drift; it doesn't.
+
+### Node 20 is past end-of-life
+- Dockerfiles (`node:20-alpine`) and CI (`node-version: 20`) still use Node 20, which reached EOL on 2026-04-30. Local dev is on Node 26. Move images and CI to Node 24 (current LTS) together.
+
+### LLM narration sits on the request path
+- With `LLM_PROVIDER=anthropic`, every action awaits a model call before the response and broadcast. Prod default is `none`, so this is latent. The default model (`claude-haiku-4-5-20251001`) is a generation behind; Haiku 5.5 is `claude-haiku-5-5`.
+
+### Prod compose still mounts migrations into `docker-entrypoint-initdb.d`
+- `docker-compose.prod.yml` mounts `./migrations` as Postgres init scripts *and* the backend runs them via `migrationRunner`. Harmless while every migration is idempotent, but the comment there ("future schema changes need a separate runner") is stale, and the host copy can drift from the image's copy.
+
+### Backend test time is dominated by module import
+- The 345-file backend suite reports ~10s of test time vs ~120s of cumulative import time: each spec file re-imports `gameEngine.ts` (11.8k lines) and the SRD catalogs (`monsters.ts` 8.4k, `spells.ts` 6.5k).
 
 ## Tech Debt
 
 ### Multiclass System — Incomplete Implementation
+
+**Status 2026-11-11:** still open — `actions/rest.ts` short rest still overwrites `spell_slots_max` with the warlock table.
 
 **Issue:** Warlock pact-slot pool merging breaks multiclass mechanics.
 - Files: `src/backend/src/services/multiclass.ts`, `src/backend/src/services/actions/rest.ts`
@@ -35,7 +60,7 @@
 ### Test Suite Split — Scattered Large Files
 
 **Issue:** Regression-spec coverage scattered across multiple files, architectural unification deferred.
-- Files: `src/backend/src/tests/services/gameEngine.spec.ts` (5,529 lines), `src/backend/src/tests/services/gameEngine.class_features.spec.ts`, `src/backend/src/tests/services/gameEngine.grid_combat.spec.ts`, `src/backend/src/tests/services/gameEngine.cast_spell.spec.ts`
+- Files: `src/backend/src/tests/services/gameEngine.spec.ts`, `src/backend/src/tests/services/gameEngine.class_features.spec.ts`, `src/backend/src/tests/services/gameEngine.grid_combat.spec.ts`, `src/backend/src/tests/services/gameEngine.cast_spell.spec.ts`
 - Impact: Large test files are hard to navigate; test discovery is unclear. `gameEngine.spec.ts` is the single largest file in the repo (11,727 lines for the service + 5,529 for the main test).
 - Fix approach: Documented as TODO "architecture-audit follow-up #1" — consolidate into smaller logical suites by action type, then index in a top-level suite registry.
 
@@ -70,7 +95,7 @@
 **Risk:** Production cookies use `sameSite: 'none'`, so session cookies ride cross-origin POSTs. An attacker could embed a form in a malicious site that makes state-changing requests (e.g., `POST /api/game/take-action`) on behalf of a logged-in user.
 
 **Files:** `src/backend/src/index.ts:77` (session cookie config)
-**Current mitigation:** Single-tenant architecture masks the issue (no multi-user sessions exposed yet); CORS is pinned.
+**Current mitigation:** CORS is pinned. Still open 2026-11-11 (`index.ts:77` unchanged). Note that sessions *are* multi-user now (invite/join), so this is no longer masked.
 **Recommendations:**
   - Tighten `sameSite` to `'lax'` in prod
   - OR implement double-submit token validation on state-changing endpoints
@@ -80,7 +105,9 @@
 
 ### Multiplayer Session Ownership
 
-**Risk:** `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify the active character's owner. When multiplayer campaigns ship, a player could theoretically submit actions on behalf of another player's character.
+**Status 2026-11-11:** largely mitigated — `takeAction` now enforces that the requester owns the active character (or an eligible reactor during a reaction window). The remaining gap is the lost-update race above.
+
+**Risk (original):** `game_sessions.user_id` is single-tenant; `takeAction` doesn't verify the active character's owner. When multiplayer campaigns ship, a player could theoretically submit actions on behalf of another player's character.
 
 **Files:** `src/backend/src/routes/game.ts` (action dispatch), `src/backend/src/db/schema.sql`
 **Current mitigation:** Single-tenant masks this; campaigns are author-only today.
@@ -98,7 +125,7 @@
 
 ### Large Monolithic Service Files
 
-**Problem:** `gameEngine.ts` is 11,727 lines — single-function discovery is slow.
+**Problem:** `gameEngine.ts` is 11,824 lines (2026-11-11). Its largest functions: `generateChoices` ~2,600 lines, `takeAction` ~970, `runEnemyTurns` ~910. 51 imports from `actions/` reach back into it.
 **Files:** `src/backend/src/services/gameEngine.ts`
 **Cause:** Historical accumulation of game-state logic; no recent refactoring.
 **Improvement path:** Move action dispatchers to `src/backend/src/services/actions/` subdirectory (already partially done). Phase out `gameEngine.ts` in favor of focused action modules + a registry.
@@ -174,11 +201,11 @@
 **Files:** `src/backend/src/services/migrationRunner.ts`
 **Impact:** Deployment fails hard; recovery requires manual DB intervention or a hotfix migration.
 **Current mitigation:** `npm run check-migrations` (double-apply to a scratch DB) catches fresh-env breakage. All migrations are tested before commit.
-**Improvement:** CI should run `check-migrations` on the test DB before deploying (currently local-only).
+**Improvement:** CI should run `check-migrations` on the test DB before deploying (still local-only as of 2026-11-11).
 
-### Undeci Dependency (v7.25.0 → 7.28.0)
+### Dependency hygiene
 
-**Status:** Bumped in commit `30edb9c`. Known to have security issues in lower versions.
+**Status:** `npm audit fix` applied across all three lockfiles on 2026-11-09 (`9a7f2843`); CI fails on high/critical advisories.
 **Files:** `package.json`, `package-lock.json`
 **Recommendation:** Keep `npm audit` in CI and audit regularly.
 
@@ -235,4 +262,4 @@
 
 ---
 
-*Concerns audit: 2026-06-20*
+*Concerns audit: 2026-06-20; re-checked 2026-11-11*

@@ -13,12 +13,16 @@ This file has been split for size and clarity:
 
 ## Deployment reference
 
-Shipped: ECR, EC2, RDS, direct EC2 + nginx, Let's Encrypt (certbot webroot
-auto-renew), GitHub Actions → SSM SendCommand deploy, Google OAuth, Docker
-Compose prod. Required `/opt/pansori/.env` vars on EC2:
+Shipped: ECR (immutable repos, full-commit-SHA tags), a single arm64 EC2 host
+running Docker Compose (Postgres in a container on the same host — not RDS),
+the shared `edge-nginx` reverse proxy from `gehsekky-infra` (Let's Encrypt via
+certbot webroot), GitHub Actions → OIDC deploy role → SSM SendCommand deploy
+(no stored AWS keys or SSH keys), Google OAuth. See [DEPLOY.md](DEPLOY.md).
+Required `/opt/pansori/.env` vars on EC2:
 
 - `POSTGRES_PASSWORD`, `POSTGRES_USER` (`pansori`), `POSTGRES_DB` (`pansori_db`)
 - `SESSION_SECRET` (64-char random)
-- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_API_KEY` (only read when `LLM_PROVIDER=anthropic`; default `none`)
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
 - `FRONTEND_URL`, `ECR_REGISTRY`, `AWS_REGION`
+- `IMAGE_TAG` (written by the deploy job; the commit SHA currently running)

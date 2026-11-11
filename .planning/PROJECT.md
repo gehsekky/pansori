@@ -44,24 +44,30 @@ main quests through to the "Sky Splits" handoff stub, all on strict-SRD mechanic
 
 <!-- This milestone. Hypotheses until shipped and validated. -->
 
+> **Status (2026-11-11):** every item below is implemented and unit-tested
+> (GSD phases 01–05, landed 2026-06-20 → 06-23). Not yet done: an end-to-end
+> Act I → Act II playtest and the formal `/gsd-complete-milestone` close-out.
+> No `ROADMAP.md` / `STATE.md` were committed for this milestone, so the phase
+> record is the `feat(0N-MM)` commit history.
+
 **Act II content — "Decoding the Coordinates" (full Act-I depth)**
 
-- [ ] New **Valerion-heartland Region + capital Town** (court, Grand Library, high-society ball venues) plus local Rooms for the Weaver-cell raid
-- [ ] Five main quests authored end-to-end: `q_act2_open` (The Faded Crest), `q_library` (Mythic Geometry), `q_fuel_cell` (The Heart of the Saint), `q_jarek` (The Inquisitor's Suspicion), `q_quentin_thread` (Old Money)
-- [ ] Full dialogue trees for new NPCs — Lady Elara Aurellion, High Inquisitor Jarek, Quentin Vance — and returning Lucian Vane
-- [ ] Act II reskin enemy roster as SRD campaign-clones: Weaver Adept (Cult Fanatic), Weaver Magus (Mage), Subverted Troopers (Veteran/Guard)
-- [ ] The `q_library` decode beat (skill/puzzle) writing `coords_decoded` and paying off the `martha_hint` thread from Act I
-- [ ] The fuel-cell **race as a narrative device** — resolved by quest-step ordering / dialogue / skill-gates, with `relic_fuel_cell = party | sect` as the stakes (no timer/competition engine mechanic)
-- [ ] Side-quest texture giving the capital the same lived-in feel Silverford has
-- [ ] Act I → Act II carry: branch at Act II's opening beats, then converge to a shared spine; Act I **war-state is flavor-only** in Act II (unlocks a few conversation options; no substantive mechanical/faction impact this cycle)
-- [ ] Act II ends on a "To be continued…" stub (Act III handoff), branched so the world the party made is acknowledged
-- [ ] Act II advances on `q_fuel_cell` completion + `coords_decoded` (per STORY.md Part 12)
+- [x] New **Valerion-heartland Region + capital Town** (court, Grand Library, high-society ball venues) plus local Rooms for the Weaver-cell raid — shipped (phase 02)
+- [x] Five main quests authored end-to-end: `q_act2_open` (The Faded Crest), `q_library` (Mythic Geometry), `q_fuel_cell` (The Heart of the Saint), `q_jarek` (The Inquisitor's Suspicion), `q_quentin_thread` (Old Money) — shipped (phases 03–04)
+- [x] Full dialogue trees for new NPCs — Lady Elara Aurellion, High Inquisitor Jarek, Quentin Vance — and returning Lucian Vane — shipped (phases 03–05)
+- [x] Act II reskin enemy roster as SRD campaign-clones: Weaver Adept (Cult Fanatic), Weaver Magus (Mage), Subverted Troopers (Veteran/Guard) — shipped (phase 02-01)
+- [x] The `q_library` decode beat (skill/puzzle) writing `coords_decoded` and paying off the `martha_hint` thread from Act I — shipped (phase 03-02)
+- [x] The fuel-cell **race as a narrative device** — resolved by quest-step ordering / dialogue / skill-gates, with `relic_fuel_cell = party | sect` as the stakes (no timer/competition engine mechanic) — shipped (phase 04-01)
+- [x] Side-quest texture giving the capital the same lived-in feel Silverford has — shipped (phases 05-03/05-04)
+- [x] Act I → Act II carry: branch at Act II's opening beats, then converge to a shared spine; Act I **war-state is flavor-only** in Act II (unlocks a few conversation options; no substantive mechanical/faction impact this cycle) — shipped (phase 05-02)
+- [x] Act II ends on a "To be continued…" stub (Act III handoff), branched so the world the party made is acknowledged — shipped (phase 05-01)
+- [x] Act II advances on `q_fuel_cell` completion + `coords_decoded` (per STORY.md Part 12) — shipped (phases 04-01/05-01)
 
 **Engine — general mid-campaign level-up**
 
-- [ ] Level-up applied mid-campaign (not only at creation): HP, spell slots, spells-on-level-gain, subclass features, for the party between Act I and Act II (L4→L5)
-- [ ] Built **general** (engine-wide: any class/subclass, any level transition), not scoped only to Act II's party
-- [ ] **Simple, guided UX** — sensible auto-suggested choices on level gain; the player should not have to min/max yet (deep optimization surface deferred)
+- [x] Level-up applied mid-campaign (not only at creation): HP, spell slots, spells-on-level-gain, subclass features, for the party between Act I and Act II (L4→L5) — shipped (phase 01)
+- [x] Built **general** (engine-wide: any class/subclass, any level transition), not scoped only to Act II's party — shipped (phase 01-03 (D-08 matrix))
+- [x] **Simple, guided UX** — sensible auto-suggested choices on level gain; the player should not have to min/max yet (deep optimization surface deferred) — shipped (phase 01-01/01-02)
 
 ### Out of Scope
 
@@ -96,12 +102,12 @@ main quests through to the "Sky Splits" handoff stub, all on strict-SRD mechanic
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Milestone = Act II only, full Act-I depth | Ship a proven, playable increment before committing to Acts III–IV | — Pending |
-| New Region + capital Town for Act II geography | Mirrors Act I's Region→Town→Rooms shape; fits the high-society move from the marsh | — Pending |
-| Act I → Act II branch at the opening only | Acknowledge the player's Act I choice without doubling the whole act's authoring | — Pending |
-| Act I war-state is flavor-only in Act II (for now) | Keep scope tight; unlock conversation options, no substantive mechanical impact yet | — Pending |
-| Fuel-cell race is a narrative device, not an engine mechanic | Keeps Act II on existing primitives; `relic_fuel_cell = party\|sect` carries the stakes | — Pending |
-| Mid-campaign level-up built general, with guided UX | One real engine feature, reusable engine-wide; no min/max burden on the player yet | — Pending |
+| Milestone = Act II only, full Act-I depth | Ship a proven, playable increment before committing to Acts III–IV | ✓ Shipped |
+| New Region + capital Town for Act II geography | Mirrors Act I's Region→Town→Rooms shape; fits the high-society move from the marsh | ✓ Shipped |
+| Act I → Act II branch at the opening only | Acknowledge the player's Act I choice without doubling the whole act's authoring | ✓ Shipped |
+| Act I war-state is flavor-only in Act II (for now) | Keep scope tight; unlock conversation options, no substantive mechanical impact yet | ✓ Shipped |
+| Fuel-cell race is a narrative device, not an engine mechanic | Keeps Act II on existing primitives; `relic_fuel_cell = party\|sect` carries the stakes | ✓ Shipped |
+| Mid-campaign level-up built general, with guided UX | One real engine feature, reusable engine-wide; no min/max burden on the player yet | ✓ Shipped |
 
 ## Evolution
 
@@ -121,4 +127,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-20 after initialization*
+*Last updated: 2026-11-11: Act II requirements marked shipped (phases 01–05)*

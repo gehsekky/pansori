@@ -288,6 +288,18 @@ documented deferrals.
 
 ## Engine & infrastructure
 
+- [ ] **Atomic session-state writes** (bug) — the action route's `turn_seq` check
+      is read-then-write (final `UPDATE` has no `AND turn_seq = …`), and
+      equip/transfer/drop/reorder/assign rewrite `state` without touching
+      `turn_seq`, so concurrent requests can lose updates (second tab, 3D move
+      sync, multiplayer). One `saveSessionState` helper with a conditional
+      update + 409. See `.planning/codebase/ARCHITECTURE-REVIEW-2026-11.md`.
+- [ ] **Postgres backups** — the prod DB (sessions + all creator-authored
+      campaign content) lives on one EBS volume with no dump/snapshot.
+      mysignalchain already has nightly `pg_dump` → S3 in gehsekky-infra; reuse it.
+- [ ] **CI parity with the local gate** — add `npm run test:fe`,
+      `npm run sync-types:check` and `npm run check-migrations` to `deploy.yml`.
+- [ ] **Node 20 → 24** — Node 20 is EOL (2026-04-30); bump Dockerfiles + CI together.
 - [ ] **Save/state persistence across redeploys (manual verify)** — specs assert
       a field-missing state loads + survives a `takeAction`; still need the end-to-end
       exercise (start → redeploy → resume → confirm parity). ~30 min.
@@ -337,5 +349,5 @@ documented deferrals.
   (`npx playwright test` still works against an already-up stack via
   `E2E_BASE_URL` / `E2E_BACKEND_URL`.)
 - `npm run check-migrations` when migrations change.
-- The three `shared-types.ts` are generated — edit `src/shared/types.ts`, then
-  `npm run sync-types` (CI runs `sync-types:check`).
+- The two `shared-types.ts` copies are generated — edit `src/shared/types.ts`, then
+  `npm run sync-types` (runs automatically before `npm test`; CI doesn't check drift yet).

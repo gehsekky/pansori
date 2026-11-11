@@ -45,18 +45,22 @@ open http://localhost:5173
 ├── docker-compose.yml
 ├── docker-compose.prod.yml
 ├── .env
-├── docs/                       ← TODO, AUTHORING, DEPLOY, srd-5.2.1.txt
+├── docs/                       ← AUTHORING, DEPLOY, STORY, srd-5.2.1.txt
+├── infra/                      ← nginx site file for the shared edge proxy, DB helpers
+├── scripts/                    ← shared-type sync, asset-overlay sync, migration check, e2e stack runner
 ├── tests/e2e/                  ← Playwright smoke tests
 └── src/
+    ├── shared/types.ts         ← source of truth for FE/BE shared types (copied into each workspace by `npm run sync-types`)
     ├── backend/                ← TypeScript; tsx in dev, tsc → dist in prod
-    │   ├── migrations/         ← SQL run on first postgres boot
+    │   ├── migrations/         ← idempotent SQL, applied on backend boot by migrationRunner
     │   └── src/
-    │       ├── types.ts        ← shared interfaces (GameState, Seed, Context, …)
-    │       ├── auth/           ← Google OAuth + session middleware
-    │       ├── campaignData/   ← the SRD base template; campaigns themselves are DB/creator-authored
-    │       │   └── srd/        ← classes, spells, monsters, species, beast_forms, items, backgrounds
+    │       ├── types.ts        ← backend interfaces (GameState, Seed, Context, …)
+    │       ├── auth/           ← Google + Discord OAuth (passport) + session middleware
+    │       ├── campaignData/   ← code-authored content; DB/creator edits overlay it at runtime
+    │       │   ├── srd/        ← classes, spells, monsters, species, beast_forms, items, backgrounds, feats
+    │       │   └── skyIsFalling/ ← flagship campaign fixture (Acts I–II), seeded with `npm run seed:sky`
     │       ├── db/             ← pool.ts
-    │       ├── routes/         ← game.ts (REST API) + schemas.ts (Zod)
+    │       ├── routes/         ← game.ts, campaigns.ts, auth.ts (REST API) + schemas.ts (Zod)
     │       └── services/       ← gameEngine, rulesEngine, gridEngine, damage, multiclass, conditions/, narrative/, procgen, campaignEngine, migrationRunner, llmProvider, and actions/ (one handler per player action, dispatched via actions/index.ts)
     └── frontend/               ← React + Vite (TypeScript)
         └── src/
@@ -71,7 +75,7 @@ open http://localhost:5173
 
 ## Database
 
-Single `game_sessions` table stores session metadata and the full game state JSONB blob; companion `users` / `user_identities` tables back Google OAuth. Migrations live in `src/backend/migrations/` and are applied transactionally on backend startup by `migrationRunner`.
+`game_sessions` stores each session's metadata plus two JSONB blobs: `state` (the live game state, rewritten every action) and `seed` (the resolved map/content snapshot, rewritten only when it changes); `turn_seq` versions it for multiplayer. `users` / `user_identities` back OAuth, and `session_participants` / `campaign_roles` handle multiplayer access. Creator-authored campaign content lives in per-section tables (`campaigns`, regions, towns, rooms, quests, factions, acts, narratives, items, monsters, …) that overlay the code-authored `campaignData/` at startup and after each edit. Migrations live in `src/backend/migrations/` and are applied transactionally on backend startup by `migrationRunner`.
 
 ## Adventure scripts (contexts)
 
@@ -84,11 +88,11 @@ Each context file defines a complete game setting:
 | `enemyTemplates` | Stat blocks with CR, HP, AC, toHit, XP, ability scores, multi-attack, boss phases, and `attackReachFt` / `speedFt` for tactical grid combat |
 | `lootTable` | Items with slot, finesse, range, weapon mastery, armor category, and effect fields. Compose from the shared SRD catalog with `srdItems('dagger', 'longsword', …)` (which also limits what's available) plus campaign-specific custom items |
 | `narratives` | All flavour text pools used by the game engine |
-| `campaign` | Fixed locations + rooms for campaign maps (Vale of Shadows, Whispering Pines, Grove of Thorns) |
+| `campaign` | Acts, quests, regions, towns, rooms, NPC dialogue, factions and rules for authored campaigns (e.g. *The Sky Is Falling*) |
 
 Procgen uses BFS from the start room to scale enemy CR by distance — early rooms draw from CR ≤ 1 templates, mid rooms from CR ≤ 5, far rooms from the full pool.
 
-The SRD pack under `src/backend/src/contexts/srd/` (classes, spells, monsters, species, beast forms, items, backgrounds) is shared by every context. Equipment lives in `items.ts` as a single canonical `SRD_ITEMS` catalog; contexts select from it via `srdItems(...ids)` so the same weapon/armor doesn't drift between campaigns, while still defining their own custom items and limiting which SRD items a campaign offers. Backgrounds work the same way — `srdBackgrounds(...)` supplies the canonical mechanics (skills, tool, origin feat, ability options) and campaigns pass only per-background flavor (`desc` / `featureDesc`). Spell-slot progression is owned by the engine (`spellSlotsForChar`), not declared per context.
+The SRD pack under `src/backend/src/campaignData/srd/` (classes, spells, monsters, species, beast forms, items, backgrounds) is shared by every context. Equipment lives in `items.ts` as a single canonical `SRD_ITEMS` catalog; contexts select from it via `srdItems(...ids)` so the same weapon/armor doesn't drift between campaigns, while still defining their own custom items and limiting which SRD items a campaign offers. Backgrounds work the same way — `srdBackgrounds(...)` supplies the canonical mechanics (skills, tool, origin feat, ability options) and campaigns pass only per-background flavor (`desc` / `featureDesc`). Spell-slot progression is owned by the engine (`spellSlotsForChar`), not declared per context.
 
 ## Rules engine (SRD 5.2.1, strict)
 
@@ -103,7 +107,7 @@ Highlights of what's implemented:
 - **Multi-target spell allocation** — Magic Missile per-dart, Eldritch Blast per-beam (L5+). Choice gen emits focus-fire + spread variants.
 - **Class features (12 classes, ≥1 subclass each)** — Cleric Divine Spark/Turn Undead/Sear Undead; Fighter Second Wind (multi-use), Tactical Master, Studied Attacks; Monk Discipline Points / Patient Defense / Stunning Strike cap; Rogue Cunning Strike; Druid Wild Shape (2024 Beast Forms); Barbarian Rage (2024 progression); plus full feature kits for Paladin, Ranger, Wizard, Sorcerer, Warlock, Bard.
 - **Multiclassing** — per-class levels (`class_levels`), the multiclass spell-slot table, ability prerequisites, proficiency grants on class entry, and feature gating by per-class level.
-- **Species** — the 9 SRD species in `contexts/srd/species.ts` (Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling) with mechanical traits (Halfling Lucky, Dwarven Toughness, Dragonborn Breath Weapon, Tiefling Infernal Legacy, Orc Relentless Endurance / Adrenaline Rush, Goliath Powerful Build / Large Form, etc.).
+- **Species** — the 9 SRD species in `campaignData/srd/species.ts` (Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling) with mechanical traits (Halfling Lucky, Dwarven Toughness, Dragonborn Breath Weapon, Tiefling Infernal Legacy, Orc Relentless Endurance / Adrenaline Rush, Goliath Powerful Build / Large Form, etc.).
 - **Inspiration** — Heroic Inspiration auto-granted on Nat 1; Heroic + Bardic Inspiration spendable on any d20 (attack / save / ability check).
 - **Hide action (2024 RAW)** — a general Action any class can take in combat (Rogues also get it as a Bonus Action via Cunning Action; both share one resolver). Gated on the SRD prerequisite (Heavily Obscured or behind Three-Quarters/Total Cover, and out of every enemy's line of sight) via `canAttemptHide`, resolved on a flat DC 15 Stealth check (not a 2014-style contest vs passive Perception). On success the check total is stored as the find DC; enemies roll passive Perception first, then an active Search action that costs their turn.
 - **Conditions with source attribution** — `condition_sources` map tracks who Frightened or Charmed a PC, so movement restrictions and "can't attack your charmer" guards have a target.
@@ -112,9 +116,9 @@ Highlights of what's implemented:
 
 ## Tests
 
-- **Backend**: `npm run test:be` — Vitest, ~1570 tests across 184 files spanning the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
-- **Frontend**: `npm run test:fe` — Vitest in jsdom (~110 tests across component + integration specs).
-- **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. CI gate; `npm run sync-types` regenerates locally.
+- **Backend**: `npm run test:be` — Vitest, ~3,430 tests across 345 files spanning the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
+- **Frontend**: `npm run test:fe` — Vitest in jsdom (~470 tests across 57 component + integration specs).
+- **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. `npm run sync-types` regenerates them and runs automatically before `npm test` / `npm run dev`; CI does not run the check yet.
 - **E2E**: `npm run test:e2e:stack` — brings up an isolated, ephemeral Docker stack, self-seeds a throwaway campaign via a gated test endpoint, runs Playwright (`tests/e2e/`) covering login → BEGIN ADVENTURE, session resume, and a combat loop, then tears the stack down. Gates production deploys in CI. (`npm run test:e2e` runs the bare Playwright suite against an already-running stack.)
 
 ## Credits

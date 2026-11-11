@@ -1,6 +1,32 @@
 # Deploying Pansori to AWS
 
-## Recommended architecture
+## Production today (2026-11)
+
+The live deployment differs from the from-scratch walkthrough further down:
+
+- **Host:** one arm64 (Graviton) EC2 instance, shared with other sites, running
+  `docker-compose.prod.yml` from `/opt/pansori` (Postgres, backend and frontend
+  containers; logs to CloudWatch via the `awslogs` driver).
+- **Proxy / TLS:** the shared `edge-nginx` container from `gehsekky-infra`
+  (`host/edge/`) owns ports 80/443 and reaches Pansori over the external `edge`
+  Docker network. Pansori's routing is `infra/nginx/pansori.conf`. Postgres is
+  not on that network.
+- **Images:** built natively on a GitHub `ubuntu-24.04-arm` runner, pushed to
+  immutable ECR repos tagged with the full commit SHA. A re-run skips images that
+  already exist.
+- **Pipeline:** `.github/workflows/deploy.yml` on every push to `main`: unit
+  tests + lint + typecheck + `npm audit` → ephemeral-stack Playwright e2e →
+  build → deploy. AWS access is an OIDC-assumed role (`vars.DEPLOY_ROLE_ARN`,
+  defined in `gehsekky-infra/pansori.tf`); no stored keys. The deploy runs over
+  SSM `SendCommand` (no SSH), pins `IMAGE_TAG` in `/opt/pansori/.env`, removes
+  old Pansori images only, then `docker compose pull && up -d`. Gated by the
+  `DEPLOY_ENABLED` repo variable.
+- **Migrations:** the backend applies pending `src/backend/migrations/*.sql` on
+  boot (`migrationRunner`) and refuses to start if one fails.
+
+## Original single-host walkthrough
+
+### Recommended architecture
 
 For a side project, a single EC2 instance running Docker Compose is the cheapest path that requires zero refactoring — the production environment is identical to development. Add S3 + CloudFront for the frontend later if you want a CDN.
 
@@ -260,35 +286,10 @@ git pull
 docker compose up --build -d
 ```
 
-Or automate with a GitHub Action (see below).
-
-### Simple GitHub Actions deploy workflow
-
-Create `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd pansori
-            git pull
-            docker compose up --build -d
-```
-
-Add `EC2_HOST` (your Elastic IP) and `EC2_SSH_KEY` (contents of your `.pem` file) as GitHub repository secrets.
+Production deploys are automated by `.github/workflows/deploy.yml` (see
+**Production today** above); the manual steps here are only for a hand-rolled
+host. The old SSH-based `appleboy/ssh-action` workflow was replaced by the
+OIDC + SSM pipeline, so no `EC2_SSH_KEY` secret is needed.
 
 ---
 

@@ -15,7 +15,7 @@
 ## Runtime
 
 **Environment:**
-- Node.js 20 (alpine Docker images for production)
+- Node.js 20 (alpine Docker images for production; EOL since 2026-04-30, upgrade pending). Local dev has been run on Node 26.
 
 **Package Manager:**
 - npm (v10+ via Node 20)
@@ -125,7 +125,7 @@
 - GitHub Actions (`.github/workflows/deploy.yml`)
 - Builds & pushes Docker images to ECR on `main` branch push
 - Deploys to EC2 via AWS SSM Session Manager (no SSH)
-- Node 20 for CI matrix, Ubuntu latest runner
+- Node 20 in CI; test jobs pinned to `ubuntu-24.04` (Playwright 1.60 can't install Chromium on 26.04); image build on native `ubuntu-24.04-arm`
 
 ---
 

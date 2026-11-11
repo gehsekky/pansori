@@ -1,7 +1,7 @@
-<!-- refreshed: 2026-06-20 -->
+<!-- refreshed: 2026-11-11 -->
 # Architecture
 
-**Analysis Date:** 2026-06-20
+**Analysis Date:** 2026-06-20 (corrections 2026-11-11; see also `ARCHITECTURE-REVIEW-2026-11.md`)
 
 ## System Overview
 
@@ -22,7 +22,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 ├──────────────────┬──────────────────┬──────────────────┬─────────────┤
 │ Authentication   │  REST API Layer  │   Game Engine    │  Campaign   │
 │  `auth/`         │  `routes/`       │  `services/`     │  `data/`    │
-│  (Google OAuth)  │  (game.ts)       │  (gameEngine.ts) │  (srd/)     │
+│ (Google/Discord) │  (game.ts)       │  (gameEngine.ts) │  (srd/)     │
 └────────────────┬─┴──────────────────┴──────────────────┴─────────────┘
                  │ Session / WebSocket coordination
                  │ Rules engine dispatches actions
@@ -45,12 +45,13 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 | **Frontend** | App.tsx | Root shell; route logic, modal/panel state | `src/frontend/src/App.tsx` |
 | **Frontend** | useGame hook | WebSocket subscription, action dispatch, state mirror | `src/frontend/src/hooks/useGame.ts` |
 | **Frontend** | lib/api.ts | Typed REST + WebSocket client | `src/frontend/src/lib/api.ts` |
-| **Backend** | routes/game.ts | REST endpoints (new session, join, take action, sync) | `src/backend/src/routes/game.ts` |
+| **Backend** | routes/game.ts | REST endpoints (new session, join, take action, equip/transfer/drop, participants) | `src/backend/src/routes/game.ts` |
+| **Backend** | routes/campaigns.ts | Campaign creator CRUD; per-section writes refresh the in-memory overlay | `src/backend/src/routes/campaigns.ts` |
 | **Backend** | routes/auth.ts | OAuth callback, login, logout | `src/backend/src/routes/auth.ts` |
 | **Backend** | services/gameEngine.ts | Turn flow, state transitions, rules dispatch | `src/backend/src/services/gameEngine.ts` |
 | **Backend** | services/rulesEngine.ts | Attack/save/skill rolls, AC, proficiency | `src/backend/src/services/rulesEngine.ts` |
 | **Backend** | services/gridEngine.ts | Tactical grid math, pathfinding, vision | `src/backend/src/services/gridEngine.ts` |
-| **Backend** | services/actions/ | 50+ action handlers (one file per action type) | `src/backend/src/services/actions/` |
+| **Backend** | services/actions/ | ~40 handler modules (plus `attack/`, `castSpell/`, `classFeature/` subdirs) | `src/backend/src/services/actions/` |
 | **Backend** | campaignData/srd/ | SRD base data (spells, monsters, items, classes) | `src/backend/src/campaignData/srd/` |
 | **Backend** | db/pool.ts | PostgreSQL connection pool | `src/backend/src/db/pool.ts` |
 
@@ -58,12 +59,14 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 
 **Overall:** Service-oriented dispatch with pure-functional rules and mutable state in a JSONB column.
 
+**Optional LLM narration:** when `LLM_PROVIDER=anthropic`, `takeAction` awaits `llmProvider.enhance()` on every action's narrative before responding (falls back to template text on error or if facts aren't preserved). Default is `none` (passthrough).
+
 **Key Characteristics:**
 - **State cohesion:** Game state (`GameState`) is a single JSONB blob persisted in `game_sessions.state`; migrations / snapshots backed by `gameState` schema validation (`stateSchema.ts`)
-- **Action dispatch:** Player actions (`StructuredAction`) flow REST → `takeAction()` → action-specific handler (one file per kind) → consequences written back to DB, broadcast via WebSocket
+- **Action dispatch:** Player actions (`StructuredAction`) flow REST `POST /api/game/session/:id/action` → `takeAction()` → action-specific handler → enemy turns run inline → `generateChoices()` → whole `state` (and `seed` if changed) written back → broadcast via Socket.IO
 - **Rules immutability:** `rulesEngine` and `gridEngine` are pure functions (no side effects); tests use fixtures and manual validation
 - **Context flexibility:** Campaigns are authored as database rows (creator-managed) or code (SRD baseline); both resolved at runtime via `contextLoader.ts`
-- **Multiplayer-friendly:** Session state includes per-player turn sequences; concurrent writes detected and rejected (race-detection via `turn_seq`); broadcasts sync all participants idempotently
+- **Multiplayer-friendly:** `turn_seq` gives best-effort stale-client detection (409 on mismatch, only when the client sends it); the check is read-then-write, not an atomic compare-and-swap (see Concurrency control); broadcasts sync all participants
 
 ## Layers
 
@@ -128,7 +131,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 1. **Player initiates action in UI** (`App.tsx` choice button / component event)
    - `useGame.handleChoice(choice)` dispatches `StructuredAction` to REST endpoint
 
-2. **REST endpoint receives action** (`routes/game.ts` POST `/game/action`)
+2. **REST endpoint receives action** (`routes/game.ts` POST `/api/game/session/:id/action`)
    - `ActionSchema` parses and validates the action body
    - Session auth verified; race-detection check compares client `turn_seq` vs DB `turn_seq`
 
@@ -143,7 +146,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 
 5. **State persisted + broadcast** (`routes/game.ts`)
    - New `gameState` written to `game_sessions.state` (JSONB)
-   - `turn_seq` incremented (atomic, prevents races)
+   - `turn_seq` incremented (plain `UPDATE ... WHERE id`; not conditioned on the old `turn_seq`)
    - WebSocket broadcast emits new state to all session participants (room: `session-{id}`)
    - REST response returns new state + choices
 
@@ -276,7 +279,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
   - 3D vs 2D view toggle per preference
 
 **Game Action Endpoint:**
-- Location: `src/backend/src/routes/game.ts` POST `/game/action`
+- Location: `src/backend/src/routes/game.ts` POST `/api/game/session/:id/action`
 - Triggers: Player action dispatch from frontend
 - Responsibilities: Validate action, dispatch handler, apply consequences, broadcast state
 
@@ -284,7 +287,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 
 - **Threading:** Node.js event loop (single-threaded); no worker threads. Async I/O via promises.
 - **Global state:** 
-  - `CONTEXTS` map (campaign definitions) cached in `contextStore.ts`; reloaded on application startup
+  - `CONTEXTS` map (campaign definitions) cached in `contextStore.ts`; built at startup (code contexts + DB overlays) and patched in place after each creator edit — this per-process cache is why the backend must run as a single instance
   - `pool` (PostgreSQL connection pool) in `db/pool.ts` — singleton, shared across all requests
   - Socket.IO namespace rooms scoped per session ID; broadcast emits to all subscribers in that room
   - No module-level mutable state in action handlers (all state flows through ActionContext)
@@ -293,8 +296,9 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
   - Frontend imports are acyclic; lib exports are imported by components, not vice versa
 - **Concurrency control:** 
   - Database transactions used for campaign role changes only (multi-user campaign ownership)
-  - Game state writes use optimistic concurrency via `turn_seq` version column; race-detected on REST, rejected with 409 Conflict
-  - No locking; concurrent action dispatches from same session are queued at the HTTP layer
+  - The action route compares the client's `turn_seq` to the row it read and rejects a mismatch with 409, but the final `UPDATE` is not conditioned on `turn_seq`, so two requests that read the same row can both succeed (last write wins)
+  - The side routes (`equip`, `transfer`, `drop`, `reorder-inventory`, `assign-character`) rewrite the whole `state` without bumping or checking `turn_seq`
+  - No row locking and no per-session queue; Node interleaves concurrent requests at every `await`
 
 ## Anti-Patterns
 
@@ -335,7 +339,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 
 ## Cross-Cutting Concerns
 
-**Logging:** Stdout via `console.log` / `console.error` in services; backend logs all state mutations (action type, character, consequence) for debugging. Structured logging TBD (defer to post-launch observability).
+**Logging:** Unstructured `console.log` / `console.error` to stdout, shipped to CloudWatch by the `awslogs` Docker driver in prod. No per-action mutation log, structured logging or error tracking yet.
 
 **Validation:** 
 - Zod schemas in `routes/schemas.ts` for all REST request bodies (ActionSchema, NewSessionSchema, etc.)
@@ -343,7 +347,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 - Runtime checks in action handlers (e.g., `hasSpellSlot()`, `canReact()`) before mutation
 
 **Authentication:** 
-- Passport.js with Google OAuth callback
+- Passport.js with Google and Discord OAuth (each enabled only when its env vars are set) plus a gated test-login for e2e
 - Session stored in PostgreSQL (connect-pg-simple middleware)
 - Cookie-based (secure: https in prod, httpOnly, sameSite)
 - `requireAuth()` middleware gates all game routes; `/auth/*` routes are public
@@ -355,4 +359,4 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 
 ---
 
-*Architecture analysis: 2026-06-20*
+*Architecture analysis: 2026-06-20; corrected 2026-11-11*
