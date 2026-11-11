@@ -66,7 +66,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 - **Action dispatch:** Player actions (`StructuredAction`) flow REST `POST /api/game/session/:id/action` → `takeAction()` → action-specific handler → enemy turns run inline → `generateChoices()` → whole `state` (and `seed` if changed) written back → broadcast via Socket.IO
 - **Rules immutability:** `rulesEngine` and `gridEngine` are pure functions (no side effects); tests use fixtures and manual validation
 - **Context flexibility:** Campaigns are authored as database rows (creator-managed) or code (SRD baseline); both resolved at runtime via `contextLoader.ts`
-- **Multiplayer-friendly:** `turn_seq` gives best-effort stale-client detection (409 on mismatch, only when the client sends it); the check is read-then-write, not an atomic compare-and-swap (see Concurrency control); broadcasts sync all participants
+- **Multiplayer-friendly:** state writes serialize per session via a row lock; `turn_seq` rejects stale clients with 409 (when the client sends it); broadcasts fire after commit
 
 ## Layers
 
@@ -146,7 +146,7 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
 
 5. **State persisted + broadcast** (`routes/game.ts`)
    - New `gameState` written to `game_sessions.state` (JSONB)
-   - `turn_seq` incremented (plain `UPDATE ... WHERE id`; not conditioned on the old `turn_seq`)
+   - `turn_seq` incremented inside the same transaction that holds the session row lock
    - WebSocket broadcast emits new state to all session participants (room: `session-{id}`)
    - REST response returns new state + choices
 
@@ -296,9 +296,10 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
   - Frontend imports are acyclic; lib exports are imported by components, not vice versa
 - **Concurrency control:** 
   - Database transactions used for campaign role changes only (multi-user campaign ownership)
-  - The action route compares the client's `turn_seq` to the row it read and rejects a mismatch with 409, but the final `UPDATE` is not conditioned on `turn_seq`, so two requests that read the same row can both succeed (last write wins)
-  - The side routes (`equip`, `transfer`, `drop`, `reorder-inventory`, `assign-character`) rewrite the whole `state` without bumping or checking `turn_seq`
-  - No row locking and no per-session queue; Node interleaves concurrent requests at every `await`
+  - Every route that rewrites `state` (action, equip, transfer, drop, reorder-inventory, assign-character, participant leave) runs inside `withSessionTx` (`db/sessionTx.ts`) and reads the session with `SELECT … FOR UPDATE`, so requests for the same session run one at a time; other sessions are unaffected
+  - Under that lock the action route's `turn_seq` check is reliable: a second request carrying the same `turn_seq` waits, then gets 409
+  - Responses and Socket.IO broadcasts are queued with `afterCommit`; a lock wait over 15s returns 409
+  - Each waiting request holds a pool connection (pg default max 10) — fine at current load
 
 ## Anti-Patterns
 

@@ -118,7 +118,7 @@ Highlights of what's implemented:
 
 - **Backend**: `npm run test:be` — Vitest, ~3,430 tests across 345 files spanning the engine specs (`gameEngine.*`, `rulesEngine`, `gridEngine`, `damage`, `multiclass`, `procgen`, `conditions/`, …) and per-action handler specs under `services/actions/`.
 - **Frontend**: `npm run test:fe` — Vitest in jsdom (~470 tests across 57 component + integration specs).
-- **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. `npm run sync-types` regenerates them and runs automatically before `npm test` / `npm run dev`; CI does not run the check yet.
+- **Shared types**: `npm run sync-types:check` — verifies `src/backend/src/shared-types.ts` and `src/frontend/src/shared-types.ts` are in sync with the source of truth at `src/shared/types.ts`. `npm run sync-types` regenerates them and runs automatically before `npm test` / `npm run dev`; CI runs the check.
 - **E2E**: `npm run test:e2e:stack` — brings up an isolated, ephemeral Docker stack, self-seeds a throwaway campaign via a gated test endpoint, runs Playwright (`tests/e2e/`) covering login → BEGIN ADVENTURE, session resume, and a combat loop, then tears the stack down. Gates production deploys in CI. (`npm run test:e2e` runs the bare Playwright suite against an already-running stack.)
 
 ## Credits

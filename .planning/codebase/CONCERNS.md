@@ -4,13 +4,15 @@
 
 ## New since June (2026-11-11 re-check)
 
-### Lost-update race on session state
+### Lost-update race on session state — FIXED 2026-11-11
+- Fixed by `db/sessionTx.ts` (`withSessionTx` + `lockSessionForParticipant` with `FOR UPDATE OF gs`): all state-writing routes serialize per session; GET's seed reconcile write is conditional on `turn_seq`. Original finding:
 - `POST /session/:id/action` checks the client's `turn_seq` against the row it read, then later runs `UPDATE game_sessions ... WHERE id = $n` without `AND turn_seq = <read value>`. Two requests that read the same row both pass and both write; the second silently overwrites the first.
 - `equip`, `transfer`, `drop`, `reorder-inventory` and `assign-character` rewrite the whole `state` without checking or bumping `turn_seq`, so an inventory change racing an action can erase either one.
 - Reachable today in solo play from a second tab or the 3D view's movement sync, not only in multiplayer.
 - Fix: make the write conditional (`WHERE id = $1 AND turn_seq = $2`, 409 on 0 rows) and route every state write through one helper; or take `SELECT ... FOR UPDATE` in a transaction.
 
-### CI runs less than the documented gate
+### CI runs less than the documented gate — FIXED 2026-11-11
+- `deploy.yml` now runs `sync-types:check`, `test:fe`, and a `migrations` job gating deploy. Original finding:
 - `.github/workflows/deploy.yml` runs backend unit tests, lint, typecheck, prettier, `npm audit` and e2e, but **not** the frontend unit suite (`npm run test:fe`), `npm run sync-types:check`, or `npm run check-migrations`. README and `scripts/sync-shared-types.ts` both say CI checks type drift; it doesn't.
 
 ### Node 20 is past end-of-life
@@ -201,7 +203,7 @@
 **Files:** `src/backend/src/services/migrationRunner.ts`
 **Impact:** Deployment fails hard; recovery requires manual DB intervention or a hotfix migration.
 **Current mitigation:** `npm run check-migrations` (double-apply to a scratch DB) catches fresh-env breakage. All migrations are tested before commit.
-**Improvement:** CI should run `check-migrations` on the test DB before deploying (still local-only as of 2026-11-11).
+**Improvement:** done 2026-11-11 — CI's `migrations` job runs `check-migrations` and gates deploy.
 
 ### Dependency hygiene
 

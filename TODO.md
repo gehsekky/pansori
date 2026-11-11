@@ -288,17 +288,18 @@ documented deferrals.
 
 ## Engine & infrastructure
 
-- [ ] **Atomic session-state writes** (bug) — the action route's `turn_seq` check
-      is read-then-write (final `UPDATE` has no `AND turn_seq = …`), and
-      equip/transfer/drop/reorder/assign rewrite `state` without touching
-      `turn_seq`, so concurrent requests can lose updates (second tab, 3D move
-      sync, multiplayer). One `saveSessionState` helper with a conditional
-      update + 409. See `.planning/codebase/ARCHITECTURE-REVIEW-2026-11.md`.
+- [x] **Atomic session-state writes** — every route that rewrites `state`
+      (action, equip, transfer, drop, reorder, assign, leave) now runs in
+      `withSessionTx` (`db/sessionTx.ts`) and reads the row `FOR UPDATE`, so
+      concurrent requests for one session serialize; responses/broadcasts fire
+      after COMMIT; lock wait >15s → 409. The GET reconcile's seed write is
+      conditional on `turn_seq`.
 - [ ] **Postgres backups** — the prod DB (sessions + all creator-authored
       campaign content) lives on one EBS volume with no dump/snapshot.
       mysignalchain already has nightly `pg_dump` → S3 in gehsekky-infra; reuse it.
-- [ ] **CI parity with the local gate** — add `npm run test:fe`,
-      `npm run sync-types:check` and `npm run check-migrations` to `deploy.yml`.
+- [x] **CI parity with the local gate** — `deploy.yml` now runs
+      `sync-types:check`, the frontend unit suite, and a `migrations` job
+      (`check-migrations` against a throwaway Postgres) that gates deploy.
 - [ ] **Node 20 → 24** — Node 20 is EOL (2026-04-30); bump Dockerfiles + CI together.
 - [ ] **Save/state persistence across redeploys (manual verify)** — specs assert
       a field-missing state loads + survives a `takeAction`; still need the end-to-end
@@ -350,4 +351,4 @@ documented deferrals.
   `E2E_BASE_URL` / `E2E_BACKEND_URL`.)
 - `npm run check-migrations` when migrations change.
 - The two `shared-types.ts` copies are generated — edit `src/shared/types.ts`, then
-  `npm run sync-types` (runs automatically before `npm test`; CI doesn't check drift yet).
+  `npm run sync-types` (runs automatically before `npm test`; CI runs `sync-types:check`).

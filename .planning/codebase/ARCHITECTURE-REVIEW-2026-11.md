@@ -35,7 +35,12 @@ duplicated FE/BE logic.
 
 ## Findings, ranked
 
-### 1. Session-state writes can lose updates — correctness (S)
+### 1. Session-state writes can lose updates — correctness (S) — DONE 2026-11-11
+
+> Implemented as a per-session row lock rather than a conditional update:
+> `withSessionTx` + `SELECT … FOR UPDATE` (`db/sessionTx.ts`). No migration
+> or FE change; side routes wait instead of failing.
+
 
 `POST /session/:id/action` reads the row, compares the client's `turn_seq`,
 does the work, then writes with `UPDATE game_sessions SET … WHERE id = $n`.
@@ -62,7 +67,7 @@ just sessions. `gehsekky-infra/mysignalchain.tf` already implements nightly
 `pg_dump` → S3 with 30-day retention and an alarm; clone it for Pansori. This
 is cheaper and simpler than moving to RDS.
 
-### 3. CI is weaker than the documented gate (S)
+### 3. CI is weaker than the documented gate (S) — DONE 2026-11-11
 
 `deploy.yml` does not run the frontend unit suite, `sync-types:check`, or
 `check-migrations`, though README / the sync script / TODO all said CI checks
