@@ -91,11 +91,13 @@ import { initMapState, pickHookText, regionEnterNarration } from '../services/ma
 import { syncSetAbilities, wornAcBonus } from '../services/wornEffects.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
+import type { PoolClient } from 'pg';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
+import { withSessionTx } from '../db/sessionTx.js';
 
 // Resolved lazily (not a const) because startup applies DB content overlays
 // onto CONTEXTS after migrations (services/campaignContent.ts) — a captured
@@ -154,6 +156,30 @@ async function fetchSessionForParticipant(
          ON sp.session_id = gs.id AND sp.user_id = $2
       WHERE gs.id = $1
       LIMIT 1`,
+    [sessionId, userId]
+  );
+  return rows[0] ?? null;
+}
+
+// Same participant check as fetchSessionForParticipant, but takes the
+// session row lock (`FOR UPDATE OF gs`) inside the caller's transaction.
+// Every route that rewrites `state` reads through this so overlapping
+// requests for one session run one after another instead of overwriting
+// each other. Use inside `withSessionTx`.
+export async function lockSessionForParticipant(
+  client: Pick<PoolClient, 'query'>,
+  sessionId: string | string[] | undefined,
+  userId: string
+): Promise<SessionRow | null> {
+  if (typeof sessionId !== 'string') return null;
+  const { rows } = await client.query<SessionRow>(
+    `SELECT gs.*
+       FROM game_sessions gs
+       INNER JOIN session_participants sp
+         ON sp.session_id = gs.id AND sp.user_id = $2
+      WHERE gs.id = $1
+      LIMIT 1
+        FOR UPDATE OF gs`,
     [sessionId, userId]
   );
   return rows[0] ?? null;
@@ -385,9 +411,14 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
     if (ctx?.campaign && row.seed && row.state) {
       const merged = reconcileSeedWithContext(row.seed, ctx, normalizeState(row.state));
       if (JSON.stringify(merged) !== JSON.stringify(row.seed)) {
-        await pool.query('UPDATE game_sessions SET seed = $1 WHERE id = $2', [
+        // Conditional on turn_seq: an action that landed after our read may
+        // have changed the seed (e.g. materialized an encounter enemy), and
+        // every action bumps turn_seq. If one did, skip the write rather than
+        // clobber it; the next GET reconciles again.
+        await pool.query('UPDATE game_sessions SET seed = $1 WHERE id = $2 AND turn_seq = $3', [
           JSON.stringify(merged),
           row.id,
+          row.turn_seq,
         ]);
         row.seed = merged;
       }
@@ -927,9 +958,9 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
   const parsed = parseBody(req, res, EquipSchema);
   if (!parsed) return;
   const { item_id, character_id } = parsed;
-  try {
+  await withSessionTx(res, async ({ client, afterCommit }) => {
     const userId = authedUserId(req);
-    const row = await fetchSessionForParticipant(req.params.id, userId);
+    const row = await lockSessionForParticipant(client, req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -1053,14 +1084,12 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       characters: state.characters.map((c, i) => (i === charIdx ? char : c)),
     };
 
-    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+    await client.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
       JSON.stringify(newState),
       row.id,
     ]);
-    res.json({ newState });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
+    afterCommit(() => res.json({ newState }));
+  });
 });
 
 // Transfer an item from one party member to another. SRD lets you
@@ -1074,9 +1103,9 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
     res.status(400).json({ error: 'Cannot transfer to the same character' });
     return;
   }
-  try {
+  await withSessionTx(res, async ({ client, afterCommit }) => {
     const userId = authedUserId(req);
-    const row = await fetchSessionForParticipant(req.params.id, userId);
+    const row = await lockSessionForParticipant(client, req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -1130,14 +1159,12 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
         return c;
       }),
     };
-    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+    await client.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
       JSON.stringify(newState),
       row.id,
     ]);
-    res.json({ newState });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
+    afterCommit(() => res.json({ newState }));
+  });
 });
 
 // Drop an item from a character's inventory. v1: the dropped item is lost
@@ -1147,9 +1174,9 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
   const parsed = parseBody(req, res, DropSchema);
   if (!parsed) return;
   const { item_instance_id, character_id } = parsed;
-  try {
+  await withSessionTx(res, async ({ client, afterCommit }) => {
     const userId = authedUserId(req);
-    const row = await fetchSessionForParticipant(req.params.id, userId);
+    const row = await lockSessionForParticipant(client, req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -1181,14 +1208,12 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       ...state,
       characters: state.characters.map((c, i) => (i === charIdx ? newChar : c)),
     };
-    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+    await client.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
       JSON.stringify(newState),
       row.id,
     ]);
-    res.json({ newState });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
+    afterCommit(() => res.json({ newState }));
+  });
 });
 
 // Rearrange a character's inventory (the icon grid's drag + sort buttons).
@@ -1199,9 +1224,9 @@ gameRouter.post('/session/:id/reorder-inventory', async (req: Request, res: Resp
   const parsed = parseBody(req, res, ReorderInventorySchema);
   if (!parsed) return;
   const { character_id, order } = parsed;
-  try {
+  await withSessionTx(res, async ({ client, afterCommit }) => {
     const userId = authedUserId(req);
-    const row = await fetchSessionForParticipant(req.params.id, userId);
+    const row = await lockSessionForParticipant(client, req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -1233,14 +1258,12 @@ gameRouter.post('/session/:id/reorder-inventory', async (req: Request, res: Resp
       ...state,
       characters: state.characters.map((c, i) => (i === charIdx ? newChar : c)),
     };
-    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+    await client.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
       JSON.stringify(newState),
       row.id,
     ]);
-    res.json({ newState });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
+    afterCommit(() => res.json({ newState }));
+  });
 });
 
 // Take a game action
@@ -1252,14 +1275,14 @@ gameRouter.post('/session/:id/assign-character', async (req: Request, res: Respo
   const parsed = parseBody(req, res, AssignCharacterSchema);
   if (!parsed) return;
   const { character_id, owner_user_id: newOwner } = parsed;
-  try {
+  await withSessionTx(res, async ({ client, afterCommit }) => {
     const userId = authedUserId(req);
     // Host-only: confirm the requester is the session's user_id (not
     // just any participant). A non-host participant can't reassign
     // ownership — keeps the host as the single point of authority
     // over party composition.
-    const { rows } = await pool.query(
-      'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2',
+    const { rows } = await client.query<SessionRow>(
+      'SELECT * FROM game_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE',
       [req.params.id, userId]
     );
     const row = rows[0];
@@ -1270,7 +1293,7 @@ gameRouter.post('/session/:id/assign-character', async (req: Request, res: Respo
     // The new owner must be a participant of this session (host
     // can't assign a PC to a user who hasn't joined). Defends
     // against the host typo'ing a random uuid.
-    const { rowCount: participantRows } = await pool.query(
+    const { rowCount: participantRows } = await client.query(
       'SELECT 1 FROM session_participants WHERE session_id = $1 AND user_id = $2',
       [req.params.id, newOwner]
     );
@@ -1290,21 +1313,21 @@ gameRouter.post('/session/:id/assign-character', async (req: Request, res: Respo
         i === charIdx ? { ...c, owner_user_id: newOwner } : c
       ),
     };
-    await pool.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
+    await client.query('UPDATE game_sessions SET state = $1, updated_at = NOW() WHERE id = $2', [
       JSON.stringify(newState),
       req.params.id,
     ]);
     // Push the updated ownership + state to every participant so their
     // UIs re-render "who owns what" without a refetch.
-    broadcastSessionState(row.id, { state: newState });
-    broadcastParticipantChange(row.id, 'ownership-changed', {
-      character_id,
-      owner_user_id: newOwner,
+    afterCommit(() => {
+      broadcastSessionState(row.id, { state: newState });
+      broadcastParticipantChange(row.id, 'ownership-changed', {
+        character_id,
+        owner_user_id: newOwner,
+      });
+      res.json({ ok: true, character_id, owner_user_id: newOwner });
     });
-    res.json({ ok: true, character_id, owner_user_id: newOwner });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
+  });
 });
 
 // List participants of a session, with the names of the user accounts
@@ -1373,7 +1396,7 @@ gameRouter.delete('/session/:id/participant', async (req: Request, res: Response
     // Confirm session exists + caller is a participant (not host).
     const {
       rows: [row],
-    } = await client.query<SessionRow>('SELECT * FROM game_sessions WHERE id = $1 LIMIT 1', [
+    } = await client.query<SessionRow>('SELECT * FROM game_sessions WHERE id = $1 FOR UPDATE', [
       req.params.id,
     ]);
     if (!row) {
@@ -1482,9 +1505,11 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
   const action = parsed.action as StructuredAction;
   const history = parsed.history;
   const clientTurnSeq = parsed.turn_seq;
-  try {
+  await withSessionTx(res, async ({ client, afterCommit }) => {
     const userId = authedUserId(req);
-    const row = await fetchSessionForParticipant(req.params.id, userId);
+    // Row lock held until COMMIT: a concurrent request for this session waits
+    // here, then sees the committed turn_seq and gets the 409 below.
+    const row = await lockSessionForParticipant(client, req.params.id, userId);
     if (!row) {
       res.status(404).json({ error: 'Session not found' });
       return;
@@ -1552,7 +1577,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     // For campaign sessions, load and merge persisted campaign state
     let campaignState = null;
     if (ctx.campaign) {
-      campaignState = await loadCampaignState(pool, authedUserId(req), ctx.id);
+      campaignState = await loadCampaignState(client, authedUserId(req), ctx.id);
       state = mergeCampaignIntoGameState(state, campaignState);
     }
 
@@ -1758,7 +1783,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
         }
       }
       const updatedCs = extractCampaignDelta(campaignState, result.newState);
-      await saveCampaignState(pool, updatedCs);
+      await saveCampaignState(client, updatedCs);
     }
 
     // Entering a terminal act resolves the campaign — the session goes terminal
@@ -1777,12 +1802,12 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     // so it's always written.
     const seedAfter = JSON.stringify(result.seed);
     if (seedAfter !== seedBefore) {
-      await pool.query(
+      await client.query(
         'UPDATE game_sessions SET state = $1, seed = $2, status = $3, turn_seq = $4, updated_at = NOW() WHERE id = $5',
         [JSON.stringify(result.newState), seedAfter, newStatus, nextTurnSeq, row.id]
       );
     } else {
-      await pool.query(
+      await client.query(
         'UPDATE game_sessions SET state = $1, status = $2, turn_seq = $3, updated_at = NOW() WHERE id = $4',
         [JSON.stringify(result.newState), newStatus, nextTurnSeq, row.id]
       );
@@ -1793,14 +1818,13 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
     // response too — that's intentional; the FE applies whichever
     // arrives first and discards the rest by identity. Other
     // participants only see the broadcast.
-    broadcastSessionState(row.id, {
-      state: result.newState,
-      narrative: result.narrative,
-      turn_seq: nextTurnSeq,
+    afterCommit(() => {
+      broadcastSessionState(row.id, {
+        state: result.newState,
+        narrative: result.narrative,
+        turn_seq: nextTurnSeq,
+      });
+      res.json({ ...result, turn_seq: nextTurnSeq });
     });
-
-    res.json({ ...result, turn_seq: nextTurnSeq });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
+  });
 });
