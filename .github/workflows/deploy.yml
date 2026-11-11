@@ -35,7 +35,31 @@ jobs:
         run: npm run lint --workspace=pansori-frontend
       - name: Prettier check
         run: npx prettier --check "src/**/*.{ts,tsx,js,jsx}" --ignore-path .gitignore
-      - run: npm test --workspace=src/backend
+      # The FE/BE shared-types.ts copies are generated from src/shared/types.ts;
+      # fail if someone edited a copy or forgot to re-sync.
+      - name: Shared types in sync
+        run: npm run sync-types:check
+      - name: Backend unit tests
+        run: npm test --workspace=src/backend
+      - name: Frontend unit tests
+        run: npm test --workspace=src/frontend
+
+  migrations:
+    name: Migrations (double-apply)
+    # Pinned for the same reason as e2e below; any runner with Docker works.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # Applies every migration to a scratch DB twice, the path a fresh
+      # environment takes (initdb + migrationRunner). Catches breakage an
+      # incrementally evolved database hides (the 015/020 incident).
+      - name: Start Postgres
+        run: docker compose up -d --wait postgres
+      - name: Check migrations
+        run: npm run check-migrations
+      - name: Stop Postgres
+        if: always()
+        run: docker compose down -v --remove-orphans || true
 
   e2e:
     name: E2E (Playwright)
@@ -86,7 +110,7 @@ jobs:
 
   build-and-deploy:
     name: Build → ECR → Deploy
-    needs: [test, e2e]
+    needs: [test, migrations, e2e]
     # Native arm64, like the host. Under QEMU emulation, npm ci crashed with
     # "Illegal instruction" and the build hung for hours.
     runs-on: ubuntu-24.04-arm
