@@ -8,7 +8,9 @@
 # frontend's vite proxy target (http://backend:3001) and the backend's
 # DATABASE_URL resolve unchanged. Only the Compose project name, container
 # names, and host-published ports differ, so this can run alongside the dev
-# stack without colliding.
+# stack without colliding. The host ports come from E2E_PG_PORT /
+# E2E_BACKEND_PORT / E2E_FRONTEND_PORT (defaults 5433 / 3002 / 5174);
+# scripts/run-e2e-stack.sh moves any that are already taken to a free port.
 name: pansori-e2e
 
 services:
@@ -20,7 +22,7 @@ services:
       POSTGRES_PASSWORD: pansori
       POSTGRES_DB: pansori_db
     ports:
-      - '5433:5432'
+      - '${E2E_PG_PORT:-5433}:5432'
     # No volume: the database lives in the container layer and is discarded on
     # `down`. tmpfs keeps it in memory for speed.
     tmpfs:
@@ -45,13 +47,13 @@ services:
       NODE_ENV: development
       PORT: 3001
       DATABASE_URL: postgres://pansori:pansori@postgres:5432/pansori_db
-      FRONTEND_URL: http://localhost:5174
+      FRONTEND_URL: http://localhost:${E2E_FRONTEND_PORT:-5174}
       SESSION_SECRET: e2e-secret
       # Gates BOTH the /api/auth/test-login bypass and the /api/test/seed-campaign
       # endpoint (each also requires NODE_ENV != production).
       E2E_TEST_LOGIN_ENABLED: 'true'
     ports:
-      - '3002:3001'
+      - '${E2E_BACKEND_PORT:-3002}:3001'
     volumes:
       - ./src/backend:/app
       - /app/node_modules
@@ -65,7 +67,7 @@ services:
     depends_on:
       - backend
     ports:
-      - '5174:5173'
+      - '${E2E_FRONTEND_PORT:-5174}:5173'
     # Free art tier (no VITE_PAINTED_ART): the e2e needs no licensed assets, and
     # the suite asserts no painted art is required.
     command: npm run dev -- --host

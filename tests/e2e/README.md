@@ -24,6 +24,15 @@ ports (frontend 5174, backend 3002, postgres 5433) — so it can run alongside
 the dev stack without colliding. The stack runs the free art tier (no licensed
 assets required).
 
+- **Ports:** override with `E2E_FRONTEND_PORT` / `E2E_BACKEND_PORT` /
+  `E2E_PG_PORT`. Any left unset whose default is taken (another project's
+  Postgres on 5433, say) moves to the next free port automatically.
+- **Browser:** `E2E_PLAYWRIGHT=auto|local|docker` (default `auto`). `auto`
+  runs Playwright locally when its Chromium is installed, otherwise inside the
+  official `mcr.microsoft.com/playwright:v<installed version>-noble` image on
+  the host network. That covers hosts where Playwright can't install its
+  browser (Ubuntu 26.04 with Playwright 1.60).
+
 ## Running against an already-up stack
 
 ```
