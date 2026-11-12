@@ -3,7 +3,8 @@
 # (installed by the deploy workflow to /opt/pansori/bin/).
 #
 # 1. Streams a pg_dump (custom format) of the pansori-postgres container to
-#    s3://pansori-backups, where a lifecycle rule deletes dumps after 30 days.
+#    s3://pansori-backups, where a lifecycle rule deletes dumps after 30 days
+#    (bucket, lifecycle and the instance-role policy: gehsekky-infra, pansori.tf).
 # 2. Publishes BackupSucceeded=1; the pansori-backup-missing alarm
 #    (gehsekky-infra, pansori.tf) emails if none arrives for 26 hours.
 #
