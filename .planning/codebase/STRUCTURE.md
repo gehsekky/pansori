@@ -33,8 +33,6 @@ pansori/
 ├── .github/workflows/           # CI/CD (GitHub Actions)
 │   └── deploy.yml               # Build, test, push to Docker registry
 │
-├── infra/                       # Infrastructure-as-code (deferred, stubs only)
-│
 ├── scripts/                     # Build & utility scripts
 │   └── sync-shared-types.ts     # Syncs src/shared/types.ts → backend/frontend
 │

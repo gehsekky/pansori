@@ -230,27 +230,7 @@ jobs:
           docker compose -f docker-compose.prod.yml --env-file .env pull backend frontend
           docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
           docker image prune -f
-
-          # Nightly Postgres backup to S3 (infra/host/: a systemd timer, so it
-          # runs whatever happens to the containers). The files arrive as a
-          # base64 tarball spliced in below. Bucket, IAM and the
-          # pansori-backup-missing alarm are in gehsekky-infra (pansori.tf).
-          HOST_TMP=$(mktemp -d)
-          echo "__HOST_BUNDLE__" | base64 -d | tar -xzf - -C "$HOST_TMP"
-          install -d -m 0755 /opt/pansori/bin
-          install -m 0755 "$HOST_TMP/backup.sh" "$HOST_TMP/restore-test.sh" /opt/pansori/bin/
-          install -m 0644 "$HOST_TMP/pansori-backup.service" \
-            "$HOST_TMP/pansori-backup.timer" /etc/systemd/system/
-          rm -rf "$HOST_TMP"
-          systemctl daemon-reload
-          systemctl enable -q --now pansori-backup.timer
-          echo "backup timer installed"
           DEPLOY
-
-          # base64 has no '|' or '&', so it's safe in the sed replacement.
-          HOST_BUNDLE=$(tar -C infra/host -czf - backup.sh restore-test.sh \
-            pansori-backup.service pansori-backup.timer | base64 -w0)
-          sed -i "s|__HOST_BUNDLE__|${HOST_BUNDLE}|" /tmp/deploy.sh
 
           sed -i "s|__ECR_REGISTRY__|${ECR_REGISTRY}|g; s|__IMAGE_TAG__|${IMAGE_TAG}|g; s|__AWS_REGION__|${AWS_REGION}|g" /tmp/deploy.sh
 

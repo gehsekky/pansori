@@ -46,7 +46,6 @@ open http://localhost:5173
 ├── docker-compose.prod.yml
 ├── .env
 ├── docs/                       ← AUTHORING, DEPLOY, STORY, srd-5.2.1.txt
-├── infra/                      ← nginx site file for the shared edge proxy, DB helpers
 ├── scripts/                    ← shared-type sync, asset-overlay sync, migration check, e2e stack runner
 ├── tests/e2e/                  ← Playwright smoke tests
 └── src/

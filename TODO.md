@@ -295,10 +295,8 @@ documented deferrals.
       after COMMIT; lock wait >15s → 409. The GET reconcile's seed write is
       conditional on `turn_seq`.
 - [x] **Postgres backups** — nightly `pg_dump` → `s3://pansori-backups` (30-day
-      expiry) by a systemd timer the deploy installs (`infra/host/`), with a
-      `pansori-backup-missing` alarm after 26h; bucket/IAM/alarm in
-      gehsekky-infra `pansori.tf`. Restore rehearsal: `restore-test.sh`
-      (docs/DEPLOY.md "Backups and restore").
+      expiry) by a systemd timer, with a `pansori-backup-missing` alarm after
+      26h. All of it is in gehsekky-infra (`host/pansori-backup/`, `pansori.tf`).
 - [x] **CI parity with the local gate** — `deploy.yml` now runs
       `sync-types:check`, the frontend unit suite, and a `migrations` job
       (`check-migrations` against a throwaway Postgres) that gates deploy.
