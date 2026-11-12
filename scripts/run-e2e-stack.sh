@@ -15,8 +15,7 @@
 #       local:  run `npx playwright test` on this machine.
 #       docker: run it in the official Playwright image matching the installed
 #               @playwright/test version, on the host network. For machines
-#               where Playwright can't install its browser (e.g. Ubuntu 26.04
-#               with Playwright 1.60).
+#               where Playwright's browser isn't installed or can't be.
 #       auto:   local when Playwright's Chromium is installed, else docker.
 set -euo pipefail
 cd "$(dirname "$0")/.."

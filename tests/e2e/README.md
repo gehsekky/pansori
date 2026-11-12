@@ -30,8 +30,8 @@ assets required).
 - **Browser:** `E2E_PLAYWRIGHT=auto|local|docker` (default `auto`). `auto`
   runs Playwright locally when its Chromium is installed, otherwise inside the
   official `mcr.microsoft.com/playwright:v<installed version>-noble` image on
-  the host network. That covers hosts where Playwright can't install its
-  browser (Ubuntu 26.04 with Playwright 1.60).
+  the host network. That covers hosts where Playwright's browser isn't
+  installed or can't be.
 
 ## Running against an already-up stack
 

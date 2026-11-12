@@ -14,8 +14,8 @@ jobs:
     name: Run tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -46,10 +46,9 @@ jobs:
 
   migrations:
     name: Migrations (double-apply)
-    # Pinned for the same reason as e2e below; any runner with Docker works.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Applies every migration to a scratch DB twice, the path a fresh
       # environment takes (initdb + migrationRunner). Catches breakage an
       # incrementally evolved database hides (the 015/020 incident).
@@ -64,14 +63,10 @@ jobs:
   e2e:
     name: E2E (Playwright)
     needs: test
-    # Pinned: ubuntu-latest became Ubuntu 26.04, where Playwright 1.60 can't
-    # install Chromium ("does not support chromium on ubuntu26.04-x64").
-    # Move back to ubuntu-latest after upgrading Playwright to a release
-    # that supports 26.04.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -92,7 +87,7 @@ jobs:
       # post-mortem possible without re-running.
       - name: Upload Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -119,12 +114,12 @@ jobs:
       id-token: write # to fetch the OIDC token for the AWS role
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The pansori-deploy role (gehsekky-infra, pansori.tf) trusts only this
       # repo's main branch: no stored AWS keys.
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -151,13 +146,13 @@ jobs:
           done
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # provenance: false: nothing reads Buildx's attestations, and each one
       # is an extra manifest in ECR.
       - name: Build & push backend image
         if: steps.existing.outputs.backend != 'true'
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./src/backend
           file: ./src/backend/Dockerfile
@@ -170,7 +165,7 @@ jobs:
 
       - name: Build & push frontend image
         if: steps.existing.outputs.frontend != 'true'
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./src/frontend
           file: ./src/frontend/Dockerfile

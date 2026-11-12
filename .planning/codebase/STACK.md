@@ -34,7 +34,7 @@
 
 **Testing:**
 - Vitest 4.1.6 - Unit test runner (backend + frontend)
-- Playwright 1.60.0 - E2E testing framework with Chromium
+- Playwright 1.65 - E2E testing framework with Chromium
 - @testing-library/react 16.3.2 - React component testing utilities
 - @testing-library/user-event 14.6.1 - User interaction simulation
 - JSDOM 29.1.1 - DOM environment for browser testing
@@ -119,7 +119,7 @@
 - GitHub Actions (`.github/workflows/deploy.yml`)
 - Builds & pushes Docker images to ECR on `main` branch push
 - Deploys to EC2 via AWS SSM Session Manager (no SSH)
-- Node 24 in CI; test jobs pinned to `ubuntu-24.04` (Playwright 1.60 can't install Chromium on 26.04); image build on native `ubuntu-24.04-arm`
+- Node 24 in CI; test jobs on `ubuntu-latest` (Ubuntu 26.04 since Playwright 1.65); image build on native `ubuntu-24.04-arm`
 
 ---
 
