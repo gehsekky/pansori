@@ -15,8 +15,8 @@
 - `deploy.yml` now runs `sync-types:check`, `test:fe`, and a `migrations` job gating deploy. Original finding:
 - `.github/workflows/deploy.yml` runs backend unit tests, lint, typecheck, prettier, `npm audit` and e2e, but **not** the frontend unit suite (`npm run test:fe`), `npm run sync-types:check`, or `npm run check-migrations`. README and `scripts/sync-shared-types.ts` both say CI checks type drift; it doesn't.
 
-### Node 20 is past end-of-life
-- Dockerfiles (`node:20-alpine`) and CI (`node-version: 20`) still use Node 20, which reached EOL on 2026-04-30. Local dev is on Node 26. Move images and CI to Node 24 (current LTS) together.
+### Node 20 is past end-of-life — FIXED 2026-11-11
+- Dockerfiles (`node:24-alpine`), CI (`node-version: 24`), `@types/node` (^24) and root `engines` (`>=24`) are on Node 24 LTS. Local dev runs Node 26, which the suites also pass on.
 
 ### LLM narration sits on the request path
 - With `LLM_PROVIDER=anthropic`, every action awaits a model call before the response and broadcast. Prod default is `none`, so this is latent. The default model (`claude-haiku-4-5-20251001`) is a generation behind; Haiku 5.5 is `claude-haiku-5-5`.

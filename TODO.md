@@ -302,7 +302,7 @@ documented deferrals.
 - [x] **CI parity with the local gate** — `deploy.yml` now runs
       `sync-types:check`, the frontend unit suite, and a `migrations` job
       (`check-migrations` against a throwaway Postgres) that gates deploy.
-- [ ] **Node 20 → 24** — Node 20 is EOL (2026-04-30); bump Dockerfiles + CI together.
+- [x] **Node 20 → 24** — Dockerfiles, CI, `@types/node` and `engines` on Node 24 LTS.
 - [ ] **Save/state persistence across redeploys (manual verify)** — specs assert
       a field-missing state loads + survives a `takeAction`; still need the end-to-end
       exercise (start → redeploy → resume → confirm parity). ~30 min.

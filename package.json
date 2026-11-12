@@ -43,5 +43,8 @@
     "@playwright/test": "^1.60.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

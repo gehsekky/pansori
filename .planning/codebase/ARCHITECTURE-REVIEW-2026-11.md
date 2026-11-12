@@ -78,7 +78,9 @@ is cheaper and simpler than moving to RDS.
 type drift. The 2026-06-06 incidents (auto-fill / Divine Order; 015/020
 migrations) are exactly what these catch. Add three steps to the `test` job.
 
-### 4. Runtime is end-of-life (S–M)
+### 4. Runtime is end-of-life (S–M) — DONE 2026-11-11
+
+> Images, CI, `@types/node` and `engines` moved to Node 24 LTS.
 
 Images and CI use Node 20 (EOL 2026-04-30). Move both to Node 24 LTS in one
 change. Local dev already runs Node 26, so the test suites are known to work on
