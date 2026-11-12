@@ -46,6 +46,7 @@ open http://localhost:5173
 ├── docker-compose.prod.yml
 ├── .env
 ├── docs/                       ← AUTHORING, DEPLOY, STORY, srd-5.2.1.txt
+├── infra/                      ← host side of the app: edge-nginx site file, nightly backup job (AWS resources are in gehsekky-infra)
 ├── scripts/                    ← shared-type sync, asset-overlay sync, migration check, e2e stack runner
 ├── tests/e2e/                  ← Playwright smoke tests
 └── src/

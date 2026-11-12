@@ -33,6 +33,8 @@ pansori/
 ├── .github/workflows/           # CI/CD (GitHub Actions)
 │   └── deploy.yml               # Build, test, push to Docker registry
 │
+├── infra/                       # Host side of the app: nginx/ edge site file, host/ backup job (Terraform is in gehsekky-infra)
+│
 ├── scripts/                     # Build & utility scripts
 │   └── sync-shared-types.ts     # Syncs src/shared/types.ts → backend/frontend
 │
