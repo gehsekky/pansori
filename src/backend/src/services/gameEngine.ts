@@ -62,6 +62,13 @@ import {
   masterableWeapons,
   weaponMasterySlotsForLevel,
 } from '../campaignData/srd/index.js';
+import {
+  CIRCLE_LANDS,
+  alwaysPreparedSpells,
+  choosesCircleLand,
+  circleLandSpells,
+  syncSubclassSpells,
+} from './subclassSpells.js';
 import { COMBAT_LOG_MAX, clampCombatDim } from '../types.js';
 import {
   DEFAULT_SPEED_FEET,
@@ -94,6 +101,7 @@ import {
   canCountercharm,
   canRitualCast,
   casterSpellOptionsByLevel,
+  channelDivinityUsesMax,
   elementalAffinityType,
   evocationSavantBudget,
   expertiseEligibleSkills,
@@ -123,6 +131,7 @@ import {
   metamagicSlots,
   piercesMagicalDarkness,
   spellSlotsForChar,
+  wildShapeUsesMax,
 } from './multiclass.js';
 import {
   availableRecoveries,
@@ -3870,34 +3879,13 @@ export function splitEncounterXp(
  *   - Multiclass prof grants when this is the **first** level in a
  *     non-primary class (`applyMulticlassProfGrants`).
  */
-// SRD Draconic Sorcery — Draconic Spells: always-prepared spells gained at
-// sorcerer levels 3/5/7/9. pansori casts from `spells_known`, so they're merged
-// in (idempotent) on subclass-select + level-up. Only the spells pansori has
-// today are listed; higher tiers (Command, Dragon's Breath, Alter Self, Arcane
-// Eye, Charm Monster, Legend Lore, Summon Dragon) await spell content.
-const DRACONIC_SPELL_TABLE: Array<{ level: number; spells: string[] }> = [
-  { level: 3, spells: ['chromatic_orb'] },
-  { level: 5, spells: ['fear', 'fly'] },
-];
-
-/** Returns `char.spells_known` with the Draconic always-prepared spells the
- *  sorcerer's level grants merged in (a Draconic Sorcerer; idempotent). */
-export function mergeDraconicSpells(char: Character): string[] {
-  const lvl = getClassLevel(char, 'sorcerer');
-  const known = new Set(char.spells_known ?? []);
-  for (const tier of DRACONIC_SPELL_TABLE) {
-    if (lvl >= tier.level) tier.spells.forEach((s) => known.add(s));
-  }
-  return [...known];
-}
-
 /**
  * Assign a subclass to a character (mutates in place) and return the narrative
  * note. SRD 5.2.1 gives each class exactly one subclass, so this is normally
  * auto-applied at level 3 by `applyLevelUpForClass` — no player choice. Shared
  * with the `select_subclass` handler (used by tests / FE). Applies the Draconic
- * Sorcerer side effects (retroactive Draconic Resilience HP + always-prepared
- * Draconic spells) since those are subclass-on-pick effects.
+ * Sorcerer's retroactive Draconic Resilience HP and grants the subclass's
+ * always-prepared spells (services/subclassSpells.ts), both on-pick effects.
  */
 export function applySubclass(char: Character, subclassId: string): string {
   char.subclass = subclassId;
@@ -3907,10 +3895,8 @@ export function applySubclass(char: Character, subclassId: string): string {
     char.max_hp += sorcLvl;
     char.hp += sorcLvl;
     note += ` Draconic Resilience: +${sorcLvl} max HP (now ${char.hp}/${char.max_hp}).`;
-    const before = (char.spells_known ?? []).length;
-    char.spells_known = mergeDraconicSpells(char);
-    if ((char.spells_known?.length ?? 0) > before) note += ` 🐉 Draconic Spells added.`;
   }
+  if (syncSubclassSpells(char) > 0) note += ' Subclass spells are now always prepared.';
   return note;
 }
 
@@ -3995,7 +3981,11 @@ export function applyLevelUpForClass(char: Character, className: string, context
   const knownTarget = knownSpellTargetForLevel(className, newClassLevel);
   if (knownTarget !== null && context.spellTable) {
     const cantrips = new Set(casterSpellOptionsByLevel(className, context.spellTable, 0)[0] ?? []);
-    const currentKnown = (char.spells_known ?? []).filter((id) => !cantrips.has(id)).length;
+    // Subclass always-prepared spells don't count against the known target.
+    const granted = new Set(char.subclass_granted_spells ?? []);
+    const currentKnown = (char.spells_known ?? []).filter(
+      (id) => !cantrips.has(id) && !granted.has(id)
+    ).length;
     const owed = Math.max(0, knownTarget - currentKnown - (char.spells_to_learn ?? 0));
     if (owed > 0) {
       char.spells_to_learn = (char.spells_to_learn ?? 0) + owed;
@@ -4042,12 +4032,9 @@ export function applyLevelUpForClass(char: Character, className: string, context
     out += ` ✨ Words of Creation! ${char.name} always has Power Word Heal and Power Word Kill prepared.`;
   }
 
-  // SRD Draconic Sorcery — gain newly-unlocked always-prepared Draconic spells.
-  if (cls === 'sorcerer' && char.subclass === 'draconic') {
-    const before = (char.spells_known ?? []).length;
-    char.spells_known = mergeDraconicSpells(char);
-    if (char.spells_known.length > before) out += ` 🐉 Draconic Spells expanded.`;
-  }
+  // Subclass spell lists (Life, Devotion, Land, Fiend, Draconic): newly
+  // unlocked tiers become always prepared.
+  if (syncSubclassSpells(char) > 0) out += ` ${char.name}'s subclass spells expand.`;
 
   // First multiclass level: narrow proficiency grants per SRD (armor /
   // weapons, plus a class-list skill + tools for Bard / Ranger / Rogue). The
@@ -5790,8 +5777,10 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // Cantrips are always known, not prepared (SRD) — exclude
       // them from the auto-prep list and from the cap math so the
       // player doesn't burn a prep slot on Sacred Flame.
+      // Subclass spells are always prepared and don't use a preparation slot.
+      const alwaysPrep = new Set(alwaysPreparedSpells(char));
       const known = (char.spells_known ?? []).filter(
-        (id) => (context.spellTable?.[id]?.level ?? 0) > 0
+        (id) => (context.spellTable?.[id]?.level ?? 0) > 0 && !alwaysPrep.has(id)
       );
       // Clamp to the cap so the action always succeeds — picking which N
       // is a future UX, but auto-prep of the first N is far better than
@@ -6336,7 +6325,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // ── Druid: Wild Shape ───────────────────────────────────────────────────────
   if (hasClass(char, 'druid')) {
-    const wsUses = char.class_resource_uses?.wild_shape ?? 2;
+    const wsUses =
+      char.class_resource_uses?.wild_shape ?? wildShapeUsesMax(getClassLevel(char, 'druid'));
     // Circle of the Moon (SRD) — Combat Wild Shape: use as a bonus
     const wsAvailable =
       !char.conditions.includes('wild_shaped') &&
@@ -6360,6 +6350,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Dismiss Wild Shape — return to normal form`,
         action: { type: 'use_class_feature', featureId: 'dismiss_wild_shape' },
+        kind: 'class_feature',
+      });
+    }
+  }
+
+  // ── Circle of the Land: choose a land after each Long Rest ──────────────────
+  if (
+    !state.combat_active &&
+    choosesCircleLand(char) &&
+    !char.class_resource_uses?.circle_land_chosen
+  ) {
+    const druidLvl = getClassLevel(char, 'druid');
+    for (const land of CIRCLE_LANDS) {
+      const names = circleLandSpells(land, druidLvl)
+        .map((id) => context.spellTable?.[id]?.name ?? id)
+        .join(', ');
+      const current = char.circle_land === land ? ' (current)' : '';
+      choices.push({
+        label: `Circle of the Land: attune to the ${land} lands${current} — ${names}`,
+        action: { type: 'use_class_feature', featureId: `circle_land_${land}` },
         kind: 'class_feature',
       });
     }
@@ -6479,7 +6489,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
 
   // ── Subclass active features ────────────────────────────────────────────────
   if (state.combat_active && enemyAlive && char.subclass) {
-    const cdLeft = char.class_resource_uses?.channel_divinity ?? 1;
+    const cdLeft = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
 
     // Lore Bard: Cutting Words (reaction, costs Bardic Inspiration)
     if (char.subclass === 'lore' && hasClass(char, 'bard') && canReact(char)) {
@@ -6577,6 +6587,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     // Enforce prep when ANY of the PC's classes is a prep class.
     const enforcePrep = [...prepClasses].some((c) => hasClass(char, c));
     const preparedSet = new Set(char.prepared_spells ?? []);
+    const alwaysPrepared = new Set(alwaysPreparedSpells(char));
     for (const spellId of char.spells_known) {
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const spell = context.spellTable[spellId];
@@ -6586,7 +6597,13 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // for prep classes. If `prepared_spells` is empty (legacy state /
       // pre-prep flow), fall back to surfacing everything so the player
       // isn't left without options.
-      if (enforcePrep && spell.level > 0 && preparedSet.size > 0 && !preparedSet.has(spellId)) {
+      if (
+        enforcePrep &&
+        spell.level > 0 &&
+        preparedSet.size > 0 &&
+        !preparedSet.has(spellId) &&
+        !alwaysPrepared.has(spellId)
+      ) {
         continue;
       }
 

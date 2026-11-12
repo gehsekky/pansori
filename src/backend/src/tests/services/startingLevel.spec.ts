@@ -67,7 +67,11 @@ describe('starting-level build — casters', () => {
     expect(c.spell_slots_max).toEqual({ 1: 4, 2: 2 });
     expect(c.subclass).toBe('life');
     // Prepared-from-list caster: no known/spellbook gate, so no auto-fill.
-    expect(c.spells_known).toEqual(before);
+    // The only additions are the Life Domain's always-prepared L3 spells.
+    expect([...c.spells_known].sort()).toEqual(
+      ['aid', 'bless', 'cure_wounds', 'lesser_restoration'].sort()
+    );
+    expect(c.subclass_granted_spells?.sort()).toEqual(['aid', 'lesser_restoration']);
   });
 });
 

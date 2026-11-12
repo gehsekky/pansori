@@ -1,16 +1,25 @@
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import {
+  CIRCLE_LANDS,
+  type CircleLand,
+  choosesCircleLand,
+  circleLandSpells,
+  syncSubclassSpells,
+} from '../../subclassSpells.js';
+import { getClassLevel, hasClass, wildShapeUsesMax } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 
 /**
  * Druid features (SRD-only build).
  *
- *  - `wild_shape` / `wild_shape_<formId>`: action. 2 uses per short
- *    rest. CR access scales with level — base table (≤8: CR 0.25,
+ *  - `wild_shape` / `wild_shape_<formId>`: action. Uses by Druid level
+ *    (wildShapeUsesMax); a Short Rest restores one, a Long Rest all. CR access scales with level — base table (≤8: CR 0.25,
  *    ≥4: CR 0.5, ≥8: CR 1). Temp HP = 2× druid level. Form supplied
  *    via fid suffix; empty fid
  *    falls back to the lowest CR available.
  *  - `dismiss_wild_shape`: revert to normal form. No cost.
+ *  - `circle_land_<arid|polar|temperate|tropical>`: Circle of the Land's
+ *    land choice, once after each Long Rest.
  */
 export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
   if (ctx.actor.kind !== 'pc') return false;
@@ -24,9 +33,10 @@ export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'You are already in Wild Shape. Attack or use Dismiss Wild Shape to end it.';
       return true;
     }
-    const wsUses = char.class_resource_uses?.wild_shape ?? 2;
+    const wsUses =
+      char.class_resource_uses?.wild_shape ?? wildShapeUsesMax(getClassLevel(char, 'druid'));
     if (wsUses <= 0) {
-      ctx.narrative = 'No Wild Shape uses remaining (recover on short rest).';
+      ctx.narrative = 'No Wild Shape uses remaining (a Short Rest restores one).';
       return true;
     }
     const formId = fid === 'wild_shape' ? '' : fid.replace('wild_shape_', '');
@@ -64,6 +74,30 @@ export function handleDruidFeature(ctx: ActionContext, fid: string): boolean {
       .join(', ');
     const traitNote = traits ? ` Traits: ${traits}.` : '';
     ctx.narrative = `🐾 ${char.name} transforms into a ${form.name}! +${tempHp} temp HP. ${form.descriptor}.${traitNote} (${wsUses - 1} uses remaining)`;
+    return true;
+  }
+
+  // SRD Circle of the Land Spells — after a Long Rest, choose a land type; its
+  // Circle spells (for your Druid level) are always prepared until you choose
+  // again.
+  if (fid.startsWith('circle_land_')) {
+    const land = fid.slice('circle_land_'.length) as CircleLand;
+    if (!CIRCLE_LANDS.includes(land)) return false;
+    if (!choosesCircleLand(char)) {
+      ctx.narrative = 'Only a Circle of the Land Druid (level 3+) chooses a land.';
+      return true;
+    }
+    if (char.class_resource_uses?.circle_land_chosen) {
+      ctx.narrative = 'You choose your land when you finish a Long Rest.';
+      return true;
+    }
+    char.circle_land = land;
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), circle_land_chosen: 1 };
+    syncSubclassSpells(char);
+    const names = circleLandSpells(land, getClassLevel(char, 'druid'))
+      .map((id) => ctx.context.spellTable?.[id]?.name ?? id)
+      .join(', ');
+    ctx.narrative = `🌿 ${char.name} attunes to the ${land} lands. Circle spells always prepared: ${names}.`;
     return true;
   }
 

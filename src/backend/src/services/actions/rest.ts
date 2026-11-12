@@ -1,3 +1,4 @@
+import type { Character, Context } from '../../types.js';
 import {
   abilityMod,
   computeTotalAc,
@@ -6,13 +7,44 @@ import {
   spellSlotsForClassLevel,
 } from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
+import {
+  channelDivinityUsesMax,
+  clericChannelDivinityUses,
+  getClassLevel,
+  hasClass,
+  wildShapeUsesMax,
+} from '../multiclass.js';
 import { equippedArmorId, equippedShieldId } from '../equipment.js';
-import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { defenseAcBonus } from '../fightingStyle.js';
 import { resetFeatLongRestResources } from '../feats.js';
+import { syncSubclassSpells } from '../subclassSpells.js';
 import { updatePcActor } from './actor.js';
 import { wornAcBonus } from '../wornEffects.js';
+
+// The level that sizes a class resource pool: the character's levels in the
+// SRD class, or, for a campaign-defined class whose feature list grants the
+// pool (e.g. a "Warrior" with `rage`), their character level. 0 = no pool.
+function poolLevel(c: Character, context: Context, srdClass: string, feature: string): number {
+  const lvl = getClassLevel(c, srdClass);
+  if (lvl > 0) return lvl;
+  const custom = context.classFeatures?.[c.character_class] ?? [];
+  return custom.includes(feature) ? c.level : 0;
+}
+
+// Channel Divinity pool size, including a campaign class granted the feature.
+function cdPoolMax(c: Character, context: Context): number {
+  const srd = channelDivinityUsesMax(c);
+  if (srd > 0) return srd;
+  const custom = context.classFeatures?.[c.character_class] ?? [];
+  return custom.includes('channel_divinity') ? clericChannelDivinityUses(c.level) : 0;
+}
+
+// "You regain one expended use when you finish a Short Rest" (Rage, Wild
+// Shape, Channel Divinity). An untouched pool (undefined) is already full.
+function regainOne(current: number | undefined, max: number): number {
+  return Math.min(max, (current ?? max) + 1);
+}
 
 /**
  * `short_rest`: SRD — spend Hit Dice to recover HP, refresh
@@ -81,7 +113,10 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     delete srUses.bardic_inspiration;
   }
   if (hasClass(next, 'monk')) delete srUses.ki_points;
-  if (hasClass(next, 'druid')) srUses.wild_shape = 2;
+  const wsMax = wildShapeUsesMax(poolLevel(next, ctx.context, 'druid', 'wild_shape'));
+  if (wsMax > 0) srUses.wild_shape = regainOne(srUses.wild_shape, wsMax);
+  const rageLvl = poolLevel(next, ctx.context, 'barbarian', 'rage');
+  if (rageLvl > 0) srUses.rage_uses = regainOne(srUses.rage_uses, rageUsesMax(rageLvl));
   // Arcane Recovery (Wizard) / Natural Recovery (Land Druid) are no longer
   // auto-applied on a short rest — the player chooses which slots to recover via
   // the interactive `recover_slots` action (surfaced as an out-of-combat choice
@@ -106,12 +141,8 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
       sorcerousRestNarr = ` ✨ Sorcerous Restoration — regained ${regain} sorcery point(s).`;
     }
   }
-  if (hasClass(next, 'cleric') || hasClass(next, 'paladin')) {
-    // Channel Divinity scales with cleric/paladin level (use the higher
-    // of the two for multi-class).
-    const cdLvl = Math.max(getClassLevel(next, 'cleric'), getClassLevel(next, 'paladin'));
-    srUses.channel_divinity = cdLvl >= 6 ? 2 : 1;
-  }
+  const cdMax = cdPoolMax(next, ctx.context);
+  if (cdMax > 0) srUses.channel_divinity = regainOne(srUses.channel_divinity, cdMax);
   delete srUses.colossus_slayer_used;
   // SRD Wizard Signature Spells — each free L3 cast recharges on a short OR
   // long rest. Keys are `signature_used_<spellId>`.
@@ -180,17 +211,22 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const recovered = Math.max(1, Math.floor(c.level / 2));
     const newHd = Math.min(c.level, (c.hit_dice_remaining ?? 0) + recovered);
     restLines.push(`${c.name}: HP ${c.hp}→${c.max_hp}, HD ${c.hit_dice_remaining ?? 0}→${newHd}`);
-    const charFeatures = ctx.context.classFeatures?.[c.character_class] ?? [];
+    // Pools are sized by the owning class's level, for every class the
+    // character has (not only the primary one).
     const restoredUses: Record<string, number> = { ...(c.class_resource_uses ?? {}) };
-    if (charFeatures.includes('rage')) restoredUses.rage_uses = rageUsesMax(c.level);
-    if (charFeatures.includes('wild_shape')) restoredUses.wild_shape = 2;
+    const rageLvl = poolLevel(c, ctx.context, 'barbarian', 'rage');
+    if (rageLvl > 0) restoredUses.rage_uses = rageUsesMax(rageLvl);
+    const wsMax = wildShapeUsesMax(poolLevel(c, ctx.context, 'druid', 'wild_shape'));
+    if (wsMax > 0) restoredUses.wild_shape = wsMax;
     delete restoredUses.natural_recovery_used;
-    if (charFeatures.includes('sorcery_points')) restoredUses.sorcery_points = c.level;
+    const sorcLvl = poolLevel(c, ctx.context, 'sorcerer', 'sorcery_points');
+    if (sorcLvl > 0) restoredUses.sorcery_points = sorcLvl;
     delete restoredUses.innate_sorcery_used; // Sorcerer Innate Sorcery — 2 uses back on a long rest
     delete restoredUses.dragon_wings_used; // Draconic Sorcery Dragon Wings — free use back on a long rest
-    if (charFeatures.includes('ki')) restoredUses.ki_points = c.level;
-    if (charFeatures.includes('channel_divinity'))
-      restoredUses.channel_divinity = c.level >= 6 ? 2 : 1;
+    const monkLvl = poolLevel(c, ctx.context, 'monk', 'ki');
+    if (monkLvl > 0) restoredUses.ki_points = monkLvl;
+    const cdMax = cdPoolMax(c, ctx.context);
+    if (cdMax > 0) restoredUses.channel_divinity = cdMax;
     delete restoredUses.action_surge;
     delete restoredUses.second_wind;
     delete restoredUses.colossus_slayer_used;
@@ -228,6 +264,9 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     // long-rest only.)
     if (c.subclass === 'land' && hasClass(c, 'druid')) {
       delete restoredUses.lands_aid_used;
+      // SRD Circle of the Land Spells — choose a land type whenever you
+      // finish a Long Rest; the choice reopens until one is made.
+      delete restoredUses.circle_land_chosen;
     }
     const restoredUsesWithFeats = resetFeatLongRestResources(c, ctx.context, restoredUses);
     // SRD Life Drain — a Long Rest removes any reduction to the Hit Point
@@ -266,6 +305,9 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
       // persist across rests, so they're NOT cleared here.
       fly_speed_ft: undefined,
     };
+    // Subclass always-prepared spells (also catches saves from before the
+    // grant existed, and tiers unlocked since).
+    syncSubclassSpells(refreshed);
     // Recompute AC after clearing the magical buffs so the stored
     // `ac` field reflects the post-rest state.
     refreshed.ac =

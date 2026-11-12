@@ -1,39 +1,42 @@
-// RE-2 — Draconic Sorcery: Draconic Spells (always-prepared spells gained at
-// sorcerer L3/5/7/9). pansori merges the ones it has (Chromatic Orb at L3;
-// Fear + Fly at L5) into spells_known on subclass-select and on level-up.
+// RE-2 — Draconic Sorcery: Draconic Spells (SRD 5.2.1: always-prepared spells
+// gained at sorcerer L3/5/7/9). Merged into spells_known on subclass-select and
+// on level-up via services/subclassSpells.ts.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applyLevelUpForClass, mergeDraconicSpells } from '../../services/gameEngine.js';
 import type { ActionContext } from '../../services/actions/types.js';
 import type { Character } from '../../types.js';
+import { applyLevelUpForClass } from '../../services/gameEngine.js';
 import { context as ctx } from '../fixtures/testContext.js';
 import { handleSelectSubclass } from '../../services/actions/meta.js';
 import { makeChar } from '../../test-fixtures.js';
 import { pcActor } from '../../services/actions/actor.js';
+import { syncSubclassSpells } from '../../services/subclassSpells.js';
 
 afterEach(() => vi.restoreAllMocks());
 
 const sorc = (over: Partial<Character> = {}) =>
   makeChar({ character_class: 'Sorcerer', cha: 16, ...over });
 
-describe('mergeDraconicSpells', () => {
-  it('grants Chromatic Orb at L3, + Fear/Fly at L5', () => {
-    expect(mergeDraconicSpells(sorc({ level: 3 }))).toEqual(['chromatic_orb']);
-    expect(mergeDraconicSpells(sorc({ level: 5 })).sort()).toEqual([
-      'chromatic_orb',
-      'fear',
-      'fly',
-    ]);
+const synced = (over: Partial<Character>) => {
+  const c = sorc({ subclass: 'draconic', ...over });
+  syncSubclassSpells(c);
+  return (c.spells_known ?? []).sort();
+};
+
+const L3 = ['alter_self', 'chromatic_orb', 'command', 'dragons_breath'];
+
+describe('Draconic Spells table', () => {
+  it('grants the full SRD list: 4 at L3, + Fear/Fly at L5, + 2 at L7, + 2 at L9', () => {
+    expect(synced({ level: 3 })).toEqual(L3);
+    expect(synced({ level: 5 })).toEqual([...L3, 'fear', 'fly'].sort());
+    expect(synced({ level: 9 })).toEqual(
+      [...L3, 'fear', 'fly', 'arcane_eye', 'charm_monster', 'legend_lore', 'summon_dragon'].sort()
+    );
   });
 
   it('grants nothing below L3 and preserves existing known spells', () => {
-    expect(mergeDraconicSpells(sorc({ level: 2, spells_known: ['fire_bolt'] }))).toEqual([
-      'fire_bolt',
-    ]);
-    expect(mergeDraconicSpells(sorc({ level: 3, spells_known: ['fire_bolt'] })).sort()).toEqual([
-      'chromatic_orb',
-      'fire_bolt',
-    ]);
+    expect(synced({ level: 2, spells_known: ['fire_bolt'] })).toEqual(['fire_bolt']);
+    expect(synced({ level: 3, spells_known: ['fire_bolt'] })).toEqual([...L3, 'fire_bolt'].sort());
   });
 });
 
@@ -53,9 +56,7 @@ describe('Draconic Spells — granted on select + level-up', () => {
   it('selecting Draconic at L5 grants the L3 + L5 spells', () => {
     const c = featCtx(sorc({ level: 5 }));
     handleSelectSubclass(c, { type: 'select_subclass', subclass: 'draconic' });
-    expect(pcChar(c).spells_known).toEqual(
-      expect.arrayContaining(['chromatic_orb', 'fear', 'fly'])
-    );
+    expect(pcChar(c).spells_known).toEqual(expect.arrayContaining([...L3, 'fear', 'fly']));
   });
 
   it('a Draconic Sorcerer leveling 4→5 gains Fear + Fly', () => {

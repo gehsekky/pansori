@@ -28,9 +28,16 @@ play. "Partial" means the feature exists but the RAW behaviour differs.
 | Feats | 4 origin + ASI + Grappler + 4 styles + 7 boons | all but Grappler (ASI handled as level-up) | Grappler (deliberately excluded per CLAUDE.md) |
 | Conditions / Exhaustion | 15 + Exhaustion | all; Exhaustion uses the 2024 −2/level rule | — |
 
-## 1. Accuracy bugs (wrong today, not merely missing)
+## 1. Accuracy bugs (wrong today, not merely missing) — FIXED 2026-11-12
 
-These produce incorrect results in normal play; fix before adding content.
+> All three fixed, plus related rest bugs found while fixing them: Rage regained
+> nothing on a Short Rest; Channel Divinity had the same 1–2-use / full-refill
+> bug as Wild Shape; a Paladin's Channel Divinity never refilled on a Long Rest
+> (`SRD_CLASS_FEATURES` listed it under Druid instead); and the Draconic list
+> was itself incomplete. Pools now use the SRD class tables
+> (`wildShapeUsesMax`, `channelDivinityUsesMax`) and class levels for every class
+> a character has; subclass lists live in `services/subclassSpells.ts`, with a
+> Circle of the Land land choice after each Long Rest.
 
 1. **Wild Shape uses.** `actions/rest.ts` hard-codes 2 uses and refills to 2 on a
    Short Rest. RAW: 2 uses, rising with Druid level per the Wild Shape column
@@ -55,22 +62,20 @@ Missing (no code path):
 - **Bard:** Font of Inspiration (L5: regain on Short Rest, spend a slot to
   regain a use), Magical Secrets (L10), College of Lore Bonus Proficiencies (L3)
   and Magical Discoveries (L6).
-- **Cleric:** Life Domain Spells (L3, see §1.3).
 - **Druid:** Primal Order (L1), Wild Companion (L2), Wild Resurgence (L5),
-  Elemental Fury (L7) and Improved Elemental Fury (L15), Archdruid (L20); Circle
-  of the Land Spells (L3), Nature's Ward (L10), Nature's Sanctuary (L14).
+  Elemental Fury (L7) and Improved Elemental Fury (L15), Archdruid (L20);
+  Nature's Ward (L10), Nature's Sanctuary (L14).
   Druid is the least complete class.
 - **Fighter:** Tactical Mind (L2), Tactical Shift (L5).
 - **Monk:** Unarmored Movement (L2), Slow Fall (L4), Acrobatic Movement (L9),
   Heightened Focus (L10).
 - **Paladin:** Abjure Foes (L9), Restoring Touch (L14), Smite of Protection
-  (Devotion L15), Oath of Devotion Spells (§1.3).
+  (Devotion L15).
 - **Ranger:** Deft Explorer (L2), Nature's Veil (L14), Hunter's Lore (L3).
 - **Rogue:** Thief's Reflexes (Thief L17). Thieves' Cant exists only as a
   language (fine; it's narrative).
 - **Sorcerer:** Dragon Companion (Draconic L18).
-- **Warlock:** Eldritch Invocations beyond 2 of 28 (§3), Contact Patron (L9),
-  Fiend Spells (§1.3).
+- **Warlock:** Eldritch Invocations beyond 2 of 28 (§3), Contact Patron (L9).
 
 Partial or unverified (check behaviour against the text):
 
@@ -147,13 +152,12 @@ concentration.
 
 ## Suggested order
 
-1. §1 accuracy bugs (small; wrong answers today).
+1. ~~§1 accuracy bugs~~ and ~~always-prepared subclass spells~~ (done 2026-11-12).
 2. Monster Magic Resistance + Legendary Resistance (one hook each, 30+ blocks).
-3. Always-prepared subclass spells (fixes four subclasses at once).
-4. Warlock Pacts + core invocations; Druid's missing base features.
-5. Remaining class features, class by class, each with a spec per CLAUDE.md.
-6. Monster spellcasting (needs enemy support for buff/control/AoE spells first).
-7. Magic items, passive-number ones first; then mechanizable narrative spells.
+3. Warlock Pacts + core invocations; Druid's missing base features.
+4. Remaining class features, class by class, each with a spec per CLAUDE.md.
+5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).
+6. Magic items, passive-number ones first; then mechanizable narrative spells.
 
 ## Reproducing
 

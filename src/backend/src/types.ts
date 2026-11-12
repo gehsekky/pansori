@@ -1510,6 +1510,12 @@ export interface Character {
   >;
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
+  // Ids that subclass "always prepared" lists added to `spells_known` (see
+  // services/subclassSpells.ts), so a grant that stops applying can be removed
+  // without touching spells the character knew on their own.
+  subclass_granted_spells?: string[];
+  // SRD Circle of the Land — the land type chosen at the last Long Rest.
+  circle_land?: 'arid' | 'polar' | 'temperate' | 'tropical';
   charmer_id?: string; // entity id of the charmer when charmed
   // SRD Mage Armor spell — when active, base AC becomes
   // 13 + DEX mod (only effective when not wearing body armor).

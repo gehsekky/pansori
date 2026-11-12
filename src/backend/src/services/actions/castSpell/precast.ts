@@ -4,6 +4,7 @@ import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
 import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { alwaysPreparedSpells } from '../../subclassSpells.js';
 import { equippedArmorId } from '../../equipment.js';
 import { spellRecallKeepsSlot } from '../../feats.js';
 import { updatePcActor } from '../actor.js';
@@ -273,7 +274,11 @@ export function runPrecast(
     !usedWish
   ) {
     const prepared = pc.char.prepared_spells ?? [];
-    if (prepared.length > 0 && !prepared.includes(spellId)) {
+    if (
+      prepared.length > 0 &&
+      !prepared.includes(spellId) &&
+      !alwaysPreparedSpells(pc.char).includes(spellId)
+    ) {
       // Reachable only as a safety net — the choice generator now
       // filters unprepared spells out of the cast menu (see the
       // prepClasses block in generateChoices). Prep is a long-rest

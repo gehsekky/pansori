@@ -1,6 +1,6 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { applyPartyLevelUps, getEnemyById, pushEvent, splitEncounterXp } from '../../gameEngine.js';
-import { getClassLevel, hasClass } from '../../multiclass.js';
+import { channelDivinityUsesMax, getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -29,7 +29,7 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Only Clerics have Divine Spark.';
       return true;
     }
-    const cdUsesDS = char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesDS = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
     if (cdUsesDS <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
@@ -86,7 +86,7 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Only Clerics have Turn Undead.';
       return true;
     }
-    const cdUsesTU = char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesTU = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
     if (cdUsesTU <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
@@ -178,7 +178,7 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Sear Undead requires Cleric level 5.';
       return true;
     }
-    const cdUsesSU = char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesSU = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
     if (cdUsesSU <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
@@ -237,7 +237,7 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       ctx.narrative = 'Only Life Clerics have Preserve Life.';
       return true;
     }
-    const cdUses = char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUses = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
     if (cdUses <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining (recover on short rest).';
       return true;

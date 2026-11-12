@@ -321,6 +321,46 @@ export function hasClass(char: Character, className: string): boolean {
 }
 
 /**
+ * SRD 5.2.1 Wild Shape uses (Druid Features table, Wild Shape column): none
+ * before Druid 2, then 2, 3 at Druid 6, 4 at Druid 17. A Short Rest regains
+ * one expended use; a Long Rest regains all.
+ */
+export function wildShapeUsesMax(druidLevel: number): number {
+  if (druidLevel >= 17) return 4;
+  if (druidLevel >= 6) return 3;
+  if (druidLevel >= 2) return 2;
+  return 0;
+}
+
+/** SRD 5.2.1 Cleric Features table, Channel Divinity column (2 / 3 at 6 / 4 at 18). */
+export function clericChannelDivinityUses(clericLevel: number): number {
+  if (clericLevel >= 18) return 4;
+  if (clericLevel >= 6) return 3;
+  if (clericLevel >= 2) return 2;
+  return 0;
+}
+
+/** SRD 5.2.1 Paladin Features table, Channel Divinity column (2 from 3 / 3 at 11). */
+export function paladinChannelDivinityUses(paladinLevel: number): number {
+  if (paladinLevel >= 11) return 3;
+  if (paladinLevel >= 3) return 2;
+  return 0;
+}
+
+/**
+ * Size of the shared `channel_divinity` pool. Both classes' Channel Divinity
+ * regain one use on a Short Rest and all on a Long Rest.
+ * Simplification: RAW each class has its own pool ("this class's Channel
+ * Divinity"); a Cleric/Paladin here gets one pool sized by the larger.
+ */
+export function channelDivinityUsesMax(char: Character): number {
+  return Math.max(
+    clericChannelDivinityUses(getClassLevel(char, 'cleric')),
+    paladinChannelDivinityUses(getClassLevel(char, 'paladin'))
+  );
+}
+
+/**
  * SRD ritual-cast eligibility — Wizard / Cleric / Druid / Bard
  * can cast spells tagged `ritualCasting` as 10-minute rituals without
  * expending a slot. Warlock + Sorcerer have NO base ritual access
@@ -1115,8 +1155,10 @@ export function expandCasterSpellsForLevel(
   const byLevel = casterSpellOptionsByLevel(char.character_class, spellTable, maxLvl);
   const cantrips = new Set(byLevel[0] ?? []);
   const known = new Set(char.spells_known ?? []);
-  // Only non-cantrip spells count toward the known/spellbook target.
-  let pool = (char.spells_known ?? []).filter((id) => !cantrips.has(id)).length;
+  // Only non-cantrip spells count toward the known/spellbook target; subclass
+  // always-prepared spells don't count either.
+  const granted = new Set(char.subclass_granted_spells ?? []);
+  let pool = (char.spells_known ?? []).filter((id) => !cantrips.has(id) && !granted.has(id)).length;
   for (let lvl = maxLvl; lvl >= 1 && pool < target; lvl--) {
     for (const id of byLevel[lvl] ?? []) {
       if (pool >= target) break;

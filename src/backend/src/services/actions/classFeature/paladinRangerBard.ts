@@ -1,6 +1,6 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
+import { channelDivinityUsesMax, getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
 import { endCombatState, enemyHpAfterDamage, isRoomCleared } from '../../gameEngine.js';
-import { getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { fmt } from '../../narrativeFmt.js';
 
@@ -124,7 +124,7 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ctx.narrative = 'Only Devotion Paladins have Sacred Weapon.';
       return true;
     }
-    const cdUsesDev = char.class_resource_uses?.channel_divinity ?? 1;
+    const cdUsesDev = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
     if (cdUsesDev <= 0) {
       ctx.narrative = 'No Channel Divinity uses remaining.';
       return true;
