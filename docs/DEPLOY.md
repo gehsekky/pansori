@@ -23,6 +23,46 @@ The live deployment differs from the from-scratch walkthrough further down:
   `DEPLOY_ENABLED` repo variable.
 - **Migrations:** the backend applies pending `src/backend/migrations/*.sql` on
   boot (`migrationRunner`) and refuses to start if one fails.
+- **Backups:** see below.
+
+### Backups and restore
+
+Postgres's data lives in a Docker volume on the instance's root disk, so a nightly
+dump is the only copy that survives losing the instance.
+
+- **Job:** `infra/host/backup.sh`, run by `pansori-backup.timer` at 07:00 UTC
+  (mysignalchain's runs at 07:30). The deploy workflow installs both into
+  `/opt/pansori/bin` and `/etc/systemd/system` on every deploy. It streams
+  `pg_dump --format=custom` from `pansori-postgres` to
+  `s3://pansori-backups/postgres/YYYY/MM/pansori-<UTC timestamp>.dump`.
+- **Retention:** an S3 lifecycle rule deletes dumps after 30 days.
+- **Alerting:** each success publishes `pansori/BackupSucceeded`; the
+  `pansori-backup-missing` alarm emails the alerts topic when none arrives for
+  26 hours. Logs: `journalctl -u pansori-backup` on the host.
+- **AWS side:** bucket, the instance-role policy and the alarm are in
+  `gehsekky-infra/pansori.tf`.
+
+Run a backup now, or rehearse a restore without touching the live database (it
+restores the newest dump, or a given key, into a throwaway container and compares
+every table's row count with live):
+
+```bash
+sudo systemctl start pansori-backup && journalctl -u pansori-backup -n 20
+sudo bash /opt/pansori/bin/restore-test.sh [postgres/2026/11/pansori-....dump]
+```
+
+Real restore (replaces the live database; stop the backend first so nothing
+writes mid-restore):
+
+```bash
+cd /opt/pansori
+aws s3 cp s3://pansori-backups/<key> /tmp/pansori.dump
+docker compose -f docker-compose.prod.yml --env-file .env stop backend
+docker exec -i pansori-postgres sh -c \
+  'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' \
+  < /tmp/pansori.dump
+docker compose -f docker-compose.prod.yml --env-file .env start backend
+```
 
 ## Original single-host walkthrough
 
@@ -298,7 +338,7 @@ OIDC + SSM pipeline, so no `EC2_SSH_KEY` secret is needed.
 | Need                         | Solution                                       |
 | ---------------------------- | ---------------------------------------------- |
 | More concurrent players      | Upgrade to t3.small or t3.medium               |
-| Managed database backups     | Move Postgres to RDS db.t3.micro (add ~$15/mo) |
+| Managed database / PITR      | Move Postgres to RDS db.t3.micro (add ~$15/mo) |
 | Global CDN for static assets | Build frontend and serve from S3 + CloudFront  |
 | Zero-downtime deploys        | Move to ECS Fargate with rolling deployments   |
 | Multiple regions             | Add CloudFront with origin failover            |

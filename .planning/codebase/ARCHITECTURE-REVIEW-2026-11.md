@@ -58,7 +58,11 @@ doing `UPDATE … WHERE id = $1 AND turn_seq = $2 RETURNING turn_seq`; 0 rows �
 current FE. No architectural change needed; this is the optimistic-concurrency
 design finished.
 
-### 2. No database backups — operational risk (S)
+### 2. No database backups — operational risk (S) — DONE 2026-11-11
+
+> Nightly `pg_dump` → `s3://pansori-backups` (30 days) via a systemd timer the
+> deploy installs (`infra/host/`), plus the `pansori-backup-missing` alarm.
+> AWS side in `gehsekky-infra/pansori.tf`. See docs/DEPLOY.md "Backups and restore".
 
 Prod Postgres runs in a container on the host's EBS volume with no `pg_dump`,
 snapshot policy, or replica. Because campaigns are now **creator-authored in

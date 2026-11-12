@@ -294,9 +294,11 @@ documented deferrals.
       concurrent requests for one session serialize; responses/broadcasts fire
       after COMMIT; lock wait >15s → 409. The GET reconcile's seed write is
       conditional on `turn_seq`.
-- [ ] **Postgres backups** — the prod DB (sessions + all creator-authored
-      campaign content) lives on one EBS volume with no dump/snapshot.
-      mysignalchain already has nightly `pg_dump` → S3 in gehsekky-infra; reuse it.
+- [x] **Postgres backups** — nightly `pg_dump` → `s3://pansori-backups` (30-day
+      expiry) by a systemd timer the deploy installs (`infra/host/`), with a
+      `pansori-backup-missing` alarm after 26h; bucket/IAM/alarm in
+      gehsekky-infra `pansori.tf`. Restore rehearsal: `restore-test.sh`
+      (docs/DEPLOY.md "Backups and restore").
 - [x] **CI parity with the local gate** — `deploy.yml` now runs
       `sync-types:check`, the frontend unit suite, and a `migrations` job
       (`check-migrations` against a throwaway Postgres) that gates deploy.

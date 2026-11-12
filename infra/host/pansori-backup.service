@@ -1,0 +1,10 @@
+[Unit]
+Description=Pansori: back up Postgres to S3
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/opt/pansori/bin/backup.sh
