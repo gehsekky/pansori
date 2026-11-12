@@ -335,6 +335,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     last_long_rest_minute: restedMinute,
     // A full rest refreshes the SRD forced-march budget (8h/day before fatigue).
     travel_minutes_today: 0,
+    // SRD Legendary Resistance is N/Day; a day has passed.
+    legendary_resistance_used: undefined,
   };
   updatePcActor(ctx, { ...restedChars[safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest

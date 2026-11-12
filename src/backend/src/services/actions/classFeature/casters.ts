@@ -5,6 +5,7 @@ import {
   isRoomCleared,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { Character } from '../../../types.js';
@@ -374,10 +375,13 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     const hthDC = 8 + profBonus(char.level) + abilityMod(char.cha);
     const hthEnemy = ctx.enemy;
     const hthEnt = ctx.st.entities?.find((e) => e.id === hthEnemy.id && e.isEnemy);
+    // SRD Magic Resistance (Advantage) + Legendary Resistance.
     const hthSave =
-      rollDice('1d20') + abilityMod((hthEnemy as unknown as Record<string, number>).cha ?? 10);
-    if (hthSave >= hthDC) {
-      ctx.narrative = `${char.name} tries to Hurl ${hthEnemy.name} through hell — CHA ${hthSave} vs DC ${hthDC}, it resists.`;
+      enemySaveD20(hthEnemy, true, () => rollDice('1d20')) +
+      abilityMod((hthEnemy as unknown as Record<string, number>).cha ?? 10);
+    const hthLegendary = legendaryResist(ctx.st, hthEnemy, hthSave < hthDC);
+    if (!hthLegendary.failed) {
+      ctx.narrative = `${char.name} tries to Hurl ${hthEnemy.name} through hell — CHA ${hthSave} vs DC ${hthDC}, it resists.${hthLegendary.note}`;
       return true;
     }
     // A Fiend is unaffected by the Psychic damage but is still displaced.

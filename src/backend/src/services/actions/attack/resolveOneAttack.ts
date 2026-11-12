@@ -35,6 +35,7 @@ import {
   peerlessSkillDie,
 } from '../../multiclass.js';
 import { enemyRef, fillEnemyTokens } from '../../narrative/enemyName.js';
+import { enemySaveD20, legendaryResist, legendaryResistInto } from '../../monsterSaves.js';
 import {
   overcomeDefensesApplies,
   overwhelmingStrikeDamage,
@@ -872,7 +873,15 @@ export function resolveOneAttack(
       const smiteDc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.cha);
       const targetStat = ((target as unknown as Record<string, number>)[saveAbility] ??
         10) as number;
-      const saved = rollDice('1d20') + abilityMod(targetStat) >= smiteDc;
+      // SRD Magic Resistance (smite spells: Advantage) + Legendary Resistance.
+      const smiteSave = enemySaveD20(target, true, () => rollDice('1d20')) + abilityMod(targetStat);
+      const smiteLegendary = legendaryResist(
+        ctx.st,
+        { ...target, id: targetId },
+        smiteSave < smiteDc
+      );
+      ctx.narrative += smiteLegendary.note;
+      const saved = !smiteLegendary.failed;
       if (saved) {
         ctx.narrative += ` ${fmt.note(`[${target.name} resists — ${saveAbility.toUpperCase()} save vs ${cond}]`)}`;
       } else if (!target.condition_immunities?.includes(cond)) {
@@ -905,7 +914,10 @@ export function resolveOneAttack(
     if (csEffect === 'trip') {
       const enemyDex = (target.dex ?? 10) as number;
       const dexSave = rollDice('1d20') + abilityMod(enemyDex);
-      if (dexSave < csDc) {
+      // SRD Legendary Resistance.
+      const tripLegendary = legendaryResist(ctx.st, { ...target, id: targetId }, dexSave < csDc);
+      ctx.narrative += tripLegendary.note;
+      if (tripLegendary.failed) {
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
@@ -933,7 +945,10 @@ export function resolveOneAttack(
       const conSave = rollDice('1d20') + abilityMod(enemyCon);
       if (target.condition_immunities?.includes('poisoned')) {
         ctx.narrative += ` ${fmt.note(`[Cunning Strike — Poison: ${target.name} is immune]`)}`;
-      } else if (conSave < csDc) {
+      } else if (
+        // SRD Legendary Resistance.
+        legendaryResistInto(ctx, { ...target, id: targetId }, conSave < csDc)
+      ) {
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
@@ -988,7 +1003,8 @@ export function resolveOneAttack(
       const conSave = rollDice('1d20') + abilityMod(enemyCon);
       const applied = csEffect === 'daze' ? 'dazed' : 'unconscious';
       const label = csEffect === 'daze' ? 'Daze' : 'Knock Out';
-      if (conSave < csDc) {
+      // SRD Legendary Resistance.
+      if (legendaryResistInto(ctx, { ...target, id: targetId }, conSave < csDc)) {
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>
@@ -1088,7 +1104,8 @@ export function resolveOneAttack(
     } else if (mastery === 'topple') {
       const enemyCon = (target.con ?? 10) as number;
       const conSave = rollDice('1d20') + abilityMod(enemyCon);
-      if (conSave < weaponDc) {
+      // SRD Legendary Resistance.
+      if (legendaryResistInto(ctx, { ...target, id: targetId }, conSave < weaponDc)) {
         ctx.st = {
           ...ctx.st,
           entities: (ctx.st.entities ?? []).map((e) =>

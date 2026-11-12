@@ -407,6 +407,13 @@ export interface EnemyTemplate {
   // SRD Petrifying Gaze / Breath (Basilisk, Medusa, Gorgon) — recharge cone that
   // seeds the petrification ladder on the party. See PetrifyingGaze.
   petrifyingGaze?: PetrifyingGaze;
+  // SRD Magic Resistance — Advantage on saving throws against spells and other
+  // magical effects (services/monsterSaves.ts).
+  magicResistance?: boolean;
+  // SRD Legendary Resistance (N/Day) — when it fails a saving throw, it can
+  // choose to succeed instead. Uses spent are tracked per enemy in
+  // GameState.legendary_resistance_used.
+  legendaryResistance?: number;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -513,6 +520,13 @@ export interface Enemy {
   // here + carried through materializeEnemy; fired on the enemy turn in
   // `maybeFirePetrifyingGaze`.
   petrifyingGaze?: PetrifyingGaze;
+  // SRD Magic Resistance — Advantage on saving throws against spells and other
+  // magical effects (services/monsterSaves.ts).
+  magicResistance?: boolean;
+  // SRD Legendary Resistance (N/Day) — when it fails a saving throw, it can
+  // choose to succeed instead. Uses spent are tracked per enemy in
+  // GameState.legendary_resistance_used.
+  legendaryResistance?: number;
   // SRD darkvision range (ft) — see EnemyTemplate.darkvision_ft. Undefined
   // defaults to 60 in the combat-visibility check; carried through procgen.
   darkvision_ft?: number;
@@ -1767,6 +1781,9 @@ export interface SpellZone {
 }
 
 export interface GameState {
+  // SRD Legendary Resistance uses spent, by enemy id. Cleared on a Long Rest
+  // (the "per Day" reset).
+  legendary_resistance_used?: Record<string, number>;
   // Schema version. `normalizeState` stamps this with
   // `CURRENT_SCHEMA_VERSION` on every load; older saves (or saves
   // missing the field — pre-versioning) are routed through the

@@ -1,5 +1,6 @@
 import type { Enemy, Spell } from '../../../types.js';
 import { coverBonus, entitiesInCone, posEqual } from '../../gridEngine.js';
+import { legendaryResist, magicResistanceAdvantage } from '../../monsterSaves.js';
 import { rollConditionSave, rollDice } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 import { applySingleTargetDamage } from './applyDamage.js';
@@ -120,10 +121,23 @@ export function runPrismaticSpray(
     ];
     const cover = coverBonus(epicenter, target.pos, obstacles);
     const conds = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy)?.conditions ?? [];
-    const failed = rollConditionSave('dex', score, dc, false, char.level, cover, conds);
+    // SRD Magic Resistance (Advantage) + Legendary Resistance (the rays can
+    // restrain, blind or banish, so it's worth spending).
+    const rolledFail = rollConditionSave(
+      'dex',
+      score,
+      dc,
+      false,
+      char.level,
+      cover,
+      conds,
+      magicResistanceAdvantage(enemy)
+    );
+    const legendary = legendaryResist(ctx.st, { ...enemy, id: target.id }, rolledFail);
+    const failed = legendary.failed;
 
     const rays = rollRays();
-    ctx.narrative += ` ${enemy.name}: ${failed ? 'fails' : 'succeeds'} DEX save —`;
+    ctx.narrative += `${legendary.note} ${enemy.name}: ${failed ? 'fails' : 'succeeds'} DEX save —`;
 
     for (const ray of rays) {
       if (enemyHp(ctx, target.id) <= 0) break; // a prior ray dropped it

@@ -19,8 +19,8 @@ play. "Partial" means the feature exists but the RAW behaviour differs.
 | Eldritch Invocations | 28 | 2 (Agonizing Blast, Devil's Sight) | **26 missing** |
 | Monsters | 330 | 328 | 169 `// Simplification:` notes; systemic gaps below |
 | Monster spellcasting | 59 stat blocks | 2 (Mage, Archmage) | **57**; enemy casting supports only damage / single-target condition spells |
-| Legendary Resistance | 33 stat blocks | no system | **missing** |
-| Magic Resistance | 34 stat blocks | no system | **missing** |
+| Legendary Resistance | 32 stat blocks | all 32 (done 2026-11-12) | lair "+1/Day" not applied |
+| Magic Resistance | 34 stat blocks | all 34 (done 2026-11-12) | Rakshasa's *Greater* Magic Resistance deferred |
 | Magic items | ~260 | ~15 (+N weapons/armor/shields, healing potions, 4 wondrous) | **~245 missing** |
 | Mundane weapons / armor / gear | — | complete, incl. all 8 weapon masteries | — |
 | Species | 9 | 9 | — |
@@ -110,17 +110,18 @@ Systemic gaps, each affecting many stat blocks:
 | System | SRD stat blocks | State |
 |---|---|---|
 | Spellcasting | 59 | 2 casters; enemy casting supports only damage and single-target condition spells |
-| Magic Resistance (Adv. on saves vs spells) | 34 | no system |
-| Legendary Resistance (auto-succeed a failed save, N/day) | 33 | no system |
+| Magic Resistance (Adv. on saves vs spells) | 34 | **done** (`services/monsterSaves.ts`) |
+| Legendary Resistance (auto-succeed a failed save, N/day) | 32 | **done**; spent on effect saves, not damage-only ones (AI policy) |
 | Legendary Actions | 32 | supported (26 data references); spot-check coverage |
 | Breath weapons / recharge | many | supported; 22 simplification notes trim riders |
 | Grapple riders | many | supported; 18 notes defer specifics |
 | Swallow / Engulf | ~11 notes | partial (4 engine references) |
 | Shape-shift | 14 | deferred |
 
-Magic Resistance and Legendary Resistance are the cheapest high-value fixes:
-each is one hook in save resolution plus a data flag on the affected blocks,
-and without them boss fights are much easier than RAW.
+Magic Resistance and Legendary Resistance landed 2026-11-12: every enemy save
+path (spell saves, AoE, re-saves, zones, smites, Turn/Sear Undead, Counterspell,
+Hurl Through Hell, Land's Aid, Sanctuary, Stunning Strike, Open Hand, Cunning
+Strike, Topple, Intimidating Presence) applies them; uses reset on a Long Rest.
 
 ## 5. Spells: 112 narrative-only
 
@@ -144,6 +145,11 @@ Giant Strength, Potion of Resistance, Spell Scrolls), then activated items.
 
 ## 7. Core rules not found
 
+**Grapple / Shove** are resolved as an opposed Athletics check (the 2014 rule).
+SRD 5.2.1 makes them an Unarmed Strike option where the target makes a STR or
+DEX saving throw against DC 8 + STR mod + Proficiency Bonus (which would also
+let Legendary Resistance apply).
+
 No code references: the **Search** and **Utilize** actions, **suffocation**,
 **squeezing** into a smaller space, **crafting**, and **poisons** as items.
 Present and 2024-correct: Exhaustion (−2 per level to d20 tests, death at 6),
@@ -153,7 +159,7 @@ concentration.
 ## Suggested order
 
 1. ~~§1 accuracy bugs~~ and ~~always-prepared subclass spells~~ (done 2026-11-12).
-2. Monster Magic Resistance + Legendary Resistance (one hook each, 30+ blocks).
+2. ~~Monster Magic Resistance + Legendary Resistance~~ (done 2026-11-12).
 3. Warlock Pacts + core invocations; Druid's missing base features.
 4. Remaining class features, class by class, each with a spec per CLAUDE.md.
 5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).

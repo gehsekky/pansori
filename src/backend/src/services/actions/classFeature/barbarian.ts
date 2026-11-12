@@ -18,6 +18,7 @@ import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import type { InventoryItem } from '../../../types.js';
 import { equippedWeaponId } from '../../equipment.js';
+import { legendaryResist } from '../../monsterSaves.js';
 
 /**
  * Barbarian + Berserker features (SRD-only build).
@@ -206,11 +207,19 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
       const enemyData = getEnemyById(ctx.seed, e.id);
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
       const save = rollDice('1d20') + abilityMod(wisScore);
-      if (save < ipDC) {
+      // SRD Legendary Resistance.
+      const ipLegendary = legendaryResist(
+        ctx.st,
+        enemyData ? { ...enemyData, id: e.id } : undefined,
+        save < ipDC
+      );
+      if (ipLegendary.failed) {
         frightenedIds.push(e.id);
         ipLines.push(`${enemyData?.name ?? 'enemy'}: WIS ${save} vs DC ${ipDC} — frightened!`);
       } else {
-        ipLines.push(`${enemyData?.name ?? 'enemy'}: WIS ${save} vs DC ${ipDC} — resists.`);
+        ipLines.push(
+          `${enemyData?.name ?? 'enemy'}: WIS ${save} vs DC ${ipDC} — resists.${ipLegendary.note}`
+        );
       }
     }
     if (frightenedIds.length > 0) {

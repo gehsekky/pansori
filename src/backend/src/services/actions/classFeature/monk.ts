@@ -11,6 +11,7 @@ import {
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { legendaryResistInto } from '../../monsterSaves.js';
 
 /**
  * Monk + Open Hand + Shadow features.
@@ -83,7 +84,8 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
         if (isOpenHand && newHp > 0) {
           const enemyDex = (ctx.enemy?.dex ?? 10) as number;
           const dexSave = rollDice('1d20') + abilityMod(enemyDex);
-          const dexSuccess = dexSave >= monkDc;
+          // SRD Legendary Resistance.
+          const dexSuccess = !legendaryResistInto(ctx, ctx.enemy, dexSave < monkDc);
           // Save event for the combat log (consolidated prose lives
           // in `flurryNarrative` below; fragment carries empty prose).
           composeNow(ctx, {
@@ -301,7 +303,8 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     const stunDC = 8 + profBonus(char.level) + abilityMod(char.wis);
     const conSave =
       rollDice('1d20') + abilityMod((ctx.enemy as unknown as Record<string, number>)['con'] ?? 10);
-    const stunSuccess = conSave >= stunDC;
+    // SRD Legendary Resistance — the classic answer to Stunning Strike.
+    const stunSuccess = !legendaryResistInto(ctx, ctx.enemy, conSave < stunDC);
     if (!stunSuccess) {
       ctx.st = {
         ...ctx.st,

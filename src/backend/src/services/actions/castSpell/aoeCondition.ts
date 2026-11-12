@@ -5,6 +5,7 @@ import {
   entitiesInCube,
   entitiesInLine,
 } from '../../gridEngine.js';
+import { legendaryResist, magicResistanceAdvantage } from '../../monsterSaves.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { concentrationRoundsFor } from './utils.js';
@@ -67,17 +68,25 @@ export function runAoeConditionSpell(ctx: ActionContext, spell: Spell, dc: numbe
       continue;
     }
     const score = (foe as unknown as Record<string, number>)?.[spell.savingThrow] ?? 10;
-    const failed = rollConditionSave(
+    // SRD Magic Resistance (Advantage) + Legendary Resistance.
+    const rolledFail = rollConditionSave(
       spell.savingThrow,
       score,
       dc,
       false,
       char.level,
       0,
-      target.conditions ?? []
+      target.conditions ?? [],
+      magicResistanceAdvantage(foe)
     );
+    const legendary = legendaryResist(
+      ctx.st,
+      foe ? { ...foe, id: target.id } : undefined,
+      rolledFail
+    );
+    const failed = legendary.failed;
     if (!failed) {
-      ctx.narrative += ` ${name}: saves.`;
+      ctx.narrative += legendary.note || ` ${name}: saves.`;
       continue;
     }
     ctx.st = {

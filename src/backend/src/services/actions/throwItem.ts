@@ -115,6 +115,7 @@ export const handleThrowItem: ActionHandler<{
                   recurType: 'fire',
                   casterId: char.id,
                   label: 'the flames',
+                  mundane: true,
                 },
               },
             }

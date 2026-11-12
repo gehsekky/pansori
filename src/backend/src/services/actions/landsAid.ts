@@ -16,6 +16,7 @@ import { abilityMod, profBonus, rollDice } from '../rulesEngine.js';
 import { getClassLevel, hasClass } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { composeNow } from '../narrative/compose.js';
+import { enemySaveD20 } from '../monsterSaves.js';
 import { updatePcActor } from './actor.js';
 
 const MAX_USES = 2;
@@ -103,7 +104,8 @@ export const handleLandsAid: ActionHandler<{
   const dmgType = action.variant === 'harm_necrotic' ? 'necrotic' : 'radiant';
   const dc = 8 + profBonus(pc.char.level) + wisMod;
   const enemyCon = (enemyData as unknown as Record<string, number>)?.con ?? 10;
-  const save = rollDice('1d20') + abilityMod(enemyCon);
+  // SRD Magic Resistance — Advantage (damage-only: no Legendary Resistance).
+  const save = enemySaveD20(enemyData, true, () => rollDice('1d20')) + abilityMod(enemyCon);
   const fullDmg = rollDice('2d6') + druidLvl;
   const dmg = save >= dc ? Math.floor(fullDmg / 2) : fullDmg;
   composeNow(ctx, {

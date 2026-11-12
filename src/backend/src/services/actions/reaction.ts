@@ -12,6 +12,7 @@ import {
   splitEncounterXp,
   tickConditions,
 } from '../gameEngine.js';
+import { enemySaveD20, legendaryResist } from '../monsterSaves.js';
 import type { ActionHandler } from './types.js';
 import type { EnemyAttackHitFragment } from '../narrative/fragments.js';
 import { consumeIndomitable } from '../indomitable.js';
@@ -295,7 +296,9 @@ export const handleResolveReaction: ActionHandler<{
         const enemyData = getEnemyById(ctx.seed, rx.attackerEnemyId);
         const enemyDex = enemyData?.dex ?? 10;
         const dc = 8 + profBonus(pc.char.level) + abilityMod(pc.char.cha);
-        const saveRoll = rollDice('1d20') + abilityMod(enemyDex);
+        // SRD Magic Resistance — Advantage (damage-only save: no Legendary Resistance).
+        const saveRoll =
+          enemySaveD20(enemyData, true, () => rollDice('1d20')) + abilityMod(enemyDex);
         const saved = saveRoll >= dc;
         const finalDmg = saved ? Math.floor(fullDmg / 2) : fullDmg;
         const attackerEnt = ctx.st.entities?.find((e) => e.id === rx.attackerEnemyId && e.isEnemy);
@@ -361,9 +364,16 @@ export const handleResolveReaction: ActionHandler<{
           'int') as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
         const dc = spellSaveDC(pc.char.level, pc.char[castingAbility] ?? 10);
         const enemyStat = getEnemyById(ctx.seed, rx.attackerEnemyId);
-        const conSave = rollDice('1d20') + abilityMod(enemyStat?.con ?? 10);
-        const success = conSave < dc; // a failed enemy save = the spell is countered
-        const checkDetail = ` (CON save ${conSave} vs DC ${dc} — ${success ? 'failed, countered' : 'succeeded'}).`;
+        // SRD Magic Resistance (Advantage) + Legendary Resistance.
+        const conSave =
+          enemySaveD20(enemyStat, true, () => rollDice('1d20')) + abilityMod(enemyStat?.con ?? 10);
+        const csLegendary = legendaryResist(
+          ctx.st,
+          enemyStat ? { ...enemyStat, id: rx.attackerEnemyId } : undefined,
+          conSave < dc
+        );
+        const success = csLegendary.failed; // a failed enemy save = the spell is countered
+        const checkDetail = ` (CON save ${conSave} vs DC ${dc} — ${success ? 'failed, countered' : 'succeeded'}).${csLegendary.note}`;
         if (success) {
           ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
         } else {

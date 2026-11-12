@@ -8,6 +8,7 @@ import {
   pick,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { legendaryResist, magicResistanceAdvantage } from '../../monsterSaves.js';
 import type { ActionContext } from '../types.js';
 import { entitiesInBlast } from '../../gridEngine.js';
 import { fillEnemyTokens } from '../../narrative/enemyName.js';
@@ -103,8 +104,20 @@ export function runDivineWord(ctx: ActionContext, spell: Spell, dc: number): boo
 
     const score = (enemy as unknown as Record<string, number>)['cha'] ?? 10;
     const conds = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy)?.conditions ?? [];
-    const failed = rollConditionSave('cha', score, dc, false, char.level, 0, conds);
-    ctx.narrative += ` ${enemy.name}: ${failed ? 'fails' : 'succeeds'} CHA save`;
+    // SRD Magic Resistance (Advantage) + Legendary Resistance.
+    const rolledFail = rollConditionSave(
+      'cha',
+      score,
+      dc,
+      false,
+      char.level,
+      0,
+      conds,
+      magicResistanceAdvantage(enemy)
+    );
+    const legendary = legendaryResist(ctx.st, { ...enemy, id: target.id }, rolledFail);
+    const failed = legendary.failed;
+    ctx.narrative += `${legendary.note} ${enemy.name}: ${failed ? 'fails' : 'succeeds'} CHA save`;
     if (!failed) {
       ctx.narrative += '.';
       continue;

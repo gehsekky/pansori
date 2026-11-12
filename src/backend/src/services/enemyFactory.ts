@@ -127,6 +127,8 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     deathBurst: template.deathBurst,
     // Petrifying Gaze / Breath — same carry-through reasoning.
     petrifyingGaze: template.petrifyingGaze,
+    magicResistance: template.magicResistance,
+    legendaryResistance: template.legendaryResistance,
     legendary_actions: template.legendary_actions,
     legendary_pool: template.legendary_pool,
     legendary_action_points: template.legendary_actions

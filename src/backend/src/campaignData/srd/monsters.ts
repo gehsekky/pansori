@@ -1623,9 +1623,9 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // The Archmage scales the Mage's pattern up: four Arcane Bursts (4d10+5 Force)
   // at 150 ft, with Psychic immunity and Charmed immunity (its Mind Blank). Its
   // Fireball / Cone of Cold / Wall of Force arsenal is AoE/utility — deferred.
-  // Magic Resistance (advantage on saves vs spells) isn't modeled yet.
   archmage: {
     name: 'Archmage',
+    magicResistance: true,
     darkvision_ft: 0, // human — no darkvision
     cr: 12,
     hp: 170,
@@ -1819,6 +1819,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   satyr: {
     name: 'Satyr',
+    magicResistance: true,
     darkvision_ft: 0,
     cr: 0.5,
     hp: 31,
@@ -1834,9 +1835,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     cha: 14,
     damageType: 'bludgeoning',
     speedFt: 40,
-    // Not modeled: Magic Resistance (advantage vs spells) and the Hooves'
-    // 10-ft push rider — narrated until save-advantage tagging / on-hit
-    // forced movement exist.
+    // Not modeled: the Hooves' 10-ft push rider — narrated until on-hit
+    // forced movement exists.
   },
   giant_hyena: {
     name: 'Giant Hyena',
@@ -4140,6 +4140,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pseudodragon: {
     name: 'Pseudodragon',
+    magicResistance: true,
     creatureType: 'dragon',
     cr: 0.25,
     hp: 10,
@@ -4157,7 +4158,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 2,
     speedFt: 60, // fly
     onHitEffect: { condition: 'poisoned', ability: 'con', dc: 12 },
-    // Simplification: Sting modeled as the on-hit save; Magic Resistance deferred.
+    // Simplification: Sting modeled as the on-hit save.
   },
 
   sprite: {
@@ -4490,6 +4491,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   dryad: {
     name: 'Dryad',
+    magicResistance: true,
     // SRD 5.2.1 type: Fey â not in the creatureType union; left unspecified.
     cr: 1,
     hp: 22,
@@ -5195,6 +5197,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   night_hag: {
     name: 'Night Hag',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 5,
     hp: 112,
@@ -6125,6 +6128,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_brass_dragon: {
     name: 'Adult Brass Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 13,
     hp: 172,
@@ -6163,6 +6167,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_white_dragon: {
     name: 'Adult White Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 13,
     hp: 200,
@@ -6234,6 +6239,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_black_dragon: {
     name: 'Adult Black Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 14,
     hp: 195,
@@ -6272,6 +6278,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_copper_dragon: {
     name: 'Adult Copper Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 14,
     hp: 184,
@@ -6310,6 +6317,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_bronze_dragon: {
     name: 'Adult Bronze Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 15,
     hp: 212,
@@ -6348,6 +6356,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_green_dragon: {
     name: 'Adult Green Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 15,
     hp: 207,
@@ -6387,6 +6396,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_blue_dragon: {
     name: 'Adult Blue Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 16,
     hp: 212,
@@ -6425,6 +6435,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_silver_dragon: {
     name: 'Adult Silver Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 16,
     hp: 216,
@@ -6463,6 +6474,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_gold_dragon: {
     name: 'Adult Gold Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 17,
     hp: 243,
@@ -6501,6 +6513,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_red_dragon: {
     name: 'Adult Red Dragon',
+    legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 17,
     hp: 256,
@@ -6539,6 +6552,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_brass_dragon: {
     name: 'Ancient Brass Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 20,
     hp: 332,
@@ -6577,6 +6591,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_white_dragon: {
     name: 'Ancient White Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 20,
     hp: 333,
@@ -6615,6 +6630,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_black_dragon: {
     name: 'Ancient Black Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 21,
     hp: 367,
@@ -6653,6 +6669,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_copper_dragon: {
     name: 'Ancient Copper Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 21,
     hp: 367,
@@ -6691,6 +6708,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_bronze_dragon: {
     name: 'Ancient Bronze Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 22,
     hp: 444,
@@ -6729,6 +6747,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_green_dragon: {
     name: 'Ancient Green Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 22,
     hp: 402,
@@ -6768,6 +6787,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_blue_dragon: {
     name: 'Ancient Blue Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 23,
     hp: 481,
@@ -6806,6 +6826,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_silver_dragon: {
     name: 'Ancient Silver Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 23,
     hp: 468,
@@ -6844,6 +6865,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_gold_dragon: {
     name: 'Ancient Gold Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 24,
     hp: 546,
@@ -6882,6 +6904,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_red_dragon: {
     name: 'Ancient Red Dragon',
+    legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 24,
     hp: 507,
@@ -6926,8 +6949,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // bestiary is COMPLETE except for Shrieker Fungus and Seahorse — both
   // attack-less non-combatants. Legendary attack options (Lash / Arcane
   // Prowl / Onslaught / Charging Horn) ride the extra_attack system;
-  // spell-based legendary options, Legendary Resistance and lairs are
-  // deferred per entry.
+  // spell-based legendary options and lairs are deferred per entry.
 
   lemure: {
     name: 'Lemure',
@@ -7027,6 +7049,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   imp: {
     name: 'Imp',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 1,
     hp: 21,
@@ -7048,11 +7071,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['fire', 'poison'],
     resistances: ['cold'],
     condition_immunities: ['poisoned'],
-    // Simplification: Invisibility + shape-shift + Magic Resistance deferred.
+    // Simplification: Invisibility + shape-shift deferred.
   },
 
   quasit: {
     name: 'Quasit',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 1,
     hp: 25,
@@ -7078,6 +7102,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sphinx_of_wonder: {
     name: 'Sphinx of Wonder',
+    magicResistance: true,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 1,
     hp: 24,
@@ -7096,7 +7121,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamage: '2d6',
     bonusDamageType: 'radiant',
     resistances: ['necrotic', 'psychic', 'radiant'],
-    // Simplification: Burst of Ingenuity + Magic Resistance deferred.
+    // Simplification: Burst of Ingenuity deferred.
   },
 
   animated_rug_of_smothering: {
@@ -7131,6 +7156,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bearded_devil: {
     name: 'Bearded Devil',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 3,
     hp: 58,
@@ -7247,6 +7273,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   barbed_devil: {
     name: 'Barbed Devil',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 5,
     hp: 110,
@@ -7272,6 +7299,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   flesh_golem: {
     name: 'Flesh Golem',
+    magicResistance: true,
     creatureType: 'construct',
     cr: 5,
     hp: 127,
@@ -7303,6 +7331,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   unicorn: {
     name: 'Unicorn',
+    magicResistance: true,
+    legendaryResistance: 3,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 5,
     hp: 97,
@@ -7327,7 +7357,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       { id: 'charging_horn', name: 'Charging Horn', cost: 1, kind: 'extra_attack' },
     ],
     legendary_pool: 3,
-    // Simplification: RAW one Hooves + one Radiant Horn — the horn averaged into a per-hit radiant rider; spellcasting, Legendary Resistance + Shimmering Shield deferred.
+    // Simplification: RAW one Hooves + one Radiant Horn — the horn averaged into a per-hit radiant rider; spellcasting + Shimmering Shield deferred.
   },
 
   drider: {
@@ -7355,6 +7385,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vrock: {
     name: 'Vrock',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 6,
     hp: 152,
@@ -7441,6 +7472,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   chain_devil: {
     name: 'Chain Devil',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 8,
     hp: 85,
@@ -7468,6 +7500,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hezrou: {
     name: 'Hezrou',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 8,
     hp: 157,
@@ -7495,6 +7528,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bone_devil: {
     name: 'Bone Devil',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 9,
     hp: 161,
@@ -7523,6 +7557,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   clay_golem: {
     name: 'Clay Golem',
+    magicResistance: true,
     creatureType: 'construct',
     cr: 9,
     hp: 123,
@@ -7556,6 +7591,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   glabrezu: {
     name: 'Glabrezu',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 9,
     hp: 189,
@@ -7582,6 +7618,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   aboleth: {
     name: 'Aboleth',
+    legendaryResistance: 3,
     // SRD 5.2.1 type: Aberration — not in the creatureType union; left unspecified.
     cr: 10,
     hp: 150,
@@ -7608,6 +7645,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   deva: {
     name: 'Deva',
+    magicResistance: true,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 10,
     hp: 229,
@@ -7634,6 +7672,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   stone_golem: {
     name: 'Stone Golem',
+    magicResistance: true,
     creatureType: 'construct',
     cr: 10,
     hp: 220,
@@ -7661,7 +7700,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       'petrified',
       'poisoned',
     ],
-    // Simplification: Force Bolt + Slow + Magic Resistance deferred.
+    // Simplification: Force Bolt + Slow deferred.
   },
 
   behir: {
@@ -7691,6 +7730,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   djinni: {
     name: 'Djinni',
+    magicResistance: true,
     // SRD 5.2.1 type: Elemental — not in the creatureType union; left unspecified.
     cr: 11,
     hp: 218,
@@ -7716,6 +7756,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   efreeti: {
     name: 'Efreeti',
+    magicResistance: true,
     // SRD 5.2.1 type: Elemental — not in the creatureType union; left unspecified.
     cr: 11,
     hp: 212,
@@ -7741,6 +7782,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   horned_devil: {
     name: 'Horned Devil',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 11,
     hp: 199,
@@ -7762,7 +7804,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['fire', 'poison'],
     resistances: ['cold'],
     condition_immunities: ['poisoned'],
-    // Simplification: Searing Fork ×3 (Hurl Flame / Infernal Tail mix deferred); Magic Resistance deferred.
+    // Simplification: Searing Fork ×3 (Hurl Flame / Infernal Tail mix deferred).
   },
 
   remorhaz: {
@@ -7816,6 +7858,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sphinx_of_lore: {
     name: 'Sphinx of Lore',
+    legendaryResistance: 3,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 11,
     hp: 170,
@@ -7854,6 +7897,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   erinyes: {
     name: 'Erinyes',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 12,
     hp: 178,
@@ -7876,11 +7920,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['fire', 'poison'],
     resistances: ['cold'],
     condition_immunities: ['poisoned'],
-    // Simplification: Entangling Rope + Magic Resistance deferred; Diabolical Restoration deferred.
+    // Simplification: Entangling Rope deferred; Diabolical Restoration deferred.
   },
 
   nalfeshnee: {
     name: 'Nalfeshnee',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 13,
     hp: 184,
@@ -7960,6 +8005,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vampire: {
     name: 'Vampire',
+    legendaryResistance: 3,
     creatureType: 'undead',
     cr: 13,
     hp: 195,
@@ -7984,11 +8030,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'necrotic',
     onHitEffect: { condition: 'grappled', escapeDc: 14 },
     resistances: ['necrotic'],
-    // Simplification: the Bite (save-based drain on a grappled target), Charm, Children of the Night, Misty Escape, shape-shift, Legendary Resistance + Beguile deferred; the sunlight burn approximated as Sunlight Sensitivity.
+    // Simplification: the Bite (save-based drain on a grappled target), Charm, Children of the Night, Misty Escape, shape-shift + Beguile deferred; the sunlight burn approximated as Sunlight Sensitivity.
   },
 
   ice_devil: {
     name: 'Ice Devil',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 14,
     hp: 228,
@@ -8016,6 +8063,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   mummy_lord: {
     name: 'Mummy Lord',
+    magicResistance: true,
+    legendaryResistance: 3,
     creatureType: 'undead',
     cr: 15,
     hp: 187,
@@ -8036,7 +8085,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['necrotic', 'poison'],
     vulnerabilities: ['fire'],
     condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
-    // Simplification: the no-heal curse, Dreadful Glare, Channel Negative Energy, spellcasting, Legendary Resistance + its legendary actions deferred.
+    // Simplification: the no-heal curse, Dreadful Glare, Channel Negative Energy, spellcasting + its legendary actions deferred.
   },
 
   purple_worm: {
@@ -8066,6 +8115,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   iron_golem: {
     name: 'Iron Golem',
+    magicResistance: true,
     creatureType: 'construct',
     cr: 16,
     hp: 252,
@@ -8107,6 +8157,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   marilith: {
     name: 'Marilith',
+    magicResistance: true,
     creatureType: 'fiend',
     cr: 16,
     hp: 220,
@@ -8134,6 +8185,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   planetar: {
     name: 'Planetar',
+    magicResistance: true,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 16,
     hp: 262,
@@ -8195,6 +8247,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sphinx_of_valor: {
     name: 'Sphinx of Valor',
+    legendaryResistance: 3,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 17,
     hp: 199,
@@ -8220,11 +8273,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       { id: 'arcane_prowl', name: 'Arcane Prowl', cost: 1, kind: 'extra_attack' },
     ],
     legendary_pool: 3,
-    // Simplification: the sequenced Roar (3/Day), spellcasting, Legendary Resistance + Weight of Years deferred.
+    // Simplification: the sequenced Roar (3/Day), spellcasting + Weight of Years deferred.
   },
 
   balor: {
     name: 'Balor',
+    magicResistance: true,
+    legendaryResistance: 3,
     creatureType: 'fiend',
     cr: 19,
     hp: 287,
@@ -8252,6 +8307,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pit_fiend: {
     name: 'Pit Fiend',
+    magicResistance: true,
+    legendaryResistance: 4,
     creatureType: 'fiend',
     cr: 20,
     hp: 337,
@@ -8279,6 +8336,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   lich: {
     name: 'Lich',
+    legendaryResistance: 4,
     creatureType: 'undead',
     cr: 21,
     hp: 315,
@@ -8299,11 +8357,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['necrotic', 'poison'],
     resistances: ['cold', 'lightning'],
     condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
-    // Simplification: Paralyzed until its next turn modeled as the plain condition; spellcasting, Legendary Resistance, the Spirit Jar and its legendary actions (Deathly Teleport / Disrupt Life) deferred.
+    // Simplification: Paralyzed until its next turn modeled as the plain condition; spellcasting, the Spirit Jar and its legendary actions (Deathly Teleport / Disrupt Life) deferred.
   },
 
   solar: {
     name: 'Solar',
+    magicResistance: true,
+    legendaryResistance: 4,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 21,
     hp: 297,
@@ -8326,11 +8386,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'radiant',
     immunities: ['poison', 'radiant'],
     condition_immunities: ['charmed', 'exhaustion', 'frightened', 'poisoned'],
-    // Simplification: Slaying Bow, spellcasting, Legendary Resistance + its legendary actions (Blinding Gaze / Radiant Teleport) deferred.
+    // Simplification: Slaying Bow, spellcasting + its legendary actions (Blinding Gaze / Radiant Teleport) deferred.
   },
 
   kraken: {
     name: 'Kraken',
+    legendaryResistance: 4,
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 23,
     hp: 481,
@@ -8355,11 +8416,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // SRD legendary action: Storm Bolt — approximated as one extra Tentacle.
     legendary_actions: [{ id: 'storm_bolt', name: 'Storm Bolt', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: Lightning Strike + Fling + Legendary Resistance + the lair deferred.
+    // Simplification: Lightning Strike + Fling + the lair deferred.
   },
 
   tarrasque: {
     name: 'Tarrasque',
+    magicResistance: true,
+    legendaryResistance: 6,
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 30,
     hp: 697,
@@ -8393,6 +8456,6 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // SRD legendary action: Onslaught — one extra Claw or Tail.
     legendary_actions: [{ id: 'onslaught', name: 'Onslaught', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: RAW one Bite (grapple) + three Claw/Tail — uniform Claw ×4; Swallow, Reflective Carapace + Legendary Resistance (6/Day) deferred.
+    // Simplification: RAW one Bite (grapple) + three Claw/Tail — uniform Claw ×4; Swallow, Reflective Carapace deferred.
   },
 };

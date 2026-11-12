@@ -1,6 +1,7 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { applyPartyLevelUps, getEnemyById, pushEvent, splitEncounterXp } from '../../gameEngine.js';
 import { channelDivinityUsesMax, getClassLevel, hasClass } from '../../multiclass.js';
+import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -118,7 +119,10 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       const enemyData = getEnemyById(ctx.seed, e.id);
       if (!enemyData || !undeadKeywords.test(enemyData.name)) continue;
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-      const save = rollDice('1d20') + abilityMod(wisScore);
+      // SRD Magic Resistance (Advantage) + Legendary Resistance.
+      const save = enemySaveD20(enemyData, true, () => rollDice('1d20')) + abilityMod(wisScore);
+      const tuLegendary = legendaryResist(ctx.st, { ...enemyData, id: e.id }, save < tuDC);
+      const tuFailed = tuLegendary.failed;
       // Per-target save event (composed via fragment so the combat
       // log captures the roll). Prose is empty because the
       // consolidated `lines` array drives the player-facing narrative.
@@ -129,11 +133,11 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
         ability: 'wis',
         roll: save,
         dc: tuDC,
-        success: save >= tuDC,
+        success: !tuFailed,
         vs: 'Turn Undead',
         prose: '',
       });
-      if (save < tuDC) {
+      if (tuFailed) {
         turnedIds.push(e.id);
         lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — turned!`);
         composeNow(ctx, {
@@ -145,7 +149,7 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
           prose: '',
         });
       } else {
-        lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — resists.`);
+        lines.push(`${enemyData.name}: WIS ${save} vs DC ${tuDC} — resists.${tuLegendary.note}`);
       }
     }
     if (turnedIds.length > 0) {
@@ -201,7 +205,8 @@ export function handleClericFeature(ctx: ActionContext, fid: string): boolean {
       const enemyData = getEnemyById(ctx.seed, e.id);
       if (!enemyData || !undeadRegex.test(enemyData.name)) return e;
       const wisScore = (enemyData as unknown as Record<string, number>)?.wis ?? 10;
-      const save = rollDice('1d20') + abilityMod(wisScore);
+      // SRD Magic Resistance — Advantage (damage-only: no Legendary Resistance).
+      const save = enemySaveD20(enemyData, true, () => rollDice('1d20')) + abilityMod(wisScore);
       // Sear Undead damage scales with Cleric level only.
       const fullDmg = rollDice(`${clericLvl}d8`);
       const dmg = save >= suDC ? Math.floor(fullDmg / 2) : fullDmg;

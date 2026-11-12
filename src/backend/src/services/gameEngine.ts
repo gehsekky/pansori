@@ -147,6 +147,7 @@ import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './in
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
 import { enemyRef, fillEnemyTokens } from './narrative/enemyName.js';
+import { enemySaveD20, legendaryResist, magicResistanceAdvantage } from './monsterSaves.js';
 import {
   equipmentFromLegacy,
   equippedArmorId,
@@ -1656,7 +1657,9 @@ function computeEnemyAttack(
   const sanctuaryDc = char.sanctuary_dc ?? 0;
   if (sanctuaryDc > 0) {
     const enemyWis = (enemy as unknown as Record<string, number>).wis ?? 10;
-    const sanctSave = rollDice('1d20') + abilityMod(enemyWis);
+    // SRD Magic Resistance — Advantage (Sanctuary is a spell). AI policy: it
+    // doesn't spend Legendary Resistance here; it can attack someone else.
+    const sanctSave = enemySaveD20(enemy, true, () => rollDice('1d20')) + abilityMod(enemyWis);
     if (sanctSave < sanctuaryDc) {
       return {
         proposedChar: char,
@@ -3310,6 +3313,8 @@ export function applyZoneTick(
     let saveTag = '';
     if (zone.savingThrow) {
       const score = (enemy as unknown as Record<string, number>)[zone.savingThrow] ?? 10;
+      // SRD Magic Resistance — Advantage against the spell's zone. (A
+      // damage-only save, so no Legendary Resistance.)
       const failed = rollConditionSave(
         zone.savingThrow,
         score,
@@ -3317,7 +3322,8 @@ export function applyZoneTick(
         false,
         1,
         0,
-        ent.conditions ?? []
+        ent.conditions ?? [],
+        magicResistanceAdvantage(enemy)
       );
       dmg = failed ? dmg : zone.saveEffect === 'half' ? Math.floor(dmg / 2) : 0;
       saveTag = ` (${zone.savingThrow.toUpperCase()} ${failed ? 'fail' : 'save'})`;
@@ -9576,8 +9582,26 @@ export function dominatedDamageReSave(
   const dc = caster?.concentrating_on?.save_dc ?? 13;
   const stats = getEnemyById(ctx.seed, targetId);
   const wis = (stats as unknown as Record<string, number>)?.wis ?? 10;
-  const failed = rollConditionSave('wis', wis, dc, false, 1, 0, ent.conditions);
-  if (failed) return;
+  // SRD Magic Resistance — Advantage. Legendary Resistance only turns failures
+  // into successes, and success here ends the domination, so a dominated
+  // legendary creature spends a use to break free.
+  const rolledFail = rollConditionSave(
+    'wis',
+    wis,
+    dc,
+    false,
+    1,
+    0,
+    ent.conditions,
+    magicResistanceAdvantage(stats)
+  );
+  const legendary = legendaryResist(
+    ctx.st,
+    stats ? { ...stats, id: targetId } : undefined,
+    rolledFail
+  );
+  ctx.narrative += legendary.note;
+  if (legendary.failed) return;
   // Save succeeded — the spell ends on the target. For single-target Dominate
   // that means the caster's concentration drops (which clears `dominated`).
   if (caster) {
@@ -10107,15 +10131,23 @@ export async function runEnemyTurns(args: {
             continue;
           }
           const score = (rm as unknown as Record<string, number>)[info.ability] ?? 10;
-          const failed = rollConditionSave(
+          // SRD Magic Resistance (unless the source is mundane, e.g.
+          // Alchemist's Fire) + Legendary Resistance to shake the condition.
+          const rolledFail = rollConditionSave(
             info.ability,
             score,
             info.dc,
             false,
             1,
             0,
-            seEnt.conditions
+            seEnt.conditions,
+            magicResistanceAdvantage(rm, !info.mundane)
           );
+          const legendary = legendaryResist(st, { ...rm, id: eEntry.id }, rolledFail, {
+            damageOnly: !!info.mundane,
+          });
+          narrative += legendary.note;
+          const failed = legendary.failed;
           if (!failed) {
             cleared.push(cond);
           } else if (info.recurDice) {
@@ -10212,15 +10244,23 @@ export async function runEnemyTurns(args: {
           );
           const confDc = confCaster?.concentrating_on?.save_dc ?? 13;
           const confWis = (rm as unknown as Record<string, number>).wis ?? 10;
-          const reSaveFailed = rollConditionSave(
-            'wis',
-            confWis,
-            confDc,
-            false,
-            1,
-            0,
-            confusedEnt.conditions
+          // SRD Magic Resistance (Advantage) + Legendary Resistance.
+          const confLegendary = legendaryResist(
+            st,
+            { ...rm, id: eEntry.id },
+            rollConditionSave(
+              'wis',
+              confWis,
+              confDc,
+              false,
+              1,
+              0,
+              confusedEnt.conditions,
+              magicResistanceAdvantage(rm)
+            )
           );
+          narrative += confLegendary.note;
+          const reSaveFailed = confLegendary.failed;
           if (!reSaveFailed) {
             stillConfused = false;
             narrative += `\n\n[${rm.name} shakes off the confusion.]`;
@@ -10392,15 +10432,23 @@ export async function runEnemyTurns(args: {
         // Re-save after the forced movement.
         const compelDc = compelCaster?.concentrating_on?.save_dc ?? 13;
         const compelWis = (rm as unknown as Record<string, number>).wis ?? 10;
-        const compelReSaveFailed = rollConditionSave(
-          'wis',
-          compelWis,
-          compelDc,
-          false,
-          1,
-          0,
-          compelledEnt.conditions
+        // SRD Magic Resistance (Advantage) + Legendary Resistance.
+        const compelLegendary = legendaryResist(
+          st,
+          { ...rm, id: eEntry.id },
+          rollConditionSave(
+            'wis',
+            compelWis,
+            compelDc,
+            false,
+            1,
+            0,
+            compelledEnt.conditions,
+            magicResistanceAdvantage(rm)
+          )
         );
+        narrative += compelLegendary.note;
+        const compelReSaveFailed = compelLegendary.failed;
         if (!compelReSaveFailed) {
           narrative += ` ${rm.name} shakes off the compulsion.`;
           st = {

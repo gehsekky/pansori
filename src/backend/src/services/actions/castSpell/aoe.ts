@@ -29,6 +29,7 @@ import {
   posEqual,
 } from '../../gridEngine.js';
 import { empoweredEvocationBonus, getClassLevel } from '../../multiclass.js';
+import { legendaryResist, magicResistanceAdvantage } from '../../monsterSaves.js';
 import type { ActionContext } from '../types.js';
 import { concentrationRoundsFor } from './utils.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -210,15 +211,22 @@ export function runAoeSpell(
       }
       const targetEntCond =
         ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy)?.conditions ?? [];
-      const tFailed = rollConditionSave(
+      // SRD Magic Resistance (Advantage) + Legendary Resistance.
+      const tRolledFail = rollConditionSave(
         spell.savingThrow,
         tScore,
         dc,
         false,
         char.level,
         tCover,
-        targetEntCond
+        targetEntCond,
+        magicResistanceAdvantage(targetEnemy)
       );
+      const tLegendary = legendaryResist(ctx.st, targetEnemy, tRolledFail, {
+        damageOnly: !spell.condition && !spell.pushFt,
+      });
+      const tFailed = tLegendary.failed;
+      ctx.narrative += tLegendary.note;
       // SRD Evoker Empowered Evocation — +INT to the evocation's damage roll
       // (RAW: one roll applied to all targets, so every target shares the +INT).
       // SRD Evoker Overchannel — maximize the spell's damage dice.

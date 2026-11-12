@@ -29,6 +29,7 @@ import {
   potentSpellcastingBonus,
 } from '../../multiclass.js';
 import { enemyRef, fillEnemyTokens } from '../../narrative/enemyName.js';
+import { legendaryResist, magicResistanceAdvantage } from '../../monsterSaves.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { coverBonus } from '../../gridEngine.js';
@@ -92,8 +93,9 @@ export function runSaveSpell(
   // Disadvantage.
   const heightened = !!ctx.metamagic?.includes('heightened');
   // SRD Dominate — the target saves with Advantage while the party fights it.
-  const saveAdvantage = !!spell.saveAdvantage;
-  const saveFailed = rollConditionSave(
+  // SRD Magic Resistance — Advantage on saves against spells.
+  const saveAdvantage = !!spell.saveAdvantage || magicResistanceAdvantage(spellTarget);
+  const rolledFail = rollConditionSave(
     saveAbility,
     enemyScore,
     dc,
@@ -104,6 +106,11 @@ export function runSaveSpell(
     saveAdvantage,
     heightened
   );
+  // SRD Legendary Resistance — may turn the failure into a success.
+  const legendary = legendaryResist(ctx.st, spellTarget, rolledFail, {
+    damageOnly: !spell.condition && !spell.conditionChoices && !spell.pushFt,
+  });
+  const saveFailed = legendary.failed;
   const saveLabel = saveAbility.toUpperCase();
 
   const saveCastPrefix = pickCastPrefix(spell, {
@@ -187,6 +194,8 @@ export function runSaveSpell(
       saveFailed,
     });
   }
+
+  ctx.narrative += legendary.note;
 
   // An AoE save spell that ALSO carries a rider condition (Sunburst → Blinded,
   // Weird → Frightened) must not be resolved single-target here — fall through

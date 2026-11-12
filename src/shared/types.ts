@@ -731,6 +731,9 @@ export interface CombatEntity {
       // Defaults to "the illusion" (Phantasmal Killer / Force); Alchemist's Fire
       // sets "the flames".
       label?: string;
+      // Not a spell or magical effect (Alchemist's Fire), so Magic Resistance
+      // gives no Advantage and Legendary Resistance isn't spent on it.
+      mundane?: boolean;
     }
   >;
   // Conditions in `save_ends` for which this creature has completed ≥1 afflicted
