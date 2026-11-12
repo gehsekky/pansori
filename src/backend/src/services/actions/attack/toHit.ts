@@ -24,6 +24,7 @@ import {
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { equippedArmorId } from '../../equipment.js';
+import { grappledAttackDisadvantage } from '../../unarmedStrike.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
 import { updatePcActor } from '../actor.js';
@@ -61,7 +62,7 @@ export interface ToHitContext {
  *    decremented at spend time in `use_luck`, the flag clears here)
  *
  * Advantage sources stacked (any one enables advantage):
- *   conditionAdv, enemyGrappled, proneAdv, enemyParalyzed, flankingAdv,
+ *   conditionAdv, proneAdv, enemyParalyzed, flankingAdv,
  *   helpAdv,
  *   recklessAdv (Barbarian L2+, melee only), inspirationAdv
  *   (Heroic Inspiration), vexAdv (consumed Vex tag), studyAdv
@@ -154,7 +155,14 @@ export function computeToHitContext(
   const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
   const conditionAdv = pc.char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
   const enemyEntity2 = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
-  const enemyGrappled = enemyEntity2?.conditions.includes('grappled') ?? false;
+  // SRD Grappled — the grappled creature has Disadvantage on attack rolls
+  // against any target other than its grappler. (Being grappled grants
+  // attackers no Advantage.)
+  const grappledDisadv = grappledAttackDisadvantage(
+    pc.char.conditions,
+    ctx.st.entities?.find((e) => e.id === pc.char.id && !e.isEnemy)?.grappled_by,
+    targetId
+  );
   const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
   const enemyParalyzed = enemyEntity2?.conditions.includes('paralyzed') ?? false;
   const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
@@ -315,6 +323,7 @@ export function computeToHitContext(
     proneDisadv ||
     thrownLongRangeDisadv ||
     darknessDisadv ||
+    grappledDisadv ||
     enemyInvisible;
 
   const inspirationAdv = !!pc.char.turn_actions.inspiration_pending;
@@ -343,7 +352,6 @@ export function computeToHitContext(
 
   const advantage =
     conditionAdv ||
-    enemyGrappled ||
     proneAdv ||
     enemyParalyzed ||
     enemyFaerieFired ||

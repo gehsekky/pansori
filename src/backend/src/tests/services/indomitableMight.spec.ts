@@ -1,13 +1,14 @@
 // RE-2 — Indomitable Might (SRD 5.2.1, Barbarian L18): if your total for a
 // Strength check is less than your Strength score, use the score in place of
 // the total. `applyIndomitableMight` floors the total; wired into the
-// STR(Athletics) contests in combatTactical (grapple, shove, escape).
+// STR (Athletics) escape check in combatTactical. (Grapple and Shove are saves
+// the target makes, so there's no PC check to floor.)
 
 import type { Character, Enemy } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionContext } from '../../services/actions/types.js';
 import { applyIndomitableMight } from '../../services/multiclass.js';
-import { handleGrapple } from '../../services/actions/combatTactical.js';
+import { handleTryEscapeGrapple } from '../../services/actions/combatTactical.js';
 import { makeChar } from '../../test-fixtures.js';
 import { pcActor } from '../../services/actions/actor.js';
 
@@ -34,16 +35,19 @@ describe('applyIndomitableMight', () => {
 
 const orc = { id: 'orc-1', name: 'Orc', toHit: 10, dex: 10, hp: 20 } as unknown as Enemy;
 
-function grappleCtx(char: Character): ActionContext {
+// The PC is held by the orc with escape DC 15.
+function heldCtx(char: Character): ActionContext {
+  const held = { ...char, conditions: ['grappled'] } as Character;
   return {
-    actor: pcActor(char, 0),
+    actor: pcActor(held, 0),
     context: { classSkills: { Barbarian: [] } }, // no Athletics prof → roll is d20 + STR mod
     enemy: orc,
     enemyAlive: true,
     livingEnemiesInRoom: [orc],
+    seed: { enemies: {} },
     st: {
       combat_active: true,
-      characters: [char],
+      characters: [held],
       entities: [
         {
           id: char.id,
@@ -51,8 +55,10 @@ function grappleCtx(char: Character): ActionContext {
           pos: { x: 1, y: 1 },
           hp: 30,
           maxHp: 30,
-          conditions: [],
+          conditions: ['grappled'],
           condition_durations: {},
+          grappled_by: 'orc-1',
+          grapple_escape_dc: 15,
         },
         {
           id: 'orc-1',
@@ -70,34 +76,23 @@ function grappleCtx(char: Character): ActionContext {
   } as unknown as ActionContext;
 }
 
-const grappledOrc = (ctx: ActionContext) =>
-  ctx.st.entities?.find((e) => e.id === 'orc-1')?.conditions.includes('grappled');
+const stillHeld = (ctx: ActionContext, id: string) =>
+  ctx.st.entities?.find((e) => e.id === id)?.conditions.includes('grappled');
 
-describe('Indomitable Might — grapple contest (integration)', () => {
-  // The grapple now resolves the enemy's d20 first (it's the skillCheck DC),
-  // then the player's. enemy d20 → 15; player d20 → 1 (raw total well under 15).
-  // Without the floor the grapple fails; with it the player's total becomes
-  // STR 20 > 15.
-  function pinRolls() {
-    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    spy.mockReturnValueOnce(0.7).mockReturnValueOnce(0);
-  }
-
-  it('a Barbarian L18 grapples on a roll that would otherwise lose', () => {
-    pinRolls();
-    const ctx = grappleCtx(
-      makeChar({ id: 'pc-1', character_class: 'Barbarian', level: 18, str: 20 })
-    );
-    handleGrapple(ctx, { type: 'grapple' });
-    expect(grappledOrc(ctx)).toBe(true); // floored to STR 20 > 15
+describe('Indomitable Might — escaping a grapple (integration)', () => {
+  // d20 → 1: the raw Athletics total (1 + 5 = 6) misses DC 15; floored to
+  // STR 20 it escapes.
+  it('a Barbarian L18 escapes on a roll that would otherwise fail', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const ctx = heldCtx(makeChar({ id: 'pc-1', character_class: 'Barbarian', level: 18, str: 20 }));
+    handleTryEscapeGrapple(ctx, { type: 'try_escape_grapple' });
+    expect(stillHeld(ctx, 'pc-1')).toBe(false);
   });
 
-  it('a Barbarian L17 fails the same contest (control)', () => {
-    pinRolls();
-    const ctx = grappleCtx(
-      makeChar({ id: 'pc-1', character_class: 'Barbarian', level: 17, str: 20 })
-    );
-    handleGrapple(ctx, { type: 'grapple' });
-    expect(grappledOrc(ctx)).toBeFalsy(); // raw 6 < 15
+  it('a Barbarian L17 stays held on the same roll (control)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const ctx = heldCtx(makeChar({ id: 'pc-1', character_class: 'Barbarian', level: 17, str: 20 }));
+    handleTryEscapeGrapple(ctx, { type: 'try_escape_grapple' });
+    expect(stillHeld(ctx, 'pc-1')).toBe(true);
   });
 });

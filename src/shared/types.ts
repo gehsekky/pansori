@@ -922,7 +922,8 @@ export type StructuredAction =
   // choice when XP crosses the next-level threshold. Out-of-combat
   // only (RAW: level-ups happen during downtime / long rest).
   | { type: 'level_up_class'; className: string }
-  | { type: 'shove'; targetEnemyId?: string }
+  // SRD Unarmed Strike: Shove — push 5 ft away or knock Prone (default).
+  | { type: 'shove'; targetEnemyId?: string; mode?: 'prone' | 'push' }
   | { type: 'dodge' }
   | { type: 'disengage' }
   // SRD 5.2.1 Hide [Action] — the general action available to any class
@@ -1087,6 +1088,7 @@ export type ChoiceKind =
   | 'attack'
   | 'grapple'
   | 'shove'
+  | 'shove_push'
   // SRD 5.2.1 Mounted Combat — Mount / Dismount movement options.
   | 'mount'
   | 'two_weapon_attack'

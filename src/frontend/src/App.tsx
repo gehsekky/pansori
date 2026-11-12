@@ -65,6 +65,7 @@ const ICONIZED_KINDS = new Set<string>([
   'attack',
   'grapple',
   'shove',
+  'shove_push',
   'two_weapon_attack',
   'recurring_spell_attack',
   'class_feature',
@@ -74,6 +75,7 @@ const COMBAT_ACTION_KINDS = new Set<string>([
   'attack',
   'grapple',
   'shove',
+  'shove_push',
   'two_weapon_attack',
   'recurring_spell_attack',
 ]);

@@ -24,6 +24,7 @@ import {
   grantDarkOnesBlessing,
   isRoomCleared,
   pick,
+  pushEntityAway,
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
@@ -47,6 +48,7 @@ import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 import { grantEnemyDrops } from '../enemyDrops.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
+import { sizeRank } from '../../unarmedStrike.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -1129,19 +1131,28 @@ export function resolveOneAttack(
         ctx.narrative += ` ${fmt.note(`[Topple: CON ${conSave} vs DC ${weaponDc} — resists]`)}`;
       }
     } else if (mastery === 'push') {
+      // SRD Push — up to 10 ft straight away, only if Large or smaller. The
+      // push stops at walls, creatures and the grid edge.
       const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
       const targetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
-      if (charEnt && targetEnt) {
-        const dx = Math.sign(targetEnt.pos.x - charEnt.pos.x);
-        const dy = Math.sign(targetEnt.pos.y - charEnt.pos.y);
-        const newPos = { x: targetEnt.pos.x + dx * 2, y: targetEnt.pos.y + dy * 2 };
-        ctx.st = {
-          ...ctx.st,
-          entities: (ctx.st.entities ?? []).map((e) =>
-            e.id === targetId && e.isEnemy ? { ...e, pos: newPos } : e
-          ),
-        };
-        ctx.narrative += ` ${fmt.note(`[Push: ${target.name} shoved 10 ft back]`)}`;
+      if (charEnt && targetEnt && sizeRank(target.size) > sizeRank('large')) {
+        ctx.narrative += ` ${fmt.note(`[Push: ${target.name} is too big to push]`)}`;
+      } else if (charEnt && targetEnt) {
+        const pushed = pushEntityAway(
+          ctx.st,
+          targetId,
+          charEnt.pos,
+          10,
+          ctx.context,
+          ctx.seed,
+          ctx.st.current_room,
+          ctx.roomObstacleCells
+        );
+        ctx.st = pushed.st;
+        ctx.narrative +=
+          pushed.pushedFt > 0
+            ? ` ${fmt.note(`[Push: ${target.name} shoved ${pushed.pushedFt} ft back]`)}`
+            : ` ${fmt.note(`[Push: no room to push ${target.name} back]`)}`;
       }
     } else if (mastery === 'sap') {
       ctx.st = {

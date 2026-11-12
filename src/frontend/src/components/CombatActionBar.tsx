@@ -28,6 +28,7 @@ const ACTIONS: ActionDef[] = [
   { kind: 'recurring_spell_attack', icon: 'lightning-sword', shortLabel: 'Spell Atk' },
   { kind: 'grapple', icon: 'grappling-hook', shortLabel: 'Grapple' },
   { kind: 'shove', icon: 'sideswipe', shortLabel: 'Shove' },
+  { kind: 'shove_push', icon: 'player-thunder-struck', shortLabel: 'Push' },
 ];
 
 // The recurring spell-attack label varies (Spiritual Weapon / Vampiric Touch /

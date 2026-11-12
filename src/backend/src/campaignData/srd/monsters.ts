@@ -30,6 +30,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 1/8 ────────────────────────────────────────────────────────────────
   bandit: {
     name: 'Bandit',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 11,
@@ -49,6 +50,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 1/4 ────────────────────────────────────────────────────────────────
   goblin: {
     name: 'Goblin Warrior', // the 5.2.1 name for the classic goblin
+    size: 'small',
     cr: 0.25,
     hp: 10,
     ac: 15,
@@ -64,6 +66,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   skeleton: {
     name: 'Skeleton',
+    size: 'medium',
     creatureType: 'undead',
     cr: 0.25,
     hp: 13,
@@ -83,6 +86,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wolf: {
     name: 'Wolf',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 11,
@@ -104,6 +108,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_spider: {
     name: 'Giant Spider',
+    size: 'large',
     creatureType: 'beast',
     cr: 1,
     hp: 26,
@@ -127,6 +132,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 1/2 ────────────────────────────────────────────────────────────────
   shadow: {
     name: 'Shadow',
+    size: 'medium',
     creatureType: 'undead',
     cr: 0.5,
     hp: 27,
@@ -161,6 +167,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ice_mephit: {
     name: 'Ice Mephit',
+    size: 'small',
     cr: 0.5,
     hp: 21,
     ac: 11,
@@ -182,6 +189,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 1 ──────────────────────────────────────────────────────────────────
   ape: {
     name: 'Ape',
+    size: 'medium',
     cr: 0.5,
     hp: 19,
     ac: 12,
@@ -200,6 +208,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   tiger: {
     name: 'Tiger',
+    size: 'large',
     cr: 1,
     hp: 30,
     ac: 13,
@@ -219,6 +228,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   spy: {
     name: 'Spy',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 1,
     hp: 27,
@@ -239,6 +249,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ghoul: {
     name: 'Ghoul',
+    size: 'medium',
     creatureType: 'undead',
     cr: 1,
     hp: 22,
@@ -261,6 +272,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   brown_bear: {
     name: 'Brown Bear',
+    size: 'large',
     creatureType: 'beast',
     cr: 1,
     hp: 22,
@@ -281,6 +293,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── CR 2 ──────────────────────────────────────────────────────────────────
   pegasus: {
     name: 'Pegasus',
+    size: 'large',
     darkvision_ft: 0, // celestial — keen sight, no darkvision
     cr: 2,
     hp: 59,
@@ -302,6 +315,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_constrictor_snake: {
     name: 'Giant Constrictor Snake',
+    size: 'huge',
     cr: 2,
     hp: 60,
     ac: 12,
@@ -328,6 +342,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // Flame (a ranged radiant bolt), so it reads as a caster, not a basher.
   priest: {
     name: 'Priest',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 38,
@@ -347,6 +362,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   cult_fanatic: {
     name: 'Cultist Fanatic', // the 5.2.1 name
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 44,
@@ -367,6 +383,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ogre: {
     name: 'Ogre',
+    size: 'large',
     cr: 2,
     hp: 68,
     ac: 11,
@@ -388,6 +405,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ally-adjacency advantage / lighting model yet.
   kobold: {
     name: 'Kobold Warrior', // the 5.2.1 name
+    size: 'small',
     cr: 0.125,
     hp: 7,
     ac: 14,
@@ -406,6 +424,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   guard: {
     name: 'Guard',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 11,
@@ -423,6 +442,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   cultist: {
     name: 'Cultist',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 9,
@@ -442,6 +462,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_rat: {
     name: 'Giant Rat',
+    size: 'small',
     cr: 0.125,
     hp: 7,
     ac: 13,
@@ -461,6 +482,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 1/4 ─────────────────────────────────────────────────────────────
   zombie: {
     name: 'Zombie',
+    size: 'medium',
     creatureType: 'undead',
     cr: 0.25,
     hp: 15,
@@ -485,6 +507,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 1/2 ─────────────────────────────────────────────────────────────
   scout: {
     name: 'Scout',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 0.5,
     hp: 16,
@@ -503,6 +526,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   worg: {
     name: 'Worg',
+    size: 'large',
     cr: 0.5,
     hp: 26,
     ac: 13,
@@ -521,6 +545,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   gnoll: {
     name: 'Gnoll Warrior', // the 5.2.1 name
+    size: 'medium',
     cr: 0.5,
     hp: 27,
     ac: 15,
@@ -540,6 +565,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   black_bear: {
     name: 'Black Bear',
+    size: 'medium',
     cr: 0.5,
     hp: 19,
     ac: 11,
@@ -559,6 +585,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 1 ───────────────────────────────────────────────────────────────
   dire_wolf: {
     name: 'Dire Wolf',
+    size: 'large',
     cr: 1,
     hp: 22,
     ac: 14,
@@ -577,6 +604,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   specter: {
     name: 'Specter',
+    size: 'medium',
     creatureType: 'undead',
     cr: 1,
     hp: 22,
@@ -621,6 +649,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   animated_armor: {
     name: 'Animated Armor',
+    size: 'medium',
     cr: 1,
     hp: 33,
     ac: 18,
@@ -651,6 +680,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 2 ───────────────────────────────────────────────────────────────
   bandit_captain: {
     name: 'Bandit Captain',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 52,
@@ -671,6 +701,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   berserker: {
     name: 'Berserker',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 2,
     hp: 67,
@@ -689,6 +720,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ghast: {
     name: 'Ghast',
+    size: 'medium',
     creatureType: 'undead',
     cr: 2,
     hp: 36,
@@ -723,6 +755,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   griffon: {
     name: 'Griffon',
+    size: 'large',
     cr: 2,
     hp: 59,
     ac: 12,
@@ -747,6 +780,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── More CR 3 ───────────────────────────────────────────────────────────────
   owlbear: {
     name: 'Owlbear',
+    size: 'large',
     cr: 3,
     hp: 59,
     ac: 13,
@@ -765,6 +799,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   manticore: {
     name: 'Manticore',
+    size: 'large',
     cr: 3,
     hp: 68,
     ac: 14,
@@ -782,6 +817,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wight: {
     name: 'Wight',
+    size: 'medium',
     creatureType: 'undead',
     cr: 3,
     hp: 82,
@@ -814,6 +850,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // actions are noted as deferred where the engine can't yet express them.
   knight: {
     name: 'Knight',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 3,
     hp: 52,
@@ -839,6 +876,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   doppelganger: {
     name: 'Doppelganger',
+    size: 'medium',
     cr: 3,
     hp: 52,
     ac: 14,
@@ -860,6 +898,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   hell_hound: {
     name: 'Hell Hound',
+    size: 'medium',
     cr: 3,
     hp: 58,
     ac: 15,
@@ -891,6 +930,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   hippogriff: {
     name: 'Hippogriff',
+    size: 'large',
     darkvision_ft: 0, // relies on sight — no darkvision
     cr: 1,
     hp: 26,
@@ -911,6 +951,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_eagle: {
     name: 'Giant Eagle',
+    size: 'large',
     darkvision_ft: 0, // relies on sight — no darkvision
     cr: 1,
     hp: 26,
@@ -934,6 +975,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   lion: {
     name: 'Lion',
+    size: 'large',
     cr: 1,
     hp: 22,
     ac: 12,
@@ -955,6 +997,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   bugbear_warrior: {
     name: 'Bugbear Warrior',
+    size: 'medium',
     cr: 1,
     hp: 33,
     ac: 14,
@@ -975,6 +1018,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   saber_toothed_tiger: {
     name: 'Saber-Toothed Tiger',
+    size: 'large',
     cr: 2,
     hp: 52,
     ac: 13,
@@ -993,6 +1037,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_boar: {
     name: 'Giant Boar',
+    size: 'large',
     darkvision_ft: 0, // no darkvision
     cr: 2,
     hp: 42,
@@ -1015,6 +1060,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   polar_bear: {
     name: 'Polar Bear',
+    size: 'large',
     cr: 2,
     hp: 42,
     ac: 12,
@@ -1034,6 +1080,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   mummy: {
     name: 'Mummy',
+    size: 'medium',
     creatureType: 'undead',
     cr: 3,
     hp: 58,
@@ -1063,6 +1110,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   hill_giant: {
     name: 'Hill Giant',
+    size: 'huge',
     darkvision_ft: 0, // no darkvision
     cr: 5,
     hp: 105,
@@ -1088,6 +1136,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── High-end SRD bestiary (CR 4–6) ──────────────────────────────────────────
   ettin: {
     name: 'Ettin',
+    size: 'large',
     cr: 4,
     hp: 85,
     ac: 12,
@@ -1116,6 +1165,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   gladiator: {
     name: 'Gladiator',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 5,
     hp: 112,
@@ -1139,6 +1189,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wraith: {
     name: 'Wraith',
+    size: 'medium',
     creatureType: 'undead',
     cr: 5,
     hp: 67,
@@ -1178,6 +1229,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   fire_elemental: {
     name: 'Fire Elemental',
+    size: 'large',
     cr: 5,
     hp: 93,
     ac: 13,
@@ -1215,6 +1267,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // — the melee Slam is the signature, like the Fire Elemental's Burn.
   air_elemental: {
     name: 'Air Elemental',
+    size: 'large',
     cr: 5,
     hp: 90,
     ac: 15,
@@ -1248,6 +1301,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   earth_elemental: {
     name: 'Earth Elemental',
+    size: 'large',
     cr: 5,
     hp: 147,
     ac: 17,
@@ -1271,6 +1325,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   water_elemental: {
     name: 'Water Elemental',
+    size: 'large',
     cr: 5,
     hp: 114,
     ac: 14,
@@ -1303,6 +1358,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   salamander: {
     name: 'Salamander',
+    size: 'large',
     cr: 5,
     hp: 90,
     ac: 15,
@@ -1329,6 +1385,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   bulette: {
     name: 'Bulette',
+    size: 'large',
     cr: 5,
     hp: 94,
     ac: 17,
@@ -1352,6 +1409,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // 120-ft range so it pelts the party without closing.
   mage: {
     name: 'Mage',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 6,
     hp: 81,
@@ -1379,6 +1437,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   wyvern: {
     name: 'Wyvern',
+    size: 'large',
     darkvision_ft: 120,
     cr: 6,
     hp: 127,
@@ -1413,6 +1472,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // SRD: Stone Giant (CR 7) — two Stone Club attacks at 15-ft reach.
   mammoth: {
     name: 'Mammoth',
+    size: 'huge',
     cr: 6,
     hp: 126,
     ac: 13,
@@ -1433,6 +1493,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   stone_giant: {
     name: 'Stone Giant',
+    size: 'huge',
     cr: 7,
     hp: 126,
     ac: 17,
@@ -1457,6 +1518,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // the Boulder Toss Prone-on-fail rider deferred.)
   giant_ape: {
     name: 'Giant Ape',
+    size: 'huge',
     cr: 7,
     hp: 168,
     ac: 12,
@@ -1488,6 +1550,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // Cold-immune. (Great Bow + War Cry bonus action deferred.)
   assassin: {
     name: 'Assassin',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 8,
     hp: 97,
@@ -1511,6 +1574,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   frost_giant: {
     name: 'Frost Giant',
+    size: 'huge',
     cr: 8,
     hp: 149,
     ac: 15,
@@ -1537,6 +1601,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // Fire-immune. (Hammer Throw deferred.)
   fire_giant: {
     name: 'Fire Giant',
+    size: 'huge',
     cr: 9,
     hp: 162,
     ac: 18,
@@ -1563,6 +1628,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // thunder rider). (Thundercloud, Spellcasting + Misty Step deferred/narrated.)
   cloud_giant: {
     name: 'Cloud Giant',
+    size: 'huge',
     cr: 9,
     hp: 200,
     ac: 14,
@@ -1590,6 +1656,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // fly. (The cone geometry is abstracted to the whole party — see BreathWeapon.)
   young_red_dragon: {
     name: 'Young Red Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 10,
     hp: 178,
@@ -1625,6 +1692,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // Fireball / Cone of Cold / Wall of Force arsenal is AoE/utility — deferred.
   archmage: {
     name: 'Archmage',
+    size: 'medium',
     magicResistance: true,
     darkvision_ft: 0, // human — no darkvision
     cr: 12,
@@ -1657,6 +1725,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hyena: {
     name: 'Hyena',
+    size: 'medium',
     cr: 0,
     hp: 5,
     ac: 11,
@@ -1676,6 +1745,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_crab: {
     name: 'Giant Crab',
+    size: 'medium',
     cr: 0.125,
     hp: 13,
     ac: 15,
@@ -1696,6 +1766,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   noble: {
     name: 'Noble',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 0.125,
     hp: 9,
@@ -1715,6 +1786,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   constrictor_snake: {
     name: 'Constrictor Snake',
+    size: 'large',
     cr: 0.25,
     hp: 13,
     ac: 13,
@@ -1736,6 +1808,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_wolf_spider: {
     name: 'Giant Wolf Spider',
+    size: 'medium',
     cr: 0.25,
     hp: 11,
     ac: 13,
@@ -1757,6 +1830,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   cockatrice: {
     name: 'Cockatrice',
+    size: 'small',
     cr: 0.5,
     hp: 22,
     ac: 11,
@@ -1779,6 +1853,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   crocodile: {
     name: 'Crocodile',
+    size: 'large',
     cr: 0.5,
     hp: 13,
     ac: 12,
@@ -1800,6 +1875,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   tough: {
     name: 'Tough',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 0.5,
     hp: 32,
@@ -1819,6 +1895,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   satyr: {
     name: 'Satyr',
+    size: 'medium',
     magicResistance: true,
     darkvision_ft: 0,
     cr: 0.5,
@@ -1840,6 +1917,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_hyena: {
     name: 'Giant Hyena',
+    size: 'large',
     cr: 1,
     hp: 45,
     ac: 12,
@@ -1859,6 +1937,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   merrow: {
     name: 'Merrow',
+    size: 'large',
     cr: 2,
     hp: 45,
     ac: 13,
@@ -1878,6 +1957,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   mimic: {
     name: 'Mimic',
+    size: 'medium',
     cr: 2,
     hp: 58,
     ac: 12,
@@ -1902,6 +1982,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   awakened_tree: {
     name: 'Awakened Tree',
+    size: 'huge',
     darkvision_ft: 0,
     cr: 2,
     hp: 59,
@@ -1923,6 +2004,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   white_dragon_wyrmling: {
     name: 'White Dragon Wyrmling',
+    size: 'medium',
     cr: 2,
     hp: 32,
     ac: 16,
@@ -1953,6 +2035,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   black_dragon_wyrmling: {
     name: 'Black Dragon Wyrmling',
+    size: 'medium',
     cr: 2,
     hp: 33,
     ac: 17,
@@ -1983,6 +2066,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ankheg: {
     name: 'Ankheg',
+    size: 'large',
     cr: 2,
     hp: 45,
     ac: 14,
@@ -2012,6 +2096,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   minotaur: {
     name: 'Minotaur of Baphomet',
+    size: 'large',
     cr: 3,
     hp: 85,
     ac: 14,
@@ -2035,6 +2120,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   giant_scorpion: {
     name: 'Giant Scorpion',
+    size: 'large',
     cr: 3,
     hp: 52,
     ac: 15,
@@ -2062,6 +2148,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   warrior_veteran: {
     name: 'Warrior Veteran',
+    size: 'medium',
     darkvision_ft: 0, // human — no darkvision
     cr: 3,
     hp: 65,
@@ -2091,6 +2178,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   baboon: {
     name: 'Baboon',
+    size: 'small',
     creatureType: 'beast',
     cr: 0,
     hp: 3,
@@ -2111,6 +2199,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   badger: {
     name: 'Badger',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 5,
@@ -2132,6 +2221,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bat: {
     name: 'Bat',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2152,6 +2242,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   cat: {
     name: 'Cat',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 2,
@@ -2171,6 +2262,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   crab: {
     name: 'Crab',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 3,
@@ -2191,6 +2283,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   deer: {
     name: 'Deer',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0,
     hp: 4,
@@ -2210,6 +2303,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   eagle: {
     name: 'Eagle',
+    size: 'small',
     creatureType: 'beast',
     cr: 0,
     hp: 4,
@@ -2230,6 +2324,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   frog: {
     name: 'Frog',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2250,6 +2345,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_fire_beetle: {
     name: 'Giant Fire Beetle',
+    size: 'small',
     creatureType: 'beast',
     cr: 0,
     hp: 4,
@@ -2270,6 +2366,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   goat: {
     name: 'Goat',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0,
     hp: 4,
@@ -2290,6 +2387,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hawk: {
     name: 'Hawk',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2310,6 +2408,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   jackal: {
     name: 'Jackal',
+    size: 'small',
     creatureType: 'beast',
     cr: 0,
     hp: 3,
@@ -2330,6 +2429,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   lizard: {
     name: 'Lizard',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 2,
@@ -2350,6 +2450,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   octopus: {
     name: 'Octopus',
+    size: 'small',
     creatureType: 'beast',
     cr: 0,
     hp: 3,
@@ -2371,6 +2472,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   owl: {
     name: 'Owl',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2391,6 +2493,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   piranha: {
     name: 'Piranha',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2410,6 +2513,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   rat: {
     name: 'Rat',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2430,6 +2534,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   raven: {
     name: 'Raven',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 2,
@@ -2450,6 +2555,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   scorpion: {
     name: 'Scorpion',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2472,6 +2578,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   spider: {
     name: 'Spider',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2494,6 +2601,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vulture: {
     name: 'Vulture',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0,
     hp: 5,
@@ -2515,6 +2623,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   weasel: {
     name: 'Weasel',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0,
     hp: 1,
@@ -2533,6 +2642,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   blood_hawk: {
     name: 'Blood Hawk',
+    size: 'small',
     creatureType: 'beast',
     cr: 0.125,
     hp: 7,
@@ -2555,6 +2665,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   camel: {
     name: 'Camel',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.125,
     hp: 17,
@@ -2574,6 +2685,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   flying_snake: {
     name: 'Flying Snake',
+    size: 'tiny',
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 0.125,
     hp: 5,
@@ -2596,6 +2708,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_weasel: {
     name: 'Giant Weasel',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.125,
     hp: 9,
@@ -2615,6 +2728,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   mastiff: {
     name: 'Mastiff',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.125,
     hp: 5,
@@ -2636,6 +2750,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   mule: {
     name: 'Mule',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.125,
     hp: 11,
@@ -2656,6 +2771,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pony: {
     name: 'Pony',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.125,
     hp: 11,
@@ -2676,6 +2792,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   venomous_snake: {
     name: 'Venomous Snake',
+    size: 'tiny',
     creatureType: 'beast',
     cr: 0.125,
     hp: 5,
@@ -2697,6 +2814,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   boar: {
     name: 'Boar',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 13,
@@ -2720,6 +2838,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   draft_horse: {
     name: 'Draft Horse',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 15,
@@ -2740,6 +2859,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   elk: {
     name: 'Elk',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 11,
@@ -2761,6 +2881,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_badger: {
     name: 'Giant Badger',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 15,
@@ -2780,6 +2901,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_bat: {
     name: 'Giant Bat',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 22,
@@ -2800,6 +2922,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_centipede: {
     name: 'Giant Centipede',
+    size: 'small',
     creatureType: 'beast',
     cr: 0.25,
     hp: 9,
@@ -2823,6 +2946,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_frog: {
     name: 'Giant Frog',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 18,
@@ -2844,6 +2968,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_lizard: {
     name: 'Giant Lizard',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 19,
@@ -2863,6 +2988,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_owl: {
     name: 'Giant Owl',
+    size: 'large',
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 0.25,
     hp: 19,
@@ -2885,6 +3011,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_venomous_snake: {
     name: 'Giant Venomous Snake',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 11,
@@ -2908,6 +3035,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   panther: {
     name: 'Panther',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 13,
@@ -2928,6 +3056,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pteranodon: {
     name: 'Pteranodon',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 13,
@@ -2948,6 +3077,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   riding_horse: {
     name: 'Riding Horse',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 13,
@@ -2968,6 +3098,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_bats: {
     name: 'Swarm of Bats',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 11,
@@ -3001,6 +3132,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_rats: {
     name: 'Swarm of Rats',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 14,
@@ -3033,6 +3165,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_ravens: {
     name: 'Swarm of Ravens',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.25,
     hp: 11,
@@ -3066,6 +3199,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_goat: {
     name: 'Giant Goat',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.5,
     hp: 19,
@@ -3087,6 +3221,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_seahorse: {
     name: 'Giant Seahorse',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.5,
     hp: 16,
@@ -3108,6 +3243,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_wasp: {
     name: 'Giant Wasp',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.5,
     hp: 22,
@@ -3130,6 +3266,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   reef_shark: {
     name: 'Reef Shark',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.5,
     hp: 22,
@@ -3151,6 +3288,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_insects: {
     name: 'Swarm of Insects',
+    size: 'medium',
     creatureType: 'beast',
     cr: 0.5,
     hp: 19,
@@ -3184,6 +3322,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   warhorse: {
     name: 'Warhorse',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.5,
     hp: 19,
@@ -3206,6 +3345,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_octopus: {
     name: 'Giant Octopus',
+    size: 'large',
     creatureType: 'beast',
     cr: 1,
     hp: 45,
@@ -3227,6 +3367,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_toad: {
     name: 'Giant Toad',
+    size: 'large',
     creatureType: 'beast',
     cr: 1,
     hp: 39,
@@ -3249,6 +3390,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_vulture: {
     name: 'Giant Vulture',
+    size: 'large',
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 1,
     hp: 25,
@@ -3272,6 +3414,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_piranhas: {
     name: 'Swarm of Piranhas',
+    size: 'medium',
     creatureType: 'beast',
     cr: 1,
     hp: 28,
@@ -3304,6 +3447,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   allosaurus: {
     name: 'Allosaurus',
+    size: 'large',
     creatureType: 'beast',
     cr: 2,
     hp: 51,
@@ -3326,6 +3470,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_elk: {
     name: 'Giant Elk',
+    size: 'huge',
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 2,
     hp: 42,
@@ -3352,6 +3497,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hunter_shark: {
     name: 'Hunter Shark',
+    size: 'large',
     creatureType: 'beast',
     cr: 2,
     hp: 45,
@@ -3372,6 +3518,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   plesiosaurus: {
     name: 'Plesiosaurus',
+    size: 'large',
     creatureType: 'beast',
     cr: 2,
     hp: 68,
@@ -3393,6 +3540,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   rhinoceros: {
     name: 'Rhinoceros',
+    size: 'large',
     creatureType: 'beast',
     cr: 2,
     hp: 45,
@@ -3415,6 +3563,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_venomous_snakes: {
     name: 'Swarm of Venomous Snakes',
+    size: 'medium',
     creatureType: 'beast',
     cr: 2,
     hp: 36,
@@ -3449,6 +3598,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ankylosaurus: {
     name: 'Ankylosaurus',
+    size: 'huge',
     creatureType: 'beast',
     cr: 3,
     hp: 68,
@@ -3472,6 +3622,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   killer_whale: {
     name: 'Killer Whale',
+    size: 'huge',
     creatureType: 'beast',
     cr: 3,
     hp: 90,
@@ -3492,6 +3643,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   archelon: {
     name: 'Archelon',
+    size: 'huge',
     creatureType: 'beast',
     cr: 4,
     hp: 90,
@@ -3513,6 +3665,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   elephant: {
     name: 'Elephant',
+    size: 'huge',
     creatureType: 'beast',
     cr: 4,
     hp: 76,
@@ -3536,6 +3689,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hippopotamus: {
     name: 'Hippopotamus',
+    size: 'large',
     creatureType: 'beast',
     cr: 4,
     hp: 82,
@@ -3556,6 +3710,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_crocodile: {
     name: 'Giant Crocodile',
+    size: 'huge',
     creatureType: 'beast',
     cr: 5,
     hp: 85,
@@ -3579,6 +3734,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   giant_shark: {
     name: 'Giant Shark',
+    size: 'huge',
     creatureType: 'beast',
     cr: 5,
     hp: 92,
@@ -3600,6 +3756,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   triceratops: {
     name: 'Triceratops',
+    size: 'huge',
     creatureType: 'beast',
     cr: 5,
     hp: 114,
@@ -3623,6 +3780,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   tyrannosaurus_rex: {
     name: 'Tyrannosaurus Rex',
+    size: 'huge',
     creatureType: 'beast',
     cr: 8,
     hp: 136,
@@ -3655,6 +3813,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   commoner: {
     name: 'Commoner',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 0,
@@ -3674,6 +3833,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   warrior_infantry: {
     name: 'Warrior Infantry',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 0.125,
@@ -3694,6 +3854,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   goblin_minion: {
     name: 'Goblin Minion',
+    size: 'small',
     // SRD 5.2.1 type: Fey (Goblinoid) — not in the creatureType union; left
     // unspecified, matching the shipped Goblin.
     cr: 0.125,
@@ -3714,6 +3875,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   merfolk_skirmisher: {
     name: 'Merfolk Skirmisher',
+    size: 'medium',
     // SRD 5.2.1 type: Elemental — not in the creatureType union.
     darkvision_ft: 0, // no darkvision
     cr: 0.125,
@@ -3737,6 +3899,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   priest_acolyte: {
     name: 'Priest Acolyte',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 0.25,
@@ -3760,6 +3923,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hobgoblin_warrior: {
     name: 'Hobgoblin Warrior',
+    size: 'medium',
     // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified.
     cr: 0.5,
     hp: 11,
@@ -3779,6 +3943,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sahuagin_warrior: {
     name: 'Sahuagin Warrior',
+    size: 'medium',
     creatureType: 'fiend', // 5.2.1 sahuagin are Fiends
     cr: 0.5,
     hp: 22,
@@ -3803,6 +3968,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pirate: {
     name: 'Pirate',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 1,
@@ -3824,6 +3990,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   goblin_boss: {
     name: 'Goblin Boss',
+    size: 'small',
     // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified.
     cr: 1,
     hp: 21,
@@ -3845,6 +4012,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   azer_sentinel: {
     name: 'Azer Sentinel',
+    size: 'medium',
     // SRD 5.2.1 type: Elemental — not in the creatureType union.
     cr: 2,
     hp: 39,
@@ -3871,6 +4039,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   centaur_trooper: {
     name: 'Centaur Trooper',
+    size: 'large',
     // SRD 5.2.1 type: Fey — not in the creatureType union.
     darkvision_ft: 0, // no darkvision
     cr: 2,
@@ -3894,6 +4063,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   druid: {
     name: 'Druid',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 2,
@@ -3918,6 +4088,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bugbear_stalker: {
     name: 'Bugbear Stalker',
+    size: 'medium',
     // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified, matching the
     // shipped Bugbear Warrior.
     cr: 3,
@@ -3941,6 +4112,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hobgoblin_captain: {
     name: 'Hobgoblin Captain',
+    size: 'medium',
     // SRD 5.2.1 type: Fey (Goblinoid) — left unspecified.
     cr: 3,
     hp: 58,
@@ -3964,6 +4136,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   guard_captain: {
     name: 'Guard Captain',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 4,
@@ -3984,6 +4157,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   tough_boss: {
     name: 'Tough Boss',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 4,
@@ -4006,6 +4180,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pirate_captain: {
     name: 'Pirate Captain',
+    size: 'medium',
     creatureType: 'humanoid',
     darkvision_ft: 0, // no darkvision
     cr: 6,
@@ -4037,6 +4212,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   awakened_shrub: {
     name: 'Awakened Shrub',
+    size: 'small',
     // SRD 5.2.1 type: Plant â not in the creatureType union; left unspecified.
     cr: 0,
     hp: 10,
@@ -4057,6 +4233,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   homunculus: {
     name: 'Homunculus',
+    size: 'tiny',
     creatureType: 'construct',
     cr: 0,
     hp: 4,
@@ -4078,6 +4255,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   stirge: {
     name: 'Stirge',
+    size: 'tiny',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 0.125,
     hp: 5,
@@ -4098,6 +4276,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   blink_dog: {
     name: 'Blink Dog',
+    size: 'medium',
     // SRD 5.2.1 type: Fey â not in the creatureType union; left unspecified.
     cr: 0.25,
     hp: 22,
@@ -4118,6 +4297,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   grimlock: {
     name: 'Grimlock',
+    size: 'medium',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 0.25,
     hp: 11,
@@ -4140,6 +4320,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pseudodragon: {
     name: 'Pseudodragon',
+    size: 'tiny',
     magicResistance: true,
     creatureType: 'dragon',
     cr: 0.25,
@@ -4163,6 +4344,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sprite: {
     name: 'Sprite',
+    size: 'tiny',
     // SRD 5.2.1 type: Fey â not in the creatureType union; left unspecified.
     cr: 0.25,
     hp: 10,
@@ -4184,6 +4366,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   steam_mephit: {
     name: 'Steam Mephit',
+    size: 'small',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 0.25,
     hp: 17,
@@ -4223,6 +4406,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   violet_fungus: {
     name: 'Violet Fungus',
+    size: 'medium',
     // SRD 5.2.1 type: Plant â not in the creatureType union; left unspecified.
     cr: 0.25,
     hp: 18,
@@ -4246,6 +4430,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   darkmantle: {
     name: 'Darkmantle',
+    size: 'small',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 22,
@@ -4268,6 +4453,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   dust_mephit: {
     name: 'Dust Mephit',
+    size: 'small',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 17,
@@ -4298,6 +4484,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   gray_ooze: {
     name: 'Gray Ooze',
+    size: 'medium',
     // SRD 5.2.1 type: Ooze â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 22,
@@ -4330,6 +4517,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   magma_mephit: {
     name: 'Magma Mephit',
+    size: 'small',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 18,
@@ -4369,6 +4557,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   magmin: {
     name: 'Magmin',
+    size: 'small',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 13,
@@ -4397,6 +4586,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   rust_monster: {
     name: 'Rust Monster',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 33,
@@ -4417,6 +4607,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   troll_limb: {
     name: 'Troll Limb',
+    size: 'small',
     // SRD 5.2.1 type: Giant â not in the creatureType union; left unspecified.
     cr: 0.5,
     hp: 14,
@@ -4438,6 +4629,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   warhorse_skeleton: {
     name: 'Warhorse Skeleton',
+    size: 'large',
     creatureType: 'undead',
     cr: 0.5,
     hp: 22,
@@ -4460,6 +4652,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   death_dog: {
     name: 'Death Dog',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 1,
     hp: 39,
@@ -4491,6 +4684,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   dryad: {
     name: 'Dryad',
+    size: 'medium',
     magicResistance: true,
     // SRD 5.2.1 type: Fey â not in the creatureType union; left unspecified.
     cr: 1,
@@ -4512,6 +4706,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   harpy: {
     name: 'Harpy',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 1,
     hp: 38,
@@ -4539,6 +4734,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ettercap: {
     name: 'Ettercap',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 44,
@@ -4561,6 +4757,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   gargoyle: {
     name: 'Gargoyle',
+    size: 'medium',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 67,
@@ -4584,6 +4781,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   gelatinous_cube: {
     name: 'Gelatinous Cube',
+    size: 'large',
     // SRD 5.2.1 type: Ooze â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 63,
@@ -4607,6 +4805,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   gibbering_mouther: {
     name: 'Gibbering Mouther',
+    size: 'medium',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 52,
@@ -4628,6 +4827,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   grick: {
     name: 'Grick',
+    size: 'medium',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 54,
@@ -4648,6 +4848,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   minotaur_skeleton: {
     name: 'Minotaur Skeleton',
+    size: 'large',
     creatureType: 'undead',
     cr: 2,
     hp: 45,
@@ -4672,6 +4873,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ochre_jelly: {
     name: 'Ochre Jelly',
+    size: 'large',
     // SRD 5.2.1 type: Ooze â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 52,
@@ -4704,6 +4906,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ogre_zombie: {
     name: 'Ogre Zombie',
+    size: 'large',
     creatureType: 'undead',
     cr: 2,
     hp: 85,
@@ -4725,6 +4928,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sea_hag: {
     name: 'Sea Hag',
+    size: 'medium',
     // SRD 5.2.1 type: Fey â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 52,
@@ -4745,6 +4949,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   wererat: {
     name: 'Wererat',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 2,
     hp: 60,
@@ -4765,6 +4970,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   will_o_wisp: {
     name: 'Will-o’-Wisp',
+    size: 'tiny',
     creatureType: 'undead',
     cr: 2,
     hp: 27,
@@ -4799,6 +5005,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   basilisk: {
     name: 'Basilisk',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 3,
     hp: 52,
@@ -4828,6 +5035,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   green_hag: {
     name: 'Green Hag',
+    size: 'medium',
     // SRD 5.2.1 type: Fey â not in the creatureType union; left unspecified.
     cr: 3,
     hp: 82,
@@ -4848,6 +5056,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   nightmare: {
     name: 'Nightmare',
+    size: 'large',
     creatureType: 'fiend',
     cr: 3,
     hp: 68,
@@ -4872,6 +5081,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   phase_spider: {
     name: 'Phase Spider',
+    size: 'large',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 3,
     hp: 45,
@@ -4894,6 +5104,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   swarm_of_crawling_claws: {
     name: 'Swarm of Crawling Claws',
+    size: 'medium',
     // SRD 5.2.1 type: Swarm â not in the creatureType union; left unspecified.
     cr: 3,
     hp: 49,
@@ -4929,6 +5140,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vampire_familiar: {
     name: 'Vampire Familiar',
+    size: 'medium',
     creatureType: 'humanoid',
     cr: 3,
     hp: 65,
@@ -4953,6 +5165,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   werewolf: {
     name: 'Werewolf',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 3,
     hp: 71,
@@ -4974,6 +5187,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   winter_wolf: {
     name: 'Winter Wolf',
+    size: 'large',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 3,
     hp: 75,
@@ -5005,6 +5219,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   black_pudding: {
     name: 'Black Pudding',
+    size: 'large',
     // SRD 5.2.1 type: Ooze â not in the creatureType union; left unspecified.
     cr: 4,
     hp: 68,
@@ -5037,6 +5252,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ghost: {
     name: 'Ghost',
+    size: 'medium',
     creatureType: 'undead',
     cr: 4,
     hp: 45,
@@ -5072,6 +5288,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   lamia: {
     name: 'Lamia',
+    size: 'large',
     creatureType: 'fiend',
     cr: 4,
     hp: 97,
@@ -5093,6 +5310,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   wereboar: {
     name: 'Wereboar',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 4,
     hp: 97,
@@ -5115,6 +5333,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   weretiger: {
     name: 'Weretiger',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 4,
     hp: 120,
@@ -5136,6 +5355,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   gorgon: {
     name: 'Gorgon',
+    size: 'large',
     creatureType: 'construct',
     cr: 5,
     hp: 114,
@@ -5164,6 +5384,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   half_dragon: {
     name: 'Half-Dragon',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 5,
     hp: 105,
@@ -5197,6 +5418,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   night_hag: {
     name: 'Night Hag',
+    size: 'medium',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 5,
@@ -5221,6 +5443,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   otyugh: {
     name: 'Otyugh',
+    size: 'large',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 104,
@@ -5243,6 +5466,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   roper: {
     name: 'Roper',
+    size: 'large',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 93,
@@ -5265,6 +5489,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   shambling_mound: {
     name: 'Shambling Mound',
+    size: 'large',
     // SRD 5.2.1 type: Plant â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 110,
@@ -5292,6 +5517,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   troll: {
     name: 'Troll',
+    size: 'large',
     // SRD 5.2.1 type: Giant â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 94,
@@ -5314,6 +5540,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vampire_spawn: {
     name: 'Vampire Spawn',
+    size: 'medium',
     creatureType: 'undead',
     cr: 5,
     hp: 90,
@@ -5339,6 +5566,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   werebear: {
     name: 'Werebear',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 135,
@@ -5360,6 +5588,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   xorn: {
     name: 'Xorn',
+    size: 'medium',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 84,
@@ -5383,6 +5612,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   chimera: {
     name: 'Chimera',
+    size: 'large',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 6,
     hp: 114,
@@ -5412,6 +5642,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   invisible_stalker: {
     name: 'Invisible Stalker',
+    size: 'large',
     // SRD 5.2.1 type: Elemental â not in the creatureType union; left unspecified.
     cr: 6,
     hp: 97,
@@ -5445,6 +5676,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   medusa: {
     name: 'Medusa',
+    size: 'medium',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 6,
     hp: 127,
@@ -5476,6 +5708,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   cloaker: {
     name: 'Cloaker',
+    size: 'large',
     // SRD 5.2.1 type: Aberration â not in the creatureType union; left unspecified.
     cr: 8,
     hp: 91,
@@ -5499,6 +5732,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hydra: {
     name: 'Hydra',
+    size: 'huge',
     // SRD 5.2.1 type: Monstrosity â not in the creatureType union; left unspecified.
     cr: 8,
     hp: 184,
@@ -5531,6 +5765,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   spirit_naga: {
     name: 'Spirit Naga',
+    size: 'large',
     creatureType: 'fiend',
     cr: 8,
     hp: 135,
@@ -5557,6 +5792,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   treant: {
     name: 'Treant',
+    size: 'huge',
     // SRD 5.2.1 type: Plant â not in the creatureType union; left unspecified.
     cr: 9,
     hp: 138,
@@ -5580,6 +5816,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   guardian_naga: {
     name: 'Guardian Naga',
+    size: 'large',
     // SRD 5.2.1 type: Celestial â not in the creatureType union; left unspecified.
     cr: 10,
     hp: 136,
@@ -5614,6 +5851,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   brass_dragon_wyrmling: {
     name: 'Brass Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 1,
     hp: 22,
@@ -5644,6 +5882,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   copper_dragon_wyrmling: {
     name: 'Copper Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 1,
     hp: 22,
@@ -5674,6 +5913,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bronze_dragon_wyrmling: {
     name: 'Bronze Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 2,
     hp: 39,
@@ -5704,6 +5944,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   green_dragon_wyrmling: {
     name: 'Green Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 2,
     hp: 38,
@@ -5736,6 +5977,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   blue_dragon_wyrmling: {
     name: 'Blue Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 3,
     hp: 65,
@@ -5767,6 +6009,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   red_dragon_wyrmling: {
     name: 'Red Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 4,
     hp: 75,
@@ -5798,6 +6041,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_brass_dragon: {
     name: 'Young Brass Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 6,
     hp: 110,
@@ -5832,6 +6076,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_black_dragon: {
     name: 'Young Black Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 7,
     hp: 127,
@@ -5865,6 +6110,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_copper_dragon: {
     name: 'Young Copper Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 7,
     hp: 119,
@@ -5899,6 +6145,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_bronze_dragon: {
     name: 'Young Bronze Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 8,
     hp: 142,
@@ -5933,6 +6180,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_green_dragon: {
     name: 'Young Green Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 8,
     hp: 136,
@@ -5967,6 +6215,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   silver_dragon_wyrmling: {
     name: 'Silver Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 2,
     hp: 45,
@@ -5997,6 +6246,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_blue_dragon: {
     name: 'Young Blue Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 9,
     hp: 152,
@@ -6030,6 +6280,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_silver_dragon: {
     name: 'Young Silver Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 9,
     hp: 168,
@@ -6064,6 +6315,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   gold_dragon_wyrmling: {
     name: 'Gold Dragon Wyrmling',
+    size: 'medium',
     creatureType: 'dragon',
     cr: 3,
     hp: 60,
@@ -6094,6 +6346,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_gold_dragon: {
     name: 'Young Gold Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 10,
     hp: 178,
@@ -6128,6 +6381,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_brass_dragon: {
     name: 'Adult Brass Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 13,
@@ -6167,6 +6421,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_white_dragon: {
     name: 'Adult White Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 13,
@@ -6206,6 +6461,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   young_white_dragon: {
     name: 'Young White Dragon',
+    size: 'large',
     creatureType: 'dragon',
     cr: 6,
     hp: 123,
@@ -6239,6 +6495,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_black_dragon: {
     name: 'Adult Black Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 14,
@@ -6278,6 +6535,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_copper_dragon: {
     name: 'Adult Copper Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 14,
@@ -6317,6 +6575,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_bronze_dragon: {
     name: 'Adult Bronze Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 15,
@@ -6356,6 +6615,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_green_dragon: {
     name: 'Adult Green Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 15,
@@ -6396,6 +6656,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_blue_dragon: {
     name: 'Adult Blue Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 16,
@@ -6435,6 +6696,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_silver_dragon: {
     name: 'Adult Silver Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 16,
@@ -6474,6 +6736,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_gold_dragon: {
     name: 'Adult Gold Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 17,
@@ -6513,6 +6776,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   adult_red_dragon: {
     name: 'Adult Red Dragon',
+    size: 'huge',
     legendaryResistance: 3,
     creatureType: 'dragon',
     cr: 17,
@@ -6552,6 +6816,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_brass_dragon: {
     name: 'Ancient Brass Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 20,
@@ -6591,6 +6856,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_white_dragon: {
     name: 'Ancient White Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 20,
@@ -6630,6 +6896,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_black_dragon: {
     name: 'Ancient Black Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 21,
@@ -6669,6 +6936,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_copper_dragon: {
     name: 'Ancient Copper Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 21,
@@ -6708,6 +6976,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_bronze_dragon: {
     name: 'Ancient Bronze Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 22,
@@ -6747,6 +7016,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_green_dragon: {
     name: 'Ancient Green Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 22,
@@ -6787,6 +7057,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_blue_dragon: {
     name: 'Ancient Blue Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 23,
@@ -6826,6 +7097,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_silver_dragon: {
     name: 'Ancient Silver Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 23,
@@ -6865,6 +7137,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_gold_dragon: {
     name: 'Ancient Gold Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 24,
@@ -6904,6 +7177,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ancient_red_dragon: {
     name: 'Ancient Red Dragon',
+    size: 'gargantuan',
     legendaryResistance: 4,
     creatureType: 'dragon',
     cr: 24,
@@ -6953,6 +7227,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   lemure: {
     name: 'Lemure',
+    size: 'medium',
     creatureType: 'fiend',
     cr: 0,
     hp: 9,
@@ -6977,6 +7252,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   animated_flying_sword: {
     name: 'Animated Flying Sword',
+    size: 'small',
     creatureType: 'construct',
     cr: 0.25,
     hp: 14,
@@ -7007,6 +7283,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   axe_beak: {
     name: 'Axe Beak',
+    size: 'large',
     creatureType: 'beast',
     cr: 0.25,
     hp: 19,
@@ -7026,6 +7303,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   dretch: {
     name: 'Dretch',
+    size: 'small',
     creatureType: 'fiend',
     cr: 0.25,
     hp: 18,
@@ -7049,6 +7327,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   imp: {
     name: 'Imp',
+    size: 'tiny',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 1,
@@ -7076,6 +7355,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   quasit: {
     name: 'Quasit',
+    size: 'tiny',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 1,
@@ -7102,6 +7382,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sphinx_of_wonder: {
     name: 'Sphinx of Wonder',
+    size: 'tiny',
     magicResistance: true,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 1,
@@ -7126,6 +7407,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   animated_rug_of_smothering: {
     name: 'Animated Rug of Smothering',
+    size: 'large',
     creatureType: 'construct',
     cr: 2,
     hp: 27,
@@ -7156,6 +7438,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bearded_devil: {
     name: 'Bearded Devil',
+    size: 'medium',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 3,
@@ -7182,6 +7465,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   chuul: {
     name: 'Chuul',
+    size: 'large',
     // SRD 5.2.1 type: Aberration — not in the creatureType union; left unspecified.
     cr: 4,
     hp: 76,
@@ -7206,6 +7490,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   couatl: {
     name: 'Couatl',
+    size: 'medium',
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 4,
     hp: 60,
@@ -7230,6 +7515,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   incubus: {
     name: 'Incubus',
+    size: 'medium',
     creatureType: 'fiend',
     cr: 4,
     hp: 66,
@@ -7252,6 +7538,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   succubus: {
     name: 'Succubus',
+    size: 'medium',
     creatureType: 'fiend',
     cr: 4,
     hp: 71,
@@ -7273,6 +7560,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   barbed_devil: {
     name: 'Barbed Devil',
+    size: 'medium',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 5,
@@ -7299,6 +7587,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   flesh_golem: {
     name: 'Flesh Golem',
+    size: 'medium',
     magicResistance: true,
     creatureType: 'construct',
     cr: 5,
@@ -7331,6 +7620,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   unicorn: {
     name: 'Unicorn',
+    size: 'large',
     magicResistance: true,
     legendaryResistance: 3,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
@@ -7362,6 +7652,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   drider: {
     name: 'Drider',
+    size: 'large',
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 6,
     hp: 123,
@@ -7385,6 +7676,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vrock: {
     name: 'Vrock',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 6,
@@ -7413,6 +7705,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   oni: {
     name: 'Oni',
+    size: 'large',
     creatureType: 'fiend',
     cr: 7,
     hp: 119,
@@ -7440,6 +7733,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   shield_guardian: {
     name: 'Shield Guardian',
+    size: 'large',
     creatureType: 'construct',
     cr: 7,
     hp: 142,
@@ -7472,6 +7766,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   chain_devil: {
     name: 'Chain Devil',
+    size: 'medium',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 8,
@@ -7500,6 +7795,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   hezrou: {
     name: 'Hezrou',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 8,
@@ -7528,6 +7824,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   bone_devil: {
     name: 'Bone Devil',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 9,
@@ -7557,6 +7854,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   clay_golem: {
     name: 'Clay Golem',
+    size: 'large',
     magicResistance: true,
     creatureType: 'construct',
     cr: 9,
@@ -7591,6 +7889,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   glabrezu: {
     name: 'Glabrezu',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 9,
@@ -7618,6 +7917,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   aboleth: {
     name: 'Aboleth',
+    size: 'large',
     legendaryResistance: 3,
     // SRD 5.2.1 type: Aberration — not in the creatureType union; left unspecified.
     cr: 10,
@@ -7645,6 +7945,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   deva: {
     name: 'Deva',
+    size: 'medium',
     magicResistance: true,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 10,
@@ -7672,6 +7973,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   stone_golem: {
     name: 'Stone Golem',
+    size: 'large',
     magicResistance: true,
     creatureType: 'construct',
     cr: 10,
@@ -7705,6 +8007,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   behir: {
     name: 'Behir',
+    size: 'huge',
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 11,
     hp: 168,
@@ -7730,6 +8033,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   djinni: {
     name: 'Djinni',
+    size: 'large',
     magicResistance: true,
     // SRD 5.2.1 type: Elemental — not in the creatureType union; left unspecified.
     cr: 11,
@@ -7756,6 +8060,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   efreeti: {
     name: 'Efreeti',
+    size: 'large',
     magicResistance: true,
     // SRD 5.2.1 type: Elemental — not in the creatureType union; left unspecified.
     cr: 11,
@@ -7782,6 +8087,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   horned_devil: {
     name: 'Horned Devil',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 11,
@@ -7809,6 +8115,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   remorhaz: {
     name: 'Remorhaz',
+    size: 'huge',
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 11,
     hp: 195,
@@ -7835,6 +8142,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   roc: {
     name: 'Roc',
+    size: 'gargantuan',
     creatureType: 'beast',
     cr: 11,
     hp: 248,
@@ -7858,6 +8166,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sphinx_of_lore: {
     name: 'Sphinx of Lore',
+    size: 'large',
     legendaryResistance: 3,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 11,
@@ -7897,6 +8206,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   erinyes: {
     name: 'Erinyes',
+    size: 'medium',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 12,
@@ -7925,6 +8235,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   nalfeshnee: {
     name: 'Nalfeshnee',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 13,
@@ -7954,6 +8265,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   rakshasa: {
     name: 'Rakshasa',
+    size: 'medium',
     creatureType: 'fiend',
     cr: 13,
     hp: 221,
@@ -7978,6 +8290,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   storm_giant: {
     name: 'Storm Giant',
+    size: 'huge',
     // SRD 5.2.1 type: Giant — not in the creatureType union; left unspecified.
     cr: 13,
     hp: 230,
@@ -8005,6 +8318,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   vampire: {
     name: 'Vampire',
+    size: 'medium',
     legendaryResistance: 3,
     creatureType: 'undead',
     cr: 13,
@@ -8035,6 +8349,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   ice_devil: {
     name: 'Ice Devil',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 14,
@@ -8063,6 +8378,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   mummy_lord: {
     name: 'Mummy Lord',
+    size: 'medium',
     magicResistance: true,
     legendaryResistance: 3,
     creatureType: 'undead',
@@ -8090,6 +8406,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   purple_worm: {
     name: 'Purple Worm',
+    size: 'gargantuan',
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 15,
     hp: 247,
@@ -8115,6 +8432,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   iron_golem: {
     name: 'Iron Golem',
+    size: 'large',
     magicResistance: true,
     creatureType: 'construct',
     cr: 16,
@@ -8157,6 +8475,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   marilith: {
     name: 'Marilith',
+    size: 'large',
     magicResistance: true,
     creatureType: 'fiend',
     cr: 16,
@@ -8185,6 +8504,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   planetar: {
     name: 'Planetar',
+    size: 'large',
     magicResistance: true,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 16,
@@ -8213,6 +8533,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   dragon_turtle: {
     name: 'Dragon Turtle',
+    size: 'gargantuan',
     creatureType: 'dragon',
     cr: 17,
     hp: 356,
@@ -8247,6 +8568,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   sphinx_of_valor: {
     name: 'Sphinx of Valor',
+    size: 'large',
     legendaryResistance: 3,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
     cr: 17,
@@ -8278,6 +8600,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   balor: {
     name: 'Balor',
+    size: 'huge',
     magicResistance: true,
     legendaryResistance: 3,
     creatureType: 'fiend',
@@ -8307,6 +8630,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   pit_fiend: {
     name: 'Pit Fiend',
+    size: 'large',
     magicResistance: true,
     legendaryResistance: 4,
     creatureType: 'fiend',
@@ -8336,6 +8660,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   lich: {
     name: 'Lich',
+    size: 'medium',
     legendaryResistance: 4,
     creatureType: 'undead',
     cr: 21,
@@ -8362,6 +8687,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   solar: {
     name: 'Solar',
+    size: 'large',
     magicResistance: true,
     legendaryResistance: 4,
     // SRD 5.2.1 type: Celestial — not in the creatureType union; left unspecified.
@@ -8391,6 +8717,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   kraken: {
     name: 'Kraken',
+    size: 'gargantuan',
     legendaryResistance: 4,
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.
     cr: 23,
@@ -8421,6 +8748,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   tarrasque: {
     name: 'Tarrasque',
+    size: 'gargantuan',
     magicResistance: true,
     legendaryResistance: 6,
     // SRD 5.2.1 type: Monstrosity — not in the creatureType union; left unspecified.

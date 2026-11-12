@@ -156,6 +156,11 @@ import {
 } from './equipment.js';
 import { evalCondition, visibleResponses } from './dialogueGating.js';
 import { fmt, pronounsForGender, stripForLlm } from './narrativeFmt.js';
+import {
+  grappledAttackDisadvantage,
+  unarmedStrikeDc,
+  withinUnarmedSizeLimit,
+} from './unarmedStrike.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
@@ -1783,9 +1788,16 @@ function computeEnemyAttack(
   // Daylight emanation's bright radius). The Daylight counterplay made live.
   const sunlightSensitivityDisadv =
     !!enemy.sunlightSensitivity && !!enemyPos && isInSunlight(enemyPos, roomLighting, lightEnts);
+  // SRD Grappled — Disadvantage on attacks against anyone but the grappler.
+  const grappledDisadv = grappledAttackDisadvantage(
+    attackerEnt?.conditions,
+    attackerEnt?.grappled_by,
+    char.id
+  );
   const hasDisadvantage =
     baseDisadvantage ||
     forceDisadvantage ||
+    grappledDisadv ||
     multiattackDefenseDisadv ||
     attackerSelfDisadv ||
     darknessDisadv ||
@@ -7179,7 +7191,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // Try to escape grapple — SRD 5.2.1, contested Athletics or Acrobatics
+  // Try to escape grapple — SRD 5.2.1: Athletics or Acrobatics vs the escape DC
   if (
     state.combat_active &&
     !char.turn_actions.action_used &&
@@ -7256,15 +7268,23 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const suffix =
         nameCounts[en.name] > 1 ? ` #${(seen[en.name] = (seen[en.name] ?? 0) + 1)}` : '';
+      // SRD Unarmed Strike: only a target at most one size larger.
+      if (!withinUnarmedSizeLimit(char, en)) continue;
+      const usDc = unarmedStrikeDc(char);
       choices.push({
-        label: `Grapple the ${en.name}${suffix} — STR vs STR/DEX contest`,
+        label: `Grapple the ${en.name}${suffix} — STR/DEX save vs DC ${usDc}`,
         action: { type: 'grapple', targetEnemyId: en.id },
         kind: 'grapple',
       });
       choices.push({
-        label: `Shove the ${en.name}${suffix} — STR vs STR/DEX contest (knocks prone)`,
+        label: `Shove the ${en.name}${suffix} prone — STR/DEX save vs DC ${usDc}`,
         action: { type: 'shove', targetEnemyId: en.id },
         kind: 'shove',
+      });
+      choices.push({
+        label: `Shove the ${en.name}${suffix} 5 ft away — STR/DEX save vs DC ${usDc}`,
+        action: { type: 'shove', targetEnemyId: en.id, mode: 'push' },
+        kind: 'shove_push',
       });
     }
   }
@@ -11805,14 +11825,26 @@ export async function takeAction({
       }
       return false;
     };
+    // SRD Grappling — the grapple also ends when the distance between the
+    // grappled creature and its grappler exceeds the grapple's range (5 ft
+    // for an Unarmed Strike; a monster's attack reach for its own grapples).
+    // Simplification: a grappler can't drag the target, so moving away
+    // releases it.
+    const outOfRange = (e: NonNullable<GameState['entities']>[number]): boolean => {
+      const grappler = st.entities!.find((x) => x.id === e.grappled_by);
+      if (!grappler) return false;
+      const rangeFt = grappler.isEnemy ? (getEnemyById(seed, grappler.id)?.attackReachFt ?? 5) : 5;
+      return distanceFeet(e.pos, grappler.pos) > rangeFt;
+    };
     let touched = false;
     const sweptEntities = st.entities.map((e) => {
-      if (e.grappled_by && incapacitated(e.grappled_by)) {
+      if (e.grappled_by && (incapacitated(e.grappled_by) || outOfRange(e))) {
         touched = true;
         return {
           ...e,
           conditions: e.conditions.filter((c) => c !== 'grappled'),
           grappled_by: undefined,
+          grapple_escape_dc: undefined,
         };
       }
       return e;

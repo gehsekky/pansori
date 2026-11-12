@@ -129,6 +129,7 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     petrifyingGaze: template.petrifyingGaze,
     magicResistance: template.magicResistance,
     legendaryResistance: template.legendaryResistance,
+    size: template.size,
     legendary_actions: template.legendary_actions,
     legendary_pool: template.legendary_pool,
     legendary_action_points: template.legendary_actions

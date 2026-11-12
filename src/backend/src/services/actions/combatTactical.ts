@@ -1,3 +1,4 @@
+import type { ActionContext, ActionHandler } from './types.js';
 import { abilityMod, d, d20TestPenalty, profBonus, skillCheck } from '../rulesEngine.js';
 import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
@@ -6,100 +7,174 @@ import {
   hasJackOfAllTrades,
   hasReliableTalent,
 } from '../multiclass.js';
-import type { ActionHandler } from './types.js';
+import { getEnemyById, pushEntityAway } from '../gameEngine.js';
+import { unarmedStrikeDc, unarmedStrikeSave, withinUnarmedSizeLimit } from '../unarmedStrike.js';
 import { checkMountFallOff } from './mount.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
-import { getEnemyById } from '../gameEngine.js';
+import { extraAttackCountForChar } from './attack/resolveOneAttack.js';
+import { handleAttack } from './attack/index.js';
 
 /**
- * `grapple`: SRD Unarmed Strike: Grapple. Contested STR
- * (Athletics) vs target's better-of-STR-or-DEX. 5 ft reach
- * prerequisite is checked before the action is spent — out-of-reach
- * attempts surface as a free notice. Sets `grappled` condition on
- * the entity and tracks the grappler id (so opportunity-attack
- * sweeps know to drop the grapple when the grappler is incapped).
+ * SRD Unarmed Strike — Grapple / Shove. Shared resolution:
+ *  - the target must be within 5 ft and no more than one size larger;
+ *  - it makes a STR or DEX save (its choice) against 8 + STR mod (a Monk may
+ *    use DEX) + Proficiency Bonus; Legendary Resistance applies;
+ *  - a failed save grapples it (escape DC = the same DC), knocks it Prone, or
+ *    pushes it 5 ft away.
+ * An Unarmed Strike is one attack of the Attack action, so with Extra Attack
+ * the remaining attacks follow against the same target (`handleAttack` with
+ * `attackActionAttacksSpent`). Simplification: the follow-up attacks can't be
+ * aimed at a different creature.
  */
-export const handleGrapple: ActionHandler<{
-  type: 'grapple';
-  targetEnemyId?: string;
-}> = (ctx, action) => {
-  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can grapple.' };
+type UnarmedOption = 'grapple' | 'prone' | 'push';
+
+function resolveUnarmedOption(
+  ctx: ActionContext,
+  targetEnemyId: string | undefined,
+  option: UnarmedOption
+): { rejected: string } | undefined {
+  if (ctx.actor.kind !== 'pc') {
+    return { rejected: option === 'grapple' ? 'Only PCs can grapple.' : 'Only PCs can shove.' };
+  }
   const { char } = ctx.actor;
+  const verb = option === 'grapple' ? 'Grapple' : 'Shove';
   if (!ctx.enemyAlive || !ctx.enemy) {
-    return { rejected: 'No enemy to grapple.' };
+    return { rejected: option === 'grapple' ? 'No enemy to grapple.' : 'No enemy to shove.' };
   }
-  const targetId = action.targetEnemyId ?? ctx.enemy.id;
+  const targetId = targetEnemyId ?? ctx.enemy.id;
   const target = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;
-  if (ctx.st.entities) {
-    const myEnt = ctx.st.entities.find((e) => e.id === char.id);
-    const tgtEnt = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy);
-    if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-      return {
-        rejected: `Out of reach — Grapple needs the target within 5 ft. Move closer first.`,
-      };
-    }
+  const myEnt = ctx.st.entities?.find((e) => e.id === char.id);
+  const tgtEnt = ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy);
+  if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
+    return { rejected: `Out of reach — ${verb} needs the target within 5 ft. Move closer first.` };
   }
-  if (target.condition_immunities?.includes('grappled')) {
-    // RAW: the action was committed (unarmed strike attempt); target's
-    // immunity merely negates the grapple effect. Dispatcher deducts.
-    ctx.narrative = `The ${target.name} cannot be grappled (condition immunity).`;
+  if (!withinUnarmedSizeLimit(char, target)) {
+    return {
+      rejected: `The ${target.name} is too big to ${verb.toLowerCase()} — it can be at most one size larger than you.`,
+    };
+  }
+
+  const dc = unarmedStrikeDc(char);
+  const immuneTo = option === 'grapple' ? 'grappled' : option === 'prone' ? 'prone' : null;
+  if (immuneTo && target.condition_immunities?.includes(immuneTo)) {
+    // RAW: the attack is spent; the immunity just negates the effect.
+    ctx.narrative = `The ${target.name} cannot be ${immuneTo === 'prone' ? 'knocked prone' : 'grappled'} (condition immunity).`;
+  } else {
+    const save = unarmedStrikeSave(ctx.st, target, tgtEnt?.conditions ?? [], dc);
+    const saveText = `${save.ability.toUpperCase()} save vs DC ${dc}`;
+    if (!save.failed) {
+      ctx.narrative =
+        option === 'grapple'
+          ? `The ${target.name} slips your grapple. (${saveText}: success)${save.note}`
+          : `The ${target.name} holds its ground against your shove. (${saveText}: success)${save.note}`;
+    } else if (option === 'grapple') {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === target.id && e.isEnemy
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
+                grappled_by: char.id,
+                grapple_escape_dc: dc,
+              }
+            : e
+        ),
+      };
+      composeNow(ctx, {
+        kind: 'condition_applied',
+        targetId: target.id,
+        targetName: target.name,
+        condition: 'grappled',
+        source: 'Grapple',
+        prose: `You grapple the ${target.name}! (${saveText}: failed) It is GRAPPLED — Speed 0, and Disadvantage on attacks against anyone but you (escape DC ${dc}).`,
+      });
+    } else if (option === 'prone') {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === target.id && e.isEnemy
+            ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
+            : e
+        ),
+      };
+      composeNow(ctx, {
+        kind: 'condition_applied',
+        targetId: target.id,
+        targetName: target.name,
+        condition: 'prone',
+        source: 'Shove',
+        prose: `You shove the ${target.name} to the ground! (${saveText}: failed) It is PRONE — melee attacks against it have Advantage, ranged attacks Disadvantage.`,
+      });
+      // SRD Mounted Combat — a shoved mount's rider makes a DC 10 DEX save or
+      // falls off (no-op for an unmounted target).
+      const fallOff = checkMountFallOff(ctx.st, target.id);
+      ctx.st = fallOff.st;
+      if (fallOff.narrative) ctx.narrative = (ctx.narrative ?? '') + fallOff.narrative;
+    } else {
+      const pushed =
+        myEnt && tgtEnt
+          ? pushEntityAway(
+              ctx.st,
+              target.id,
+              myEnt.pos,
+              5,
+              ctx.context,
+              ctx.seed,
+              ctx.st.current_room,
+              ctx.roomObstacleCells
+            )
+          : { st: ctx.st, pushedFt: 0 };
+      ctx.st = pushed.st;
+      ctx.narrative =
+        pushed.pushedFt > 0
+          ? `You shove the ${target.name} 5 feet back! (${saveText}: failed)`
+          : `You shove the ${target.name}, but there's no room to push it back. (${saveText}: failed)`;
+    }
+    if (save.failed && save.note) ctx.narrative += save.note;
+  }
+
+  spendUnarmedStrikeAttack(ctx, target.id);
+  return undefined;
+}
+
+/**
+ * The Grapple / Shove was one attack. Outside combat it simply uses the
+ * action; in combat with Extra Attack the remaining attacks follow.
+ */
+function spendUnarmedStrikeAttack(ctx: ActionContext, targetId: string): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  if (!ctx.st.combat_active) {
     ctx.usedInitiative = true;
     return;
   }
-  const enemyStr = abilityMod(target.toHit);
-  const enemyDex = abilityMod(target.dex ?? 10);
-  const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
-  // STR (Athletics) check routed through skillCheck so it picks up Expertise /
-  // Jack of All Trades / Reliable Talent / Halfling Lucky + the exhaustion
-  // penalty; Indomitable Might (Barbarian L18) floors the total at STR after.
-  const athProf = (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === 'athletics');
-  const gDie = consumeGuidanceDie(ctx);
-  const grappleCheck = applyGuidanceDie(
-    skillCheck(
-      char.str,
-      enemyRoll + 1,
-      athProf,
-      char.level,
-      false,
-      hasExpertise(char, 'athletics'),
-      hasJackOfAllTrades(char),
-      false,
-      char.species === 'halfling',
-      hasReliableTalent(char),
-      false,
-      d20TestPenalty(char)
-    ),
-    gDie,
-    enemyRoll + 1
-  );
-  const playerRoll = applyIndomitableMight(char, grappleCheck.total);
-  ctx.usedInitiative = true;
-  if (playerRoll > enemyRoll) {
-    ctx.st = {
-      ...ctx.st,
-      entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === target.id && e.isEnemy
-          ? {
-              ...e,
-              conditions: [...e.conditions.filter((c) => c !== 'grappled'), 'grappled'],
-              grappled_by: char.id,
-            }
-          : e
-      ),
-    };
-    composeNow(ctx, {
-      kind: 'condition_applied',
-      targetId: target.id,
-      targetName: target.name,
-      condition: 'grappled',
-      source: 'Grapple',
-      prose: `You grapple the ${target.name}! (${playerRoll} vs ${enemyRoll}) They are GRAPPLED — speed 0, your attacks have advantage.`,
-    });
-  } else {
-    ctx.narrative = `The ${target.name} breaks free of your grapple attempt. (${playerRoll} vs ${enemyRoll})`;
+  const remaining = char.turn_actions.haste_extra_action_used ? 0 : extraAttackCountForChar(char);
+  const targetAlive = (ctx.st.entities?.find((e) => e.id === targetId)?.hp ?? 0) > 0;
+  if (remaining > 0 && targetAlive) {
+    const before = ctx.narrative;
+    ctx.narrative = '';
+    ctx.attackActionAttacksSpent = 1;
+    handleAttack(ctx, { type: 'attack', targetEnemyId: targetId });
+    ctx.attackActionAttacksSpent = undefined;
+    const pc = ctx.actor.kind === 'pc' ? ctx.actor.char : char;
+    if (pc.turn_actions.action_used || ctx.st.pending_reaction) {
+      ctx.narrative = `${before}\n\n${ctx.narrative}`;
+      return;
+    }
+    // The follow-up never happened (e.g. a pushed target is now out of reach).
+    ctx.narrative = `${before} (Your remaining attacks have no target in reach.)`;
   }
-};
+  const latest = ctx.actor.kind === 'pc' ? ctx.actor.char : char;
+  updatePcActor(ctx, { turn_actions: { ...latest.turn_actions, action_used: true } });
+}
+
+/** `grapple`: SRD Unarmed Strike — Grapple. See `resolveUnarmedOption`. */
+export const handleGrapple: ActionHandler<{
+  type: 'grapple';
+  targetEnemyId?: string;
+}> = (ctx, action) => resolveUnarmedOption(ctx, action.targetEnemyId, 'grapple');
 
 /**
  * `try_escape_grapple`: SRD 5.2.1 — grappled creature spends its
@@ -196,88 +271,10 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   }
 };
 
-/**
- * `shove`: SRD Unarmed Strike: Shove. Contested STR (Athletics)
- * vs target's better-of-STR-or-DEX. 5 ft reach prerequisite enforced
- * up front. On success: knocks the target prone (SRD prone
- * condition — melee attackers gain advantage, ranged attackers get
- * disadvantage).
- */
+/** `shove`: SRD Unarmed Strike — Shove (Prone by default, or push 5 ft). */
 export const handleShove: ActionHandler<{
   type: 'shove';
   targetEnemyId?: string;
-}> = (ctx, action) => {
-  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can shove.' };
-  const { char } = ctx.actor;
-  if (!ctx.enemyAlive || !ctx.enemy) {
-    return { rejected: 'No enemy to shove.' };
-  }
-  const targetId = action.targetEnemyId ?? ctx.enemy.id;
-  const target = ctx.livingEnemiesInRoom.find((e) => e.id === targetId) ?? ctx.enemy;
-  if (ctx.st.entities) {
-    const myEnt = ctx.st.entities.find((e) => e.id === char.id);
-    const tgtEnt = ctx.st.entities.find((e) => e.id === target.id && e.isEnemy);
-    if (myEnt && tgtEnt && distanceFeet(myEnt.pos, tgtEnt.pos) > 5) {
-      return { rejected: `Out of reach — Shove needs the target within 5 ft. Move closer first.` };
-    }
-  }
-  if (target.condition_immunities?.includes('prone')) {
-    // RAW: the action was committed; target's prone-immunity negates effect.
-    ctx.narrative = `The ${target.name} cannot be knocked prone (condition immunity).`;
-    ctx.usedInitiative = true;
-    return;
-  }
-  const enemyStr = abilityMod(target.toHit);
-  const enemyDex = abilityMod(target.dex ?? 10);
-  const enemyRoll = d(20) + Math.max(enemyStr, enemyDex);
-  // STR (Athletics) check routed through skillCheck so it picks up Expertise /
-  // Jack of All Trades / Reliable Talent / Halfling Lucky + the exhaustion
-  // penalty; Indomitable Might (Barbarian L18) floors the total at STR after.
-  const athProf = (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === 'athletics');
-  const gDie = consumeGuidanceDie(ctx);
-  const grappleCheck = applyGuidanceDie(
-    skillCheck(
-      char.str,
-      enemyRoll + 1,
-      athProf,
-      char.level,
-      false,
-      hasExpertise(char, 'athletics'),
-      hasJackOfAllTrades(char),
-      false,
-      char.species === 'halfling',
-      hasReliableTalent(char),
-      false,
-      d20TestPenalty(char)
-    ),
-    gDie,
-    enemyRoll + 1
-  );
-  const playerRoll = applyIndomitableMight(char, grappleCheck.total);
-  ctx.usedInitiative = true;
-  if (playerRoll > enemyRoll) {
-    ctx.st = {
-      ...ctx.st,
-      entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === target.id && e.isEnemy
-          ? { ...e, conditions: [...e.conditions.filter((c) => c !== 'prone'), 'prone'] }
-          : e
-      ),
-    };
-    composeNow(ctx, {
-      kind: 'condition_applied',
-      targetId: target.id,
-      targetName: target.name,
-      condition: 'prone',
-      source: 'Shove',
-      prose: `You shove the ${target.name} to the ground! (${playerRoll} vs ${enemyRoll}) They are PRONE — melee attacks against them have advantage, ranged attacks have disadvantage.`,
-    });
-    // SRD Mounted Combat — if the shoved creature was a mount, its rider must
-    // make a DC 10 DEX save or fall off (no-op for an unmounted target).
-    const fallOff = checkMountFallOff(ctx.st, target.id);
-    ctx.st = fallOff.st;
-    if (fallOff.narrative) ctx.narrative = (ctx.narrative ?? '') + fallOff.narrative;
-  } else {
-    ctx.narrative = `The ${target.name} resists your shove. (${playerRoll} vs ${enemyRoll})`;
-  }
-};
+  mode?: 'prone' | 'push';
+}> = (ctx, action) =>
+  resolveUnarmedOption(ctx, action.targetEnemyId, action.mode === 'push' ? 'push' : 'prone');

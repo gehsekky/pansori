@@ -171,7 +171,12 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // (not 2). The Fighter L11/20 cap only applies when the PC
     // actually has 11+ fighter levels.
     const isHasteExtra = pc.char.turn_actions.haste_extra_action_used;
-    const extraCount = weaponItem?.loading || isHasteExtra ? 0 : extraAttackCountForChar(pc.char);
+    // A Grapple / Shove already spent `attackActionAttacksSpent` attacks.
+    const extraCount = Math.max(
+      0,
+      (weaponItem?.loading || isHasteExtra ? 0 : extraAttackCountForChar(pc.char)) -
+        (ctx.attackActionAttacksSpent ?? 0)
+    );
     for (let ei = 0; ei < extraCount; ei++) {
       if ((ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
       const killedExtra = resolveOneAttack(ctx, atkCtx, `Attack ${ei + 2} — `);

@@ -145,10 +145,25 @@ Giant Strength, Potion of Resistance, Spell Scrolls), then activated items.
 
 ## 7. Core rules not found
 
-**Grapple / Shove** are resolved as an opposed Athletics check (the 2014 rule).
-SRD 5.2.1 makes them an Unarmed Strike option where the target makes a STR or
-DEX saving throw against DC 8 + STR mod + Proficiency Bonus (which would also
-let Legendary Resistance apply).
+**Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the
+5.2.1 Unarmed Strike options: the target makes a STR or DEX save (its choice)
+against 8 + STR mod (Monk: DEX via Dexterous Attacks) + PB; Legendary
+Resistance applies; only a target at most one size larger (every SRD stat block
+now carries `size`); Shove pushes 5 ft or knocks Prone; a grapple's escape DC is
+the same DC. Each replaces one attack of the Attack action, so Extra Attack's
+remaining attacks follow (against the same target — simplification). Fixed along
+the way: attacks against a Grappled creature no longer get Advantage (2014
+rule); a Grappled creature now has Disadvantage on attacks against anyone but
+its grappler; a grapple ends when the two are farther apart than its range (no
+dragging — simplification); Grapple / Shove no longer end the turn on the spot;
+the Push weapon mastery now respects walls, creatures and its "Large or
+smaller" limit (it moved the target two squares through anything).
+
+**Spell attack rolls ignore conditions.** `resolveSpellAttack` takes only
+Innate Sorcery's Advantage: a Blinded, Poisoned, Prone, Restrained or Grappled
+caster rolls spell attacks normally, and attacks against a Paralyzed or
+Restrained target get no Advantage. Weapon attacks (`attack/toHit.ts`) handle
+all of these.
 
 No code references: the **Search** and **Utilize** actions, **suffocation**,
 **squeezing** into a smaller space, **crafting**, and **poisons** as items.
@@ -160,7 +175,8 @@ concentration.
 
 1. ~~§1 accuracy bugs~~ and ~~always-prepared subclass spells~~ (done 2026-11-12).
 2. ~~Monster Magic Resistance + Legendary Resistance~~ (done 2026-11-12).
-3. Warlock Pacts + core invocations; Druid's missing base features.
+3. ~~Grapple / Shove as 5.2.1 saves~~ (done 2026-11-12). Warlock Pacts + core
+   invocations; Druid's missing base features. Spell attacks honoring conditions.
 4. Remaining class features, class by class, each with a spec per CLAUDE.md.
 5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).
 6. Magic items, passive-number ones first; then mechanizable narrative spells.

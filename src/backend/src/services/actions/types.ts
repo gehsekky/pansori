@@ -55,6 +55,12 @@ export interface ActionContext {
   escaped: boolean;
   usedInitiative: boolean;
   /**
+   * Attacks of the current Attack action already spent before `handleAttack`
+   * runs (SRD Unarmed Strike: a Grapple or Shove replaces one attack). The
+   * Extra Attack loop makes that many fewer attacks.
+   */
+  attackActionAttacksSpent?: number;
+  /**
    * Structured emission queue (see services/narrative/fragments.ts).
    * Migrated handlers push fragments here instead of doing
    * `ctx.narrative += ...` + `pushEvent(...)` in parallel; the composer

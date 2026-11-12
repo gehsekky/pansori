@@ -896,6 +896,7 @@ const EnemyTemplateSchema = z
     petrifyingGaze: PetrifyingGazeSchema.optional(),
     magicResistance: z.boolean().optional(),
     legendaryResistance: z.number().int().min(1).max(10).optional(),
+    size: z.enum(['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan']).optional(),
     spells: z.array(z.string().min(1).max(60)).optional(),
     castChance: z.number().min(0).max(1).optional(),
     spellSaveDC: z.number().int().min(1).max(30).optional(),

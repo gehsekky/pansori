@@ -15,6 +15,7 @@ import {
 import { equippedArmorId, equippedWeaponId } from '../equipment.js';
 import type { ActionHandler } from './types.js';
 import type { GameState } from '../../types.js';
+import { grappledAttackDisadvantage } from '../unarmedStrike.js';
 import { hasFightingStyle } from '../fightingStyle.js';
 import { updatePcActor } from './actor.js';
 
@@ -86,7 +87,13 @@ export const handleTwoWeaponAttack: ActionHandler<{
     pc.char.armor_proficiencies ?? [],
     armorLootItem?.armorCategory
   );
-  const disadv = condDisadv || !armorProf;
+  // SRD Grappled — Disadvantage against anyone but the grappler.
+  const grappledDisadv = grappledAttackDisadvantage(
+    pc.char.conditions,
+    ctx.st.entities?.find((e) => e.id === pc.char.id && !e.isEnemy)?.grappled_by,
+    targetEntityId
+  );
+  const disadv = condDisadv || !armorProf || grappledDisadv;
   const offhandMagicBonus = offhandLoot.magicBonus ?? 0;
   const atk = resolveOffHandAttack(
     { str: pc.char.str, dex: pc.char.dex, level: pc.char.level },

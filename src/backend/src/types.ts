@@ -414,6 +414,9 @@ export interface EnemyTemplate {
   // choose to succeed instead. Uses spent are tracked per enemy in
   // GameState.legendary_resistance_used.
   legendaryResistance?: number;
+  // SRD creature size from the stat block. Gates Grapple / Shove (target no
+  // more than one size larger than the PC). Undefined ⇒ Medium.
+  size?: CreatureSize;
   // Spell-casting (see Enemy.spells for runtime behaviour).
   spells?: string[];
   castChance?: number;
@@ -527,6 +530,9 @@ export interface Enemy {
   // choose to succeed instead. Uses spent are tracked per enemy in
   // GameState.legendary_resistance_used.
   legendaryResistance?: number;
+  // SRD creature size from the stat block. Gates Grapple / Shove (target no
+  // more than one size larger than the PC). Undefined ⇒ Medium.
+  size?: CreatureSize;
   // SRD darkvision range (ft) — see EnemyTemplate.darkvision_ft. Undefined
   // defaults to 60 in the combat-visibility check; carried through procgen.
   darkvision_ft?: number;
@@ -604,6 +610,9 @@ export interface Seed {
 // ─── Game state ───────────────────────────────────────────────────────────────
 
 // `CoverLevel` is re-exported from ./shared-types (see src/shared/types.ts).
+
+// SRD creature sizes, smallest to largest.
+export type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan';
 
 export interface TurnActions {
   action_used: boolean;
