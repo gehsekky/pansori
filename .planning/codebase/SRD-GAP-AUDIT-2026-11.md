@@ -89,19 +89,23 @@ Partial or unverified (check behaviour against the text):
 
 ## 3. Warlock: Eldritch Invocations
 
-Present: Agonizing Blast, Devil's Sight. Missing: Armor of Shadows, Ascendant
-Step, Devouring Blade, Eldritch Mind, Eldritch Smite, Eldritch Spear, Fiendish
-Vigor, Gaze of Two Minds, Gift of the Depths, Gift of the Protectors,
-Investment of the Chain Master, Lessons of the First Ones, Lifedrinker, Mask of
-Many Faces, Master of Myriad Forms, Misty Visions, One with Shadows,
-Otherworldly Leap, **Pact of the Blade / Chain / Tome**, Repelling Blast,
-Thirsting Blade, Visions of Distant Realms, Whispers of the Grave, Witch Sight.
+**In progress (2026-11-12).** `services/invocations.ts` holds the catalog,
+prerequisites and the Invocations-column cap (1 at L1 … 10 at L18); learning is
+an out-of-combat choice. Modeled: Agonizing Blast, Armor of Shadows, Ascendant
+Step, Devil's Sight, Eldritch Mind, Fiendish Vigor, Mask of Many Faces, Master
+of Myriad Forms, Misty Visions, One with Shadows, Otherworldly Leap, Visions of
+Distant Realms, Whispers of the Grave. Spell invocations cast through
+`cast_spell` with `invocation` set (no slot, at will).
 
-The Pacts and Thirsting Blade matter most: without them a Warlock has no
-pact identity and no Extra Attack path. Many others (Armor of Shadows,
-Ascendant Step, Fiendish Vigor, Misty Visions, Mask of Many Faces, Otherworldly
-Leap) are "cast spell X at will / without a slot", which the existing
-free-cast machinery (`wishDuplicate`-style flags) should cover cheaply.
+Still missing: Pact of the Blade / Chain / Tome, Thirsting Blade, Devouring
+Blade, Eldritch Smite, Lifedrinker, Repelling Blast, Eldritch Spear,
+Investment of the Chain Master, Gift of the Protectors, Gift of the Depths,
+Gaze of Two Minds, Lessons of the First Ones, Witch Sight. Simplifications:
+Agonizing Blast applies to Eldritch Blast only (RAW: a chosen damaging Warlock
+cantrip, repeatable); replacing an invocation on level-up isn't offered.
+
+Fixed alongside: Concentration saves never added the Proficiency Bonus for CON
+save proficiency (Sorcerer, Fighter, Barbarian…).
 
 ## 4. Monsters
 

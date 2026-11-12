@@ -1,8 +1,14 @@
 import type { AbilityKey, Spell } from '../../../types.js';
-import { SQUARE_SIZE, distanceFeet, hasLineOfSight } from '../../gridEngine.js';
+import {
+  SQUARE_SIZE,
+  distanceFeet,
+  hasLineOfSight,
+  inDimLightOrDarkness,
+} from '../../gridEngine.js';
 import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
 import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
+import { hasInvocation, invocationDef } from '../../invocations.js';
 import type { ActionContext } from '../types.js';
 import { alwaysPreparedSpells } from '../../subclassSpells.js';
 import { equippedArmorId } from '../../equipment.js';
@@ -47,6 +53,7 @@ export function runPrecast(
     overchannel?: boolean;
     mysticArcanum?: boolean;
     wishDuplicate?: boolean;
+    invocation?: string;
   },
   spell: Spell
 ): PrecastResult {
@@ -218,6 +225,39 @@ export function runPrecast(
     usedMysticArcanum = true;
   }
 
+  // SRD Eldritch Invocations — Armor of Shadows, Misty Visions, etc. let the
+  // Warlock cast a specific spell at will without a slot (at its base level).
+  let usedInvocation = false;
+  if (action.invocation) {
+    const inv = invocationDef(action.invocation);
+    if (
+      !inv?.freeSpell ||
+      inv.freeSpell.spellId !== spellId ||
+      !hasInvocation(pc.char, inv.id) ||
+      isRitualCast
+    ) {
+      ctx.narrative = `You can't cast ${spell.name} with that invocation.`;
+      return { done: true };
+    }
+    if (slotLevel !== spell.level) {
+      ctx.narrative = `${inv.name} casts ${spell.name} at its base level only.`;
+      return { done: true };
+    }
+    if (inv.freeSpell.needsDimOrDark) {
+      const pos = ctx.st.entities?.find((e) => e.id === pc.char.id)?.pos;
+      const lighting = ctx.seed.rooms?.find((r) => r.id === ctx.st.current_room)?.lighting;
+      const dark = pos
+        ? inDimLightOrDarkness(pos, lighting, ctx.st.entities ?? [], ctx.roomObstacleCells)
+        : lighting === 'dim' || lighting === 'dark';
+      if (!dark) {
+        ctx.narrative = `${inv.name} works only in Dim Light or Darkness.`;
+        return { done: true };
+      }
+    }
+    usedInvocation = true;
+    ctx.invocation = inv.id;
+  }
+
   // Long-cast spells (1 minute+, e.g. Animate Dead) can't be cast in
   // combat. Gated before slot spend so an in-combat attempt doesn't
   // waste a slot.
@@ -271,7 +311,8 @@ export function runPrecast(
     spell.level > 0 &&
     !isRitualCast &&
     !usedDivineIntervention &&
-    !usedWish
+    !usedWish &&
+    !usedInvocation
   ) {
     const prepared = pc.char.prepared_spells ?? [];
     if (
@@ -340,7 +381,8 @@ export function runPrecast(
     !usedSpellMastery &&
     !usedSignature &&
     !usedMysticArcanum &&
-    !usedWish
+    !usedWish &&
+    !usedInvocation
   ) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
@@ -474,13 +516,15 @@ export function runPrecast(
           ? ' (Signature Spell)'
           : usedMagicInitiateFree
             ? ' (Magic Initiate — free cast)'
-            : usedWish
-              ? ' (granted by Wish)'
-              : isRitualCast
-                ? ' (ritual)'
-                : spell.level > 0
-                  ? ` (level-${slotLevel} slot)`
-                  : ' (cantrip)';
+            : usedInvocation
+              ? ` (${invocationDef(action.invocation!)?.name} — no slot)`
+              : usedWish
+                ? ' (granted by Wish)'
+                : isRitualCast
+                  ? ' (ritual)'
+                  : spell.level > 0
+                    ? ` (level-${slotLevel} slot)`
+                    : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
   const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
@@ -498,7 +542,8 @@ export function runPrecast(
       usedSpellMastery ||
       usedSignature ||
       usedMysticArcanum ||
-      usedWish,
+      usedWish ||
+      usedInvocation,
   };
 }
 

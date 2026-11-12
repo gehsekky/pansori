@@ -902,6 +902,9 @@ export type StructuredAction =
       // Warlock Mystic Arcanum (L11/13/15/17) — cast this chosen L6-9 spell
       // once per long rest without a slot. Validated in precast.
       mysticArcanum?: boolean;
+      // Warlock Eldritch Invocation (e.g. 'armor_of_shadows') that lets this
+      // spell be cast without a slot. Validated in precast.
+      invocation?: string;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }

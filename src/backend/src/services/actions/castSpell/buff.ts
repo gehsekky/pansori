@@ -10,6 +10,7 @@ import { equippedArmorId, equippedShieldId, equippedWeaponId } from '../../equip
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { defenseAcBonus } from '../../fightingStyle.js';
+import { invocationDef } from '../../invocations.js';
 import { wornAcBonus } from '../../wornEffects.js';
 
 /**
@@ -52,7 +53,14 @@ export function runBuffSpell(
   const spellId = action.spellId;
   const buffTargetCharId = action.targetCharId;
   let buffTarget = char;
-  if (targetType === 'ally' || (targetType === 'self_or_ally' && buffTargetCharId)) {
+  // An invocation that casts the spell "on yourself" always targets the caster.
+  const invocationSelfOnly = ctx.invocation
+    ? !!invocationDef(ctx.invocation)?.freeSpell?.selfOnly
+    : false;
+  if (
+    !invocationSelfOnly &&
+    (targetType === 'ally' || (targetType === 'self_or_ally' && buffTargetCharId))
+  ) {
     const explicit = ctx.st.characters.find((c) => c.id === buffTargetCharId && !c.dead);
     if (explicit) buffTarget = explicit;
   }
@@ -104,7 +112,10 @@ export function runBuffSpell(
 
   // Apply temp HP grant (replace if greater — temp HP doesn't stack).
   if (spell.tempHpGrant) {
-    const grant = spell.tempHpGrant;
+    // SRD Fiendish Vigor — False Life cast through the invocation takes the
+    // highest number on the dice: 2d4 + 4 → 12 (the plain cast uses the average).
+    const grant =
+      ctx.invocation === 'fiendish_vigor' && spell.id === 'false_life' ? 12 : spell.tempHpGrant;
     if (isCasterTarget) {
       const prev = char.temp_hp ?? 0;
       if (grant > prev) char.temp_hp = grant;

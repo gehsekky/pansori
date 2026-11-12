@@ -61,6 +61,11 @@ export interface ActionContext {
    */
   attackActionAttacksSpent?: number;
   /**
+   * The Eldritch Invocation powering the current slot-free cast (set by
+   * `runPrecast`), e.g. 'fiendish_vigor' maximizes False Life's temp HP.
+   */
+  invocation?: string;
+  /**
    * Structured emission queue (see services/narrative/fragments.ts).
    * Migrated handlers push fragments here instead of doing
    * `ctx.narrative += ...` + `pushEvent(...)` in parallel; the composer

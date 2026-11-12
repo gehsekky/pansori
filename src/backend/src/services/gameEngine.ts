@@ -83,6 +83,7 @@ import {
   entitiesInLine,
   findPath,
   hasLineOfSight,
+  inDimLightOrDarkness,
   isInSunlight,
   magicalDarknessCells,
   opportunityAttackTriggers,
@@ -161,6 +162,7 @@ import {
   unarmedStrikeDc,
   withinUnarmedSizeLimit,
 } from './unarmedStrike.js';
+import { hasInvocation, knownInvocations, learnableInvocations } from './invocations.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
@@ -898,9 +900,13 @@ export function checkConcentration(
   // is higher; capped at 30. The cap basically only matters at >60 dmg.
   const dc = Math.min(30, Math.max(10, Math.floor(dmgTaken / 2)));
   // SRD revive penalty applies to the concentration CON save like
-  // any other D20 Test.
-  const save =
-    d(20) + abilityMod(char.con) - d20TestPenalty(char) + auraOfProtectionBonus(char, st);
+  // any other D20 Test. CON save proficiency adds the Proficiency Bonus.
+  const conProf = context && hasSaveProficiency(char, 'con', context) ? profBonus(char.level) : 0;
+  const conMods =
+    abilityMod(char.con) + conProf - d20TestPenalty(char) + auraOfProtectionBonus(char, st);
+  // SRD Eldritch Mind (Warlock invocation): Advantage on these saves.
+  const concD20 = () => (hasInvocation(char, 'eldritch_mind') ? Math.max(d(20), d(20)) : d(20));
+  const save = concD20() + conMods;
   if (save >= dc)
     return {
       char,
@@ -911,12 +917,7 @@ export function checkConcentration(
   // spell stays active (the break is what we're deferring); the window keeps it
   // on a successful reroll and breaks it on decline / a failed reroll.
   if (deferIndomitable && indomitableRemaining(char) > 0) {
-    const reroll =
-      d(20) +
-      abilityMod(char.con) -
-      d20TestPenalty(char) +
-      auraOfProtectionBonus(char, st) +
-      indomitableBonus(char);
+    const reroll = concD20() + conMods + indomitableBonus(char);
     return {
       char,
       st,
@@ -934,12 +935,7 @@ export function checkConcentration(
   }
   // SRD Fighter Indomitable — reroll the failed CON save with +Fighter level.
   const indo = tryIndomitableReroll(char, () => {
-    const reroll =
-      d(20) +
-      abilityMod(char.con) -
-      d20TestPenalty(char) +
-      auraOfProtectionBonus(char, st) +
-      indomitableBonus(char);
+    const reroll = concD20() + conMods + indomitableBonus(char);
     return reroll >= dc;
   });
   if (indo.used && indo.saved)
@@ -950,8 +946,7 @@ export function checkConcentration(
     };
   // SRD Rogue Stroke of Luck — turn the failed CON save into a 20 if it holds.
   if (strokeOfLuckAvailable(char)) {
-    const mods = abilityMod(char.con) - d20TestPenalty(char) + auraOfProtectionBonus(char, st);
-    if (20 + mods >= dc)
+    if (20 + conMods >= dc)
       return {
         char: consumeStrokeOfLuck(char),
         st,
@@ -6487,22 +6482,46 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // ── Warlock: Invocations ─────────────────────────────────────────────────────
-  // RAW (SRD): invocations are learned at level-up, not chosen mid-fight.
-  // Gate to out-of-combat so this surfaces as a downtime/level-up decision.
-  if (!state.combat_active && hasClass(char, 'warlock') && getClassLevel(char, 'warlock') >= 2) {
-    if (!(char.feats ?? []).includes('agonizing_blast'))
+  // ── Warlock: Eldritch Invocations ─────────────────────────────────────────────
+  // RAW (SRD): invocations are learned as the Warlock levels, not mid-fight, so
+  // learning is out of combat; the Invocations column caps how many.
+  if (hasClass(char, 'warlock')) {
+    if (!state.combat_active) {
+      for (const inv of learnableInvocations(char)) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `Learn Invocation: ${inv.name} — ${inv.blurb}`,
+          action: { type: 'use_class_feature', featureId: inv.id },
+          kind: 'class_feature',
+        });
+      }
+    }
+    // At-will casts without a slot (Armor of Shadows, Misty Visions, ...).
+    for (const inv of knownInvocations(char)) {
+      const free = inv.freeSpell;
+      const sp = free ? context.spellTable?.[free.spellId] : undefined;
+      if (!free || !sp) continue;
+      if (sp.outOfCombatOnly && state.combat_active) continue;
+      if (free.needsDimOrDark) {
+        const pos = state.entities?.find((e) => e.id === char.id)?.pos;
+        const lighting = seed.rooms?.find((r) => r.id === state.current_room)?.lighting;
+        const obstacles = seed.rooms?.find((r) => r.id === state.current_room)?.obstacles ?? [];
+        const dark = pos
+          ? inDimLightOrDarkness(pos, lighting, state.entities ?? [], obstacles)
+          : lighting === 'dim' || lighting === 'dark';
+        if (!dark) continue;
+      }
+      if (state.combat_active) {
+        const slotAction = sp.castTime === 'bonus_action' ? 'bonus_action_used' : 'action_used';
+        if (char.turn_actions[slotAction]) continue;
+      }
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       choices.push({
-        label: `Learn Invocation: Agonizing Blast — +CHA to Eldritch Blast`,
-        action: { type: 'use_class_feature', featureId: 'agonizing_blast' },
-        kind: 'class_feature',
+        label: `${inv.name} — cast ${sp.name}${free.selfOnly ? ' on yourself' : ''} (no slot)`,
+        action: { type: 'cast_spell', spellId: sp.id, slotLevel: sp.level, invocation: inv.id },
+        kind: 'cast_spell',
       });
-    if (!(char.feats ?? []).includes('devils_sight'))
-      choices.push({
-        label: `Learn Invocation: Devil's Sight — see in magical darkness`,
-        action: { type: 'use_class_feature', featureId: 'devils_sight' },
-        kind: 'class_feature',
-      });
+    }
   }
 
   // ── Subclass active features ────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
 } from '../../gameEngine.js';
 import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
+import { hasInvocation, invocationDef, learnableInvocations } from '../../invocations.js';
 import type { ActionContext } from '../types.js';
 import type { Character } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -41,10 +42,12 @@ function metamagicCost(char: Character, base: number): { cost: number; free: boo
  * flag and adjusts target counts / damage rerolls / bonus-action
  * timing.
  *
- * Warlock Invocations (Agonizing Blast, Devil's Sight): passive
- * toggles into `char.feats`. The attack/spell handlers read those
- * tags. Agonizing adds +CHA per Eldritch Blast beam; Devil's Sight
- * lets the Warlock see in magical darkness (rendering hook).
+ * Warlock Eldritch Invocations: learning one records its id in
+ * `char.feats` (catalog, prerequisites and count cap in
+ * services/invocations.ts). Handlers read those tags: Agonizing Blast
+ * adds +CHA per Eldritch Blast beam; Devil's Sight sees in magical
+ * darkness; the free-spell invocations cast via `cast_spell` with
+ * `invocation` set.
  *
  * Archfey Patron — Fey Presence: AoE WIS save in 10 ft → frightened.
  * 1/short rest. The SRD shape (no charm option) since fright is
@@ -285,33 +288,29 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
     return true;
   }
 
-  if (fid === 'agonizing_blast') {
+  // SRD Eldritch Invocations — learn one (out of combat; capped by the
+  // Invocations column of the Warlock table, prerequisites enforced).
+  const invDef = invocationDef(fid);
+  if (invDef) {
     if (!hasClass(char, 'warlock')) {
-      ctx.narrative = 'Only Warlocks can take Agonizing Blast.';
+      ctx.narrative = `Only Warlocks can learn ${invDef.name}.`;
       return true;
     }
-    const hasIt = char.feats?.includes('agonizing_blast') ?? false;
-    if (hasIt) {
-      ctx.narrative = 'You already have the Agonizing Blast invocation.';
+    if (hasInvocation(char, fid)) {
+      ctx.narrative = `You already have the ${invDef.name} invocation.`;
       return true;
     }
-    char.feats = [...(char.feats ?? []), 'agonizing_blast'];
-    ctx.narrative = `${char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(char.cha)} force damage per beam.`;
-    return true;
-  }
-
-  if (fid === 'devils_sight') {
-    if (!hasClass(char, 'warlock')) {
-      ctx.narrative = "Only Warlocks can take Devil's Sight.";
+    if (!learnableInvocations(char).some((d) => d.id === fid)) {
+      ctx.narrative = `You can't learn ${invDef.name} now — check its prerequisites and your invocation count.`;
       return true;
     }
-    const hasIt2 = char.feats?.includes('devils_sight') ?? false;
-    if (hasIt2) {
-      ctx.narrative = "You already have the Devil's Sight invocation.";
-      return true;
-    }
-    char.feats = [...(char.feats ?? []), 'devils_sight'];
-    ctx.narrative = `${char.name} gains Devil's Sight — you can see normally in magical darkness.`;
+    char.feats = [...(char.feats ?? []), fid];
+    ctx.narrative =
+      fid === 'agonizing_blast'
+        ? `${char.name} gains the Agonizing Blast invocation — Eldritch Blast now adds +${abilityMod(char.cha)} force damage per beam.`
+        : fid === 'devils_sight'
+          ? `${char.name} gains Devil's Sight — you can see normally in magical darkness.`
+          : `${char.name} learns the ${invDef.name} invocation — ${invDef.blurb}.`;
     return true;
   }
 

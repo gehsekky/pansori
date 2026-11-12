@@ -49,6 +49,26 @@ export function lightReaches(source: CombatEntity, cells: GridPos[]): boolean {
 }
 
 /**
+ * SRD 5.2.1 Vision & Light — whether `pos` is in Dim Light or Darkness: the
+ * room isn't brightly lit (or sunlit), and no light source's *bright* radius
+ * reaches it (a wall blocks the light). Used by One with Shadows.
+ */
+export function inDimLightOrDarkness(
+  pos: GridPos,
+  roomLighting: string | undefined,
+  entities: CombatEntity[],
+  obstacles: GridPos[] = []
+): boolean {
+  if (roomLighting === undefined || roomLighting === 'bright' || roomLighting === 'sunlight') {
+    return false;
+  }
+  return !entities.some((e) => {
+    const r = e.light_radius_ft ?? 0;
+    return r > 0 && distanceFeet(e.pos, pos) <= r && hasLineOfSight(e.pos, pos, obstacles);
+  });
+}
+
+/**
  * SRD 5.2.1 Vision & Light — whether `pos` stands in *sunlight* (which triggers
  * Sunlight Sensitivity). True when the room itself is sunlit, or `pos` is within
  * the *bright* radius of a Daylight emanation (a light source whose source spell
