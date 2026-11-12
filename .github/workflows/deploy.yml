@@ -124,14 +124,14 @@ jobs:
       # The pansori-deploy role (gehsekky-infra, pansori.tf) trusts only this
       # repo's main branch: no stored AWS keys.
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
 
       # Images are tagged with the full commit SHA. The repositories are
       # immutable (gehsekky-infra, pansori.tf), so a tag can't be pushed
@@ -151,13 +151,13 @@ jobs:
           done
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # provenance: false: nothing reads Buildx's attestations, and each one
       # is an extra manifest in ECR.
       - name: Build & push backend image
         if: steps.existing.outputs.backend != 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: ./src/backend
           file: ./src/backend/Dockerfile
@@ -170,7 +170,7 @@ jobs:
 
       - name: Build & push frontend image
         if: steps.existing.outputs.frontend != 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: ./src/frontend
           file: ./src/frontend/Dockerfile
