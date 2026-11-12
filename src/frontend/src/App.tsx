@@ -1,7 +1,7 @@
 import { type AuthUser, type CharacterInput, api } from './lib/api.ts';
 import { FactionsView, QuestsView } from './components/CampaignPanel.tsx';
 import type { FrontendContext, GameChoice, Seed, SessionSummary } from './types.ts';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AboutModal from './components/AboutModal.tsx';
 import AdminScreen from './components/AdminScreen.tsx';
 import AdventureLogPanel from './components/AdventureLogPanel.tsx';
@@ -44,46 +44,6 @@ import { clampCombatDim } from './types.ts';
 import { mapPanelVisible } from './lib/mapPanelVisible.ts';
 import styles from './styles.module.css';
 import { useGame } from './hooks/useGame.ts';
-
-// The first-person grid crawler + the combat diorama (3D experiment v2) —
-// lazy so three.js stays out of the main bundle until something renders in 3D.
-const Crawler3DView = lazy(() => import('./components/Crawler3DView.tsx'));
-const Combat3DView = lazy(() => import('./components/Combat3DView.tsx'));
-
-// The crawler-by-default preference for local rooms. e2e/CI opts out via
-// localStorage; WebGL-less browsers fall back inside the component itself.
-function preferCrawler(): boolean {
-  try {
-    return localStorage.getItem('pansori_crawler') !== 'off';
-  } catch {
-    return true;
-  }
-}
-function persistPreferCrawler(on: boolean): void {
-  try {
-    localStorage.setItem('pansori_crawler', on ? 'on' : 'off');
-  } catch {
-    // private mode etc. — preference just won't stick
-  }
-}
-// The combat diorama keeps its OWN preference (the v1 lesson: one shared
-// switch let a battlefield toggle silently change the exploration default),
-// falling back to the crawler preference when never touched.
-function preferCombat3d(): boolean {
-  try {
-    const v = localStorage.getItem('pansori_combat_3d');
-    return v === null ? preferCrawler() : v !== 'off';
-  } catch {
-    return true;
-  }
-}
-function persistPreferCombat3d(on: boolean): void {
-  try {
-    localStorage.setItem('pansori_combat_3d', on ? 'on' : 'off');
-  } catch {
-    // private mode etc. — preference just won't stick
-  }
-}
 
 // The FE ships ONE code context — the base donor. Every campaign (creator-built)
 // resolves as DB rows: CharScreen synthesizes its card over this donor from the
@@ -210,14 +170,6 @@ export default function App() {
     Array<{ kind: 'region' | 'town' | 'room'; mapId: string }>
   >([]);
   const [mapOpen, setMapOpen] = useState(false);
-  // Local rooms render as the first-person grid crawler by default (3D
-  // experiment v2); the 2D grid stays one toggle away.
-  const [crawler3d, setCrawler3d] = useState(preferCrawler);
-  // Combat's 3D diorama, on its own preference switch.
-  const [combat3d, setCombat3d] = useState(preferCombat3d);
-  // The diorama's orbit-camera quadrant — rotates the MoveDPad layout so its
-  // arrows match what the player SEES, not grid-absolute compass directions.
-  const [combatCamQuadrant, setCombatCamQuadrant] = useState(0);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   // The full quest journal (grouped by act, finished quests included) — the
   // right-rail tracker only shows open quests.
@@ -470,7 +422,7 @@ export default function App() {
         setInventoryOpen((v) => !v);
         return;
       }
-      // 'j' toggles the quest-log journal ('q' belongs to the crawler's strafe)
+      // 'j' toggles the quest-log journal
       if (e.key === 'j' || e.key === 'J') {
         e.preventDefault();
         setQuestLogOpen((v) => !v);
@@ -910,8 +862,6 @@ export default function App() {
                       // context.gridWidth) so a bare arena room with no size of its
                       // own draws at the same size the server bounds it to.
                       const combatRoom = seed.rooms.find((r) => r.id === gameState.current_room);
-                      // Identical contract for the 2D grid and the 3D diorama —
-                      // same turn-based engine, the player picks the presentation.
                       const combatViewProps = {
                         state: gameState,
                         seed,
@@ -928,42 +878,7 @@ export default function App() {
                             }
                           : undefined,
                       };
-                      return (
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            className={styles.signOutBtn}
-                            style={{ position: 'absolute', right: 6, top: 6, zIndex: 5 }}
-                            onClick={() => {
-                              setCombat3d((v) => {
-                                persistPreferCombat3d(!v);
-                                return !v;
-                              });
-                            }}
-                            aria-label={
-                              combat3d ? 'Switch to 2D battlefield' : 'Switch to 3D battlefield'
-                            }
-                            data-testid="combat-3d-toggle"
-                          >
-                            {combat3d ? '2D GRID' : '3D VIEW'}
-                          </button>
-                          {combat3d ? (
-                            <Suspense
-                              fallback={
-                                <div className={styles.card} style={{ height: 440 }}>
-                                  Loading 3D battlefield…
-                                </div>
-                              }
-                            >
-                              <Combat3DView
-                                {...combatViewProps}
-                                onCameraQuadrant={setCombatCamQuadrant}
-                              />
-                            </Suspense>
-                          ) : (
-                            <GridCombatView {...combatViewProps} />
-                          )}
-                        </div>
-                      );
+                      return <GridCombatView {...combatViewProps} />;
                     }
                     if (!gameState.combat_active && gameState.map_level) {
                       const grid = activeGrid(seed, gameState);
@@ -1070,125 +985,64 @@ export default function App() {
                           convHere ||
                           shopHere ||
                           !!gameState.active_leveling;
-                        // Local rooms default to the first-person grid crawler
-                        // (one keypress = one marker_move; the engine stays the
-                        // movement model). The 2D grid is the toggle fallback —
-                        // and the only view for regional/town until the town
-                        // crawler lands.
-                        const crawlerHere = grid.level === 'local' || grid.level === 'town';
-                        const crawlerToggle = crawlerHere && (
-                          <button
-                            className={styles.signOutBtn}
-                            style={{ position: 'absolute', right: 6, top: 6, zIndex: 5 }}
-                            onClick={() => {
-                              setCrawler3d((v) => {
-                                persistPreferCrawler(!v);
-                                return !v;
-                              });
-                            }}
-                            aria-label={
-                              crawler3d ? 'Switch to the 2D map' : 'Switch to the 3D view'
-                            }
-                            data-testid="crawler-3d-toggle"
-                          >
-                            {crawler3d ? '2D MAP' : '3D VIEW'}
-                          </button>
-                        );
-                        if (crawlerHere && crawler3d) {
-                          return (
-                            <div style={{ position: 'relative' }}>
-                              {crawlerToggle}
-                              <Suspense
-                                fallback={
-                                  <div className={styles.card} style={{ height: 440 }}>
-                                    Loading the crawler…
-                                  </div>
-                                }
-                              >
-                                <Crawler3DView
-                                  gameState={gameState}
-                                  seed={seed}
-                                  grid={grid}
-                                  choices={choices}
-                                  loading={loading}
-                                  // An open modal owns the keyboard — WASD in
-                                  // the quest log/inventory must not step the
-                                  // party around in the background.
-                                  readOnly={
-                                    mapReadOnly ||
-                                    inventoryOpen ||
-                                    mapOpen ||
-                                    questLogOpen ||
-                                    !!introText ||
-                                    !!sheetCharId
-                                  }
-                                  onChoice={handleChoice}
-                                />
-                              </Suspense>
-                            </div>
-                          );
-                        }
                         return (
-                          <div style={{ position: 'relative' }}>
-                            {crawlerToggle}
-                            <GridMapView
-                              grid={grid}
-                              markerPos={gameState.marker_pos}
-                              revealed={revealed}
-                              readOnly={mapReadOnly}
-                              terrainArt={seed?.terrain_art}
-                              // A surfaced Attack choice means a hostile is here
-                              // pre-combat — show the red enemy marker.
-                              enemyPresent={choices.some((c) => c.kind === 'attack')}
-                              // Clicking the red dot engages — dispatch the
-                              // out-of-combat Attack choice to drop into combat.
-                              onEnemyClick={() => {
-                                const atk = choices.find((c) => c.kind === 'attack');
-                                if (atk) handleChoice(atk);
-                              }}
-                              npcs={npcTokens}
-                              onNpcClick={(npcId) => {
-                                const tc = talkByNpc.get(npcId);
-                                if (tc) handleChoice(tc);
-                              }}
-                              loot={lootTokens}
-                              onLootClick={(key) => {
-                                // Adjacent already? Pick it up. Otherwise walk up to
-                                // it; the Pick-up choice surfaces next.
-                                const pick = pickupByKey.get(key);
-                                if (pick) {
-                                  handleChoice(pick);
-                                  return;
-                                }
-                                const tok = lootTokens.find((l) => l.key === key);
-                                if (tok)
-                                  handleChoice({
-                                    label: `Approach the ${tok.name}`,
-                                    action: { type: 'approach', pos: tok.pos },
-                                  });
-                              }}
-                              objects={objectTokens}
-                              onObjectClick={(id) => {
-                                const it = interactById.get(id);
-                                if (it) {
-                                  handleChoice(it);
-                                  return;
-                                }
-                                const tok = objectTokens.find((o) => o.id === id);
-                                if (tok)
-                                  handleChoice({
-                                    label: `Approach the ${tok.name}`,
-                                    action: { type: 'approach', pos: tok.pos },
-                                  });
-                              }}
-                              onMarkerMove={(to) =>
-                                handleChoice({
-                                  label: `Travel to (${to.x},${to.y})`,
-                                  action: { type: 'marker_move', to },
-                                })
+                          <GridMapView
+                            grid={grid}
+                            markerPos={gameState.marker_pos}
+                            revealed={revealed}
+                            readOnly={mapReadOnly}
+                            terrainArt={seed?.terrain_art}
+                            // A surfaced Attack choice means a hostile is here
+                            // pre-combat — show the red enemy marker.
+                            enemyPresent={choices.some((c) => c.kind === 'attack')}
+                            // Clicking the red dot engages — dispatch the
+                            // out-of-combat Attack choice to drop into combat.
+                            onEnemyClick={() => {
+                              const atk = choices.find((c) => c.kind === 'attack');
+                              if (atk) handleChoice(atk);
+                            }}
+                            npcs={npcTokens}
+                            onNpcClick={(npcId) => {
+                              const tc = talkByNpc.get(npcId);
+                              if (tc) handleChoice(tc);
+                            }}
+                            loot={lootTokens}
+                            onLootClick={(key) => {
+                              // Adjacent already? Pick it up. Otherwise walk up to
+                              // it; the Pick-up choice surfaces next.
+                              const pick = pickupByKey.get(key);
+                              if (pick) {
+                                handleChoice(pick);
+                                return;
                               }
-                            />
-                          </div>
+                              const tok = lootTokens.find((l) => l.key === key);
+                              if (tok)
+                                handleChoice({
+                                  label: `Approach the ${tok.name}`,
+                                  action: { type: 'approach', pos: tok.pos },
+                                });
+                            }}
+                            objects={objectTokens}
+                            onObjectClick={(id) => {
+                              const it = interactById.get(id);
+                              if (it) {
+                                handleChoice(it);
+                                return;
+                              }
+                              const tok = objectTokens.find((o) => o.id === id);
+                              if (tok)
+                                handleChoice({
+                                  label: `Approach the ${tok.name}`,
+                                  action: { type: 'approach', pos: tok.pos },
+                                });
+                            }}
+                            onMarkerMove={(to) =>
+                              handleChoice({
+                                label: `Travel to (${to.x},${to.y})`,
+                                action: { type: 'marker_move', to },
+                              })
+                            }
+                          />
                         );
                       }
                     }
@@ -1451,9 +1305,6 @@ export default function App() {
                                         <MoveDPad
                                           choices={choices.filter((c) => c.kind === 'grid_move')}
                                           onChoose={handleChoice}
-                                          // Only the 3D diorama orbits; the 2D
-                                          // grid is always grid-aligned.
-                                          cameraQuadrant={combat3d ? combatCamQuadrant : 0}
                                         />
                                         <div className={styles.combatControlsCol}>
                                           {gameState && (

@@ -93,10 +93,9 @@ describe('The Sky Is Falling — region navigability', () => {
 
 describe('The Sky Is Falling — room object placement', () => {
   it('every searchable object carries an in-bounds authored pos off the entry/exit cells', () => {
-    // The 3D room renders objects as physical interactables. Unplaced objects
-    // get auto-placed by the view, but the flagship campaign places them
-    // deliberately so the flavor text and the spot agree (the Brine Barrels
-    // incident, 2026-06-13: no pos → invisible in the 3D den).
+    // The room map renders objects as tokens at their pos. The flagship
+    // campaign places them deliberately so the flavor text and the spot agree
+    // (the Brine Barrels incident, 2026-06-13: no pos → invisible in the den).
     // Both Act I (ROOMS) and Act II (ROOMS_ACT2 — the capital venue + flavor-
     // site interiors) are held to the deliberate-placement invariant.
     for (const room of [...ROOMS, ...ROOMS_ACT2] as CampaignRoom[]) {

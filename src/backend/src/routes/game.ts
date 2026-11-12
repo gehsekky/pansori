@@ -1523,8 +1523,8 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       return;
     }
     // A resolved campaign (terminal act) is just as terminal as death/escape —
-    // without this gate a stale client (the 3D world's movement sync, a second
-    // tab) keeps mutating a finished story.
+    // without this gate a stale client (a second tab) keeps mutating a
+    // finished story.
     if (row.status === 'resolved') {
       res.status(410).json({ error: 'Campaign already resolved.' });
       return;

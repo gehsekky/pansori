@@ -2,7 +2,7 @@
 //
 // Every route that rewrites `game_sessions.state` used to read the row,
 // work on it, then `UPDATE ... WHERE id = $1`. Two overlapping requests
-// (a second tab, the 3D view's movement sync, two party members) both read
+// (a second tab, two party members acting at once) both read
 // the same row and the later write silently erased the earlier one. The
 // action route's `turn_seq` check didn't help: it compared against the row
 // it had read, not the row it was about to overwrite.

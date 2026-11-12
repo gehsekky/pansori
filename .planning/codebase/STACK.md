@@ -28,11 +28,6 @@
 - React 18.3.1 - Frontend UI framework
 - Vite 7.3.3 - Frontend dev server and build tool
 
-**3D/Graphics:**
-- Three.js 0.160.1 - 3D rendering for room crawler view (`Room3DView` lazy-loaded)
-- @react-three/fiber 8.18.0 - React bindings for Three.js
-- @react-three/drei 9.122.0 - Three.js utilities for React
-
 **Real-Time Communication:**
 - Socket.IO 4.7.4 - Real-time bidirectional event-driven communication
 - Socket.IO Client 4.8.3 - Frontend Socket.IO consumer
@@ -86,7 +81,6 @@
 **Build:**
 - Backend: `tsconfig.json` + `tsconfig.build.json` for production compilation
 - Frontend: `tsconfig.json` + `tsconfig.node.json` for Vite build config
-- Vite optimizes dependencies for React + Three.js (dedupes react, react-dom, three)
 - Backend TypeScript emits ES modules (`"type": "module"` in package.json)
 
 **Code Style:**

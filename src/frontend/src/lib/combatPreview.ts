@@ -1,5 +1,4 @@
-// Shared combat-grid preview math — used by BOTH the 2D GridCombatView and the
-// 3D Combat3DView so their overlays can't drift. Mirrors the backend geometry
+// Combat-grid preview math for GridCombatView's overlays. Mirrors the backend geometry
 // (entitiesInCone/Cube/Line/Blast in gridEngine.ts) so previews are RAW-accurate.
 
 import type { GridPos } from '../types';

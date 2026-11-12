@@ -1,4 +1,4 @@
-// Shared combat-preview math (2D grid + 3D diorama). The shape math mirrors the
+// Combat-preview math for the grid view. The shape math mirrors the
 // backend gridEngine geometry; these pin the per-shape footprints + the
 // same-name enemy disambiguation.
 

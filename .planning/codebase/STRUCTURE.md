@@ -174,7 +174,7 @@ pansori/
     │           └── (Vitest discovers all **/*.spec.ts)
     │
     └── frontend/                # React + Vite app (TypeScript)
-        ├── package.json         # Frontend deps (react, vite, three.js, etc.)
+        ├── package.json         # Frontend deps (react, vite, etc.)
         ├── tsconfig.json        # Frontend TypeScript config
         ├── vite.config.ts       # Vite bundler config
         ├── vitest.config.ts     # Unit test runner
@@ -184,7 +184,6 @@ pansori/
         │   ├── art/             # Game art (gated: painted-art overlay in pansori-assets)
         │   │   ├── tiles/       # Terrain tiles (procgen+campaign)
         │   │   ├── sprites/     # Character/enemy sprites
-        │   │   ├── textures3d/  # 3D textures for combat diorama
         │   │   ├── markers/     # Map markers (gates, merchants, etc.)
         │   │   └── icons/       # Item / ability icons
         │   └── index.html       # Vite SPA entry (div#root)
@@ -213,11 +212,8 @@ pansori/
             │   ├── pointBuy.ts  # Ability score point-buy calculator
             │   ├── multiclass.ts # Frontend side of class feature display
             │   ├── combatPreview.ts # Predict next attack outcome (for UI hints)
-            │   ├── roomPlacement.ts # Place party + enemies on a room grid
             │   ├── placedLoot.ts # Find loot in room
-            │   ├── characters3d.ts # 3D character model loading (three.js)
             │   ├── terrainStyle.ts # CSS classes for terrain tiles
-            │   ├── gridStep.ts  # Move-validation for each grid step
             │   ├── mapPanelVisible.ts # Show/hide map panel logic
             │   ├── narrativeFmt.ts # Format narrative text (capitalize names, etc.)
             │   └── [lib].ts     # Utility helpers (50+ files)
@@ -237,9 +233,7 @@ pansori/
             │   ├── CharacterModal.tsx # Modal for single character creation
             │   │
             │   ├── GridCombatView.tsx # 2D tactical grid view (combat)
-            │   ├── Crawler3DView.tsx # 3D first-person crawler (exploration)
-            │   ├── Combat3DView.tsx # 3D diorama view (combat, lazy-loaded)
-            │   ├── GridMapView.tsx # 2D regional/town map (exploration)
+            │   ├── GridMapView.tsx # 2D region/town/room map (exploration)
             │   ├── WorldMap.tsx # Large world map for fast travel
             │   │
             │   ├── PartyRail.tsx # Horizontal party member cards (left side)
@@ -247,7 +241,7 @@ pansori/
             │   ├── SpellBar.tsx # Spell action buttons (spell list UI)
             │   ├── CombatActionBar.tsx # Attack/cast/move buttons (combat)
             │   ├── DefaultActionBar.tsx # Exploration action buttons
-            │   ├── MoveDPad.tsx # D-pad for movement (mobile / crawler)
+            │   ├── MoveDPad.tsx # D-pad for combat movement
             │   │
             │   ├── ContextPanel.tsx # Context tabs (combat log, inventory, etc.)
             │   ├── CombatLogPanel.tsx # Combat event log

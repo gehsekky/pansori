@@ -387,8 +387,8 @@ function GridCombatView({
   }
 
   // AoE preview — when the player hovers a spell choice with an AoE shape,
-  // compute the affected cells. Shared math with the 3D combat view
-  // (lib/combatPreview), itself a mirror of the backend gridEngine geometry.
+  // compute the affected cells (lib/combatPreview, a mirror of the backend
+  // gridEngine geometry).
   const aoeCells: Set<string> = (() => {
     const empty = new Set<string>();
     if (!aoePreview) return empty;

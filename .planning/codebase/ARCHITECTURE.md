@@ -276,7 +276,6 @@ Pansori is a browser-based SRD 5.2.1 RPG engine with a three-tier architecture: 
   - Main route logic (login → sessions → in-game)
   - Modal/panel lifecycle (character creation, inventory, etc.)
   - Theme application per campaign
-  - 3D vs 2D view toggle per preference
 
 **Game Action Endpoint:**
 - Location: `src/backend/src/routes/game.ts` POST `/api/game/session/:id/action`

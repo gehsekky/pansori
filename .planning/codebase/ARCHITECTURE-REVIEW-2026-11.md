@@ -140,7 +140,12 @@ the template narrative immediately, then push the enhanced text over the
 existing socket as a follow-up event. Also update the default model from
 `claude-haiku-4-5-20251001` to the current Haiku (`claude-haiku-5-5`).
 
-### 9. Two renderers (product decision)
+### 9. Two renderers (product decision) — DONE 2026-11-11
+
+> Decided: 2D only. The 3D crawler and combat diorama, their helpers, the
+> three.js / @react-three deps and the 3D models/textures were removed so
+> effort goes to the 2D views and engine accuracy/completeness. Recoverable
+> from git history if 3D comes back.
 
 The FE maintains both 2D (`GridMapView` / `GridCombatView`) and 3D
 (`Crawler3DView` / `Combat3DView`) views, and the 3D ones also mirror backend
