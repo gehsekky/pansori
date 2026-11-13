@@ -1,4 +1,5 @@
-import type { Character } from '../types.js';
+import type { Character, LootItem } from '../types.js';
+import { BASE_ITEMS } from '../campaignData/srd/items.js';
 import { getClassLevel } from './multiclass.js';
 
 // SRD: Warlock — Eldritch Invocations.
@@ -105,6 +106,40 @@ export const INVOCATIONS: InvocationDef[] = [
     blurb: 'Jump on yourself, no slot',
   },
   {
+    id: 'pact_of_the_blade',
+    name: 'Pact of the Blade',
+    minLevel: 1,
+    blurb: 'bond a melee weapon: proficiency, and CHA for its attack and damage',
+  },
+  {
+    id: 'thirsting_blade',
+    name: 'Thirsting Blade',
+    minLevel: 5,
+    requires: 'pact_of_the_blade',
+    blurb: 'Extra Attack with your pact weapon',
+  },
+  {
+    id: 'eldritch_smite',
+    name: 'Eldritch Smite',
+    minLevel: 5,
+    requires: 'pact_of_the_blade',
+    blurb: 'spend a Pact Magic slot on a pact-weapon hit for force damage and Prone',
+  },
+  {
+    id: 'lifedrinker',
+    name: 'Lifedrinker',
+    minLevel: 9,
+    requires: 'pact_of_the_blade',
+    blurb: '+1d6 necrotic once per turn on a pact-weapon hit',
+  },
+  {
+    id: 'devouring_blade',
+    name: 'Devouring Blade',
+    minLevel: 12,
+    requires: 'thirsting_blade',
+    blurb: 'Thirsting Blade grants two extra attacks',
+  },
+  {
     id: 'visions_of_distant_realms',
     name: 'Visions of Distant Realms',
     minLevel: 9,
@@ -160,5 +195,55 @@ export function learnableInvocations(char: Character): InvocationDef[] {
       !hasInvocation(char, d.id) &&
       wl >= d.minLevel &&
       (!d.requires || hasInvocation(char, d.requires))
+  );
+}
+
+/**
+ * SRD Pact of the Blade — whether `weapon` is the Warlock's bonded pact weapon
+ * (the inventory instance recorded in `Character.pact_weapon`).
+ */
+export function isPactWeapon(
+  char: Pick<Character, 'feats' | 'pact_weapon'>,
+  weapon: { instance_id?: string } | null | undefined
+): boolean {
+  return (
+    hasInvocation(char, 'pact_of_the_blade') &&
+    !!char.pact_weapon &&
+    weapon?.instance_id === char.pact_weapon
+  );
+}
+
+/** Extra attacks from Thirsting Blade (1) / Devouring Blade (2), pact weapon only. */
+export function pactWeaponExtraAttacks(char: Pick<Character, 'feats'>): number {
+  if (hasInvocation(char, 'devouring_blade')) return 2;
+  return hasInvocation(char, 'thirsting_blade') ? 1 : 0;
+}
+
+/**
+ * Weapons Pact of the Blade can conjure: the mundane SRD Simple / Martial
+ * Melee weapons (Dart is a Ranged weapon in the SRD).
+ */
+export function conjurablePactWeapons(): LootItem[] {
+  return Object.values(BASE_ITEMS).filter(
+    (l) =>
+      l.slot === 'weapon' &&
+      l.range === 'melee' &&
+      (l.weaponType === 'simple' || l.weaponType === 'martial') &&
+      l.id !== 'dart'
+  );
+}
+
+/**
+ * The highest spell-slot level with a slot left (a Warlock's Pact Magic slots
+ * are all one level), or 0 when none is open. Eldritch Smite spends it.
+ */
+export function highestOpenSlot(
+  char: Pick<Character, 'spell_slots_max' | 'spell_slots_used'>
+): number {
+  const levels = Object.keys(char.spell_slots_max ?? {})
+    .map(Number)
+    .sort((a, b) => b - a);
+  return (
+    levels.find((l) => (char.spell_slots_used?.[l] ?? 0) < (char.spell_slots_max?.[l] ?? 0)) ?? 0
   );
 }

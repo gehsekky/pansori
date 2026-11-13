@@ -705,6 +705,11 @@ export interface TurnActions {
   // whose mastery you've trained, the Fighter may swap in Push, Sap, or
   // Slow for that attack. Cleared when the attack resolves.
   tactical_master_mastery?: 'push' | 'sap' | 'slow';
+  // SRD Eldritch Smite — armed for the next pact-weapon hit this turn; and the
+  // once-per-turn marks for Eldritch Smite and Lifedrinker.
+  eldritch_smite_armed?: boolean;
+  eldritch_smite_used?: boolean;
+  lifedrinker_used?: boolean;
   // SRD Fighter L17 — Action Surge can be used twice per rest, but
   // still only ONCE per turn. This flag marks the per-turn use; the
   // per-rest cap is tracked on class_resource_uses.action_surge.
@@ -1444,6 +1449,10 @@ export interface Character {
   // cleared at combat end (≈ duration) and when the qualifying weapon is dropped.
   // The attack pipeline (preattack + resolveOneAttack) reads this.
   shillelagh?: { ability: AbilityKey };
+  // SRD Pact of the Blade — inventory instance_id of the bonded pact weapon.
+  // A conjured one carries `conjured_pact_weapon` on its inventory entry and
+  // vanishes when the bond moves on.
+  pact_weapon?: string;
   // SRD Ranger Hunter "feature option" picks (swappable on a rest):
   //   Hunter's Prey (L3): 'colossus_slayer' | 'horde_breaker' (defaults to
   //     colossus_slayer when unset, preserving the pre-picker behavior).

@@ -1396,7 +1396,7 @@ export default function App() {
                                                 )}
                                                 <ClassAbilityBar
                                                   choices={classFeatureChoices}
-                                                  onChoose={handleChoice}
+                                                  onChoose={chooseWithPicker}
                                                 />
                                               </div>
                                             );

@@ -1,3 +1,4 @@
+import type { Character, LootItem } from '../../../types.js';
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
@@ -5,12 +6,19 @@ import {
   isRoomCleared,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { clearInstance, equippedWeaponId, setSlot } from '../../equipment.js';
+import {
+  conjurablePactWeapons,
+  hasInvocation,
+  highestOpenSlot,
+  invocationDef,
+  learnableInvocations,
+} from '../../invocations.js';
 import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
-import { hasInvocation, invocationDef, learnableInvocations } from '../../invocations.js';
 import type { ActionContext } from '../types.js';
-import type { Character } from '../../../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { randomUUID } from 'crypto';
 
 // SRD Sorcery Incarnate (L7) — while Innate Sorcery is active, up to TWO
 // Metamagic options can be stacked on one spell. Returns the next
@@ -58,7 +66,7 @@ function metamagicCost(char: Character, base: number): { cost: number; free: boo
  * that absorbs damage before HP. Damage-absorbtion hook is in the
  * enemy-attack resolver elsewhere.
  */
-export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
+export function handleCasterFeature(ctx: ActionContext, fid: string, option?: string): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
   // SRD Metamagic — gate every metamagic activation on being a Sorcerer who
@@ -311,6 +319,93 @@ export function handleCasterFeature(ctx: ActionContext, fid: string): boolean {
         : fid === 'devils_sight'
           ? `${char.name} gains Devil's Sight — you can see normally in magical darkness.`
           : `${char.name} learns the ${invDef.name} invocation — ${invDef.blurb}.`;
+    return true;
+  }
+
+  // SRD Pact of the Blade — Bonus Action: bond with the melee weapon in your
+  // hand, or conjure one (`option` = a mundane Simple/Martial melee weapon id).
+  // A new bond ends the old one; a conjured weapon disappears when it does.
+  if (fid === 'pact_blade_bond' || fid === 'pact_blade_conjure') {
+    if (!hasInvocation(char, 'pact_of_the_blade')) {
+      ctx.narrative = 'You need the Pact of the Blade invocation.';
+      return true;
+    }
+    if (ctx.st.combat_active && char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    let instanceId: string;
+    let weaponName: string;
+    if (fid === 'pact_blade_bond') {
+      const heldId = equippedWeaponId(char);
+      const held = char.inventory.find((i) => i.instance_id === heldId);
+      const loot = held
+        ? { ...ctx.context.lootTable.find((l) => l.id === held.id), ...held }
+        : undefined;
+      const melee =
+        !!loot &&
+        (loot as LootItem).range === 'melee' &&
+        ['simple', 'martial'].includes((loot as LootItem).weaponType ?? '');
+      if (!held || !melee) {
+        ctx.narrative = 'Hold a Simple or Martial melee weapon to bond with it.';
+        return true;
+      }
+      if (char.pact_weapon === held.instance_id) {
+        ctx.narrative = `Your ${held.name} is already your pact weapon.`;
+        return true;
+      }
+      instanceId = held.instance_id;
+      weaponName = held.name;
+    } else {
+      const base = conjurablePactWeapons().find((w) => w.id === option);
+      if (!base) {
+        ctx.narrative = 'Choose a Simple or Martial melee weapon to conjure.';
+        return true;
+      }
+      instanceId = randomUUID();
+      weaponName = base.name;
+      char.inventory = [
+        ...char.inventory,
+        { ...base, instance_id: instanceId, conjured_pact_weapon: true },
+      ];
+      char.equipment = setSlot(char.equipment ?? {}, 'main_hand', instanceId);
+    }
+    const old = char.pact_weapon;
+    if (old && old !== instanceId) {
+      const oldItem = char.inventory.find((i) => i.instance_id === old);
+      if (oldItem?.conjured_pact_weapon) {
+        char.inventory = char.inventory.filter((i) => i.instance_id !== old);
+        char.equipment = clearInstance(char.equipment ?? {}, old);
+      }
+    }
+    char.pact_weapon = instanceId;
+    if (ctx.st.combat_active) {
+      char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    }
+    ctx.narrative =
+      fid === 'pact_blade_conjure'
+        ? `${char.name} conjures a ${weaponName} and bonds with it as a pact weapon.`
+        : `${char.name} bonds with the ${weaponName} — it is now a pact weapon.`;
+    return true;
+  }
+
+  // SRD Eldritch Smite — armed (no action) for the next pact-weapon hit this
+  // turn: spend a Pact Magic slot for force damage and Prone.
+  if (fid === 'eldritch_smite_arm') {
+    if (!hasInvocation(char, 'eldritch_smite')) {
+      ctx.narrative = 'You need the Eldritch Smite invocation.';
+      return true;
+    }
+    if (char.turn_actions.eldritch_smite_used) {
+      ctx.narrative = 'Eldritch Smite is once per turn.';
+      return true;
+    }
+    if (!highestOpenSlot(char)) {
+      ctx.narrative = 'No Pact Magic slot left for Eldritch Smite.';
+      return true;
+    }
+    char.turn_actions = { ...char.turn_actions, eldritch_smite_armed: true };
+    ctx.narrative = `${char.name} readies an Eldritch Smite for the next pact-weapon hit this turn.`;
     return true;
   }
 

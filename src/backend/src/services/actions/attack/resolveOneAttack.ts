@@ -37,6 +37,7 @@ import {
 } from '../../multiclass.js';
 import { enemyRef, fillEnemyTokens } from '../../narrative/enemyName.js';
 import { enemySaveD20, legendaryResist, legendaryResistInto } from '../../monsterSaves.js';
+import { hasInvocation, highestOpenSlot, isPactWeapon } from '../../invocations.js';
 import {
   overcomeDefensesApplies,
   overwhelmingStrikeDamage,
@@ -151,14 +152,26 @@ export function resolveOneAttack(
   const castScore = shillelaghApplies
     ? ((pc.char[pc.char.shillelagh!.ability] as number) ?? 10)
     : 0;
+  // SRD Pact of the Blade — the bonded weapon may use CHA for its attack and
+  // damage rolls instead of STR / DEX (taken when it's better).
+  const pactWeapon = isPactWeapon(pc.char, weaponItem);
+  const normalMod =
+    weaponItem?.range === 'ranged'
+      ? abilityMod(pc.char.dex)
+      : weaponItem?.finesse
+        ? Math.max(abilityMod(pc.char.str), abilityMod(pc.char.dex))
+        : abilityMod(pc.char.str);
+  const pactCha = pactWeapon && !shillelaghApplies && abilityMod(pc.char.cha) > normalMod;
   const atkPlayer = shillelaghApplies
     ? { str: castScore, dex: castScore, level: pc.char.level }
-    : { str: pc.char.str, dex: pc.char.dex, level: pc.char.level };
+    : pactCha
+      ? { str: pc.char.cha, dex: pc.char.cha, level: pc.char.level }
+      : { str: pc.char.str, dex: pc.char.dex, level: pc.char.level };
   const atk = resolvePlayerAttack(
     atkPlayer,
     weaponDamage,
     effectiveEnemyAc,
-    shillelaghApplies ? false : (weaponItem?.finesse ?? false),
+    shillelaghApplies || pactCha ? false : (weaponItem?.finesse ?? false),
     disadvantage,
     effectiveAdvantage,
     weaponProficient,
@@ -454,7 +467,11 @@ export function resolveOneAttack(
       weaponItem?.mastery === 'graze' &&
       (pc.char.weapon_masteries ?? []).includes(weaponItem.id)
     ) {
-      const grazeMod = weaponItem.finesse ? abilityMod(pc.char.dex) : abilityMod(pc.char.str);
+      const grazeMod = pactCha
+        ? abilityMod(pc.char.cha)
+        : weaponItem.finesse
+          ? abilityMod(pc.char.dex)
+          : abilityMod(pc.char.str);
       const grazeDmg = Math.max(0, grazeMod);
       if (grazeDmg > 0) {
         const grazedHp = Math.max(0, target.hp - grazeDmg);
@@ -624,6 +641,43 @@ export function resolveOneAttack(
     smiteRiderDmg = isCrit ? rollCritical(pendingSmite.dice) : rollDice(pendingSmite.dice);
   }
 
+  // SRD Eldritch Smite — armed: on this pact-weapon hit spend a Pact Magic
+  // slot for 1d8 Force + 1d8 per slot level (and Prone, below). Once per turn.
+  let eldritchSmiteDmg = 0;
+  let eldritchSmiteExpr = '';
+  if (pactWeapon && atk.hit && pc.char.turn_actions.eldritch_smite_armed) {
+    const slot = highestOpenSlot(pc.char);
+    if (slot > 0) {
+      eldritchSmiteExpr = `${1 + slot}d8`;
+      eldritchSmiteDmg = isCrit ? rollCritical(eldritchSmiteExpr) : rollDice(eldritchSmiteExpr);
+      updatePcActor(ctx, {
+        spell_slots_used: {
+          ...(pc.char.spell_slots_used ?? {}),
+          [slot]: (pc.char.spell_slots_used?.[slot] ?? 0) + 1,
+        },
+        turn_actions: {
+          ...pc.char.turn_actions,
+          eldritch_smite_armed: false,
+          eldritch_smite_used: true,
+        },
+      });
+    }
+  }
+  // SRD Lifedrinker — once per turn, a pact-weapon hit deals +1d6 Necrotic.
+  // (Spending a Hit Point Die to heal is not offered — simplification.)
+  let lifedrinkerDmg = 0;
+  if (
+    pactWeapon &&
+    atk.hit &&
+    hasInvocation(pc.char, 'lifedrinker') &&
+    !pc.char.turn_actions.lifedrinker_used
+  ) {
+    lifedrinkerDmg = isCrit ? rollCritical('1d6') : rollDice('1d6');
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, lifedrinker_used: true },
+    });
+  }
+
   const rawDmg =
     baseHit +
     sneakDmg +
@@ -656,7 +710,7 @@ export function resolveOneAttack(
   const radiantRider = smiteDmg + improvedSmiteDmg + divineStrikeDmg;
   // Divine Favor / smite riders also ride on top of the weapon multiplier (same
   // resistance simplification as the radiant riders above).
-  const spellWeaponRider = weaponRiderDmg + smiteRiderDmg;
+  const spellWeaponRider = weaponRiderDmg + smiteRiderDmg + eldritchSmiteDmg + lifedrinkerDmg;
   const totalDmg = finalDmg + radiantRider + spellWeaponRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
@@ -736,6 +790,14 @@ export function resolveOneAttack(
   }
   if (divineStrikeDmg > 0) {
     hitBonuses.push({ label: `Divine Strike ${dsDie}: +${divineStrikeDmg} radiant` });
+  }
+  if (eldritchSmiteDmg > 0) {
+    hitBonuses.push({
+      label: `Eldritch Smite ${eldritchSmiteExpr}${isCrit ? ' (crit)' : ''}: +${eldritchSmiteDmg} force`,
+    });
+  }
+  if (lifedrinkerDmg > 0) {
+    hitBonuses.push({ label: `Lifedrinker 1d6: +${lifedrinkerDmg} necrotic` });
   }
   composeNow(ctx, {
     kind: 'attack_hit',
@@ -1314,6 +1376,18 @@ export function resolveOneAttack(
       return updated;
     }),
   };
+  // SRD Eldritch Smite — the target, if Huge or smaller, is knocked Prone.
+  if (eldritchSmiteDmg > 0 && sizeRank(target.size) <= sizeRank('huge')) {
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === targetId && e.isEnemy && !e.conditions.includes('prone')
+          ? { ...e, conditions: [...e.conditions, 'prone'] }
+          : e
+      ),
+    };
+    ctx.narrative += ` ${fmt.note(`[Eldritch Smite: ${target.name} is knocked prone]`)}`;
+  }
   if (polymorphFormDrops) {
     const formName = enemyEnt?.polymorph_state?.formName ?? 'the beast form';
     ctx.narrative += ` The ${formName} form shatters — ${target.name} returns to themselves!`;

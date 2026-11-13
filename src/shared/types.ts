@@ -787,7 +787,9 @@ export type StructuredAction =
   | { type: 'enter_leveling'; characterId: string }
   | { type: 'exit_leveling' }
   | { type: 'attack_npc'; npcId: string }
-  | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string }
+  // `option`: a feature-specific pick from a `pickOption` picker (e.g. the
+  // weapon Pact of the Blade conjures).
+  | { type: 'use_class_feature'; featureId: string; targetEnemyId?: string; option?: string }
   | { type: 'apply_asi'; stat: AbilityKey }
   | {
       // Take a feat. When the feat is a half-feat with `choices`,

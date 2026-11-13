@@ -22,7 +22,8 @@ import type { LootItem } from '../../types.js';
 //
 // Item IDs match the SRD 5.2.1 names. Mechanical fields (damage, mastery,
 // armor class, etc.) follow RAW (Battleaxe = Topple, per the SRD weapon table).
-const BASE_ITEMS: Record<string, LootItem> = {
+// Mundane SRD gear (weapons, armor, adventuring items) — no magic items.
+export const BASE_ITEMS: Record<string, LootItem> = {
   // ─── Simple melee weapons ──────────────────────────────────────────────────
   dagger: {
     id: 'dagger',

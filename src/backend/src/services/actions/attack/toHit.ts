@@ -27,6 +27,7 @@ import { equippedArmorId } from '../../equipment.js';
 import { grappledAttackDisadvantage } from '../../unarmedStrike.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isHeavilyEncumbered } from '../../gameEngine.js';
+import { isPactWeapon } from '../../invocations.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -115,11 +116,14 @@ export function computeToHitContext(
     pc.char.armor_proficiencies ?? [],
     equippedArmorLootItem?.armorCategory
   );
-  const weaponProficient = hasWeaponProficiency(
-    pc.char.weapon_proficiencies ?? [],
-    weaponItem?.weaponType,
-    weaponItem ?? undefined
-  );
+  // SRD Pact of the Blade — you have proficiency with your pact weapon.
+  const weaponProficient =
+    isPactWeapon(pc.char, weaponItem) ||
+    hasWeaponProficiency(
+      pc.char.weapon_proficiencies ?? [],
+      weaponItem?.weaponType,
+      weaponItem ?? undefined
+    );
 
   // SRD ranged-in-melee disadvantage: only applies when a
   // non-incapacitated enemy is within 5 ft of the attacker. Previously

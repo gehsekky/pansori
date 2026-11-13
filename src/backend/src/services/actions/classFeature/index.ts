@@ -41,6 +41,7 @@ import { handleSpeciesFeature } from './species.js';
 export const handleUseClassFeature: ActionHandler<{
   type: 'use_class_feature';
   featureId: string;
+  option?: string;
 }> = (ctx, action) => {
   const fid = action.featureId;
 
@@ -49,7 +50,7 @@ export const handleUseClassFeature: ActionHandler<{
   if (handleRogueFeature(ctx, fid)) return;
   if (handleMonkFeature(ctx, fid)) return;
   if (handleDruidFeature(ctx, fid)) return;
-  if (handleCasterFeature(ctx, fid)) return;
+  if (handleCasterFeature(ctx, fid, action.option)) return;
   if (handleClericFeature(ctx, fid)) return;
   if (handlePaladinRangerBardFeature(ctx, fid)) return;
   if (handleSpeciesFeature(ctx, fid)) return;

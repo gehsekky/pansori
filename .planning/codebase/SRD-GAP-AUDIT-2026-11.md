@@ -97,8 +97,15 @@ of Myriad Forms, Misty Visions, One with Shadows, Otherworldly Leap, Visions of
 Distant Realms, Whispers of the Grave. Spell invocations cast through
 `cast_spell` with `invocation` set (no slot, at will).
 
-Still missing: Pact of the Blade / Chain / Tome, Thirsting Blade, Devouring
-Blade, Eldritch Smite, Lifedrinker, Repelling Blast, Eldritch Spear,
+Pact of the Blade (bond the held weapon or conjure one from the mundane SRD
+melee weapons; proficiency and CHA for the pact weapon), Thirsting Blade,
+Devouring Blade, Eldritch Smite (armed before the hit; spends the highest open
+slot) and Lifedrinker are modeled. Simplifications: the pact weapon keeps its
+normal damage type (no Necrotic/Psychic/Radiant option); the bond doesn't
+lapse when the weapon is left behind; Lifedrinker's Hit Point Die heal isn't
+offered.
+
+Still missing: Pact of the Chain / Tome, Repelling Blast, Eldritch Spear,
 Investment of the Chain Master, Gift of the Protectors, Gift of the Depths,
 Gaze of Two Minds, Lessons of the First Ones, Witch Sight. Simplifications:
 Agonizing Blast applies to Eldritch Blast only (RAW: a chosen damaging Warlock

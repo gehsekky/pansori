@@ -142,6 +142,14 @@ import {
   planTotal,
 } from './slotRecovery.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
+import {
+  conjurablePactWeapons,
+  hasInvocation,
+  highestOpenSlot,
+  isPactWeapon,
+  knownInvocations,
+  learnableInvocations,
+} from './invocations.js';
 import { consumeDarkOnesLuck, tryDarkOnesLuck } from './darkOnesOwnLuck.js';
 import { consumeImproveFate, tryImproveFate } from './improveFate.js';
 import { consumeIndomitable, indomitableBonus, tryIndomitableReroll } from './indomitable.js';
@@ -162,7 +170,6 @@ import {
   unarmedStrikeDc,
   withinUnarmedSizeLimit,
 } from './unarmedStrike.js';
-import { hasInvocation, knownInvocations, learnableInvocations } from './invocations.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
@@ -6495,6 +6502,59 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           kind: 'class_feature',
         });
       }
+    }
+    // SRD Pact of the Blade — Bonus Action: bond the held melee weapon, or
+    // conjure one (a picker of the mundane Simple / Martial melee weapons).
+    const bonusFree = !state.combat_active || !char.turn_actions.bonus_action_used;
+    if (hasInvocation(char, 'pact_of_the_blade') && bonusFree) {
+      const heldId = equippedWeaponId(char);
+      const held = char.inventory.find((i) => i.instance_id === heldId);
+      const heldLoot = held
+        ? { ...context.lootTable.find((l) => l.id === held.id), ...held }
+        : undefined;
+      const heldIsMelee =
+        !!heldLoot &&
+        (heldLoot as LootItem).range === 'melee' &&
+        ['simple', 'martial'].includes((heldLoot as LootItem).weaponType ?? '');
+      if (held && heldIsMelee && char.pact_weapon !== held.instance_id) {
+        choices.push({
+          label: `Bond Pact Weapon — your ${held.name} (Pact of the Blade)`,
+          action: { type: 'use_class_feature', featureId: 'pact_blade_bond' },
+          kind: 'class_feature',
+          requiresBonusAction: state.combat_active || undefined,
+        });
+      }
+      choices.push({
+        label: 'Conjure Pact Weapon — a melee weapon of your choice (Pact of the Blade)',
+        action: { type: 'use_class_feature', featureId: 'pact_blade_conjure' },
+        kind: 'class_feature',
+        requiresBonusAction: state.combat_active || undefined,
+        pickOption: {
+          param: 'option',
+          title: 'Conjure which weapon?',
+          options: conjurablePactWeapons().map((w) => ({
+            id: w.id,
+            label: w.name,
+            sub: w.desc,
+          })),
+        },
+      });
+    }
+    // SRD Eldritch Smite — ready it for the next pact-weapon hit this turn.
+    if (
+      state.combat_active &&
+      enemyAlive &&
+      hasInvocation(char, 'eldritch_smite') &&
+      isPactWeapon(char, { instance_id: equippedWeaponId(char) ?? undefined }) &&
+      !char.turn_actions.eldritch_smite_armed &&
+      !char.turn_actions.eldritch_smite_used &&
+      highestOpenSlot(char) > 0
+    ) {
+      choices.push({
+        label: `Eldritch Smite — next pact-weapon hit: spend a level-${highestOpenSlot(char)} Pact slot for +${1 + highestOpenSlot(char)}d8 force and Prone`,
+        action: { type: 'use_class_feature', featureId: 'eldritch_smite_arm' },
+        kind: 'class_feature',
+      });
     }
     // At-will casts without a slot (Armor of Shadows, Misty Visions, ...).
     for (const inv of knownInvocations(char)) {

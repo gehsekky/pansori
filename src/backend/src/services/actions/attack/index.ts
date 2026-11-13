@@ -4,6 +4,7 @@ import {
   resolveOneAttack,
 } from './resolveOneAttack.js';
 import { getClassLevel, huntersPrey } from '../../multiclass.js';
+import { isPactWeapon, pactWeaponExtraAttacks } from '../../invocations.js';
 import type { ActionHandler } from '../types.js';
 import { computeToHitContext } from './toHit.js';
 import { runCombatStart } from './combatStart.js';
@@ -174,8 +175,14 @@ export const handleAttack: ActionHandler<{ type: 'attack'; targetEnemyId?: strin
     // A Grapple / Shove already spent `attackActionAttacksSpent` attacks.
     const extraCount = Math.max(
       0,
-      (weaponItem?.loading || isHasteExtra ? 0 : extraAttackCountForChar(pc.char)) -
-        (ctx.attackActionAttacksSpent ?? 0)
+      (weaponItem?.loading || isHasteExtra
+        ? 0
+        : // SRD Thirsting / Devouring Blade — Extra Attack for the pact weapon
+          // only; it doesn't stack with other Extra Attack (take the larger).
+          Math.max(
+            extraAttackCountForChar(pc.char),
+            isPactWeapon(pc.char, weaponItem) ? pactWeaponExtraAttacks(pc.char) : 0
+          )) - (ctx.attackActionAttacksSpent ?? 0)
     );
     for (let ei = 0; ei < extraCount; ei++) {
       if ((ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? 0) <= 0) break;
