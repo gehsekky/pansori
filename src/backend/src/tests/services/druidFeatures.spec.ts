@@ -21,6 +21,7 @@ import {
   wildShapeBlocksCasting,
 } from '../../services/druidFeatures.js';
 import { context as ctx } from '../fixtures/testContext.js';
+import { evergreenWildShape } from '../../services/actions/classFeature/druid.js';
 import { potentSpellcastingBonus } from '../../services/multiclass.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -236,5 +237,88 @@ describe("Nature's Ward", () => {
     const low = druid(9, { subclass: 'land', circle_land: 'arid' });
     expect(naturesWardResistance(low)).toBeNull();
     expect(conditionImmunitiesFor(low, outOfCombat(low)).has('poisoned')).toBe(false);
+  });
+});
+
+describe('Wild Shape economy', () => {
+  const feature = (st: GameState, featureId: string, option?: string) =>
+    act(st, { type: 'use_class_feature', featureId, option });
+  const uses = (st: GameState) => st.characters[0].class_resource_uses?.wild_shape;
+
+  it('Wild Shape is a Bonus Action in combat and grants temp HP = Druid level', async () => {
+    const st = {
+      ...outOfCombat(druid(4, { class_resource_uses: { wild_shape: 2 } })),
+      combat_active: true,
+    } as GameState;
+    const r = await feature(st, 'wild_shape');
+    const pc = r.newState.characters[0];
+    expect(pc.conditions).toContain('wild_shaped');
+    expect(pc.temp_hp).toBe(4);
+    expect(pc.turn_actions.bonus_action_used).toBe(true);
+    expect(pc.turn_actions.action_used).toBeFalsy();
+  });
+
+  it('Wild Companion: a Wild Shape use buys a fey familiar that leaves on a Long Rest', async () => {
+    const st = outOfCombat(druid(2, { class_resource_uses: { wild_shape: 2 } }));
+    const r = await feature(st, 'wild_companion_ws', 'Cat');
+    expect(uses(r.newState)).toBe(1);
+    const fam = r.newState.summoned_allies ?? [];
+    expect(fam.map((a) => a.name)).toEqual(['Cat']);
+    expect(fam[0].wild_companion).toBe(true);
+    const rested = await act(r.newState, { type: 'long_rest' });
+    expect(rested.newState.summoned_allies ?? []).toEqual([]);
+  });
+
+  it('Wild Companion can spend a spell slot instead', async () => {
+    const r = await feature(outOfCombat(druid(2)), 'wild_companion_slot', 'Owl');
+    expect(r.newState.characters[0].spell_slots_used?.[1]).toBe(1);
+    expect((r.newState.summoned_allies ?? []).map((a) => a.name)).toEqual(['Owl']);
+  });
+
+  it('Wild Resurgence: a slot buys a use when none are left', async () => {
+    const empty = outOfCombat(druid(5, { class_resource_uses: { wild_shape: 0 } }));
+    const r = await feature(empty, 'wild_resurgence_ws');
+    expect(uses(r.newState)).toBe(1);
+    expect(r.newState.characters[0].spell_slots_used?.[1]).toBe(1);
+    const notEmpty = await feature(
+      outOfCombat(druid(5, { class_resource_uses: { wild_shape: 1 } })),
+      'wild_resurgence_ws'
+    );
+    expect(notEmpty.narrative).toMatch(/still have a Wild Shape use/);
+  });
+
+  it('Wild Resurgence: a use buys a level-1 slot, once per Long Rest', async () => {
+    const st = outOfCombat(
+      druid(5, { class_resource_uses: { wild_shape: 2 }, spell_slots_used: { 1: 2 } })
+    );
+    const r = await feature(st, 'wild_resurgence_slot');
+    expect(r.newState.characters[0].spell_slots_used?.[1]).toBe(1);
+    expect(uses(r.newState)).toBe(1);
+    const again = await feature(r.newState, 'wild_resurgence_slot');
+    expect(again.newState.characters[0].spell_slots_used?.[1]).toBe(1);
+  });
+
+  it('Archdruid: Nature Magician turns 2 uses into a level-4 slot; Evergreen refills one', async () => {
+    const st = outOfCombat(
+      druid(20, {
+        class_resource_uses: { wild_shape: 4 },
+        spell_slots_max: { 4: 3 },
+        spell_slots_used: { 4: 2 },
+      })
+    );
+    const r = await feature(st, 'nature_magician', '2');
+    expect(r.newState.characters[0].spell_slots_used?.[4]).toBe(1);
+    expect(uses(r.newState)).toBe(2);
+    const again = await feature(r.newState, 'nature_magician', '1');
+    expect(again.narrative).toMatch(/after a Long Rest/);
+
+    const drained = druid(20, { class_resource_uses: { wild_shape: 0 } });
+    expect(evergreenWildShape(drained).class_resource_uses?.wild_shape).toBe(1);
+    const full = druid(20, { class_resource_uses: { wild_shape: 2 } });
+    expect(evergreenWildShape(full).class_resource_uses?.wild_shape).toBe(2);
+    expect(
+      evergreenWildShape(druid(19, { class_resource_uses: { wild_shape: 0 } })).class_resource_uses
+        ?.wild_shape
+    ).toBe(0);
   });
 });

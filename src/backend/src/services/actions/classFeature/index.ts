@@ -49,7 +49,7 @@ export const handleUseClassFeature: ActionHandler<{
   if (handleFighterFeature(ctx, fid)) return;
   if (handleRogueFeature(ctx, fid)) return;
   if (handleMonkFeature(ctx, fid)) return;
-  if (handleDruidFeature(ctx, fid)) return;
+  if (handleDruidFeature(ctx, fid, action.option)) return;
   if (handleCasterFeature(ctx, fid, action.option)) return;
   if (handleClericFeature(ctx, fid)) return;
   if (handlePaladinRangerBardFeature(ctx, fid)) return;

@@ -219,6 +219,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     const wsMax = wildShapeUsesMax(poolLevel(c, ctx.context, 'druid', 'wild_shape'));
     if (wsMax > 0) restoredUses.wild_shape = wsMax;
     delete restoredUses.natural_recovery_used;
+    delete restoredUses.wild_resurgence_slot_used; // SRD Wild Resurgence — once per Long Rest
+    delete restoredUses.nature_magician_used; // SRD Archdruid Nature Magician — once per Long Rest
     const sorcLvl = poolLevel(c, ctx.context, 'sorcerer', 'sorcery_points');
     if (sorcLvl > 0) restoredUses.sorcery_points = sorcLvl;
     delete restoredUses.innate_sorcery_used; // Sorcerer Innate Sorcery — 2 uses back on a long rest
@@ -337,6 +339,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     travel_minutes_today: 0,
     // SRD Legendary Resistance is N/Day; a day has passed.
     legendary_resistance_used: undefined,
+    // SRD Druid Wild Companion — that familiar disappears on a Long Rest.
+    summoned_allies: (ctx.st.summoned_allies ?? []).filter((a) => !a.wild_companion),
   };
   updatePcActor(ctx, { ...restedChars[safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest

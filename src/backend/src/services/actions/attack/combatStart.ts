@@ -15,6 +15,7 @@ import {
 } from '../../multiclass.js';
 import { syncSetAbilities, wornLightRadius } from '../../wornEffects.js';
 import type { ActionContext } from '../types.js';
+import { evergreenWildShape } from '../classFeature/druid.js';
 import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { improveFateRefresh } from '../../improveFate.js';
 import { inRange } from '../../gridEngine.js';
@@ -93,10 +94,13 @@ export function runCombatStart(
     // SRD Monk Perfect Focus (L15): tops Focus Points up to 4 if you didn't use
     // Uncanny Metabolism (applied after it, so it's a no-op when that fired).
     // SRD Boon of Fate: Improve Fate recharges when you roll Initiative.
-    const refreshed = improveFateRefresh(
-      perfectFocusRefresh(
-        uncannyMetabolismRefresh(
-          persistentRageTopUp(superiorInspirationTopUp(heroicWarriorTopUp(c)))
+    // SRD Archdruid Evergreen Wild Shape: with no Wild Shape uses left, regain one.
+    const refreshed = evergreenWildShape(
+      improveFateRefresh(
+        perfectFocusRefresh(
+          uncannyMetabolismRefresh(
+            persistentRageTopUp(superiorInspirationTopUp(heroicWarriorTopUp(c)))
+          )
         )
       )
     );

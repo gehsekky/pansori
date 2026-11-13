@@ -714,6 +714,8 @@ export interface TurnActions {
   familiar_attack_used?: boolean;
   // SRD Druid Elemental Fury (Primal Strike) — once per turn.
   primal_strike_used?: boolean;
+  // SRD Druid Wild Resurgence — slot-for-Wild-Shape, once per turn.
+  wild_resurgence_used?: boolean;
   // SRD Fighter L17 — Action Surge can be used twice per rest, but
   // still only ONCE per turn. This flag marks the per-turn use; the
   // per-rest cap is tracked on class_resource_uses.action_surge.
@@ -1734,6 +1736,8 @@ export interface SummonedAlly {
   // SRD Find Familiar — this ally is its owner's familiar (one at a time: a
   // recast replaces it with the new form).
   familiar?: boolean;
+  // SRD Druid Wild Companion — this familiar vanishes at the next Long Rest.
+  wild_companion?: boolean;
   // SRD 5.2.1 Mounted Combat — this ally is a rideable mount (Phantom Steed).
   // `seedSummonedAllies` auto-mounts its owner at combat start; `speed` is the
   // mount's Speed (ft), carried onto the entity's `speed_ft`.

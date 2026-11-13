@@ -6402,11 +6402,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (hasClass(char, 'druid')) {
     const wsUses =
       char.class_resource_uses?.wild_shape ?? wildShapeUsesMax(getClassLevel(char, 'druid'));
-    // Circle of the Moon (SRD) — Combat Wild Shape: use as a bonus
-    const wsAvailable =
-      !char.conditions.includes('wild_shaped') &&
-      wsUses > 0 &&
-      (!state.combat_active || !char.turn_actions.action_used);
+    // SRD Wild Shape is a Bonus Action (as is leaving the form early).
+    const bonusOpen = !state.combat_active || !char.turn_actions.bonus_action_used;
+    const wsAvailable = !char.conditions.includes('wild_shaped') && wsUses > 0 && bonusOpen;
     if (wsAvailable) {
       // SRD Beast Forms — surface one choice per accessible form. The
       // form's stat block replaces the druid's attack while shifted (see
@@ -6421,12 +6419,76 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
-    if (char.conditions.includes('wild_shaped')) {
+    if (char.conditions.includes('wild_shaped') && bonusOpen) {
       choices.push({
         label: `Dismiss Wild Shape — return to normal form`,
         action: { type: 'use_class_feature', featureId: 'dismiss_wild_shape' },
         kind: 'class_feature',
       });
+    }
+
+    const druidLvl = getClassLevel(char, 'druid');
+    const openSlot = Object.keys(char.spell_slots_max ?? {}).some(
+      (l) => (char.spell_slots_used?.[+l] ?? 0) < (char.spell_slots_max?.[+l] ?? 0)
+    );
+    // SRD Wild Companion (L2) — Find Familiar for a Wild Shape use or a slot.
+    const familiarSpell = context.spellTable?.find_familiar?.summon;
+    if (druidLvl >= 2 && !state.combat_active && familiarSpell) {
+      const forms = [familiarSpell, ...(familiarSpell.variants ?? [])].map((f) => ({
+        id: f.name,
+        label: f.name,
+      }));
+      const offer = (featureId: string, cost: string) =>
+        choices.push({
+          label: `Wild Companion — summon a fey familiar for ${cost}`,
+          action: { type: 'use_class_feature', featureId },
+          kind: 'class_feature',
+          pickOption: { param: 'option', title: 'Wild Companion: which form?', options: forms },
+        });
+      if (wsUses > 0) offer('wild_companion_ws', 'a Wild Shape use');
+      if (openSlot) offer('wild_companion_slot', 'a spell slot');
+    }
+    // SRD Wild Resurgence (L5).
+    if (druidLvl >= 5) {
+      if (
+        wsUses === 0 &&
+        openSlot &&
+        !(state.combat_active && char.turn_actions.wild_resurgence_used)
+      ) {
+        choices.push({
+          label: 'Wild Resurgence — spend a spell slot to regain a Wild Shape use',
+          action: { type: 'use_class_feature', featureId: 'wild_resurgence_ws' },
+          kind: 'class_feature',
+        });
+      }
+      if (
+        wsUses > 0 &&
+        (char.spell_slots_used?.[1] ?? 0) > 0 &&
+        !char.class_resource_uses?.wild_resurgence_slot_used
+      ) {
+        choices.push({
+          label: 'Wild Resurgence — spend a Wild Shape use to regain a level-1 slot (1/Long Rest)',
+          action: { type: 'use_class_feature', featureId: 'wild_resurgence_slot' },
+          kind: 'class_feature',
+        });
+      }
+    }
+    // SRD Archdruid — Nature Magician (L20).
+    if (druidLvl >= 20 && !char.class_resource_uses?.nature_magician_used) {
+      const options = [1, 2, 3, 4]
+        .filter((n) => n <= wsUses && 2 * n <= 9 && (char.spell_slots_used?.[2 * n] ?? 0) > 0)
+        .map((n) => ({
+          id: String(n),
+          label: `${n} use${n === 1 ? '' : 's'} → a level-${2 * n} slot`,
+        }));
+      if (options.length > 0) {
+        choices.push({
+          label: 'Nature Magician — turn Wild Shape uses into a spell slot (1/Long Rest)',
+          action: { type: 'use_class_feature', featureId: 'nature_magician' },
+          kind: 'class_feature',
+          pickOption: { param: 'option', title: 'Nature Magician', options },
+        });
+      }
     }
   }
 

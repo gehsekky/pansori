@@ -62,9 +62,13 @@ Missing (no code path):
 - **Bard:** Font of Inspiration (L5: regain on Short Rest, spend a slot to
   regain a use), Magical Secrets (L10), College of Lore Bonus Proficiencies (L3)
   and Magical Discoveries (L6).
-- **Druid:** Wild Companion (L2), Wild Resurgence (L5), Archdruid (L20);
-  Nature's Sanctuary (L14). (Primal Order, Elemental Fury + Improved, Nature's
-  Ward and Beast Spells done 2026-11-12 — `services/druidFeatures.ts`.)
+- **Druid:** Nature's Sanctuary (L14). (Done 2026-11-12: Primal Order,
+  Wild Companion, Wild Resurgence, Elemental Fury + Improved, Archdruid's
+  Evergreen Wild Shape and Nature Magician, Nature's Ward, Beast Spells —
+  `services/druidFeatures.ts`, `actions/classFeature/druid.ts`. Wild Shape
+  itself was fixed: a Bonus Action, Temporary Hit Points = Druid level — it
+  used to take the Action and add 2× level to real HP, above the maximum.
+  Wild Companion is out of combat only, like other summons.)
 - **Fighter:** Tactical Mind (L2), Tactical Shift (L5).
 - **Monk:** Unarmored Movement (L2), Slow Fall (L4), Acrobatic Movement (L9),
   Heightened Focus (L10).
@@ -197,7 +201,7 @@ concentration.
 1. ~~§1 accuracy bugs~~ and ~~always-prepared subclass spells~~ (done 2026-11-12).
 2. ~~Monster Magic Resistance + Legendary Resistance~~ (done 2026-11-12).
 3. ~~Grapple / Shove as 5.2.1 saves~~, ~~Warlock Pacts + core invocations~~
-   (done 2026-11-12). Druid's missing base features. Spell attacks honoring
+   and Druid base features (done 2026-11-12). Next: spell attacks honoring
    conditions.
 4. Remaining class features, class by class, each with a spec per CLAUDE.md.
 5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).

@@ -213,7 +213,7 @@ describe('class features', () => {
 
   // ── Druid subclasses (SRD-69) ──────────────────────────────────────────
 
-  it('Base Druid Wild Shape — temp HP = 2 × druid level (SRD)', async () => {
+  it('Base Druid Wild Shape — Temporary Hit Points equal to Druid level (SRD 5.2.1)', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const druidId = 'd-base';
     const druid = makeChar({
@@ -237,8 +237,10 @@ describe('class features', () => {
     });
     const newDruid = result.newState.characters[0];
     expect(newDruid.conditions).toContain('wild_shaped');
-    // 2024 base: 2 × level 8 = 16 temp HP on top of 40 → 56.
-    expect(newDruid.hp).toBe(56);
+    // SRD 5.2.1: Temporary Hit Points equal to the Druid level (8); HP is
+    // untouched.
+    expect(newDruid.temp_hp).toBe(8);
+    expect(newDruid.hp).toBe(40);
   });
 
   it('Wild Shape: black_bear at L4 grants physical resistance + records the form', async () => {
