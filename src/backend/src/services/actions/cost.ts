@@ -53,6 +53,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   grapple: 'action',
   shove: 'action',
   try_escape_grapple: 'action',
+  familiar_attack: 'action',
 
   // Reaction-cost handlers.
   use_reaction: 'reaction',

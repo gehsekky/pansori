@@ -76,8 +76,18 @@ describe('learning invocations', () => {
     expect(r.newState.characters[0].feats).not.toContain('ascendant_step');
   });
 
+  it('Agonizing Blast needs a damaging Warlock cantrip (Eldritch Blast)', () => {
+    const ids = (c: Character) => learnableInvocations(c).map((d) => d.id);
+    expect(ids(warlock(2))).not.toContain('agonizing_blast');
+    expect(ids(warlock(2, [], { spells_known: ['eldritch_blast'] }))).toContain('agonizing_blast');
+  });
+
   it('offers Learn Invocation choices out of combat only', () => {
-    const out = generateChoices(stateFor(warlock(2)), baseSandboxSeed, ctx);
+    const out = generateChoices(
+      stateFor(warlock(2, [], { spells_known: ['eldritch_blast'] })),
+      baseSandboxSeed,
+      ctx
+    );
     expect(out.some((c) => c.label.startsWith('Learn Invocation: Agonizing Blast'))).toBe(true);
     const inCombat = generateChoices(
       stateFor(warlock(2), { combat_active: true }),

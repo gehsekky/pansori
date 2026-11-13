@@ -15,6 +15,7 @@ import {
 } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
+import { applyRepellingBlast } from './repellingBlast.js';
 import { composeNow } from '../../narrative/compose.js';
 import { empoweredEvocationBonus } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
@@ -123,6 +124,10 @@ export function runMultiTargetSpell(
         killed,
         note,
       });
+      // SRD Repelling Blast — each Eldritch Blast beam that hits pushes.
+      if (!killed && spell.id === 'eldritch_blast') {
+        lines[lines.length - 1] += applyRepellingBlast(ctx, tgtEnemy);
+      }
       if (killed) {
         const split = splitEncounterXp(ctx.st, char.id, tgtEnemy.xp ?? 0);
         ctx.st = split.st;

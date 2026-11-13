@@ -121,6 +121,12 @@ export function alwaysPreparedSpells(char: Character): string[] {
   if (choosesCircleLand(char) && char.circle_land) {
     circleLandSpells(char.circle_land, getClassLevel(char, 'druid')).forEach((s) => out.add(s));
   }
+  // SRD Pact of the Tome — the Book of Shadows' spells are prepared.
+  for (const s of [
+    ...(char.book_of_shadows?.cantrips ?? []),
+    ...(char.book_of_shadows?.rituals ?? []),
+  ])
+    out.add(s);
   return [...out];
 }
 

@@ -17,6 +17,7 @@ import {
   potentSpellcastingBonus,
 } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { applyRepellingBlast } from './repellingBlast.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 import { pickCastPrefix } from './utils.js';
@@ -156,6 +157,11 @@ export function runAttackRollSpell(
       ),
     };
     ctx.narrative += ` ${fmt.note(`[${spellTarget.name} is ${cond}!]`)}`;
+  }
+  // SRD Repelling Blast — push the target unless this beam drops it.
+  if (spell.id === 'eldritch_blast') {
+    const hpNow = ctx.st.entities?.find((e) => e.id === spellTarget.id && e.isEnemy)?.hp ?? 0;
+    if (spellDmg < hpNow) ctx.narrative += applyRepellingBlast(ctx, spellTarget);
   }
   return { done: false, spellDmg, spellHit: true };
 }

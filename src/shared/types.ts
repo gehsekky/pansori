@@ -918,6 +918,8 @@ export type StructuredAction =
   | { type: 'attune'; instanceId: string }
   | { type: 'grapple'; targetEnemyId?: string }
   | { type: 'try_escape_grapple' }
+  // SRD Pact of the Chain — forgo one attack so the familiar attacks.
+  | { type: 'familiar_attack'; targetEnemyId?: string }
   | { type: 'stand_up' }
   | { type: 'spend_inspiration' }
   // Manual level-up into a specific class (SRD multiclassing).

@@ -13,6 +13,8 @@ import {
   highestOpenSlot,
   invocationDef,
   learnableInvocations,
+  tomeCantripOptions,
+  tomeRitualOptions,
 } from '../../invocations.js';
 import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
@@ -386,6 +388,50 @@ export function handleCasterFeature(ctx: ActionContext, fid: string, option?: st
       fid === 'pact_blade_conjure'
         ? `${char.name} conjures a ${weaponName} and bonds with it as a pact weapon.`
         : `${char.name} bonds with the ${weaponName} — it is now a pact weapon.`;
+    return true;
+  }
+
+  // SRD Pact of the Tome — fill the Book of Shadows (out of combat): three
+  // cantrips and two level-1 Ritual spells from any class list that you don't
+  // already have. They join `spells_known` and are always prepared. Rewriting
+  // the book clears it (RAW: a new book appears at the end of a rest).
+  if (fid === 'tome_add_cantrip' || fid === 'tome_add_ritual' || fid === 'tome_rewrite') {
+    if (!hasInvocation(char, 'pact_of_the_tome')) {
+      ctx.narrative = 'You need the Pact of the Tome invocation.';
+      return true;
+    }
+    if (ctx.st.combat_active) {
+      ctx.narrative = 'You fill your Book of Shadows outside combat.';
+      return true;
+    }
+    const book = char.book_of_shadows ?? { cantrips: [], rituals: [] };
+    if (fid === 'tome_rewrite') {
+      const drop = new Set([...book.cantrips, ...book.rituals]);
+      char.spells_known = (char.spells_known ?? []).filter((s) => !drop.has(s));
+      char.book_of_shadows = { cantrips: [], rituals: [] };
+      ctx.narrative = `${char.name}'s Book of Shadows fades; a blank one takes its place.`;
+      return true;
+    }
+    const isCantrip = fid === 'tome_add_cantrip';
+    const options = isCantrip
+      ? tomeCantripOptions(char, ctx.context.spellTable ?? {})
+      : tomeRitualOptions(char, ctx.context.spellTable ?? {});
+    const spell = options.find((sp) => sp.id === option);
+    if (!spell) {
+      ctx.narrative = isCantrip
+        ? 'Choose a cantrip you don’t already have.'
+        : 'Choose a level-1 Ritual spell you don’t already have.';
+      return true;
+    }
+    if (isCantrip ? book.cantrips.length >= 3 : book.rituals.length >= 2) {
+      ctx.narrative = `Your Book of Shadows already holds its ${isCantrip ? 'three cantrips' : 'two rituals'}.`;
+      return true;
+    }
+    char.book_of_shadows = isCantrip
+      ? { ...book, cantrips: [...book.cantrips, spell.id] }
+      : { ...book, rituals: [...book.rituals, spell.id] };
+    char.spells_known = [...(char.spells_known ?? []), spell.id];
+    ctx.narrative = `${char.name} inscribes ${spell.name} into the Book of Shadows.`;
     return true;
   }
 

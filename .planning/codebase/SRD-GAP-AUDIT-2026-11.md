@@ -89,7 +89,7 @@ Partial or unverified (check behaviour against the text):
 
 ## 3. Warlock: Eldritch Invocations
 
-**In progress (2026-11-12).** `services/invocations.ts` holds the catalog,
+**Mostly done (2026-11-12).** `services/invocations.ts` holds the catalog,
 prerequisites and the Invocations-column cap (1 at L1 … 10 at L18); learning is
 an out-of-combat choice. Modeled: Agonizing Blast, Armor of Shadows, Ascendant
 Step, Devil's Sight, Eldritch Mind, Fiendish Vigor, Mask of Many Faces, Master
@@ -105,14 +105,23 @@ normal damage type (no Necrotic/Psychic/Radiant option); the bond doesn't
 lapse when the weapon is left behind; Lifedrinker's Hit Point Die heal isn't
 offered.
 
-Still missing: Pact of the Chain / Tome, Repelling Blast, Eldritch Spear,
-Investment of the Chain Master, Gift of the Protectors, Gift of the Depths,
-Gaze of Two Minds, Lessons of the First Ones, Witch Sight. Simplifications:
-Agonizing Blast applies to Eldritch Blast only (RAW: a chosen damaging Warlock
-cantrip, repeatable); replacing an invocation on level-up isn't offered.
+Pact of the Chain (Find Familiar without a slot, the seven special forms, one
+familiar at a time, forgo an attack so the familiar attacks), Pact of the Tome
+(Book of Shadows: 3 cantrips + 2 level-1 Rituals from any list, always
+prepared), Repelling Blast and Eldritch Spear are modeled. Simplifications:
+Chain's free Find Familiar is out of combat only (summons join at the next
+combat start); the Book of Shadows can be rewritten any time out of combat
+(RAW: when it appears at the end of a rest).
+
+Still missing: Investment of the Chain Master, Gift of the Protectors, Gift of
+the Depths, Gaze of Two Minds, Lessons of the First Ones, Witch Sight.
+Simplifications: Agonizing Blast, Repelling Blast and Eldritch Spear apply to
+Eldritch Blast only (RAW: a chosen damaging Warlock cantrip, repeatable);
+replacing an invocation on level-up isn't offered.
 
 Fixed alongside: Concentration saves never added the Proficiency Bonus for CON
-save proficiency (Sorcerer, Fighter, Barbarian…).
+save proficiency (Sorcerer, Fighter, Barbarian…); casting Find Familiar again
+added a second familiar (RAW: one familiar; a recast changes its form).
 
 ## 4. Monsters
 
@@ -186,8 +195,9 @@ concentration.
 
 1. ~~§1 accuracy bugs~~ and ~~always-prepared subclass spells~~ (done 2026-11-12).
 2. ~~Monster Magic Resistance + Legendary Resistance~~ (done 2026-11-12).
-3. ~~Grapple / Shove as 5.2.1 saves~~ (done 2026-11-12). Warlock Pacts + core
-   invocations; Druid's missing base features. Spell attacks honoring conditions.
+3. ~~Grapple / Shove as 5.2.1 saves~~, ~~Warlock Pacts + core invocations~~
+   (done 2026-11-12). Druid's missing base features. Spell attacks honoring
+   conditions.
 4. Remaining class features, class by class, each with a spec per CLAUDE.md.
 5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).
 6. Magic items, passive-number ones first; then mechanizable narrative spells.

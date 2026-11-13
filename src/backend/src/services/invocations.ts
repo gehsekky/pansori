@@ -1,5 +1,6 @@
-import type { Character, LootItem } from '../types.js';
+import type { Character, LootItem, Spell } from '../types.js';
 import { BASE_ITEMS } from '../campaignData/srd/items.js';
+import { SRD_MONSTERS } from '../campaignData/srd/monsters.js';
 import { getClassLevel } from './multiclass.js';
 
 // SRD: Warlock — Eldritch Invocations.
@@ -24,6 +25,8 @@ export interface InvocationDef {
   minLevel: number;
   /** Another invocation this one requires (e.g. a Pact). */
   requires?: string;
+  /** A spell the Warlock must know (e.g. a damaging Warlock cantrip). */
+  requiresSpell?: string;
   /** A spell the invocation lets you cast without a slot, at will. */
   freeSpell?: InvocationFreeSpell;
   /** Short menu blurb (our own words). */
@@ -35,6 +38,7 @@ export const INVOCATIONS: InvocationDef[] = [
     id: 'agonizing_blast',
     name: 'Agonizing Blast',
     minLevel: 2,
+    requiresSpell: 'eldritch_blast',
     blurb: '+CHA to Eldritch Blast damage',
   },
   {
@@ -104,6 +108,33 @@ export const INVOCATIONS: InvocationDef[] = [
     minLevel: 2,
     freeSpell: { spellId: 'jump', selfOnly: true },
     blurb: 'Jump on yourself, no slot',
+  },
+  {
+    id: 'eldritch_spear',
+    name: 'Eldritch Spear',
+    minLevel: 2,
+    requiresSpell: 'eldritch_blast',
+    blurb: 'Eldritch Blast range +30 ft per Warlock level',
+  },
+  {
+    id: 'pact_of_the_chain',
+    name: 'Pact of the Chain',
+    minLevel: 1,
+    freeSpell: { spellId: 'find_familiar' },
+    blurb: 'Find Familiar without a slot, special forms, and familiar attacks',
+  },
+  {
+    id: 'pact_of_the_tome',
+    name: 'Pact of the Tome',
+    minLevel: 1,
+    blurb: 'a Book of Shadows with 3 cantrips and 2 ritual spells from any list',
+  },
+  {
+    id: 'repelling_blast',
+    name: 'Repelling Blast',
+    minLevel: 2,
+    requiresSpell: 'eldritch_blast',
+    blurb: 'Eldritch Blast pushes a Large or smaller target 10 ft',
   },
   {
     id: 'pact_of_the_blade',
@@ -194,7 +225,8 @@ export function learnableInvocations(char: Character): InvocationDef[] {
     (d) =>
       !hasInvocation(char, d.id) &&
       wl >= d.minLevel &&
-      (!d.requires || hasInvocation(char, d.requires))
+      (!d.requires || hasInvocation(char, d.requires)) &&
+      (!d.requiresSpell || (char.spells_known ?? []).includes(d.requiresSpell))
   );
 }
 
@@ -245,5 +277,60 @@ export function highestOpenSlot(
     .sort((a, b) => b - a);
   return (
     levels.find((l) => (char.spell_slots_used?.[l] ?? 0) < (char.spell_slots_max?.[l] ?? 0)) ?? 0
+  );
+}
+
+/**
+ * SRD Pact of the Chain — the special familiar forms, from their stat blocks.
+ * (Familiars can't attack on their own turn; see `familiar_attack`.)
+ */
+const CHAIN_FORM_KEYS = [
+  'imp',
+  'pseudodragon',
+  'quasit',
+  'skeleton',
+  'sphinx_of_wonder',
+  'sprite',
+  'venomous_snake',
+] as const;
+
+export function pactChainForms(): {
+  name: string;
+  ac: number;
+  maxHp: number;
+  toHit: number;
+  damage: string;
+}[] {
+  return CHAIN_FORM_KEYS.map((k) => SRD_MONSTERS[k]).map((m) => ({
+    name: m.name,
+    ac: m.ac,
+    maxHp: m.hp,
+    toHit: m.toHit,
+    damage: m.damage,
+  }));
+}
+
+/** SRD Pact of the Tome — the Book of Shadows' spells. */
+export function bookOfShadowsSpells(char: Pick<Character, 'book_of_shadows'>): string[] {
+  return [...(char.book_of_shadows?.cantrips ?? []), ...(char.book_of_shadows?.rituals ?? [])];
+}
+
+/** Cantrips (any class list) the Book of Shadows can take. */
+export function tomeCantripOptions(
+  char: Pick<Character, 'spells_known'>,
+  spellTable: Record<string, Spell>
+): Spell[] {
+  const known = new Set(char.spells_known ?? []);
+  return Object.values(spellTable).filter((sp) => sp.level === 0 && !known.has(sp.id));
+}
+
+/** Level-1 Ritual spells (any class list) the Book of Shadows can take. */
+export function tomeRitualOptions(
+  char: Pick<Character, 'spells_known'>,
+  spellTable: Record<string, Spell>
+): Spell[] {
+  const known = new Set(char.spells_known ?? []);
+  return Object.values(spellTable).filter(
+    (sp) => sp.level === 1 && !!sp.ritualCasting && !known.has(sp.id)
   );
 }

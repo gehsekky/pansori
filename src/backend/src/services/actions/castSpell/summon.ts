@@ -1,6 +1,7 @@
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
 import { abilityMod } from '../../rulesEngine.js';
+import { pactChainForms } from '../../invocations.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -31,7 +32,27 @@ export function runSummonSpell(
   const { char } = ctx.actor;
   if (!spell.summon) return false;
   const base = spell.summon;
-  const chosen = [base, ...(base.variants ?? [])].find((o) => o.name === summonVariant) ?? base;
+  // SRD Pact of the Chain — Find Familiar cast through the pact may take one of
+  // the special forms (Imp, Pseudodragon, Quasit, ...).
+  const forms = [
+    base,
+    ...(base.variants ?? []),
+    ...(spell.id === 'find_familiar' && ctx.invocation === 'pact_of_the_chain'
+      ? pactChainForms()
+      : []),
+  ];
+  const chosen = forms.find((o) => o.name === summonVariant) ?? base;
+  // SRD Find Familiar — one familiar only: a recast gives the existing
+  // familiar the new form (the old one is replaced).
+  const isFamiliar = spell.id === 'find_familiar';
+  if (isFamiliar) {
+    ctx.st = {
+      ...ctx.st,
+      summoned_allies: (ctx.st.summoned_allies ?? []).filter(
+        (a) => !(a.familiar && a.ownerId === char.id)
+      ),
+    };
+  }
   const baseLevel = spell.level ?? 1;
   const perUpcast = base.countPerUpcastLevel ?? 0;
   // Animate Objects: the base count is the caster's spellcasting modifier;
@@ -52,6 +73,7 @@ export function runSummonSpell(
     // Non-combatant flag lives on the base summon (Find Familiar), so it applies
     // to every chosen form/variant.
     noAttack: base.noAttack,
+    familiar: isFamiliar || undefined,
     // SRD Mounted Combat — a rideable mount (Phantom Steed) carries its mount
     // flag + Speed so combat start auto-mounts the caster.
     isMount: base.isMount,

@@ -1157,7 +1157,12 @@ export function expandCasterSpellsForLevel(
   const known = new Set(char.spells_known ?? []);
   // Only non-cantrip spells count toward the known/spellbook target; subclass
   // always-prepared spells don't count either.
-  const granted = new Set(char.subclass_granted_spells ?? []);
+  // (Pact of the Tome's Book of Shadows spells are likewise extra.)
+  const granted = new Set([
+    ...(char.subclass_granted_spells ?? []),
+    ...(char.book_of_shadows?.cantrips ?? []),
+    ...(char.book_of_shadows?.rituals ?? []),
+  ]);
   let pool = (char.spells_known ?? []).filter((id) => !cantrips.has(id) && !granted.has(id)).length;
   for (let lvl = maxLvl; lvl >= 1 && pool < target; lvl--) {
     for (const id of byLevel[lvl] ?? []) {

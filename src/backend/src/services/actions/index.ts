@@ -52,7 +52,12 @@ import {
   handleStandUp,
 } from './combatUtility.js';
 import { handleDismount, handleMount } from './mount.js';
-import { handleGrapple, handleShove, handleTryEscapeGrapple } from './combatTactical.js';
+import {
+  handleFamiliarAttack,
+  handleGrapple,
+  handleShove,
+  handleTryEscapeGrapple,
+} from './combatTactical.js';
 import { handleLongRest, handleShortRest } from './rest.js';
 import { handleResolveReaction, handleUseReaction } from './reaction.js';
 import type { StructuredAction } from '../../types.js';
@@ -153,6 +158,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   grapple: handleGrapple as ActionHandler,
   try_escape_grapple: handleTryEscapeGrapple as ActionHandler,
   shove: handleShove as ActionHandler,
+  familiar_attack: handleFamiliarAttack as ActionHandler,
   move_zone: handleMoveZone as ActionHandler,
   loot: handleLoot as ActionHandler,
   sneak: handleSneak as ActionHandler,

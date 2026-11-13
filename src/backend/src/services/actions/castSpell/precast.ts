@@ -573,7 +573,12 @@ export function isSpellOutOfRange(
   // SRD Metamagic Distant Spell — double a ranged spell's range, or make a
   // touch spell reach 30 ft.
   const distant = !!ctx.metamagic?.includes('distant');
-  const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0);
+  // SRD Eldritch Spear — Eldritch Blast's range grows by 30 ft per Warlock level.
+  const spearFt =
+    spell.id === 'eldritch_blast' && hasInvocation(pc.char, 'eldritch_spear')
+      ? 30 * getClassLevel(pc.char, 'warlock')
+      : 0;
+  const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0) + spearFt;
   const maxFt = distant ? (spell.rangeKind === 'touch' ? 30 : baseMaxFt * 2) : baseMaxFt;
   // SRD line of sight — most offensive spells target "a creature you can see".
   // A solid obstacle strictly between caster and target blocks the cast (the

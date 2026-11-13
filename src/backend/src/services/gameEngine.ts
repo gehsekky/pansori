@@ -149,6 +149,9 @@ import {
   isPactWeapon,
   knownInvocations,
   learnableInvocations,
+  pactChainForms,
+  tomeCantripOptions,
+  tomeRitualOptions,
 } from './invocations.js';
 import { consumeDarkOnesLuck, tryDarkOnesLuck } from './darkOnesOwnLuck.js';
 import { consumeImproveFate, tryImproveFate } from './improveFate.js';
@@ -4001,8 +4004,13 @@ export function applyLevelUpForClass(char: Character, className: string, context
   const knownTarget = knownSpellTargetForLevel(className, newClassLevel);
   if (knownTarget !== null && context.spellTable) {
     const cantrips = new Set(casterSpellOptionsByLevel(className, context.spellTable, 0)[0] ?? []);
-    // Subclass always-prepared spells don't count against the known target.
-    const granted = new Set(char.subclass_granted_spells ?? []);
+    // Subclass always-prepared spells (and the Book of Shadows) don't count
+    // against the known target.
+    const granted = new Set([
+      ...(char.subclass_granted_spells ?? []),
+      ...(char.book_of_shadows?.cantrips ?? []),
+      ...(char.book_of_shadows?.rituals ?? []),
+    ]);
     const currentKnown = (char.spells_known ?? []).filter(
       (id) => !cantrips.has(id) && !granted.has(id)
     ).length;
@@ -6540,6 +6548,43 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
       });
     }
+    // SRD Pact of the Tome — fill the Book of Shadows out of combat.
+    if (hasInvocation(char, 'pact_of_the_tome') && !state.combat_active) {
+      const book = char.book_of_shadows ?? { cantrips: [], rituals: [] };
+      const spellTable = context.spellTable ?? {};
+      const pick = (sps: Spell[]) => sps.map((sp) => ({ id: sp.id, label: sp.name, sub: sp.desc }));
+      if (book.cantrips.length < 3) {
+        choices.push({
+          label: `Add Book Cantrip — inscribe a cantrip from any list (${book.cantrips.length}/3)`,
+          action: { type: 'use_class_feature', featureId: 'tome_add_cantrip' },
+          kind: 'class_feature',
+          pickOption: {
+            param: 'option',
+            title: 'Book of Shadows: which cantrip?',
+            options: pick(tomeCantripOptions(char, spellTable)),
+          },
+        });
+      }
+      if (book.rituals.length < 2) {
+        choices.push({
+          label: `Add Book Ritual — inscribe a level-1 Ritual spell from any list (${book.rituals.length}/2)`,
+          action: { type: 'use_class_feature', featureId: 'tome_add_ritual' },
+          kind: 'class_feature',
+          pickOption: {
+            param: 'option',
+            title: 'Book of Shadows: which ritual?',
+            options: pick(tomeRitualOptions(char, spellTable)),
+          },
+        });
+      }
+      if (book.cantrips.length + book.rituals.length > 0) {
+        choices.push({
+          label: 'Rewrite Book of Shadows — clear it and choose again',
+          action: { type: 'use_class_feature', featureId: 'tome_rewrite' },
+          kind: 'class_feature',
+        });
+      }
+    }
     // SRD Eldritch Smite — ready it for the next pact-weapon hit this turn.
     if (
       state.combat_active &&
@@ -6576,6 +6621,29 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         if (char.turn_actions[slotAction]) continue;
       }
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      if (sp.summon) {
+        // A summon (Pact of the Chain's Find Familiar): one choice per form,
+        // the pact's special forms included.
+        const forms = [
+          sp.summon,
+          ...(sp.summon.variants ?? []),
+          ...(inv.id === 'pact_of_the_chain' ? pactChainForms() : []),
+        ];
+        for (const f of forms) {
+          choices.push({
+            label: `${inv.name} — cast ${sp.name}: ${f.name} (no slot)`,
+            action: {
+              type: 'cast_spell',
+              spellId: sp.id,
+              slotLevel: sp.level,
+              invocation: inv.id,
+              summonVariant: f.name,
+            },
+            kind: 'cast_spell',
+          });
+        }
+        continue;
+      }
       choices.push({
         label: `${inv.name} — cast ${sp.name}${free.selfOnly ? ' on yourself' : ''} (no slot)`,
         action: { type: 'cast_spell', spellId: sp.id, slotLevel: sp.level, invocation: inv.id },
@@ -7364,6 +7432,28 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         label: `Shove the ${en.name}${suffix} 5 ft away — STR/DEX save vs DC ${usDc}`,
         action: { type: 'shove', targetEnemyId: en.id, mode: 'push' },
         kind: 'shove_push',
+      });
+    }
+  }
+
+  // SRD Pact of the Chain — forgo one of your attacks so your familiar makes
+  // one of its own (its Reaction), against an enemy within 5 ft of it.
+  if (
+    state.combat_active &&
+    !char.turn_actions.action_used &&
+    !char.turn_actions.familiar_attack_used &&
+    hasInvocation(char, 'pact_of_the_chain')
+  ) {
+    const familiar = state.entities?.find(
+      (e) => e.summoned_by === char.id && e.noAttack && e.hp > 0
+    );
+    const famName = familiar?.companionName ?? 'familiar';
+    for (const en of familiar ? livingEnemies : []) {
+      const enEnt = state.entities?.find((e) => e.id === en.id && e.isEnemy);
+      if (!enEnt || distanceFeet(familiar!.pos, enEnt.pos) > 5) continue;
+      choices.push({
+        label: `Your ${famName} attacks the ${en.name} — forgo one of your attacks (Pact of the Chain)`,
+        action: { type: 'familiar_attack', targetEnemyId: en.id },
       });
     }
   }

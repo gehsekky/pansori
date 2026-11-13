@@ -1,5 +1,19 @@
 import type { ActionContext, ActionHandler } from './types.js';
-import { abilityMod, d, d20TestPenalty, profBonus, skillCheck } from '../rulesEngine.js';
+import {
+  abilityMod,
+  d,
+  d20TestPenalty,
+  profBonus,
+  resolveEnemyAttack,
+  skillCheck,
+} from '../rulesEngine.js';
+import {
+  applyDamageToEntity,
+  endCombatState,
+  entitySide,
+  getEnemyById,
+  pushEntityAway,
+} from '../gameEngine.js';
 import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
   applyIndomitableMight,
@@ -7,13 +21,13 @@ import {
   hasJackOfAllTrades,
   hasReliableTalent,
 } from '../multiclass.js';
-import { getEnemyById, pushEntityAway } from '../gameEngine.js';
 import { unarmedStrikeDc, unarmedStrikeSave, withinUnarmedSizeLimit } from '../unarmedStrike.js';
 import { checkMountFallOff } from './mount.js';
 import { composeNow } from '../narrative/compose.js';
 import { distanceFeet } from '../gridEngine.js';
 import { extraAttackCountForChar } from './attack/resolveOneAttack.js';
 import { handleAttack } from './attack/index.js';
+import { hasInvocation } from '../invocations.js';
 
 /**
  * SRD Unarmed Strike — Grapple / Shove. Shared resolution:
@@ -135,15 +149,17 @@ function resolveUnarmedOption(
     if (save.failed && save.note) ctx.narrative += save.note;
   }
 
-  spendUnarmedStrikeAttack(ctx, target.id);
+  spendOneAttack(ctx, target.id);
   return undefined;
 }
 
 /**
- * The Grapple / Shove was one attack. Outside combat it simply uses the
- * action; in combat with Extra Attack the remaining attacks follow.
+ * One attack of the Attack action was spent on something other than a weapon
+ * attack (a Grapple / Shove, or the familiar's attack for Pact of the Chain).
+ * Outside combat it simply uses the action; in combat with Extra Attack the
+ * remaining attacks follow against the same target.
  */
-function spendUnarmedStrikeAttack(ctx: ActionContext, targetId: string): void {
+function spendOneAttack(ctx: ActionContext, targetId: string): void {
   if (ctx.actor.kind !== 'pc') return;
   const { char } = ctx.actor;
   if (!ctx.st.combat_active) {
@@ -278,3 +294,61 @@ export const handleShove: ActionHandler<{
   mode?: 'prone' | 'push';
 }> = (ctx, action) =>
   resolveUnarmedOption(ctx, action.targetEnemyId, action.mode === 'push' ? 'push' : 'prone');
+
+/**
+ * `familiar_attack`: SRD Pact of the Chain — when you take the Attack action
+ * you can forgo one of your attacks to let your familiar make one attack of its
+ * own with its Reaction. The familiar must be within 5 ft of the target; your
+ * remaining attacks (Extra Attack) follow against the same target.
+ */
+export const handleFamiliarAttack: ActionHandler<{
+  type: 'familiar_attack';
+  targetEnemyId?: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs command a familiar.' };
+  const { char } = ctx.actor;
+  if (!hasInvocation(char, 'pact_of_the_chain')) {
+    return { rejected: 'Your familiar can attack only with Pact of the Chain.' };
+  }
+  if (!ctx.st.combat_active) return { rejected: 'Your familiar attacks only in combat.' };
+  if (char.turn_actions.action_used) return { rejected: 'You have already used your action.' };
+  if (char.turn_actions.familiar_attack_used) {
+    return { rejected: 'Your familiar has already attacked this turn.' };
+  }
+  const familiar = ctx.st.entities?.find(
+    (e) => e.summoned_by === char.id && e.noAttack && e.hp > 0
+  );
+  if (!familiar) return { rejected: 'You have no familiar in this fight.' };
+  const target = ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId) ?? ctx.enemy;
+  const tgtEnt = target ? ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy) : undefined;
+  if (!target || !tgtEnt || tgtEnt.hp <= 0) return { rejected: 'No enemy for your familiar.' };
+  if (distanceFeet(familiar.pos, tgtEnt.pos) > 5) {
+    return { rejected: `Your familiar must be within 5 ft of the ${target.name}.` };
+  }
+
+  const famName = familiar.companionName ?? 'Your familiar';
+  const res = resolveEnemyAttack(
+    { toHit: familiar.toHit ?? 0, damage: familiar.damage ?? '1d4' },
+    target.ac
+  );
+  updatePcActor(ctx, {
+    turn_actions: { ...char.turn_actions, familiar_attack_used: true },
+  });
+  if (!res.hit) {
+    ctx.narrative = `${famName} lunges at the ${target.name} — ${res.total} vs AC ${target.ac}, miss.`;
+  } else {
+    ctx.st = applyDamageToEntity(ctx.st, target.id, res.damage);
+    ctx.narrative = `${famName} strikes the ${target.name} — ${res.total} vs AC ${target.ac}, ${res.damage} damage!`;
+    const slain = (ctx.st.entities?.find((e) => e.id === target.id)?.hp ?? 0) <= 0;
+    if (slain) {
+      ctx.st = { ...ctx.st, enemies_killed: [...ctx.st.enemies_killed, target.id] };
+      ctx.narrative += ` The ${target.name} is slain!`;
+      const anyEnemyLeft = (ctx.st.entities ?? []).some(
+        (e) => entitySide(e) === 'enemy' && e.hp > 0 && !ctx.st.enemies_killed.includes(e.id)
+      );
+      if (!anyEnemyLeft) ctx.st = endCombatState(ctx.st);
+    }
+  }
+  spendOneAttack(ctx, target.id);
+  return undefined;
+};

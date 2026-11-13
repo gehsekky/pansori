@@ -710,6 +710,8 @@ export interface TurnActions {
   eldritch_smite_armed?: boolean;
   eldritch_smite_used?: boolean;
   lifedrinker_used?: boolean;
+  // SRD Pact of the Chain — the familiar's Reaction attack this turn.
+  familiar_attack_used?: boolean;
   // SRD Fighter L17 — Action Surge can be used twice per rest, but
   // still only ONCE per turn. This flag marks the per-turn use; the
   // per-rest cap is tracked on class_resource_uses.action_surge.
@@ -1453,6 +1455,10 @@ export interface Character {
   // A conjured one carries `conjured_pact_weapon` on its inventory entry and
   // vanishes when the bond moves on.
   pact_weapon?: string;
+  // SRD Pact of the Tome — the Book of Shadows' chosen spells (3 cantrips and
+  // 2 level-1 Rituals from any class list). They sit in `spells_known`, are
+  // always prepared, and don't count toward the known-spell limit.
+  book_of_shadows?: { cantrips: string[]; rituals: string[] };
   // SRD Ranger Hunter "feature option" picks (swappable on a rest):
   //   Hunter's Prey (L3): 'colossus_slayer' | 'horde_breaker' (defaults to
   //     colossus_slayer when unset, preserving the pre-picker behavior).
@@ -1718,6 +1724,9 @@ export interface SummonedAlly {
   // Carried onto `CombatEntity.noAttack` by `seedSummonedAllies`; `runAllyTurn`
   // takes the Help action instead of attacking.
   noAttack?: boolean;
+  // SRD Find Familiar — this ally is its owner's familiar (one at a time: a
+  // recast replaces it with the new form).
+  familiar?: boolean;
   // SRD 5.2.1 Mounted Combat — this ally is a rideable mount (Phantom Steed).
   // `seedSummonedAllies` auto-mounts its owner at combat start; `speed` is the
   // mount's Speed (ft), carried onto the entity's `speed_ft`.
