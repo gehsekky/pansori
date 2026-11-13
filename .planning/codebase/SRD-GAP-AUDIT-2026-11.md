@@ -62,10 +62,9 @@ Missing (no code path):
 - **Bard:** Font of Inspiration (L5: regain on Short Rest, spend a slot to
   regain a use), Magical Secrets (L10), College of Lore Bonus Proficiencies (L3)
   and Magical Discoveries (L6).
-- **Druid:** Primal Order (L1), Wild Companion (L2), Wild Resurgence (L5),
-  Elemental Fury (L7) and Improved Elemental Fury (L15), Archdruid (L20);
-  Nature's Ward (L10), Nature's Sanctuary (L14).
-  Druid is the least complete class.
+- **Druid:** Wild Companion (L2), Wild Resurgence (L5), Archdruid (L20);
+  Nature's Sanctuary (L14). (Primal Order, Elemental Fury + Improved, Nature's
+  Ward and Beast Spells done 2026-11-12 — `services/druidFeatures.ts`.)
 - **Fighter:** Tactical Mind (L2), Tactical Shift (L5).
 - **Monk:** Unarmored Movement (L2), Slow Fall (L4), Acrobatic Movement (L9),
   Heightened Focus (L10).
@@ -85,7 +84,9 @@ Partial or unverified (check behaviour against the text):
   exist; check that two effects can be applied at once.
 - Wizard Ritual Adept (L1): ritual casting exists; check that rituals can be
   cast from the spellbook without being prepared.
-- Druid Beast Spells (L18): no evidence that casting is allowed while Wild Shaped.
+- ~~Druid Beast Spells (L18)~~: fixed 2026-11-12. Wild Shape never blocked
+  spellcasting at all (RAW: no spellcasting in a beast form until L18, and then
+  not spells with a costly or consumed Material component).
 
 ## 3. Warlock: Eldritch Invocations
 

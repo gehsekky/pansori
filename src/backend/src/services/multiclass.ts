@@ -774,14 +774,21 @@ export function divineStrikeDie(char: Character): string | null {
   return lvl >= 14 ? '2d8' : lvl >= 7 ? '1d8' : null;
 }
 
-/** SRD Cleric Blessed Strikes — Potent Spellcasting: +WIS to Cleric cantrip
- *  damage (Cleric L7+ who chose Potent Spellcasting). 0 otherwise. */
-export function potentSpellcastingBonus(char: Character, spell: { level?: number }): number {
-  return spell.level === 0 &&
-    char.blessed_strikes === 'potent_spellcasting' &&
-    getClassLevel(char, 'cleric') >= 7
-    ? Math.max(0, abilityMod(char.wis))
-    : 0;
+/** SRD Potent Spellcasting: +WIS to cantrip damage — the Cleric's Blessed
+ *  Strikes option (Cleric L7+), and the Druid's Elemental Fury option (Druid
+ *  L7+, Druid cantrips: the Primal list). 0 otherwise. */
+export function potentSpellcastingBonus(
+  char: Character,
+  spell: { level?: number; spellList?: ReadonlyArray<string> }
+): number {
+  if (spell.level !== 0) return 0;
+  const cleric =
+    char.blessed_strikes === 'potent_spellcasting' && getClassLevel(char, 'cleric') >= 7;
+  const druid =
+    char.elemental_fury === 'potent_spellcasting' &&
+    getClassLevel(char, 'druid') >= 7 &&
+    (spell.spellList?.includes('primal') ?? false);
+  return cleric || druid ? Math.max(0, abilityMod(char.wis)) : 0;
 }
 
 /** SRD Improved Blessed Strikes (Cleric L14, Potent Spellcasting) — when a

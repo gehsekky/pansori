@@ -43,6 +43,7 @@ import {
   overwhelmingStrikeDamage,
   peerlessAimAvailable,
 } from '../../feats.js';
+import { primalStrikeDie, primalStrikeType } from '../../druidFeatures.js';
 import type { ActionContext } from '../types.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
@@ -663,6 +664,26 @@ export function resolveOneAttack(
       });
     }
   }
+  // SRD Elemental Fury (Primal Strike) — once per turn, a weapon or beast-form
+  // hit deals +1d8 (2d8 at L15) Cold, Fire, Lightning or Thunder; the type is
+  // picked to beat the target's defenses (`primalStrikeType`).
+  let primalStrikeDmg = 0;
+  let primalStrikeLabel = '';
+  const psDie = primalStrikeDie(pc.char);
+  if (
+    psDie &&
+    atk.hit &&
+    (weaponItem || pc.char.conditions.includes('wild_shaped')) &&
+    !pc.char.turn_actions.primal_strike_used
+  ) {
+    const psType = primalStrikeType(target);
+    const rolled = isCrit ? rollCritical(psDie) : rollDice(psDie);
+    primalStrikeDmg = applyDamageMultiplier(rolled, psType, target).damage;
+    primalStrikeLabel = `Primal Strike ${psDie}${isCrit ? ' (crit)' : ''}: +${primalStrikeDmg} ${psType}`;
+    updatePcActor(ctx, {
+      turn_actions: { ...pc.char.turn_actions, primal_strike_used: true },
+    });
+  }
   // SRD Lifedrinker — once per turn, a pact-weapon hit deals +1d6 Necrotic.
   // (Spending a Hit Point Die to heal is not offered — simplification.)
   let lifedrinkerDmg = 0;
@@ -710,7 +731,8 @@ export function resolveOneAttack(
   const radiantRider = smiteDmg + improvedSmiteDmg + divineStrikeDmg;
   // Divine Favor / smite riders also ride on top of the weapon multiplier (same
   // resistance simplification as the radiant riders above).
-  const spellWeaponRider = weaponRiderDmg + smiteRiderDmg + eldritchSmiteDmg + lifedrinkerDmg;
+  const spellWeaponRider =
+    weaponRiderDmg + smiteRiderDmg + eldritchSmiteDmg + lifedrinkerDmg + primalStrikeDmg;
   const totalDmg = finalDmg + radiantRider + spellWeaponRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
@@ -796,6 +818,7 @@ export function resolveOneAttack(
       label: `Eldritch Smite ${eldritchSmiteExpr}${isCrit ? ' (crit)' : ''}: +${eldritchSmiteDmg} force`,
     });
   }
+  if (primalStrikeLabel) hitBonuses.push({ label: primalStrikeLabel });
   if (lifedrinkerDmg > 0) {
     hitBonuses.push({ label: `Lifedrinker 1d6: +${lifedrinkerDmg} necrotic` });
   }

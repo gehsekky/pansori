@@ -78,6 +78,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   choose_elemental_affinity: 'managed',
   choose_blessed_strikes: 'managed',
   choose_divine_order: 'managed',
+  choose_primal_order: 'managed',
+  choose_elemental_fury: 'managed',
   choose_spell_mastery: 'managed',
   choose_signature_spell: 'managed',
   choose_evocation_savant: 'managed',

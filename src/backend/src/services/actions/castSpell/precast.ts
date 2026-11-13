@@ -7,6 +7,7 @@ import {
 } from '../../gridEngine.js';
 import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
 import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
+import { druidCantripRangeBonus, wildShapeBlocksCasting } from '../../druidFeatures.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import { hasInvocation, invocationDef } from '../../invocations.js';
 import type { ActionContext } from '../types.js';
@@ -72,6 +73,16 @@ export function runPrecast(
   ctx.metamagic = ctx.st.metamagic_active ?? [];
   if (ctx.st.metamagic_active) ctx.st = { ...ctx.st, metamagic_active: undefined };
   const isSubtle = ctx.metamagic.includes('subtle');
+
+  // SRD Wild Shape — "No Spellcasting" in a beast form (Beast Spells, L18,
+  // allows it except for a costly or consumed Material component).
+  if (wildShapeBlocksCasting(pc.char, spell)) {
+    ctx.narrative =
+      getClassLevel(pc.char, 'druid') >= 18
+        ? `You can't cast ${spell.name} in Wild Shape — its Material component has a cost.`
+        : `You can't cast spells while in Wild Shape.`;
+    return { done: true };
+  }
 
   // SRD: cannot cast spells while wearing armor you are not proficient with
   const spellArmorItem = equippedArmorId(pc.char)
@@ -578,7 +589,9 @@ export function isSpellOutOfRange(
     spell.id === 'eldritch_blast' && hasInvocation(pc.char, 'eldritch_spear')
       ? 30 * getClassLevel(pc.char, 'warlock')
       : 0;
-  const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0) + spearFt;
+  // SRD Improved Elemental Fury (Potent Spellcasting) — Druid cantrips +300 ft.
+  const furyFt = druidCantripRangeBonus(pc.char, spell);
+  const baseMaxFt = spell.rangeKind === 'touch' ? 5 : (spell.rangeFt ?? 0) + spearFt + furyFt;
   const maxFt = distant ? (spell.rangeKind === 'touch' ? 30 : baseMaxFt * 2) : baseMaxFt;
   // SRD line of sight — most offensive spells target "a creature you can see".
   // A solid obstacle strictly between caster and target blocks the cast (the

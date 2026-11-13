@@ -310,6 +310,78 @@ export const handleChooseDivineOrder: ActionHandler<{
 };
 
 /**
+ * `choose_primal_order`: SRD Druid (L1) — Magician (learn an extra Druid
+ * cantrip via `cantrip`; +WIS, min +1, to Intelligence (Arcana/Nature) checks)
+ * or Warden (Martial weapons + Medium armor training). Out of combat, no
+ * action cost.
+ */
+export const handleChoosePrimalOrder: ActionHandler<{
+  type: 'choose_primal_order';
+  option: 'magician' | 'warden';
+  cantrip?: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Primal Order.' };
+  const { char } = ctx.actor;
+  if (!hasClass(char, 'druid')) return { rejected: 'Only Druids have Primal Order.' };
+  if (char.primal_order) return { rejected: 'Primal Order is already chosen.' };
+  if (action.option === 'warden') {
+    updatePcActor(ctx, {
+      primal_order: 'warden',
+      weapon_proficiencies: char.weapon_proficiencies.includes('martial')
+        ? char.weapon_proficiencies
+        : [...char.weapon_proficiencies, 'martial'],
+      armor_proficiencies: char.armor_proficiencies.includes('medium')
+        ? char.armor_proficiencies
+        : [...char.armor_proficiencies, 'medium'],
+    });
+    ctx.narrative = `${char.name} takes the Warden's role — trained with Martial weapons and Medium armor.`;
+    return;
+  }
+  if (action.option === 'magician') {
+    const spell = action.cantrip ? ctx.context.spellTable?.[action.cantrip] : undefined;
+    const isDruidCantrip =
+      spell?.level === 0 &&
+      ((spell as { spellList?: ReadonlyArray<string> }).spellList?.includes('primal') ?? false);
+    if (!spell || !isDruidCantrip) return { rejected: 'Choose a Druid cantrip to learn.' };
+    if ((char.spells_known ?? []).includes(spell.id)) {
+      return { rejected: `You already know ${spell.name}.` };
+    }
+    updatePcActor(ctx, {
+      primal_order: 'magician',
+      spells_known: [...(char.spells_known ?? []), spell.id],
+    });
+    ctx.narrative = `${char.name} takes the Magician's role — learns ${spell.name} and adds WIS to Arcana/Nature checks.`;
+    return;
+  }
+  return { rejected: `Unknown Primal Order option: ${action.option}.` };
+};
+
+/**
+ * `choose_elemental_fury`: SRD Druid (L7) — Potent Spellcasting (+WIS to Druid
+ * cantrip damage; L15: +300 ft range) or Primal Strike (+1d8 elemental on a
+ * weapon / beast-form hit once per turn; L15: 2d8).
+ */
+export const handleChooseElementalFury: ActionHandler<{
+  type: 'choose_elemental_fury';
+  option: 'potent_spellcasting' | 'primal_strike';
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Elemental Fury.' };
+  const { char } = ctx.actor;
+  if (getClassLevel(char, 'druid') < 7) {
+    return { rejected: 'Elemental Fury requires a Druid of level 7.' };
+  }
+  if (char.elemental_fury) return { rejected: 'Elemental Fury is already chosen.' };
+  if (action.option !== 'potent_spellcasting' && action.option !== 'primal_strike') {
+    return { rejected: `Unknown Elemental Fury option: ${action.option}.` };
+  }
+  updatePcActor(ctx, { elemental_fury: action.option });
+  ctx.narrative =
+    action.option === 'primal_strike'
+      ? `${char.name} takes Primal Strike — weapon and beast-form hits crackle with elemental power once per turn.`
+      : `${char.name} takes Potent Spellcasting — Druid cantrips deal +WIS damage.`;
+};
+
+/**
  * SRD Cleric Divine Order applied at *character creation* (the player picks it on
  * the new-game screen), mirroring the in-game {@link handleChooseDivineOrder}.
  * Mutates the built character: Protector trains Martial weapons + Heavy armor;

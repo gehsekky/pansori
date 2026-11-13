@@ -1022,6 +1022,9 @@ export type StructuredAction =
   // training) or Thaumaturge (extra Cleric cantrip via `cantrip` + WIS to
   // Arcana/Religion). Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_divine_order'; option: 'protector' | 'thaumaturge'; cantrip?: string }
+  // SRD Druid Primal Order (L1) / Elemental Fury (L7) — one-time choices.
+  | { type: 'choose_primal_order'; option: 'magician' | 'warden'; cantrip?: string }
+  | { type: 'choose_elemental_fury'; option: 'potent_spellcasting' | 'primal_strike' }
   // SRD 5.2.1 Wizard Spell Mastery (L18): designate a L1 (tier 1) or L2
   // (tier 2) action spell to cast at will with no slot. Out-of-combat. (RE-2.)
   | { type: 'choose_spell_mastery'; tier: 1 | 2; spellId: string }

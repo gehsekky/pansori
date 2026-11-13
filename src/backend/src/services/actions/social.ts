@@ -20,6 +20,7 @@ import { pathToNode, responsesAtNodePath } from '../conversation.js';
 import type { ActionHandler } from './types.js';
 import type { ActiveGrid } from '../mapEngine.js';
 import type { GridPos } from '../../types.js';
+import { magicianCheckBonus } from '../druidFeatures.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -714,10 +715,11 @@ export const handleStudy: ActionHandler<{
   const studyLuckActive = consumeLuckForCheck(char);
   // SRD Cleric Divine Order (Thaumaturge) — add WIS (min +1) to Intelligence
   // (Arcana/Religion) checks. `divine_order` is only ever set on a Cleric.
+  // SRD Druid Primal Order (Magician) — the same bonus to Arcana/Nature checks.
   const thaumaturgeBonus =
-    char.divine_order === 'thaumaturge' && (skillName === 'arcana' || skillName === 'religion')
+    (char.divine_order === 'thaumaturge' && (skillName === 'arcana' || skillName === 'religion')
       ? Math.max(1, abilityMod(char.wis))
-      : 0;
+      : 0) + magicianCheckBonus(char, skillName);
   // Routed through skillCheck (Study skills are all INT) so it gains Expertise /
   // Jack of All Trades / Reliable Talent / Halfling Lucky. The Thaumaturge bonus
   // folds into the DC (lowered by it), mirroring how Bardic dice are handled.

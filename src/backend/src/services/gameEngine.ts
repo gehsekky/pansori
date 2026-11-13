@@ -173,6 +173,7 @@ import {
   unarmedStrikeDc,
   withinUnarmedSizeLimit,
 } from './unarmedStrike.js';
+import { hasNaturesWard, naturesWardResistance, wildShapeBlocksCasting } from './druidFeatures.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
@@ -1236,6 +1237,8 @@ export function auraConditionImmunity(char: Character, st: GameState): Set<strin
 export function conditionImmunitiesFor(char: Character, st: GameState): Set<string> {
   const out = auraConditionImmunity(char, st);
   for (const c of char.condition_immunities ?? []) out.add(c);
+  // SRD Circle of the Land Nature's Ward (L10) — immune to Poisoned.
+  if (hasNaturesWard(char)) out.add('poisoned');
   return out;
 }
 
@@ -1921,7 +1924,11 @@ function computeEnemyAttack(
     // element). Cleared when the granting spell's concentration ends.
     const spellResist =
       !!enemy.damageType && (char.spell_resistances ?? []).includes(enemy.damageType);
+    // SRD Circle of the Land Nature's Ward (L10) — the current land's type.
+    const wardType = naturesWardResistance(char);
+    const wardResist = !!enemy.damageType && wardType === enemy.damageType;
     const anyResist =
+      wardResist ||
       isRaging ||
       isPetrified ||
       beastResist ||
@@ -2005,6 +2012,7 @@ function computeEnemyAttack(
       const resistsBonus =
         isPetrified ||
         (!!bt && (char.spell_resistances ?? []).includes(bt)) ||
+        (!!bt && wardType === bt) ||
         speciesData?.resistances?.includes(bt ?? '') === true;
       bonusDmg = resistsBonus ? Math.ceil(rolled / 2) : rolled;
       if (bonusDmg > 0) bonusNote = ` (plus ${fmt.dmg(bonusDmg)} ${bt ?? ''})`.replace(' )', ')');
@@ -2026,6 +2034,7 @@ function computeEnemyAttack(
       const resistsCharge =
         isPetrified ||
         (!!ct && (char.spell_resistances ?? []).includes(ct)) ||
+        (!!ct && wardType === ct) ||
         speciesData?.resistances?.includes(ct ?? '') === true;
       chargeDmg = resistsCharge ? Math.ceil(rolled / 2) : rolled;
       if (chargeDmg > 0)
@@ -5585,6 +5594,44 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     });
   }
 
+  // ── Druid Primal Order (L1) — Magician / Warden ────────────────────────────
+  if (!state.combat_active && hasClass(char, 'druid') && !char.primal_order) {
+    choices.push({
+      label: 'Primal Order: Warden (train with Martial weapons + Medium armor)',
+      action: { type: 'choose_primal_order', option: 'warden' },
+    });
+    const knownSet = new Set(char.spells_known ?? []);
+    const druidCantrips = Object.values(context.spellTable ?? {}).filter(
+      (sp) =>
+        sp.level === 0 &&
+        ((sp as { spellList?: ReadonlyArray<string> }).spellList?.includes('primal') ?? false) &&
+        !knownSet.has(sp.id)
+    );
+    if (druidCantrips.length > 0) {
+      choices.push({
+        label: 'Primal Order: Magician (learn a Druid cantrip; +WIS to Arcana/Nature)',
+        action: { type: 'choose_primal_order', option: 'magician' },
+        pickOption: {
+          param: 'cantrip',
+          title: 'Magician: which Druid cantrip?',
+          options: druidCantrips.map((sp) => ({ id: sp.id, label: sp.name, sub: sp.desc })),
+        },
+      });
+    }
+  }
+
+  // ── Druid Elemental Fury (L7) — Potent Spellcasting / Primal Strike ────────
+  if (!state.combat_active && getClassLevel(char, 'druid') >= 7 && !char.elemental_fury) {
+    choices.push({
+      label: 'Elemental Fury: Primal Strike (+1d8 elemental on a weapon or beast-form hit, 1/turn)',
+      action: { type: 'choose_elemental_fury', option: 'primal_strike' },
+    });
+    choices.push({
+      label: 'Elemental Fury: Potent Spellcasting (+WIS to Druid cantrip damage)',
+      action: { type: 'choose_elemental_fury', option: 'potent_spellcasting' },
+    });
+  }
+
   // ── Cleric Blessed Strikes (L7) — Divine Strike / Potent Spellcasting ──────
   // One-time choice surfaced out of combat once the cleric reaches L7. (RE-2.)
   if (
@@ -6757,6 +6804,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
       const spell = context.spellTable[spellId];
       if (!spell) continue;
+      // SRD Wild Shape — no spellcasting in a beast form (until Beast Spells).
+      if (wildShapeBlocksCasting(char, spell)) continue;
 
       // Prep gate: filter unprepared level-1+ spells out of the cast menu
       // for prep classes. If `prepared_spells` is empty (legacy state /

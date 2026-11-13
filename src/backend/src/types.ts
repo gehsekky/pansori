@@ -712,6 +712,8 @@ export interface TurnActions {
   lifedrinker_used?: boolean;
   // SRD Pact of the Chain — the familiar's Reaction attack this turn.
   familiar_attack_used?: boolean;
+  // SRD Druid Elemental Fury (Primal Strike) — once per turn.
+  primal_strike_used?: boolean;
   // SRD Fighter L17 — Action Surge can be used twice per rest, but
   // still only ONCE per turn. This flag marks the per-turn use; the
   // per-rest cap is tracked on class_resource_uses.action_surge.
@@ -1479,6 +1481,11 @@ export interface Character {
   // Martial weapon + Heavy armor training; Thaumaturge knows an extra Cleric
   // cantrip and adds WIS (min +1) to Intelligence (Arcana/Religion) checks.
   divine_order?: 'protector' | 'thaumaturge';
+  // SRD Druid Primal Order (L1) — Magician (extra Druid cantrip, +WIS to
+  // Arcana/Nature checks) or Warden (Martial weapons, Medium armor).
+  primal_order?: 'magician' | 'warden';
+  // SRD Druid Elemental Fury (L7) — Potent Spellcasting or Primal Strike.
+  elemental_fury?: 'potent_spellcasting' | 'primal_strike';
   // SRD Wizard Spell Mastery (L18) — a chosen L1 and L2 action spell that can
   // be cast at its base level without expending a slot.
   spell_mastery_l1?: string;
