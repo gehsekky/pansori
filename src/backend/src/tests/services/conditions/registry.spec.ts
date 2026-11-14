@@ -123,11 +123,11 @@ describe('condition registry — on-expire hooks', () => {
 });
 
 describe('condition registry — derived Sets (compat shim)', () => {
-  it('ADVANTAGE_CONDITIONS = pre-registry membership + Petrified', () => {
-    // Petrified grants attackers Advantage per SRD (the pre-registry set omitted
-    // it — a gap closed in the condition-fidelity pass).
+  it('ADVANTAGE_CONDITIONS = pre-registry membership + Petrified + Unconscious', () => {
+    // Petrified and Unconscious grant attackers Advantage per SRD (the
+    // pre-registry set omitted both).
     expect([...ADVANTAGE_CONDITIONS].sort()).toEqual(
-      ['blinded', 'paralyzed', 'petrified', 'prone', 'restrained', 'stunned'].sort()
+      ['blinded', 'paralyzed', 'petrified', 'prone', 'restrained', 'stunned', 'unconscious'].sort()
     );
   });
 

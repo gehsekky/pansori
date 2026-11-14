@@ -1,13 +1,8 @@
 import type { ActionContext, ActionHandler } from './types.js';
 import type { Character, Enemy, Spell } from '../../types.js';
-import {
-  abilityMod,
-  resolveSpellAttack,
-  rollCritical,
-  rollDice,
-  upcastDamage,
-} from '../rulesEngine.js';
+import { abilityMod, rollCritical, rollDice, upcastDamage } from '../rulesEngine.js';
 import { applySingleTargetDamage } from './castSpell/applyDamage.js';
+import { rollSpellAttack } from './castSpell/spellAttackEdges.js';
 import { updatePcActor } from './actor.js';
 
 type Recurring = NonNullable<Character['recurring_attack']>;
@@ -47,9 +42,15 @@ export function resolveRecurringAttack(
     ctx.narrative += ` ${recurring.name} finds no target.`;
     return;
   }
-  const atk = resolveSpellAttack(char.level, recurring.castingScore, target.ac);
+  // A melee spell attack made from beside the target (Spiritual Weapon and the
+  // other summoned attackers strike from their own space — simplification: the
+  // attack is treated as made from within 5 ft, with no Cover).
+  const atk = rollSpellAttack(ctx, target, recurring.castingScore, {
+    ranged: false,
+    fromAdjacent: true,
+  });
   if (!atk.hit) {
-    ctx.narrative += ` ${recurring.name} misses the ${target.name} (${atk.total} vs AC ${target.ac}).`;
+    ctx.narrative += ` ${recurring.name} misses the ${target.name} (${atk.total} vs AC ${atk.ac})${atk.note}.`;
     return;
   }
   const dmg = atk.critical ? rollCritical(recurring.damage) : rollDice(recurring.damage);
@@ -64,14 +65,16 @@ export function resolveRecurringAttack(
     const heal = Math.floor(dealt * recurring.healFraction);
     if (heal > 0) {
       const newHp = Math.min(char.max_hp, char.hp + heal);
-      char.hp = newHp;
+      // Through the live actor: the attack roll may have replaced ctx.actor.char
+      // (consuming a one-shot Advantage grant), leaving `char` stale.
+      updatePcActor(ctx, { hp: newHp });
       ctx.st = {
         ...ctx.st,
         entities: (ctx.st.entities ?? []).map((e) =>
           e.id === char.id && !e.isEnemy ? { ...e, hp: newHp } : e
         ),
       };
-      ctx.narrative += ` ${char.name} drains ${heal} HP (now ${char.hp}/${char.max_hp}).`;
+      ctx.narrative += ` ${char.name} drains ${heal} HP (now ${newHp}/${char.max_hp}).`;
     }
   }
 }

@@ -167,7 +167,8 @@ function sorcState(active: boolean): GameState {
       {
         id: ENEMY,
         isEnemy: true,
-        pos: { x: 5, y: 5 },
+        // 15 ft away — clear of Ranged Attacks in Close Combat.
+        pos: { x: 7, y: 5 },
         hp: 40,
         maxHp: 40,
         conditions: [],

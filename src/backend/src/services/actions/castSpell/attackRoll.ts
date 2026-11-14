@@ -21,6 +21,7 @@ import { applyRepellingBlast } from './repellingBlast.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
 import { pickCastPrefix } from './utils.js';
+import { rollSpellAttack } from './spellAttackEdges.js';
 
 /**
  * Spell-attack-roll branch. Rolls one attack vs the target's AC,
@@ -45,15 +46,25 @@ export function runAttackRollSpell(
   // SRD Sorcerer Innate Sorcery (L1): Advantage on Sorcerer spell attack rolls
   // while active.
   const innateAdv = char.conditions.includes('innate_sorcery');
-  let atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
+  // Touch spells are melee spell attacks; the rest are ranged.
+  const ranged = spell.rangeKind !== 'touch' && spell.rangeKind !== 'self';
+  let atk = rollSpellAttack(ctx, spellTarget, castingScore, { ranged, extraAdvantage: innateAdv });
   // SRD Metamagic Seeking Spell — on a miss, reroll the d20 once (use the new).
+  // Same Advantage / Disadvantage as the first roll.
   let seekingNote = '';
   if (!atk.hit && ctx.metamagic?.includes('seeking')) {
-    atk = resolveSpellAttack(char.level, castingScore, spellTarget.ac, innateAdv);
+    const re = resolveSpellAttack(
+      char.level,
+      castingScore,
+      atk.ac,
+      atk.edges.advantage || innateAdv,
+      { disadvantage: atk.edges.disadvantage, penalty: atk.edges.penalty }
+    );
+    atk = { ...atk, ...re, critical: re.critical || (re.hit && atk.edges.autoCritOnHit) };
     seekingNote = ' 🎯 Seeking Spell (reroll)';
   }
   const spellHit = atk.hit;
-  const atkNote = ` (spell attack ${atk.roll}+${atk.bonus}=${atk.total} vs AC ${spellTarget.ac})${seekingNote}`;
+  const atkNote = ` (spell attack ${atk.roll}${atk.bonus >= 0 ? '+' : ''}${atk.bonus}=${atk.total} vs AC ${atk.ac})${atk.note}${seekingNote}`;
   const castPrefix = pickCastPrefix(spell, {
     name: char.name,
     spell: spell.name,
@@ -70,7 +81,7 @@ export function runAttackRollSpell(
       spellName: spell.name,
       castPrefix,
       toHit: atk.total,
-      targetAc: spellTarget.ac,
+      targetAc: atk.ac,
       atkNote,
     });
     // SRD Evoker Potent Cantrip (L3) — a damaging cantrip that misses still
@@ -132,7 +143,7 @@ export function runAttackRollSpell(
     damageType: spell.damageType ?? '',
     isCrit: atk.critical,
     toHit: atk.total,
-    targetAc: spellTarget.ac,
+    targetAc: atk.ac,
     atkNote,
     bonuses: agonizingBonus > 0 ? [{ label: `Agonizing Blast: +${agonizingBonus}` }] : undefined,
   });

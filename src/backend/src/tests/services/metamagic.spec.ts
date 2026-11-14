@@ -75,7 +75,8 @@ function sorcCombat(over: Partial<ReturnType<typeof makeChar>> = {}, enemyHp = 6
       {
         id: ENEMY,
         isEnemy: true,
-        pos: { x: 5, y: 5 },
+        // 15 ft away — clear of Ranged Attacks in Close Combat.
+        pos: { x: 7, y: 5 },
         hp: enemyHp,
         maxHp: enemyHp,
         conditions: [],

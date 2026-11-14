@@ -13,7 +13,6 @@ import {
   sneakAttackDice,
   unarmedDamage,
 } from '../../rulesEngine.js';
-import { SQUARE_SIZE, posEqual } from '../../gridEngine.js';
 import {
   applyPartyLevelUps,
   dominatedDamageReSave,
@@ -45,6 +44,7 @@ import {
 } from '../../feats.js';
 import { primalStrikeDie, primalStrikeType } from '../../druidFeatures.js';
 import type { ActionContext } from '../types.js';
+import { SQUARE_SIZE } from '../../gridEngine.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -105,7 +105,7 @@ export function resolveOneAttack(
     disadvNote,
     noProfNote,
     coverAcBonus,
-    enemyUnconscious,
+    autoCritOnHit,
     critThresh,
     sacredWeaponBonus,
     totalAttackBonus,
@@ -334,25 +334,8 @@ export function resolveOneAttack(
       parryNote = ` 🛡 Parry — ${target.name} deflects the blow (+${parryBonus} AC → ${effectiveEnemyAc + parryBonus})`;
     }
   }
-  // Unconscious target within 5 ft: an attack that hits is a crit (SRD).
-  const autoCritCheck =
-    enemyUnconscious &&
-    (!ctx.st.entities ||
-      (() => {
-        const charEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
-        const enmEnt = ctx.st.entities?.find((e) => e.id === targetId);
-        return charEnt && enmEnt
-          ? posEqual(
-              { x: charEnt.pos.x, y: charEnt.pos.y },
-              { x: enmEnt.pos.x, y: enmEnt.pos.y }
-            ) ||
-              Math.max(
-                Math.abs(charEnt.pos.x - enmEnt.pos.x),
-                Math.abs(charEnt.pos.y - enmEnt.pos.y)
-              ) <= 1
-          : true;
-      })());
-  const isCrit = atk.critical || (autoCritCheck && atk.hit);
+  // SRD Paralyzed / Unconscious — a hit from within 5 ft is a Critical Hit.
+  const isCrit = atk.critical || (autoCritOnHit && atk.hit);
   let baseHit = weaponDamage
     ? isCrit && !atk.critical
       ? Math.max(1, rollWeaponCrit(weaponDamage) + atk.atkMod)

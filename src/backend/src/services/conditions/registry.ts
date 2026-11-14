@@ -139,13 +139,13 @@ const defs: ConditionDef[] = [
   // auto-expiring it. (The fiend/undead-hit-blinds-attacker rider is deferred.)
   { id: 'holy_warded', duration: 'permanent', imposesDisadvantageOnAttackers: true },
   // Unconscious + petrified: no auto-expire; cleared by death-save recovery
-  // / Restoration. Saves auto-fail while present. The pre-registry code
-  // omitted them from CONDITION_DURATION (treated as permanent) and from
-  // ADVANTAGE_CONDITIONS — only the STR_DEX_AUTO_FAIL set covered them.
-  // Registry mirrors that exactly.
+  // / Restoration. Saves auto-fail while present.
+  // SRD Unconscious — attack rolls against you have Advantage (and a hit from
+  // within 5 ft is a Critical Hit; see `computeAttackEdges`).
   {
     id: 'unconscious',
     duration: 'permanent',
+    grantsAdvantageToAttackers: true,
     autoFailSaves: ['str', 'dex'],
   },
   {

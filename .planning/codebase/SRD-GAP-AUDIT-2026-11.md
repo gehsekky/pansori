@@ -184,11 +184,23 @@ dragging — simplification); Grapple / Shove no longer end the turn on the spot
 the Push weapon mastery now respects walls, creatures and its "Large or
 smaller" limit (it moved the target two squares through anything).
 
-**Spell attack rolls ignore conditions.** `resolveSpellAttack` takes only
-Innate Sorcery's Advantage: a Blinded, Poisoned, Prone, Restrained or Grappled
-caster rolls spell attacks normally, and attacks against a Paralyzed or
-Restrained target get no Advantage. Weapon attacks (`attack/toHit.ts`) handle
-all of these.
+**Spell attack rolls honor conditions — done 2026-11-13** (`services/attackEdges.ts`).
+One `computeAttackEdges` now feeds weapon, single-target spell, per-beam
+(Eldritch Blast / Scorching Ray) and recurring spell attacks (Spiritual Weapon,
+Vampiric Touch, ...): the attacker's conditions, Ranged Attacks in Close Combat
+(touch spells are melee), target conditions read from the condition registry,
+Prone by distance (within 5 ft Advantage, else Disadvantage), Cover, Vision &
+Light, Exhaustion's d20 penalty, and the one-shot grants (Help, Heroic
+Inspiration, Steady Aim, Vex, Studied Attacks). Fixed along the way for weapon
+attacks too: a Stunned, Restrained, Petrified or Unconscious target granted no
+Advantage (only Paralyzed / Blinded / Prone / Faerie Fire were checked); a hit
+on a Paralyzed target from within 5 ft wasn't a Critical Hit (only Unconscious
+was); Prone used melee/ranged instead of the 5-ft distance (a reach weapon got
+Advantage at 10 ft). The Unconscious condition now grants attackers Advantage
+in the registry, so enemies get it against an Unconscious PC as well.
+Simplifications: recurring spell attacks are treated as made from within 5 ft
+with no Cover; the "enemy who can see you" clause of close-combat Disadvantage
+isn't modeled; flanking stays weapon-only.
 
 No code references: the **Search** and **Utilize** actions, **suffocation**,
 **squeezing** into a smaller space, **crafting**, and **poisons** as items.
@@ -201,8 +213,8 @@ concentration.
 1. ~~§1 accuracy bugs~~ and ~~always-prepared subclass spells~~ (done 2026-11-12).
 2. ~~Monster Magic Resistance + Legendary Resistance~~ (done 2026-11-12).
 3. ~~Grapple / Shove as 5.2.1 saves~~, ~~Warlock Pacts + core invocations~~
-   and Druid base features (done 2026-11-12). Next: spell attacks honoring
-   conditions.
+   and Druid base features (done 2026-11-12); ~~spell attacks honoring
+   conditions~~ (done 2026-11-13).
 4. Remaining class features, class by class, each with a spec per CLAUDE.md.
 5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).
 6. Magic items, passive-number ones first; then mechanizable narrative spells.

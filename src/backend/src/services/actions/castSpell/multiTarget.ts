@@ -2,7 +2,6 @@ import {
   abilityMod,
   applyDamageMultiplier,
   maxDice,
-  resolveSpellAttack,
   rollCritical,
   rollDice,
 } from '../../rulesEngine.js';
@@ -19,6 +18,8 @@ import { applyRepellingBlast } from './repellingBlast.js';
 import { composeNow } from '../../narrative/compose.js';
 import { empoweredEvocationBonus } from '../../multiclass.js';
 import { pickCastPrefix } from './utils.js';
+import { rollSpellAttack } from './spellAttackEdges.js';
+import { updatePcActor } from '../actor.js';
 
 /**
  * Magic Missile / Eldritch Blast multi-target branch. The action
@@ -85,9 +86,12 @@ export function runMultiTargetSpell(
     }
     if (isAttackRollMulti) {
       // Each beam/ray rolls its own attack vs the target's AC.
-      const atkE = resolveSpellAttack(char.level, castingScore, tgtEnemy.ac);
+      // Each beam is its own attack roll, with its own Advantage / Disadvantage.
+      const atkE = rollSpellAttack(ctx, tgtEnemy, castingScore, { ranged: true });
       if (!atkE.hit) {
-        lines.push(`${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${tgtEnemy.ac}).`);
+        lines.push(
+          `${i + 1}: ${tgtEnemy.name} — MISS (${atkE.total} vs AC ${atkE.ac})${atkE.note}.`
+        );
         continue;
       }
       const dmgRoll =
@@ -131,7 +135,7 @@ export function runMultiTargetSpell(
       if (killed) {
         const split = splitEncounterXp(ctx.st, char.id, tgtEnemy.xp ?? 0);
         ctx.st = split.st;
-        char.xp = (char.xp || 0) + split.share;
+        updatePcActor(ctx, { xp: (ctx.actor.char.xp || 0) + split.share });
         ctx.st.enemies_killed = [...(ctx.st.enemies_killed ?? []), tid];
       }
     } else {
@@ -165,7 +169,7 @@ export function runMultiTargetSpell(
       if (killed) {
         const split = splitEncounterXp(ctx.st, char.id, tgtEnemy.xp ?? 0);
         ctx.st = split.st;
-        char.xp = (char.xp || 0) + split.share;
+        updatePcActor(ctx, { xp: (ctx.actor.char.xp || 0) + split.share });
         ctx.st.enemies_killed = [...(ctx.st.enemies_killed ?? []), tid];
       }
     }

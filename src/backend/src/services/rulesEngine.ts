@@ -1123,16 +1123,20 @@ export function spellSaveDC(level: number, castingAbilityScore: number): number 
 }
 
 // Spell attack roll against an enemy. Crits (nat 20) double damage dice; nat 1 always misses.
+// `advantage` / `disadvantage` come from `computeAttackEdges` (+ Innate
+// Sorcery); both together cancel. `penalty` is the flat d20 Test penalty
+// (Exhaustion, Raise Dead).
 export function resolveSpellAttack(
   level: number,
   castingAbilityScore: number,
   enemyAc: number,
-  // SRD Sorcerer Innate Sorcery (L1) grants Advantage on Sorcerer spell attack
-  // rolls while active — roll two d20 and keep the higher.
-  advantage = false
+  advantage = false,
+  opts: { disadvantage?: boolean; penalty?: number } = {}
 ): { hit: boolean; critical: boolean; roll: number; bonus: number; total: number } {
-  const bonus = spellAttackBonus(level, castingAbilityScore);
-  const roll = advantage ? Math.max(d(20), d(20)) : d(20);
+  const bonus = spellAttackBonus(level, castingAbilityScore) - (opts.penalty ?? 0);
+  const adv = advantage && !opts.disadvantage;
+  const dis = !!opts.disadvantage && !advantage;
+  const roll = adv ? Math.max(d(20), d(20)) : dis ? Math.min(d(20), d(20)) : d(20);
   if (roll === 1) return { hit: false, critical: false, roll, bonus, total: roll + bonus };
   if (roll === 20) return { hit: true, critical: true, roll, bonus, total: roll + bonus };
   const total = roll + bonus;

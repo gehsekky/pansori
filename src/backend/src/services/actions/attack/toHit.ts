@@ -1,35 +1,13 @@
 import { BEAST_FORMS, SRD_SPECIES } from '../../../campaignData/srd/index.js';
-import {
-  DISADV_CONDITIONS,
-  PLAYER_ADV_CONDITIONS,
-  abilityMod,
-  d20TestPenalty,
-  hasArmorProficiency,
-  hasWeaponProficiency,
-  seesInDarkness,
-} from '../../rulesEngine.js';
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
-import {
-  canSeeTarget,
-  coverBonus,
-  distanceFeet,
-  isFlankingPosition,
-  magicalDarknessCells,
-} from '../../gridEngine.js';
-import {
-  getClassLevel,
-  hasClass,
-  hasFeralSenses,
-  piercesMagicalDarkness,
-} from '../../multiclass.js';
+import { abilityMod, hasArmorProficiency, hasWeaponProficiency } from '../../rulesEngine.js';
+import { distanceFeet, isFlankingPosition } from '../../gridEngine.js';
+import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
+import { computeAttackEdges } from '../../attackEdges.js';
 import { equippedArmorId } from '../../equipment.js';
-import { grappledAttackDisadvantage } from '../../unarmedStrike.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
-import { isHeavilyEncumbered } from '../../gameEngine.js';
 import { isPactWeapon } from '../../invocations.js';
-import { updatePcActor } from '../actor.js';
-
 /**
  * Everything resolveOneAttack needs once the target + weapon are
  * known. Computing it up front (a) ensures stable adv/disadv state
@@ -45,7 +23,8 @@ export interface ToHitContext {
   disadvNote: string;
   noProfNote: string;
   coverAcBonus: number;
-  enemyUnconscious: boolean;
+  /** A hit is a Critical Hit (Paralyzed / Unconscious target within 5 ft). */
+  autoCritOnHit: boolean;
   critThresh: number;
   sacredWeaponBonus: number;
   totalAttackBonus: number;
@@ -93,7 +72,7 @@ export function computeToHitContext(
       disadvNote: '',
       noProfNote: '',
       coverAcBonus: 0,
-      enemyUnconscious: false,
+      autoCritOnHit: false,
       critThresh: 20,
       sacredWeaponBonus: 0,
       totalAttackBonus: 0,
@@ -125,63 +104,14 @@ export function computeToHitContext(
       weaponItem ?? undefined
     );
 
-  // SRD ranged-in-melee disadvantage: only applies when a
-  // non-incapacitated enemy is within 5 ft of the attacker. Previously
-  // pansori applied the penalty to every ranged attack — making bows
-  // strictly worse than melee in any combat. The grid + condition
-  // check matches RAW: an Incapacitated enemy doesn't threaten, so
-  // no disadvantage from them. Without grid positions (e.g. legacy
-  // saves without entities), default to no disadvantage so the
-  // penalty is opt-in.
-  let rangedInMelee = false;
-  if (weaponItem?.range === 'ranged' && ctx.st.entities) {
-    const charEnt = ctx.st.entities.find((e) => e.id === pc.char.id);
-    if (charEnt) {
-      rangedInMelee = ctx.st.entities.some(
-        (e) =>
-          e.isEnemy &&
-          e.hp > 0 &&
-          !e.conditions.includes('incapacitated') &&
-          distanceFeet(charEnt.pos, e.pos) <= 5
-      );
-    }
-  }
-  // SRD Ranger Feral Senses (L18) — Blindsight; the ranger ignores Blinded
-  // for its own attack rolls (other disadvantage conditions still apply).
-  const ignoreBlinded = hasFeralSenses(pc.char);
-  const conditionDisadv = pc.char.conditions.some(
-    (c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded)
-  );
-  // 2024 Exhaustion is a flat −2/level penalty on the attack roll (folded into
-  // `d20TestPenalty` → `totalAttackBonus`), not Disadvantage.
-  const heavyEncumberedDisadv = isHeavilyEncumbered(pc.char);
+  // Generic attack-roll edges shared with spell attacks (conditions on either
+  // side, Ranged Attacks in Close Combat, Cover, Vision & Light, and the
+  // one-shot "next attack roll" grants — consumed here).
+  const edges = computeAttackEdges(ctx, target, targetId, {
+    ranged: weaponItem?.range === 'ranged',
+  });
   const smallSpecies = pc.char.species ? SRD_SPECIES[pc.char.species]?.size === 'small' : false;
   const heavyWeaponSmallDisadv = !!(weaponItem?.heavy && smallSpecies);
-  const conditionAdv = pc.char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
-  const enemyEntity2 = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
-  // SRD Grappled — the grappled creature has Disadvantage on attack rolls
-  // against any target other than its grappler. (Being grappled grants
-  // attackers no Advantage.)
-  const grappledDisadv = grappledAttackDisadvantage(
-    pc.char.conditions,
-    ctx.st.entities?.find((e) => e.id === pc.char.id && !e.isEnemy)?.grappled_by,
-    targetId
-  );
-  const enemyProne = enemyEntity2?.conditions.includes('prone') ?? false;
-  const enemyParalyzed = enemyEntity2?.conditions.includes('paralyzed') ?? false;
-  const enemyUnconscious = enemyEntity2?.conditions.includes('unconscious') ?? false;
-  // SRD Faerie Fire — attacks against an outlined creature
-  // have advantage.
-  const enemyFaerieFired = enemyEntity2?.conditions.includes('faerie_fired') ?? false;
-  // SRD Blinded — attack rolls against a Blinded creature have Advantage
-  // (Blindness/Deafness, Color Spray, Rogue Cunning Strike: Obscure).
-  const enemyBlinded = enemyEntity2?.conditions.includes('blinded') ?? false;
-  // SRD Invisible — an attacker can't see the creature, so attacks against it
-  // have Disadvantage. See Invisibility (Character.sees_invisible) negates it.
-  const enemyInvisible =
-    (enemyEntity2?.conditions.includes('invisible') ?? false) && !(pc.char.sees_invisible ?? false);
-  const proneAdv = enemyProne && weaponItem?.range !== 'ranged';
-  const proneDisadv = enemyProne && weaponItem?.range === 'ranged';
 
   // Thrown weapon beyond normal range: disadvantage (SRD)
   let thrownLongRangeDisadv = false;
@@ -194,19 +124,11 @@ export function computeToHitContext(
     }
   }
 
-  let coverAcBonus = 0;
   let flankingAdv = false;
   if (ctx.st.entities) {
     const charEntity = ctx.st.entities.find((e) => e.id === pc.char.id);
     const enemyEntity = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy);
     if (charEntity && enemyEntity) {
-      const obstacles = [
-        ...ctx.st.entities
-          .filter((e) => e.id !== pc.char.id && e.id !== targetId)
-          .map((e) => e.pos),
-        ...ctx.roomObstacleCells,
-      ];
-      coverAcBonus = coverBonus(charEntity.pos, enemyEntity.pos, obstacles);
       const flankingAlly = ctx.st.entities.find(
         (e) =>
           !e.isEnemy &&
@@ -216,14 +138,6 @@ export function computeToHitContext(
       if (flankingAlly) flankingAdv = true;
     }
   }
-
-  const helpAdv = ctx.st.help_target_id === pc.char.id;
-  if (helpAdv) ctx.st = { ...ctx.st, help_target_id: undefined };
-
-  // SRD Ranger Precise Hunter (L17): Advantage on attack rolls vs your
-  // Hunter's Mark target.
-  const preciseHunterAdv =
-    getClassLevel(pc.char, 'ranger') >= 17 && pc.char.hunters_mark_target_id === targetId;
 
   const recklessAdv = !!pc.char.turn_actions.reckless && weaponItem?.range !== 'ranged';
 
@@ -244,148 +158,26 @@ export function computeToHitContext(
     }
   }
 
-  // SRD Vex weapon mastery — previous hit with a Vex weapon by this
-  // char on this target grants advantage on the next attack. Consume the
-  // tag immediately (RAW: lasts until end of your next turn, but for our
-  // single-attack action model, one-shot is closer to what players expect).
-  const vexTag = `vexed_by_${pc.char.id}`;
-  const vexAdv = !!ctx.st.entities?.find(
-    (e) => e.id === targetId && e.isEnemy && e.conditions.includes(vexTag)
-  );
-  if (vexAdv) {
-    ctx.st = {
-      ...ctx.st,
-      entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === targetId && e.isEnemy
-          ? { ...e, conditions: e.conditions.filter((c) => c !== vexTag) }
-          : e
-      ),
-    };
-  }
-
-  // SRD Fighter L13 Studied Attacks — same shape as Vex but seeded by
-  // a *miss* on a prior turn (mark applied in the miss branch below).
-  const studyTag = `studied_by_${pc.char.id}`;
-  const studyAdv = !!ctx.st.entities?.find(
-    (e) => e.id === targetId && e.isEnemy && e.conditions.includes(studyTag)
-  );
-  if (studyAdv) {
-    ctx.st = {
-      ...ctx.st,
-      entities: (ctx.st.entities ?? []).map((e) =>
-        e.id === targetId && e.isEnemy
-          ? { ...e, conditions: e.conditions.filter((c) => c !== studyTag) }
-          : e
-      ),
-    };
-  }
-
-  // SRD Vision & Light — in a Heavily Obscured (dark) room a creature that can't
-  // see is effectively Blinded: it attacks at Disadvantage, and attacks against
-  // it have Advantage. "Can see X" = darkvision/blindsight, OR X stands in an
-  // illuminated cell (a light source — Light/Daylight/torch — overrides the
-  // dark). Dim light is only Lightly Obscured (Perception, not combat). Enemies
-  // default to 60 ft darkvision.
-  const roomLighting = ctx.seed?.rooms?.find((r) => r.id === ctx.roomId)?.lighting ?? 'bright';
-  const roomDark = roomLighting === 'dark';
-  // Blindsight / Devil's Sight / Truesight all let the PC see in the dark and
-  // pierce magical Darkness (see `piercesMagicalDarkness`).
-  const pcBlindsight = piercesMagicalDarkness(pc.char);
-  const litEntities = ctx.st.entities ?? [];
-  const darknessCells = magicalDarknessCells(ctx.st.spell_zones);
-  const pcPos = litEntities.find((e) => e.id === pc.char.id)?.pos;
-  const enemyPos = enemyEntity2?.pos;
-  const pcCanSeeEnemy = canSeeTarget({
-    observerPos: pcPos,
-    targetPos: enemyPos,
-    observerCanSeeInDark: seesInDarkness(pc.char.darkvision_ft ?? 0, pcBlindsight),
-    observerPiercesMagicalDarkness: pcBlindsight,
-    roomDark,
-    entities: litEntities,
-    darknessCells,
-    obstacles: ctx.roomObstacleCells,
-  });
-  const enemyCanSeePc = canSeeTarget({
-    observerPos: enemyPos,
-    targetPos: pcPos,
-    observerCanSeeInDark: seesInDarkness(target.darkvision_ft ?? 60, false),
-    observerPiercesMagicalDarkness: false,
-    roomDark,
-    entities: litEntities,
-    darknessCells,
-    obstacles: ctx.roomObstacleCells,
-  });
-  const darknessDisadv = !pcCanSeeEnemy; // PC can't see the enemy → Disadvantage
-  const darknessAdv = !enemyCanSeePc; // enemy can't see the PC → Advantage
-
   const disadvantage =
-    rangedInMelee ||
-    conditionDisadv ||
-    heavyEncumberedDisadv ||
-    heavyWeaponSmallDisadv ||
-    !armorProficient ||
-    proneDisadv ||
-    thrownLongRangeDisadv ||
-    darknessDisadv ||
-    grappledDisadv ||
-    enemyInvisible;
+    edges.disadvantage || heavyWeaponSmallDisadv || !armorProficient || thrownLongRangeDisadv;
 
-  const inspirationAdv = !!pc.char.turn_actions.inspiration_pending;
-  if (inspirationAdv) {
-    updatePcActor(ctx, {
-      turn_actions: { ...pc.char.turn_actions, inspiration_pending: false },
-      inspiration: false,
-    });
-  }
-
-  const luckAdv = !!pc.char.turn_actions.luck_pending;
-  if (luckAdv) {
-    updatePcActor(ctx, {
-      turn_actions: { ...pc.char.turn_actions, luck_pending: false },
-    });
-  }
-
-  // Rogue Steady Aim (L3) — advantage on the next attack this turn. One-shot:
-  // consumed here so only the first swing of the turn benefits.
-  const steadyAimAdv = !!pc.char.turn_actions.steady_aim_pending;
-  if (steadyAimAdv) {
-    updatePcActor(ctx, {
-      turn_actions: { ...pc.char.turn_actions, steady_aim_pending: false },
-    });
-  }
-
-  const advantage =
-    conditionAdv ||
-    proneAdv ||
-    enemyParalyzed ||
-    enemyFaerieFired ||
-    enemyBlinded ||
-    flankingAdv ||
-    helpAdv ||
-    preciseHunterAdv ||
-    recklessAdv ||
-    inspirationAdv ||
-    vexAdv ||
-    studyAdv ||
-    packTacticsAdv ||
-    luckAdv ||
-    steadyAimAdv ||
-    darknessAdv;
+  const advantage = edges.advantage || flankingAdv || recklessAdv || packTacticsAdv;
 
   const disadvReasons = [
-    rangedInMelee ? 'ranged in melee' : '',
-    conditionDisadv
-      ? pc.char.conditions
-          .filter((c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded))
-          .join(', ')
-      : '',
-    heavyEncumberedDisadv ? 'heavily encumbered' : '',
+    edges.rangedInMelee ? 'ranged in melee' : '',
+    edges.selfDisadvConditions.join(', '),
+    edges.heavilyEncumbered ? 'heavily encumbered' : '',
     heavyWeaponSmallDisadv ? 'heavy weapon — Small creature' : '',
     !armorProficient ? `not proficient with ${equippedArmorLootItem?.name ?? 'armor'}` : '',
-    proneDisadv ? 'prone (ranged)' : '',
+    edges.proneDisadv ? 'prone target beyond 5 ft' : '',
     thrownLongRangeDisadv ? 'thrown beyond normal range' : '',
-    darknessDisadv ? "Blinded by darkness — you can't see your target" : '',
-    enemyInvisible ? 'target is invisible' : '',
+    edges.darknessDisadv ? "Blinded by darkness — you can't see your target" : '',
+    edges.targetDisadvConditions.includes('invisible') ? 'target is invisible' : '',
+    edges.targetDisadvConditions
+      .filter((c) => c !== 'invisible')
+      .map((c) => `target ${c}`)
+      .join(', '),
+    edges.grappled ? 'grappled' : '',
   ]
     .filter(Boolean)
     .join(', ');
@@ -394,7 +186,7 @@ export function computeToHitContext(
     : advantage && !disadvantage
       ? // SRD Vision & Light — when the only/least edge is the foe being Blinded
         // by darkness, say so; otherwise the generic advantage note.
-        darknessAdv
+        edges.darknessAdv
         ? ' (advantage — your target is Blinded by darkness)'
         : ' (advantage)'
       : '';
@@ -416,7 +208,7 @@ export function computeToHitContext(
   // SRD Raise Dead / Resurrection — recently-revived PCs take a
   // −N penalty on D20 Tests (attacks, saves, checks) until it
   // decays off via long rest. Subtracted from the attack bonus.
-  const revivePenalty = d20TestPenalty(pc.char);
+  const revivePenalty = edges.penalty;
   // Magic weapons — flat +N to the attack roll (weapon attacks only; the
   // matching +N to damage is applied in resolveOneAttack). Combines the
   // intrinsic +N of a magic weapon (`magicBonus`) with the Magic Weapon spell's
@@ -426,10 +218,6 @@ export function computeToHitContext(
     : 0;
   const totalAttackBonus = sacredWeaponBonus - revivePenalty + archeryBonus + magicWeaponBonus;
 
-  // Silence linter: target is part of the signature but referenced via the
-  // returned ToHitContext (resolveOneAttack reads target via the closure).
-  void target;
-
   return {
     weaponProficient,
     armorProficient,
@@ -438,8 +226,8 @@ export function computeToHitContext(
     disadvantage,
     disadvNote,
     noProfNote,
-    coverAcBonus,
-    enemyUnconscious,
+    coverAcBonus: edges.coverAcBonus,
+    autoCritOnHit: edges.autoCritOnHit,
     critThresh,
     sacredWeaponBonus,
     totalAttackBonus,
