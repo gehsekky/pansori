@@ -20,6 +20,7 @@ import {
   hasExpertise,
   hasJackOfAllTrades,
   hasReliableTalent,
+  hasSkillProficiency,
 } from '../multiclass.js';
 import { unarmedStrikeDc, unarmedStrikeSave, withinUnarmedSizeLimit } from '../unarmedStrike.js';
 import { checkMountFallOff } from './mount.js';
@@ -28,6 +29,7 @@ import { distanceFeet } from '../gridEngine.js';
 import { extraAttackCountForChar } from './attack/resolveOneAttack.js';
 import { handleAttack } from './attack/index.js';
 import { hasInvocation } from '../invocations.js';
+import { primalKnowledgeScore } from '../barbarianFeatures.js';
 
 /**
  * SRD Unarmed Strike — Grapple / Shove. Shared resolution:
@@ -230,14 +232,16 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   // escape gains Expertise / Jack of All Trades / Reliable Talent / Halfling
   // Lucky + the exhaustion penalty. Indomitable Might floors a STR check after.
   const prof = profBonus(char.level);
-  const isProf = (skill: string) =>
-    (char.skill_proficiencies ?? []).some((s) => s.toLowerCase() === skill);
+  const isProf = (skill: string) => hasSkillProficiency(char, skill);
   const athProf = isProf('athletics');
   const acrProf = isProf('acrobatics');
   const athMod =
     abilityMod(char.str) + (athProf ? prof : 0) + (hasExpertise(char, 'athletics') ? prof : 0);
+  // SRD Barbarian Primal Knowledge — a raging Barbarian may make the
+  // Acrobatics check with STR.
+  const acrScore = primalKnowledgeScore(char, 'acrobatics', char.dex);
   const acrMod =
-    abilityMod(char.dex) + (acrProf ? prof : 0) + (hasExpertise(char, 'acrobatics') ? prof : 0);
+    abilityMod(acrScore) + (acrProf ? prof : 0) + (hasExpertise(char, 'acrobatics') ? prof : 0);
   const useAthletics = athMod >= acrMod;
   const escapeSkill = useAthletics ? 'athletics' : 'acrobatics';
   const gDie = consumeGuidanceDie(ctx);
@@ -245,7 +249,7 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
     ctx,
     applyGuidanceDie(
       skillCheck(
-        useAthletics ? char.str : char.dex,
+        useAthletics ? char.str : acrScore,
         grapplerRoll + 1,
         useAthletics ? athProf : acrProf,
         char.level,

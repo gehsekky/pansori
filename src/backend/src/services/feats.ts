@@ -10,6 +10,7 @@
 // feats are out of scope — see CLAUDE.md for the contribution rule.
 
 import type { AbilityKey, Character, Context, Feat } from '../types.js';
+import { hasSkillProficiency } from './multiclass.js';
 
 /**
  * Check whether `char` meets the prerequisites for `feat`. Returns
@@ -164,15 +165,15 @@ export function applyFeatTake(
       // Skilled — player picks N skills (N = 3 for SRD Skilled).
       // Merge into char.skill_proficiencies, deduping.
       const chosen = opts.skillChoices ?? [];
-      const existing = new Set(next.skill_proficiencies ?? []);
+      const existing = [...(next.skill_proficiencies ?? [])];
       const granted: string[] = [];
       for (const s of chosen) {
-        if (!existing.has(s)) {
-          existing.add(s);
+        if (!hasSkillProficiency({ skill_proficiencies: existing }, s)) {
+          existing.push(s);
           granted.push(s);
         }
       }
-      next = { ...next, skill_proficiencies: [...existing] };
+      next = { ...next, skill_proficiencies: existing };
       if (granted.length > 0) {
         narrativeParts.push(`Proficient in: ${granted.join(', ')}.`);
       } else {

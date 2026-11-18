@@ -45,6 +45,8 @@ export interface AttackEdges {
   autoCritOnHit: boolean;
   /** Flat penalty on the d20 (Exhaustion, Raise Dead). */
   penalty: number;
+  /** SRD Barbarian Sundering Blow — +5 on this attack roll (0 when none). */
+  sunderingBonus: number;
   advantage: boolean;
   disadvantage: boolean;
 }
@@ -212,6 +214,25 @@ export function computeAttackEdges(
     };
   }
 
+  // SRD Barbarian Sundering Blow (Improved Brutal Strike) — the next attack
+  // roll ANOTHER creature makes against the target gains +5; one bonus per
+  // roll. The Barbarian's own attacks leave the tag in place.
+  let sunderingBonus = 0;
+  const sunderTag = tgtConds.find(
+    (c) => c.startsWith('sundered_by_') && c !== `sundered_by_${char.id}`
+  );
+  if (sunderTag) {
+    sunderingBonus = 5;
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === targetId && e.isEnemy
+          ? { ...e, conditions: e.conditions.filter((c) => c !== sunderTag) }
+          : e
+      ),
+    };
+  }
+
   const advantage =
     selfAdv || proneAdv || targetAdvConditions.length > 0 || darknessAdv || grantedAdv.length > 0;
   const disadvantage =
@@ -239,6 +260,7 @@ export function computeAttackEdges(
     coverAcBonus,
     autoCritOnHit,
     penalty: d20TestPenalty(char),
+    sunderingBonus,
     advantage,
     disadvantage,
   };

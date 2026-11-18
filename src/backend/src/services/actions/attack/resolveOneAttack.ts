@@ -26,6 +26,7 @@ import {
   pushEntityAway,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { brutalStrikeDice, brutalStrikeRiders, sunderedTag } from '../../barbarianFeatures.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
 import {
   divineStrikeDie,
@@ -117,9 +118,9 @@ export function resolveOneAttack(
   // forgoes the Reckless advantage on one STR melee attack that isn't at
   // disadvantage; on a hit it deals +1d10 (weapon's type) and applies the
   // chosen effect. `effectiveAdvantage` drops the advantage for this swing.
-  const brutalRider = pc.char.turn_actions.brutal_strike_pending;
+  const brutalRiders = brutalStrikeRiders(pc.char.turn_actions.brutal_strike_pending);
   const brutalStrikeApplies =
-    !!brutalRider &&
+    brutalRiders.length > 0 &&
     getClassLevel(pc.char, 'barbarian') >= 9 &&
     !!pc.char.turn_actions.reckless &&
     weaponItem?.range !== 'ranged' &&
@@ -596,12 +597,13 @@ export function resolveOneAttack(
     });
   }
 
-  // Brutal Strike +1d10 (weapon's damage type, so it rides inside rawDmg and
-  // shares the weapon's resistance/vulnerability multiplier). Doubled on a crit
-  // like the rest of the attack's dice. Plain d10 — GWF only rerolls the
-  // weapon's own dice, not this feature rider.
+  // Brutal Strike +1d10 (2d10 at L17 — Improved Brutal Strike), the weapon's
+  // damage type, so it rides inside rawDmg and shares the weapon's resistance/
+  // vulnerability multiplier. Doubled on a crit like the rest of the attack's
+  // dice. Plain dice — GWF only rerolls the weapon's own dice, not this rider.
+  const brutalDice = brutalStrikeDice(pc.char);
   const brutalStrikeDmg =
-    brutalStrikeApplies && atk.hit ? (isCrit ? rollCritical('1d10') : rollDice('1d10')) : 0;
+    brutalStrikeApplies && atk.hit ? (isCrit ? rollCritical(brutalDice) : rollDice(brutalDice)) : 0;
   // SRD Boon of Irresistible Offense — Overwhelming Strike: on a natural 20,
   // add flat extra damage (the attack's type) equal to the boosted ability
   // score. Folded into rawDmg so it shares the weapon's damage type and its
@@ -769,7 +771,7 @@ export function resolveOneAttack(
   }
   if (brutalStrikeDmg > 0) {
     hitBonuses.push({
-      label: `Brutal Strike ${isCrit ? '2d10 (crit)' : '1d10'}: +${brutalStrikeDmg}`,
+      label: `Brutal Strike ${brutalDice}${isCrit ? ' (crit, doubled)' : ''}: +${brutalStrikeDmg}`,
     });
   }
   if (overwhelmingStrikeDmg > 0) {
@@ -871,7 +873,7 @@ export function resolveOneAttack(
   if (brutalStrikeApplies && atk.hit && newEnemyHp > 0) {
     const bsCharEnt = ctx.st.entities?.find((e) => e.id === pc.char.id);
     const bsTargetEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
-    if (brutalRider === 'forceful' && bsCharEnt && bsTargetEnt) {
+    if (brutalRiders.includes('forceful') && bsCharEnt && bsTargetEnt) {
       // Push 15 ft (3 squares) straight away from the attacker...
       const dx = Math.sign(bsTargetEnt.pos.x - bsCharEnt.pos.x);
       const dy = Math.sign(bsTargetEnt.pos.y - bsCharEnt.pos.y);
@@ -901,7 +903,8 @@ export function resolveOneAttack(
         ),
       };
       ctx.narrative += ` ${fmt.note(`[Forceful Blow: ${target.name} pushed 15 ft; ${pc.char.name} closes ${followSquares * SQUARE_SIZE} ft]`)}`;
-    } else if (brutalRider === 'hamstring' && bsTargetEnt) {
+    }
+    if (brutalRiders.includes('hamstring') && bsTargetEnt) {
       // -15 ft Speed until the start of your next turn — honored by
       // attemptEnemyApproach; cleared on round wrap.
       ctx.st = {
@@ -913,6 +916,42 @@ export function resolveOneAttack(
         ),
       };
       ctx.narrative += ` ${fmt.note(`[Hamstring Blow: ${target.name}'s Speed −15 ft]`)}`;
+    }
+    // SRD Improved Brutal Strike (L13) — Staggering Blow: Disadvantage on the
+    // target's next saving throw, and no Opportunity Attacks until the start of
+    // your next turn. Simplification: one `staggered` tag covers both and
+    // lasts until the round wraps — every save it makes in that window has
+    // Disadvantage (registry `disadvantageSaves`), and `opportunityAttackTriggers`
+    // skips it.
+    if (brutalRiders.includes('staggering') && bsTargetEnt) {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === targetId && e.isEnemy
+            ? {
+                ...e,
+                conditions: [...e.conditions.filter((c) => c !== 'staggered'), 'staggered'],
+              }
+            : e
+        ),
+      };
+      ctx.narrative += ` ${fmt.note(`[Staggering Blow: ${target.name} has Disadvantage on its next save and can't make Opportunity Attacks]`)}`;
+    }
+    // SRD Improved Brutal Strike (L13) — Sundering Blow: the next attack roll
+    // another creature makes against the target before your next turn gains
+    // +5. Tagged with the Barbarian's id (their own attacks don't consume it);
+    // `computeAttackEdges` spends it, and the round wrap clears it.
+    if (brutalRiders.includes('sundering') && bsTargetEnt) {
+      const tag = sunderedTag(pc.char.id);
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === targetId && e.isEnemy
+            ? { ...e, conditions: [...e.conditions.filter((c) => c !== tag), tag] }
+            : e
+        ),
+      };
+      ctx.narrative += ` ${fmt.note(`[Sundering Blow: the next attack against ${target.name} by an ally gains +5]`)}`;
     }
   }
 

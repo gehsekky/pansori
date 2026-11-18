@@ -28,10 +28,13 @@ import {
   maxSpellLevelForLevel,
   metamagicOptions,
   metamagicSlots,
+  skillKey,
+  skillLabel,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { characterAc } from '../armorClass.js';
 import { masterableWeapons } from '../../campaignData/srd/index.js';
+import { pendingBonusSkills } from '../barbarianFeatures.js';
 import { syncSetAbilities } from '../wornEffects.js';
 import { updatePcActor } from './actor.js';
 
@@ -668,6 +671,36 @@ export const handleChooseExpertise: ActionHandler<{
   }
   updatePcActor(ctx, { expertise_skills: [...current, match] });
   ctx.narrative = `${char.name} gains Expertise in ${match} (double proficiency bonus).`;
+};
+
+/**
+ * `choose_bonus_skill`: spend a feature's "gain proficiency in a skill of your
+ * choice" grant (SRD Barbarian Primal Knowledge, L3 — one skill from the
+ * Barbarian list). Validates the grant has a pick open and the skill is one of
+ * its options the character isn't already proficient in. Out-of-combat, no
+ * action cost.
+ */
+export const handleChooseBonusSkill: ActionHandler<{
+  type: 'choose_bonus_skill';
+  source: string;
+  skill: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose skill proficiencies.' };
+  const { char } = ctx.actor;
+  const grant = pendingBonusSkills(char).find((g) => g.source === action.source);
+  if (!grant) return { rejected: 'You have no skill proficiency choice of that kind open.' };
+  const skill = grant.options.find((s) => skillKey(s) === skillKey(action.skill));
+  if (!skill) {
+    return { rejected: `${action.skill} isn't a skill ${grant.label} can grant you.` };
+  }
+  updatePcActor(ctx, {
+    skill_proficiencies: [...(char.skill_proficiencies ?? []), skill],
+    bonus_skill_picks: {
+      ...(char.bonus_skill_picks ?? {}),
+      [grant.source]: [...(char.bonus_skill_picks?.[grant.source] ?? []), skill],
+    },
+  });
+  ctx.narrative = `${char.name} gains proficiency in ${skillLabel(skill)} (${grant.label}).`;
 };
 
 /**

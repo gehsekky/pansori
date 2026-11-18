@@ -31,11 +31,19 @@ export function rollSpellAttack(
   const advantage = edges.advantage || !!opts.extraAdvantage;
   const atk = resolveSpellAttack(ctx.actor.char.level, castingScore, ac, advantage, {
     disadvantage: edges.disadvantage,
-    penalty: edges.penalty,
+    // Sundering Blow's +5 rides the same flat-modifier slot as the penalty.
+    penalty: edges.penalty - edges.sunderingBonus,
   });
   const critical = atk.critical || (atk.hit && edges.autoCritOnHit);
   const extraNote =
     opts.extraAdvantage && !edges.advantage && !edges.disadvantage ? ' (advantage)' : '';
   const coverNote = edges.coverAcBonus ? ` [cover +${edges.coverAcBonus} AC]` : '';
-  return { ...atk, critical, ac, note: attackEdgeNote(edges) + extraNote + coverNote, edges };
+  const sunderNote = edges.sunderingBonus ? ` [Sundering Blow +${edges.sunderingBonus}]` : '';
+  return {
+    ...atk,
+    critical,
+    ac,
+    note: attackEdgeNote(edges) + extraNote + coverNote + sunderNote,
+    edges,
+  };
 }

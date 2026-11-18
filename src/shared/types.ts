@@ -993,6 +993,10 @@ export type StructuredAction =
   // chosen skill proficiency. `skill` matches a `skill_proficiencies` entry.
   // Out-of-combat, no action cost. (RE-2.)
   | { type: 'choose_expertise'; skill: string }
+  // A feature's "gain proficiency in a skill of your choice" grant (Barbarian
+  // Primal Knowledge, L3). `source` names the grant; `skill` must be one of its
+  // options. Out-of-combat, no action cost.
+  | { type: 'choose_bonus_skill'; source: string; skill: string }
   // 2024 Weapon Mastery slot growth — on level-up the player picks a new weapon
   // to master (Fighter L4/10/16, Barbarian L4/10). `weaponId` is the chosen
   // weapon. Out-of-combat, no action cost.

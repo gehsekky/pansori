@@ -121,6 +121,15 @@ const defs: ConditionDef[] = [
     imposesDisadvantageOnAttackers: true,
     grantsAdvantageOnSelfAttacks: true,
   },
+  // SRD Barbarian Improved Brutal Strike — Staggering Blow (a pansori tag, not
+  // an SRD condition): Disadvantage on the next saving throw. Applied to enemy
+  // grid entities and cleared on the round wrap; `opportunityAttackTriggers`
+  // also reads it (no Opportunity Attacks).
+  {
+    id: 'staggered',
+    duration: 1,
+    disadvantageSaves: ['str', 'dex', 'con', 'int', 'wis', 'cha'],
+  },
   // SRD Deafened — the creature can't hear and auto-fails any ability check that
   // requires hearing. No attack/save modifiers (deafened ≠ silenced; it doesn't
   // block Verbal spell components RAW, though pansori's precast currently gates

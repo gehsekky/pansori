@@ -1,4 +1,5 @@
 import { commitCharacter, getItemData } from '../gameEngine.js';
+import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
 import {
   profBonus,
   resolveMysteryConsumable,
@@ -10,7 +11,6 @@ import { applyDamage } from '../damage.js';
 import { characterAc } from '../armorClass.js';
 import { clearInstance } from '../equipment.js';
 import { fmt } from '../narrativeFmt.js';
-import { maxAttunement } from '../multiclass.js';
 import { syncSetAbilities } from '../wornEffects.js';
 import { updatePcActor } from './actor.js';
 
@@ -152,8 +152,7 @@ export const handleUse: ActionHandler<{
     narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;
   } else if (itemData.type === 'consumable') {
     if (itemData.heal) {
-      const hasMedicine =
-        ctx.context.classSkills[nextChar.character_class]?.includes('medicine') ?? false;
+      const hasMedicine = hasSkillProficiency(nextChar, 'medicine');
       const healBonus = hasMedicine ? profBonus(nextChar.level) : 0;
       const healed = rollDice(itemData.heal) + healBonus;
       const bonusNote = healBonus > 0 ? ` (+${healBonus} medicine)` : '';

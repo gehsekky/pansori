@@ -14,8 +14,10 @@ import {
   hasExpertise,
   hasJackOfAllTrades,
   hasReliableTalent,
+  hasSkillProficiency,
   peerlessSkillDie,
 } from '../multiclass.js';
+import { primalKnowledgeScore } from '../barbarianFeatures.js';
 
 /**
  * Result of a Hide attempt:
@@ -49,7 +51,7 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
   // SRD Pass without Trace — +10 to the Stealth check (folded into the check's
   // effective DC, the same way the bardic roll is below; the displayed DC stays 15).
   const passWithoutTraceBonus = pc.char.pass_without_trace_active ? 10 : 0;
-  const hideProf = pc.char.skill_proficiencies?.includes('Stealth') ?? false;
+  const hideProf = hasSkillProficiency(pc.char, 'stealth');
   const inspAdv = consumeInspirationForCheck(pc.char);
   const luckAdv = consumeLuckForCheck(pc.char);
   const bardicRoll = consumeBardicForCheck(pc.char);
@@ -60,7 +62,8 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
     ctx,
     applyGuidanceDie(
       skillCheck(
-        pc.char.dex,
+        // SRD Barbarian Primal Knowledge — a raging Barbarian may use STR.
+        primalKnowledgeScore(pc.char, 'stealth', pc.char.dex),
         hideDc,
         hideProf,
         pc.char.level,

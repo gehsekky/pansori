@@ -115,7 +115,7 @@ export const handleDash: ActionHandler<{ type: 'dash' }> = (ctx) => {
     ...ctx.st,
     movement_used: {
       ...(ctx.st.movement_used ?? {}),
-      [char.id]: Math.max(0, (ctx.st.movement_used?.[char.id] ?? 0) - dashSpeed),
+      [char.id]: (ctx.st.movement_used?.[char.id] ?? 0) - dashSpeed,
     },
   };
   ctx.narrative = `${char.name} Dashes — gaining an extra ${dashSpeed} ft of movement this turn.`;

@@ -7,6 +7,7 @@ import {
   seedSummonedAllies,
 } from '../../gameEngine.js';
 import {
+  hasSkillProficiency,
   heroicWarriorTopUp,
   perfectFocusRefresh,
   persistentRageTopUp,
@@ -73,7 +74,7 @@ export function runCombatStart(
   const livingParty = ctx.st.characters.filter((c) => !c.dead);
   const partyAvgStealth = Math.round(
     livingParty.reduce((sum, c) => {
-      const prof = c.skill_proficiencies?.includes('Stealth') ?? false;
+      const prof = hasSkillProficiency(c, 'stealth');
       return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
     }, 0) / Math.max(1, livingParty.length)
   );

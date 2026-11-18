@@ -117,8 +117,7 @@ export function applyMulticlassProfGrants(
   // One skill from the class's list (Bard / Ranger / Rogue) — auto-pick the
   // first option the character doesn't already have.
   if (grant.skillFromClass && skillOptions?.length) {
-    const have = new Set(char.skill_proficiencies ?? []);
-    const pick = skillOptions.find((s) => !have.has(s));
+    const pick = skillOptions.find((s) => !hasSkillProficiency(char, s));
     if (pick) {
       char.skill_proficiencies = [...(char.skill_proficiencies ?? []), pick];
       added.push(`${pick} (skill)`);
@@ -577,7 +576,37 @@ export function expertiseEligibleSkills(char: Character): string[] {
   const profs = char.skill_proficiencies ?? [];
   const broad = getClassLevel(char, 'rogue') >= 1 || getClassLevel(char, 'bard') >= 2;
   if (broad) return profs;
-  return profs.filter((s) => SCHOLAR_SKILLS.some((k) => k.toLowerCase() === s.toLowerCase()));
+  return profs.filter((s) => SCHOLAR_SKILLS.some((k) => skillKey(k) === skillKey(s)));
+}
+
+/**
+ * Canonical skill key: lowercase, words joined by '_'. Skill names arrive in
+ * several spellings — class picks are `'sleight_of_hand'`, backgrounds and
+ * species grants `'Sleight of Hand'` / `'Perception'` — so every lookup
+ * compares through this.
+ */
+export function skillKey(skill: string): string {
+  return skill
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '_');
+}
+
+/** Display form of a skill name: `'animal_handling'` → `'Animal Handling'`. */
+export function skillLabel(skill: string): string {
+  return skillKey(skill)
+    .split('_')
+    .map((w) => (w === 'of' ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ');
+}
+
+/** True when the character is proficient in `skill` (any spelling). */
+export function hasSkillProficiency(
+  char: Pick<Character, 'skill_proficiencies'>,
+  skill: string
+): boolean {
+  const key = skillKey(skill);
+  return (char.skill_proficiencies ?? []).some((s) => skillKey(s) === key);
 }
 
 /**
@@ -585,7 +614,8 @@ export function expertiseEligibleSkills(char: Character): string[] {
  * doubled proficiency is applied by `skillCheck` when it is also proficient. (RE-2.)
  */
 export function hasExpertise(char: Character, skill: string): boolean {
-  return (char.expertise_skills ?? []).some((s) => s.toLowerCase() === skill.toLowerCase());
+  const key = skillKey(skill);
+  return (char.expertise_skills ?? []).some((s) => skillKey(s) === key);
 }
 
 /**

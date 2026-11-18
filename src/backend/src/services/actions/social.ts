@@ -14,13 +14,19 @@ import {
   shopStockLeft,
 } from '../gameEngine.js';
 import { applyGuidanceDie, applyTacticalMind, consumeGuidanceDie, updatePcActor } from './actor.js';
-import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
+import {
+  hasExpertise,
+  hasJackOfAllTrades,
+  hasReliableTalent,
+  hasSkillProficiency,
+} from '../multiclass.js';
 import { onceKey, visibleResponses } from '../dialogueGating.js';
 import { pathToNode, responsesAtNodePath } from '../conversation.js';
 import type { ActionHandler } from './types.js';
 import type { ActiveGrid } from '../mapEngine.js';
 import type { GridPos } from '../../types.js';
 import { magicianCheckBonus } from '../druidFeatures.js';
+import { primalKnowledgeScore } from '../barbarianFeatures.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -232,9 +238,11 @@ export const handleTalkResponse: ActionHandler<{
       ctx,
       applyGuidanceDie(
         skillCheck(
-          char.cha,
+          // SRD Barbarian Primal Knowledge — a raging Barbarian may use STR
+          // for Intimidation.
+          primalKnowledgeScore(char, chk.skill, char.cha),
           chk.dc,
-          char.skill_proficiencies?.includes(chk.skill) ?? false,
+          hasSkillProficiency(char, chk.skill),
           char.level,
           false,
           hasExpertise(char, chk.skill),
@@ -608,9 +616,11 @@ export const handleInfluence: ActionHandler<{
     ctx,
     applyGuidanceDie(
       skillCheck(
-        char.cha,
+        // SRD Barbarian Primal Knowledge — a raging Barbarian may use STR
+        // for Intimidation.
+        primalKnowledgeScore(char, skillName, char.cha),
         dc,
-        char.skill_proficiencies?.includes(skillName) ?? false,
+        hasSkillProficiency(char, skillName),
         char.level,
         false,
         hasExpertise(char, skillName),
@@ -738,7 +748,7 @@ export const handleStudy: ActionHandler<{
       skillCheck(
         char.int,
         dc - thaumaturgeBonus,
-        char.skill_proficiencies?.includes(skillName) ?? false,
+        hasSkillProficiency(char, skillName),
         char.level,
         false,
         hasExpertise(char, skillName),

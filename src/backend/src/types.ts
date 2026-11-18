@@ -614,6 +614,10 @@ export interface Seed {
 // SRD creature sizes, smallest to largest.
 export type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan';
 
+/** SRD Barbarian Brutal Strike effects (L9: Forceful / Hamstring; L13 adds
+ *  Staggering / Sundering). */
+export type BrutalStrikeEffect = 'forceful' | 'hamstring' | 'staggering' | 'sundering';
+
 export interface TurnActions {
   action_used: boolean;
   bonus_action_used: boolean;
@@ -654,11 +658,14 @@ export interface TurnActions {
   // (which also zeroes remaining movement), cleared on the next attack
   // (one-shot) or at end of turn via FRESH_TURN.
   steady_aim_pending?: boolean;
-  // Barbarian Brutal Strike (L9) — pre-committed rider for the next STR
+  // Barbarian Brutal Strike (L9) — pre-committed rider(s) for the next STR
   // melee attack while Reckless: forgoes the Reckless advantage and, on a
-  // hit, deals +1d10 and applies the chosen effect. Consumed on the next
-  // qualifying attack; cleared at end of turn via FRESH_TURN otherwise.
-  brutal_strike_pending?: 'forceful' | 'hamstring';
+  // hit, deals +1d10 (2d10 at L17) and applies the chosen effect(s) — one, or
+  // two different ones at L17 (Improved Brutal Strike). Consumed on the next
+  // qualifying attack; cleared at end of turn via FRESH_TURN otherwise. (A
+  // bare string is the pre-L17 save shape; read it through
+  // `brutalStrikeRiders`.)
+  brutal_strike_pending?: BrutalStrikeEffect[] | BrutalStrikeEffect;
   // Savage Attacker feat (SRD origin) — once per turn, on a
   // weapon-damage hit, reroll damage and take the higher. This flag
   // marks the reroll as already spent this turn so multi-hit turns
@@ -1560,6 +1567,11 @@ export interface Character {
     }
   >;
   expertise_skills?: string[]; // skills with double proficiency bonus (Rogue/Bard)
+  // Skill proficiencies picked through a feature's "gain proficiency in a
+  // skill of your choice" grant, keyed by the grant's source (e.g.
+  // 'primal_knowledge'). The picks are also added to `skill_proficiencies`;
+  // this map only tracks which grants have been used (see `pendingBonusSkills`).
+  bonus_skill_picks?: Record<string, string[]>;
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   // Ids that subclass "always prepared" lists added to `spells_known` (see
   // services/subclassSpells.ts), so a grant that stops applying can be removed

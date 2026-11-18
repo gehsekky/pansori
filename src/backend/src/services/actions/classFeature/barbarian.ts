@@ -1,4 +1,14 @@
 import {
+  BRUTAL_STRIKE_LABELS,
+  brutalStrikeDice,
+  brutalStrikeMaxEffects,
+  brutalStrikeOptions,
+  brutalStrikeRiders,
+  instinctivePounceFeet,
+  mindlessRageActive,
+} from '../../barbarianFeatures.js';
+import type { BrutalStrikeEffect, InventoryItem } from '../../../types.js';
+import {
   abilityMod,
   profBonus,
   rageDamageBonus,
@@ -7,6 +17,7 @@ import {
 } from '../../rulesEngine.js';
 import {
   applyPartyLevelUps,
+  effectiveSpeed,
   endCombatState,
   enemyHpAfterDamage,
   getEnemyById,
@@ -16,7 +27,6 @@ import {
 } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
-import type { InventoryItem } from '../../../types.js';
 import { equippedWeaponId } from '../../equipment.js';
 import { legendaryResist } from '../../monsterSaves.js';
 
@@ -65,6 +75,41 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
     };
     char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
     ctx.narrative = `${char.name} RAGES! +${rageDamageBonus(barbLvl)} bonus STR melee damage, resistance to physical attacks. (${rageUses - 1} use${rageUses - 1 === 1 ? '' : 's'} remaining)`;
+    // SRD Berserker Mindless Rage (L6) — entering the Rage ends Charmed and
+    // Frightened (and grants immunity to both while it lasts; see
+    // `conditionImmunitiesFor`).
+    if (mindlessRageActive(char)) {
+      const shaken = char.conditions.filter((c) => c === 'charmed' || c === 'frightened');
+      if (shaken.length > 0) {
+        char.conditions = char.conditions.filter((c) => c !== 'charmed' && c !== 'frightened');
+        const durations = { ...(char.condition_durations ?? {}) };
+        const sources = { ...(char.condition_sources ?? {}) };
+        for (const c of shaken) {
+          delete durations[c];
+          delete sources[c];
+        }
+        char.condition_durations = durations;
+        char.condition_sources = sources;
+        if (shaken.includes('charmed')) char.charmer_id = undefined;
+        ctx.narrative += ` Mindless Rage burns away the ${shaken.join(' and ')} condition${shaken.length > 1 ? 's' : ''}.`;
+      }
+    }
+    // SRD Barbarian Instinctive Pounce (L7) — move up to half your Speed as
+    // part of the Rage Bonus Action. Granted as extra movement this turn (the
+    // same budget refund Dash uses); it provokes Opportunity Attacks normally.
+    const pounceFt = ctx.st.combat_active
+      ? instinctivePounceFeet(char, effectiveSpeed(char, ctx.context.lootTable))
+      : 0;
+    if (pounceFt > 0) {
+      ctx.st = {
+        ...ctx.st,
+        movement_used: {
+          ...(ctx.st.movement_used ?? {}),
+          [char.id]: (ctx.st.movement_used?.[char.id] ?? 0) - pounceFt,
+        },
+      };
+      ctx.narrative += ` Instinctive Pounce: +${pounceFt} ft of movement this turn.`;
+    }
     return true;
   }
 
@@ -151,22 +196,36 @@ export function handleBarbarianFeature(ctx: ActionContext, fid: string): boolean
     return true;
   }
 
-  if (fid === 'brutal_strike_forceful' || fid === 'brutal_strike_hamstring') {
+  if (fid.startsWith('brutal_strike_')) {
+    const effect = fid.slice('brutal_strike_'.length) as BrutalStrikeEffect;
     if (!hasClass(char, 'barbarian') || getClassLevel(char, 'barbarian') < 9) {
       ctx.narrative = 'Brutal Strike requires Barbarian level 9.';
+      return true;
+    }
+    if (!brutalStrikeOptions(char).includes(effect)) {
+      ctx.narrative =
+        effect in BRUTAL_STRIKE_LABELS
+          ? `That Brutal Strike effect requires Barbarian level 13 (Improved Brutal Strike).`
+          : 'Unknown Brutal Strike effect.';
       return true;
     }
     if (!char.turn_actions.reckless) {
       ctx.narrative = 'Brutal Strike requires Reckless Attack this turn.';
       return true;
     }
-    const rider = fid === 'brutal_strike_forceful' ? 'forceful' : 'hamstring';
-    char.turn_actions = { ...char.turn_actions, brutal_strike_pending: rider };
-    const label =
-      rider === 'forceful'
-        ? 'Forceful Blow (push 15 ft, then close in)'
-        : 'Hamstring Blow (−15 ft Speed)';
-    ctx.narrative = `${char.name} readies a Brutal Strike — ${label}. The next Strength melee attack forgoes advantage; on a hit it deals +1d10 and applies the effect.`;
+    const riders = brutalStrikeRiders(char.turn_actions.brutal_strike_pending);
+    if (riders.includes(effect)) {
+      ctx.narrative = 'That Brutal Strike effect is already readied.';
+      return true;
+    }
+    // SRD Improved Brutal Strike (L17) — two different effects per strike.
+    if (riders.length >= brutalStrikeMaxEffects(char)) {
+      ctx.narrative = 'Your Brutal Strike already has all the effects it can carry.';
+      return true;
+    }
+    const next = [...riders, effect];
+    char.turn_actions = { ...char.turn_actions, brutal_strike_pending: next };
+    ctx.narrative = `${char.name} readies a Brutal Strike — ${next.map((e) => BRUTAL_STRIKE_LABELS[e]).join(' + ')}. The next Strength melee attack forgoes advantage; on a hit it deals +${brutalStrikeDice(char)} and applies the effect${next.length > 1 ? 's' : ''}.`;
     return true;
   }
 

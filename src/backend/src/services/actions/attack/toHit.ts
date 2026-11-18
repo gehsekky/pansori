@@ -216,7 +216,9 @@ export function computeToHitContext(
   const magicWeaponBonus = weaponItem
     ? (pc.char.weapon_enhancement ?? 0) + (weaponItem.magicBonus ?? 0)
     : 0;
-  const totalAttackBonus = sacredWeaponBonus - revivePenalty + archeryBonus + magicWeaponBonus;
+  // SRD Barbarian Sundering Blow — +5 on this roll (consumed in computeAttackEdges).
+  const totalAttackBonus =
+    sacredWeaponBonus - revivePenalty + archeryBonus + magicWeaponBonus + edges.sunderingBonus;
 
   return {
     weaponProficient,

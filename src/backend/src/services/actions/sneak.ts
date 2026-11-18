@@ -19,11 +19,13 @@ import {
   hasExpertise,
   hasJackOfAllTrades,
   hasReliableTalent,
+  hasSkillProficiency,
   peerlessSkillDie,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { isInSunlight } from '../gridEngine.js';
+import { primalKnowledgeScore } from '../barbarianFeatures.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -79,8 +81,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
   let activeChar = char;
   const rolls = livingParty.map((member) => {
     const isActive = member.id === char.id;
-    const proficient =
-      ctx.context.classSkills[member.character_class]?.includes('stealth') ?? false;
+    const proficient = hasSkillProficiency(member, 'stealth');
     // 2024 Exhaustion is a flat −2/level penalty (folded into d20TestPenalty),
     // not Disadvantage.
     const checkDisadv = isHeavilyEncumbered(member);
@@ -90,7 +91,8 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     if (isActive) activeChar = member;
     const peerlessRollSneak = isActive ? peerlessSkillDie(member) : 0;
     const rawCheck = skillCheck(
-      member.dex,
+      // SRD Barbarian Primal Knowledge — a raging Barbarian may use STR.
+      primalKnowledgeScore(member, 'stealth', member.dex),
       sneakDC - bardicRoll,
       proficient,
       member.level,

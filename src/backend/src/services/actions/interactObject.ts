@@ -10,11 +10,13 @@ import {
   hasExpertise,
   hasJackOfAllTrades,
   hasReliableTalent,
+  hasSkillProficiency,
   peerlessSkillDie,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { pickHookText } from '../mapEngine.js';
+import { primalKnowledgeScore } from '../barbarianFeatures.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
 
@@ -83,8 +85,7 @@ export const handleInteractObject: ActionHandler<{
   const usePerception = obj.searchSkill === 'perception';
   const skillName = usePerception ? 'Perception' : 'Investigation';
   const abilityScore = usePerception ? nextChar.wis : nextChar.int;
-  const proficient =
-    nextChar.skill_proficiencies?.some((s) => s.toLowerCase() === skillName.toLowerCase()) ?? false;
+  const proficient = hasSkillProficiency(nextChar, skillName);
   // 2024 Exhaustion is a flat −2/level penalty (folded into d20TestPenalty
   // below), not Disadvantage.
   const inspAdv = consumeInspirationForCheck(nextChar);
@@ -102,7 +103,8 @@ export const handleInteractObject: ActionHandler<{
   const lowLightDisadv = effectiveLight !== 'bright';
   const searchDc = (obj.searchDC ?? 12) - bardicRoll;
   const rawCheck = skillCheck(
-    abilityScore,
+    // SRD Barbarian Primal Knowledge — a raging Barbarian may use STR (Perception).
+    primalKnowledgeScore(nextChar, skillName, abilityScore),
     searchDc,
     proficient,
     nextChar.level,

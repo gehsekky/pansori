@@ -410,5 +410,13 @@ export function opportunityAttackTriggers(
 ): CombatEntity[] {
   const wasAdjacent = (e: CombatEntity) => distanceFeet(e.pos, mover) <= attackerReachFt(e);
   const isAdjacent = (e: CombatEntity) => distanceFeet(e.pos, movedTo) <= attackerReachFt(e);
-  return entities.filter((e) => e.isEnemy !== moverIsEnemy && wasAdjacent(e) && !isAdjacent(e));
+  // SRD Barbarian Staggering Blow — a staggered creature can't make
+  // Opportunity Attacks until the start of the Barbarian's next turn.
+  return entities.filter(
+    (e) =>
+      e.isEnemy !== moverIsEnemy &&
+      !e.conditions?.includes('staggered') &&
+      wasAdjacent(e) &&
+      !isAdjacent(e)
+  );
 }

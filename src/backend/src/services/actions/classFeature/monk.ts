@@ -235,7 +235,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
         ...ctx.st,
         movement_used: {
           ...(ctx.st.movement_used ?? {}),
-          [char.id]: Math.max(0, (ctx.st.movement_used?.[char.id] ?? 0) - sw),
+          [char.id]: (ctx.st.movement_used?.[char.id] ?? 0) - sw,
         },
       };
       ctx.narrative = `${char.name} — Step of the Wind: Dash (free)! +${sw} ft movement.`;
@@ -282,7 +282,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ...ctx.st,
       movement_used: {
         ...(ctx.st.movement_used ?? {}),
-        [char.id]: Math.max(0, (ctx.st.movement_used?.[char.id] ?? 0) - stwSpeed),
+        [char.id]: (ctx.st.movement_used?.[char.id] ?? 0) - stwSpeed,
       },
     };
     ctx.narrative = `${char.name} — Step of the Wind (1 DP): Dash +${stwSpeed} ft AND Disengage. (${kiPool2 - 1} DP remaining)`;
@@ -446,7 +446,7 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
       ...ctx.st,
       movement_used: {
         ...(ctx.st.movement_used ?? {}),
-        [char.id]: Math.max(0, (ctx.st.movement_used?.[char.id] ?? 0) - fsSpeed),
+        [char.id]: (ctx.st.movement_used?.[char.id] ?? 0) - fsSpeed,
       },
     };
     ctx.narrative = `${char.name} — Fleet Step! A free Step of the Wind: Dash +${fsSpeed} ft and Disengage.`;

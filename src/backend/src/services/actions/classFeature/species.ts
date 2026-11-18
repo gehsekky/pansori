@@ -45,7 +45,7 @@ export function handleSpeciesFeature(ctx: ActionContext, fid: string): boolean {
       ...ctx.st,
       movement_used: {
         ...(ctx.st.movement_used ?? {}),
-        [pc.char.id]: Math.max(0, (ctx.st.movement_used?.[pc.char.id] ?? 0) - arSpeed),
+        [pc.char.id]: (ctx.st.movement_used?.[pc.char.id] ?? 0) - arSpeed,
       },
     };
     const arTemp = profBonus(pc.char.level);

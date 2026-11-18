@@ -43,7 +43,7 @@ export function handleRogueFeature(ctx: ActionContext, fid: string): boolean {
       ...ctx.st,
       movement_used: {
         ...(ctx.st.movement_used ?? {}),
-        [pc.char.id]: Math.max(0, (ctx.st.movement_used?.[pc.char.id] ?? 0) - caSpeed),
+        [pc.char.id]: (ctx.st.movement_used?.[pc.char.id] ?? 0) - caSpeed,
       },
     };
     ctx.narrative = `${pc.char.name} uses Cunning Action: Dash — +${caSpeed} ft movement this turn.`;

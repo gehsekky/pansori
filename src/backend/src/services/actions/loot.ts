@@ -1,5 +1,6 @@
 import type { ActionHandler } from './types.js';
 import { fmt } from '../narrativeFmt.js';
+import { hasSkillProficiency } from '../multiclass.js';
 import { pick } from '../gameEngine.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
@@ -44,9 +45,7 @@ export const handleLoot: ActionHandler<{ type: 'loot'; lootKey?: string }> = (ct
   let narrative = pick(ctx.context.narratives.lootPickedUp).replace(/{item}/g, loot.name);
   const isMagicMisc = loot.type === 'misc' && !!loot.requiresAttunement;
   const hasIdentify =
-    ctx.context.classSkills[char.character_class]?.some((s) =>
-      ['arcana', 'investigation'].includes(s)
-    ) ?? false;
+    hasSkillProficiency(char, 'arcana') || hasSkillProficiency(char, 'investigation');
   if (isMagicMisc && !hasIdentify) {
     narrative += ` ${fmt.note(`[${loot.name}: unidentified]`)}`;
   } else {

@@ -12,11 +12,12 @@
 import { SQUARE_SIZE, chebyshev, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
 import { combatGridDims, effectiveSpeed, getEnemyById } from '../gameEngine.js';
 import { d20TestPenalty, resolveEnemyAttack, skillCheck } from '../rulesEngine.js';
-import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
+import { hasEscapeTheHorde, hasSecondStoryWork, hasSkillProficiency } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { longJumpDistance } from '../jump.js';
+import { primalKnowledgeScore } from '../barbarianFeatures.js';
 import { updatePcActor } from './actor.js';
 
 export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: number } }> = (
@@ -105,9 +106,10 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
   let landNarrative = '';
   const landsInDifficult = (room?.difficultTerrain ?? []).some((dt) => posEqual(dt, to));
   if (landsInDifficult) {
-    const proficient = nextChar.skill_proficiencies?.includes('Acrobatics') ?? false;
+    const proficient = hasSkillProficiency(nextChar, 'acrobatics');
     const rawCheck = skillCheck(
-      nextChar.dex,
+      // SRD Barbarian Primal Knowledge — a raging Barbarian may use STR.
+      primalKnowledgeScore(nextChar, 'acrobatics', nextChar.dex),
       10,
       proficient,
       nextChar.level,

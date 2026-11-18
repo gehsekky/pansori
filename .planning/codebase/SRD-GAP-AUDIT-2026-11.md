@@ -66,9 +66,28 @@ of base Speed, so Fast Movement / Roving / Haste / Unarmored Movement show.
 
 Missing (no code path):
 
-- **Barbarian:** Primal Knowledge (L3), Instinctive Pounce (L7), Improved Brutal
+- ~~**Barbarian:** Primal Knowledge (L3), Instinctive Pounce (L7), Improved Brutal
   Strike (L13 Staggering/Sundering Blow; L17 2d10 + two effects — only Forceful
-  Blow and Hamstring Blow exist), Berserker Mindless Rage (L6).
+  Blow and Hamstring Blow exist), Berserker Mindless Rage (L6).~~ Done 2026-11-17
+  (`services/barbarianFeatures.ts`). Primal Knowledge's skill is a
+  `choose_bonus_skill` pick (a generic feature-skill grant, reusable for Lore's
+  Bonus Proficiencies); its STR-for-skills option auto-picks the better score at
+  every Acrobatics / Intimidation / Perception / Stealth check site. Pounce is
+  extra movement on the Rage turn (the Dash budget refund). Simplifications:
+  Staggering Blow's "next saving throw" is every save until the round wraps, and
+  Staggering / Sundering end on the round wrap like Hamstring; Sundering's +5
+  applies to PC weapon and spell attack rolls (summon / companion attacks don't
+  read it).
+  **Found on the way:** (1) Dash, Cunning Action Dash, Step of the Wind, Fleet
+  Step and the species dash clamped `movement_used` at 0, so dashing *before*
+  moving granted nothing — fixed (negative = extra budget, as Expeditious
+  Retreat already did). Known edge: Steady Aim's "haven't moved" test reads
+  `movement_used <= 0`, so Dash-then-move-then-Steady-Aim slips through.
+  (2) Skill-proficiency lookups were case-sensitive while class picks are stored
+  `'stealth'` and backgrounds `'Stealth'` — a class-picked Stealth / Perception
+  didn't count for Hide, the surprise roll, jump landings, or trap detection,
+  and Sneak read the class's default list instead of the character. All sites
+  now go through `hasSkillProficiency` (spelling-insensitive).
 - **Bard:** Font of Inspiration (L5: regain on Short Rest, spend a slot to
   regain a use), Magical Secrets (L10), College of Lore Bonus Proficiencies (L3)
   and Magical Discoveries (L6).

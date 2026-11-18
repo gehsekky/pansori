@@ -4,6 +4,7 @@ import { handleAcceptQuest, handleCompleteQuest } from './quest.js';
 import {
   handleApplyAsi,
   handleChooseBlessedStrikes,
+  handleChooseBonusSkill,
   handleChooseDivineOrder,
   handleChooseElementalAffinity,
   handleChooseElementalFury,
@@ -120,6 +121,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   select_subclass: handleSelectSubclass as ActionHandler,
   choose_fighting_style: handleChooseFightingStyle as ActionHandler,
   choose_expertise: handleChooseExpertise as ActionHandler,
+  choose_bonus_skill: handleChooseBonusSkill as ActionHandler,
   choose_weapon_mastery: handleChooseWeaponMastery as ActionHandler,
   learn_spell: handleLearnSpell as ActionHandler,
   choose_hunter_option: handleChooseHunterOption as ActionHandler,

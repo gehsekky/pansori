@@ -62,6 +62,15 @@ import {
   weaponMasterySlotsForLevel,
 } from '../campaignData/srd/index.js';
 import {
+  BRUTAL_STRIKE_LABELS,
+  brutalStrikeDice,
+  brutalStrikeMaxEffects,
+  brutalStrikeOptions,
+  brutalStrikeRiders,
+  mindlessRageActive,
+  pendingBonusSkills,
+} from './barbarianFeatures.js';
+import {
   CIRCLE_LANDS,
   alwaysPreparedSpells,
   choosesCircleLand,
@@ -115,6 +124,7 @@ import {
   hasHeroicWarrior,
   hasMultiattackDefense,
   hasRetaliation,
+  hasSkillProficiency,
   hasSlipperyMind,
   hasSuperiorHuntersDefense,
   hunterFeatureOptions,
@@ -129,6 +139,7 @@ import {
   metamagicOptions,
   metamagicSlots,
   piercesMagicalDarkness,
+  skillLabel,
   spellSlotsForChar,
   wildShapeUsesMax,
 } from './multiclass.js';
@@ -1203,11 +1214,22 @@ export function auraConditionImmunity(char: Character, st: GameState): Set<strin
  * auto-apply + save-based, monster auras) and the per-turn "freed from a
  * now-immune condition" sweep. (RE-6.)
  */
+/** Brutal Strike enemy tags that expire on the round wrap. */
+function isRoundScopedBrutalTag(c: string): boolean {
+  return c === 'hamstrung' || c === 'staggered' || c.startsWith('sundered_by_');
+}
+
 export function conditionImmunitiesFor(char: Character, st: GameState): Set<string> {
   const out = auraConditionImmunity(char, st);
   for (const c of char.condition_immunities ?? []) out.add(c);
   // SRD Circle of the Land Nature's Ward (L10) — immune to Poisoned.
   if (hasNaturesWard(char)) out.add('poisoned');
+  // SRD Path of the Berserker Mindless Rage (L6) — immune to Charmed and
+  // Frightened while raging.
+  if (mindlessRageActive(char)) {
+    out.add('charmed');
+    out.add('frightened');
+  }
   return out;
 }
 
@@ -4169,7 +4191,7 @@ export function pacePerceptionMod(state: GameState): number {
 export function partyDetectsTrap(characters: Character[], trap: Trap, paceMod = 0): boolean {
   return characters.some((c) => {
     if (c.dead) return false;
-    const proficient = c.skill_proficiencies?.includes('Perception') ?? false;
+    const proficient = hasSkillProficiency(c, 'perception');
     return passivePerception(c.wis, c.level, proficient) + paceMod >= trap.dc;
   });
 }
@@ -5555,6 +5577,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Feature skill-proficiency picks (Barbarian Primal Knowledge L3) ─────────
+  // RAW level-up choice, surfaced out of combat like the Expertise picks.
+  if (!state.combat_active) {
+    for (const grant of pendingBonusSkills(char)) {
+      for (const skill of grant.options) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `${grant.label}: gain proficiency in ${skillLabel(skill)}`,
+          action: { type: 'choose_bonus_skill', source: grant.source, skill },
+        });
+      }
+    }
+  }
+
   // ── Cleric Divine Order (L1) — Protector / Thaumaturge ─────────────────────
   // One-time choice surfaced out of combat. Thaumaturge grants a concrete
   // extra Cleric cantrip (the first learnable one) plus the Arcana/Religion
@@ -6077,7 +6113,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     if (
       hasClass(char, 'rogue') &&
       getClassLevel(char, 'rogue') >= 3 &&
-      (state.movement_used?.[char.id] ?? 0) === 0
+      (state.movement_used?.[char.id] ?? 0) <= 0
     ) {
       choices.push({
         label: 'Steady Aim — advantage on your next attack (Speed 0 this turn)',
@@ -6229,25 +6265,31 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   }
 
   // ── Barbarian Brutal Strike (L9): pre-commit a rider while Reckless ──────────
+  // SRD Improved Brutal Strike — L13 adds Staggering / Sundering Blow; at L17
+  // one Brutal Strike applies two different effects, so a second pick is
+  // offered after the first.
   if (
     state.combat_active &&
     hasClass(char, 'barbarian') &&
     getClassLevel(char, 'barbarian') >= 9 &&
     char.turn_actions.reckless &&
-    !char.turn_actions.brutal_strike_pending &&
     !char.turn_actions.action_used
   ) {
-    choices.push({
-      label:
-        'Brutal Strike: Forceful Blow — forgo advantage; on hit +1d10 and push 15 ft, then close in',
-      action: { type: 'use_class_feature', featureId: 'brutal_strike_forceful' },
-      kind: 'class_feature',
-    });
-    choices.push({
-      label: 'Brutal Strike: Hamstring Blow — forgo advantage; on hit +1d10 and −15 ft Speed',
-      action: { type: 'use_class_feature', featureId: 'brutal_strike_hamstring' },
-      kind: 'class_feature',
-    });
+    const chosenRiders = brutalStrikeRiders(char.turn_actions.brutal_strike_pending);
+    if (chosenRiders.length < brutalStrikeMaxEffects(char)) {
+      const dice = brutalStrikeDice(char);
+      for (const effect of brutalStrikeOptions(char)) {
+        if (chosenRiders.includes(effect)) continue;
+        choices.push({
+          label:
+            chosenRiders.length === 0
+              ? `Brutal Strike: ${BRUTAL_STRIKE_LABELS[effect]} — forgo advantage; on hit +${dice}`
+              : `Brutal Strike — add a second effect: ${BRUTAL_STRIKE_LABELS[effect]}`,
+          action: { type: 'use_class_feature', featureId: `brutal_strike_${effect}` },
+          kind: 'class_feature',
+        });
+      }
+    }
   }
 
   // ── Monk choices ────────────────────────────────────────────────────────────
@@ -11755,12 +11797,13 @@ export async function takeAction({
         movement_used: {},
         surprised: [],
         characters: st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
-        // Brutal Strike Hamstring lasts "until the start of your next turn" —
-        // approximated as one full round; cleared on round wrap. Enemy
-        // reactions (Bandit Captain Parry) also refresh here.
+        // Brutal Strike effects that last "until the start of your next turn"
+        // (Hamstring, Staggering, Sundering) are approximated as one full
+        // round; cleared on round wrap. Enemy reactions (Bandit Captain Parry)
+        // also refresh here.
         entities: (st.entities ?? []).map((e) => {
-          const conditions = e.conditions.includes('hamstrung')
-            ? e.conditions.filter((c) => c !== 'hamstrung')
+          const conditions = e.conditions.some(isRoundScopedBrutalTag)
+            ? e.conditions.filter((c) => !isRoundScopedBrutalTag(c))
             : e.conditions;
           if (conditions === e.conditions && !e.reaction_used) return e;
           return { ...e, conditions, reaction_used: false };

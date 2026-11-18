@@ -40,7 +40,7 @@ describe('handleBarbarianFeature — brutal_strike rider toggle', () => {
     const char = makeChar({ character_class: 'Barbarian', level: 9, turn_actions: reckless });
     const c = featCtx(char);
     expect(handleBarbarianFeature(c, 'brutal_strike_forceful')).toBe(true);
-    expect(pcChar(c).turn_actions.brutal_strike_pending).toBe('forceful');
+    expect(pcChar(c).turn_actions.brutal_strike_pending).toEqual(['forceful']);
   });
 
   it('requires Barbarian L9', () => {
