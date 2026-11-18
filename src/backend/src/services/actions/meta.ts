@@ -30,6 +30,7 @@ import {
   metamagicSlots,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { characterAc } from '../armorClass.js';
 import { masterableWeapons } from '../../campaignData/srd/index.js';
 import { syncSetAbilities } from '../wornEffects.js';
 import { updatePcActor } from './actor.js';
@@ -74,6 +75,8 @@ export const handleApplyAsi: ActionHandler<{ type: 'apply_asi'; stat: AbilityKey
         narrative += ` Max HP increased by ${bonus * next.level} (${bonus}/level × ${next.level} levels).`;
     }
   }
+  // DEX / CON / WIS / CHA feed AC (Unarmored Defense, Draconic Resilience).
+  next.ac = characterAc(next, ctx.context.lootTable);
   updatePcActor(ctx, next);
   ctx.narrative = narrative;
   clearLevelingIfDone(ctx);
@@ -101,6 +104,7 @@ export const handleSelectSubclass: ActionHandler<{ type: 'select_subclass'; subc
   // same effect path, including the Draconic Sorcerer side effects.
   const next = { ...char };
   const narrative = applySubclass(next, action.subclass);
+  next.ac = characterAc(next, ctx.context.lootTable);
   updatePcActor(ctx, next);
   ctx.narrative = narrative.trim();
 };
@@ -971,6 +975,8 @@ export const handleTakeFeat: ActionHandler<{
   // level 19+. Origin feats from a background don't gate on asi_pending.
   const consumeAsi =
     char.asi_pending && (feat.category === 'general' || feat.category === 'epic-boon');
+  // A feat's ability increase can feed AC (DEX, or an Unarmored Defense score).
+  newChar.ac = characterAc(newChar, ctx.context.lootTable);
   updatePcActor(ctx, consumeAsi ? { ...newChar, asi_pending: false } : newChar);
   ctx.narrative = narrative;
   clearLevelingIfDone(ctx);

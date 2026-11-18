@@ -1,6 +1,8 @@
 import { getClassLevel, hasClass } from '../../multiclass.js';
 import { profBonus, rollDice } from '../../rulesEngine.js';
+import { secondWindMax, tacticalShiftFeet } from '../../fighterFeatures.js';
 import type { ActionContext } from '../types.js';
+import { effectiveSpeed } from '../../gameEngine.js';
 
 /**
  * Fighter + Champion features (SRD-only build).
@@ -10,7 +12,10 @@ import type { ActionContext } from '../types.js';
  *  - `tactical_master_{push|sap|slow}`: Fighter L9+. Pre-arms the next
  *    attack to apply the chosen mastery.
  *  - `second_wind`: 2/3/4 uses per rest at L1/4/10. Bonus action heal
- *    of 1d10 + level HP.
+ *    of 1d10 + level HP. L5 Tactical Shift: half Speed of free movement
+ *    that provokes no Opportunity Attacks (`turn_actions.tactical_shift_ft`).
+ *    L2 Tactical Mind (spend a use on a failed ability check) is applied at
+ *    the check sites — see `services/fighterFeatures.ts`.
  *  - `remarkable_athlete`: Champion. Passive narrative line.
  */
 export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
@@ -75,7 +80,7 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
     // Second Wind uses scale with Fighter level (RAW 2/3/4 at L1/4/10),
     // and the heal adds Fighter level — not total character level.
     const fighterLvl = getClassLevel(char, 'fighter');
-    const swMax = fighterLvl >= 10 ? 4 : fighterLvl >= 4 ? 3 : 2;
+    const swMax = secondWindMax(char);
     const swUsed = char.class_resource_uses?.second_wind ?? 0;
     if (swUsed >= swMax) {
       ctx.narrative = `Second Wind exhausted (${swMax}/${swMax} used). Recovers on a short or long rest.`;
@@ -91,8 +96,19 @@ export function handleFighterFeature(ctx: ActionContext, fid: string): boolean {
       ...(char.class_resource_uses ?? {}),
       second_wind: swUsed + 1,
     };
-    char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
-    ctx.narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)`;
+    // SRD Tactical Shift (L5) — half Speed of free movement that provokes no
+    // Opportunity Attacks (spent by grid moves that fit inside it).
+    const shiftFt = tacticalShiftFeet(char, effectiveSpeed(char, ctx.context.lootTable));
+    char.turn_actions = {
+      ...char.turn_actions,
+      bonus_action_used: true,
+      ...(shiftFt > 0 ? { tactical_shift_ft: shiftFt } : {}),
+    };
+    ctx.narrative = `${char.name} uses Second Wind — healed ${swHeal} HP (now ${char.hp}/${char.max_hp}). (${swMax - swUsed - 1}/${swMax} remaining)${
+      shiftFt > 0
+        ? ` Tactical Shift: may move ${shiftFt} ft without provoking Opportunity Attacks.`
+        : ''
+    }`;
     return true;
   }
 

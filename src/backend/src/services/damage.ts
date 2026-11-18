@@ -1,6 +1,7 @@
 import type { Character, GameState } from '../types.js';
+import { canReact, rollDice } from './rulesEngine.js';
 import { checkConcentration, clampHpForExhaustion, inflictCondition } from './gameEngine.js';
-import { rollDice } from './rulesEngine.js';
+import { slowFallReduction } from './monkFeatures.js';
 
 /**
  * Single-entry helper for applying damage to a PC. Centralizes the
@@ -244,6 +245,9 @@ export function applyDamage(
  * condition is intentionally skipped (a dying character is already
  * unconscious + prone-equivalent).
  *
+ * A Monk of level 4+ with its Reaction available auto-uses Slow Fall,
+ * reducing the damage by 5 × Monk level (SRD Monk Slow Fall).
+ *
  * No game system currently triggers this — Pansori doesn't model
  * jumping, flying, or pit traps that drop creatures. The helper
  * exists so future content (Misty Step into open air, Levitate
@@ -280,7 +284,12 @@ export function applyFallingDamage(
   }
   const diceRolled = Math.min(20, Math.floor(distanceFt / 10));
   const rolledDamage = rollDice(`${diceRolled}d6`);
-  const result = applyDamage(char, st, rolledDamage);
+  // SRD Monk Slow Fall (L4) — a Reaction reduces the fall's damage by
+  // 5 × Monk level. Auto-used when the monk has its Reaction.
+  const slowFall = canReact(char) ? Math.min(rolledDamage, slowFallReduction(char)) : 0;
+  const fallChar: Character =
+    slowFall > 0 ? { ...char, turn_actions: { ...char.turn_actions, reaction_used: true } } : char;
+  const result = applyDamage(fallChar, st, rolledDamage - slowFall);
   // Prone only if the fall did damage AND the character is still
   // conscious afterward.
   let nextChar = result.char;
@@ -290,7 +299,8 @@ export function applyFallingDamage(
     landedProne = true;
   }
   const proneNote = landedProne ? ' — lands prone.' : '';
-  const narrative = `${char.name} falls ${distanceFt} ft and takes ${result.amountDealt} bludgeoning damage (${diceRolled}d6 → ${rolledDamage})${proneNote}${result.concentrationNote}`;
+  const slowFallNote = slowFall > 0 ? `, Slow Fall −${slowFall}` : '';
+  const narrative = `${char.name} falls ${distanceFt} ft and takes ${result.amountDealt} bludgeoning damage (${diceRolled}d6 → ${rolledDamage}${slowFallNote})${proneNote}${result.concentrationNote}`;
   return {
     char: nextChar,
     st: result.st,

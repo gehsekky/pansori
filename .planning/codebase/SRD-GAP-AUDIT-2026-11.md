@@ -52,6 +52,16 @@ play. "Partial" means the feature exists but the RAW behaviour differs.
    Fiend Patron spell lists are not granted, so those subclasses are missing
    their spells entirely.
 
+**Found 2026-11-17: Unarmored Defense was never applied.** Barbarian and Monk
+Unarmored Defense, and Draconic Resilience's AC (10 + DEX + CHA), weren't in
+the AC formula at all — a Monk or Barbarian had 10 + DEX. Fixed: every stored-AC
+write now goes through one `characterAc` (`services/armorClass.ts`), which takes
+the best single calculation (SRD Multiclassing: Armor Class) and keeps an
+active Shield spell's +5. AC is also recomputed on level-up, ASI, feats and
+subclass choice (a DEX increase used to wait for the next rest). The FE's grid
+preview now reads the engine's effective Speed (`GameState.speed_ft`) instead
+of base Speed, so Fast Movement / Roving / Haste / Unarmored Movement show.
+
 ## 2. Class features — missing or partial
 
 Missing (no code path):
@@ -69,9 +79,18 @@ Missing (no code path):
   itself was fixed: a Bonus Action, Temporary Hit Points = Druid level — it
   used to take the Action and add 2× level to real HP, above the maximum.
   Wild Companion is out of combat only, like other summons.)
-- **Fighter:** Tactical Mind (L2), Tactical Shift (L5).
-- **Monk:** Unarmored Movement (L2), Slow Fall (L4), Acrobatic Movement (L9),
-  Heightened Focus (L10).
+- ~~**Fighter:** Tactical Mind (L2), Tactical Shift (L5).~~ Done 2026-11-17
+  (`services/fighterFeatures.ts`). Tactical Mind is auto-applied like Peerless
+  Skill: on a failed ability check the d10 is rolled and a Second Wind spent
+  only if it rescues the check (every PC check site). Tactical Shift gives a
+  half-Speed budget (`turn_actions.tactical_shift_ft`) that a grid move fitting
+  inside spends instead of Speed, provoking no Opportunity Attacks.
+- ~~**Monk:** Unarmored Movement (L2), Slow Fall (L4), Acrobatic Movement (L9),
+  Heightened Focus (L10).~~ Done 2026-11-17 (`services/monkFeatures.ts`).
+  Simplifications: Acrobatic Movement makes climb / swim cells cost no extra
+  movement (no verticality model); Slow Fall is auto-used inside
+  `applyFallingDamage`, which nothing triggers yet; Heightened Focus's Step of
+  the Wind carry-an-ally rider isn't modeled.
 - **Paladin:** Abjure Foes (L9), Restoring Touch (L14), Smite of Protection
   (Devotion L15).
 - **Ranger:** Deft Explorer (L2), Nature's Veil (L14), Hunter's Lore (L3).

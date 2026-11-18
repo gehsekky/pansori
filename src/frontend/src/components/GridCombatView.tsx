@@ -214,9 +214,13 @@ function GridCombatView({
   const activeId = state.active_character_id;
   const activeChar = state.characters.find((c) => c.id === activeId);
   const activeEntity = entities.find((e) => e.id === activeId && !e.isEnemy);
-  const speedFt = activeChar?.speed ?? 30;
+  // The backend's effective Speed (armor, class features, Haste, encumbrance)
+  // when it sent one; else the base Speed.
+  const speedFt = state.speed_ft?.[activeId] ?? activeChar?.speed ?? 30;
   const usedFt = state.movement_used?.[activeId] ?? 0;
-  const remainingFt = Math.max(0, speedFt - usedFt);
+  // Fighter Tactical Shift: a move that fits in this budget doesn't use Speed.
+  const shiftFt = activeChar?.turn_actions?.tactical_shift_ft ?? 0;
+  const remainingFt = Math.max(0, speedFt - usedFt, shiftFt);
   const remainingSquares = Math.floor(remainingFt / SQUARE_SIZE_FT);
 
   // Find enemy lookup map (id → name, ac) from seed for tooltips

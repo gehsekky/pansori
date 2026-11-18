@@ -3,6 +3,7 @@ import { combatGridDims, effectiveSpeed, getEnemyById, wallObstacleCells } from 
 import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { hasAcrobaticMovement } from '../monkFeatures.js';
 import { resolveEnemyAttack } from '../rulesEngine.js';
 import { updatePcActor } from './actor.js';
 
@@ -128,8 +129,12 @@ export const handleGridMove: ActionHandler<{
   const swimTerrain = currentRoomForMove?.swimTerrain ?? [];
   // SRD Thief Second-Story Work (L3) — Climb Speed equal to Speed (climbing
   // costs no extra movement), in addition to any innate/granted climb speed.
-  const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0 || hasSecondStoryWork(char);
-  const hasSwimSpeed = (char.swim_speed_ft ?? 0) > 0;
+  // SRD Monk Acrobatic Movement (L9) — while unarmored and without a Shield,
+  // move along vertical surfaces and across liquids on your turn without
+  // falling. Simplification: climb / swim cells cost no extra movement for it.
+  const acrobatic = hasAcrobaticMovement(char, ctx.context.lootTable);
+  const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0 || hasSecondStoryWork(char) || acrobatic;
+  const hasSwimSpeed = (char.swim_speed_ft ?? 0) > 0 || acrobatic;
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
     const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
@@ -151,7 +156,12 @@ export const handleGridMove: ActionHandler<{
       ? Math.max(walkSpeedFt, flySpeedFt)
       : walkSpeedFt;
   const usedFt = ctx.st.movement_used?.[char.id] ?? 0;
-  if (usedFt + costFeet > speedFt) {
+  // SRD Fighter Tactical Shift — a move that fits in the Second Wind budget
+  // spends that instead of Speed and provokes no Opportunity Attacks. (Not
+  // while mounted: the mount, not the fighter, is doing the moving.)
+  const shiftFt = mountEnt ? 0 : (char.turn_actions?.tactical_shift_ft ?? 0);
+  const useShift = shiftFt > 0 && costFeet <= shiftFt;
+  if (!useShift && usedFt + costFeet > speedFt) {
     const reasons: string[] = [];
     if (difficultTerrain.length) reasons.push('difficult terrain');
     if (climbTerrain.length && !hasClimbSpeed) reasons.push('climbing (no climb speed)');
@@ -161,7 +171,9 @@ export const handleGridMove: ActionHandler<{
     return;
   }
 
-  const oaTargets = opportunityAttackTriggers(charEntity.pos, action.to, ctx.st.entities, false);
+  const oaTargets = useShift
+    ? []
+    : opportunityAttackTriggers(charEntity.pos, action.to, ctx.st.entities, false);
   let nextChar = char;
   let nextSt = ctx.st;
   let oaNarrative = '';
@@ -199,10 +211,19 @@ export const handleGridMove: ActionHandler<{
     entities: (nextSt.entities ?? []).map((e) =>
       e.id === char.id || e.id === mountEnt?.id ? { ...e, pos: action.to } : e
     ),
-    movement_used: { ...nextSt.movement_used, [char.id]: usedFt + costFeet },
+    movement_used: { ...nextSt.movement_used, [char.id]: usedFt + (useShift ? 0 : costFeet) },
   };
+  if (useShift) {
+    nextChar = {
+      ...nextChar,
+      turn_actions: { ...nextChar.turn_actions, tactical_shift_ft: shiftFt - costFeet },
+    };
+  }
   updatePcActor(ctx, nextChar);
   ctx.st = nextSt;
   const moveVerb = mountEnt ? `rides ${mountEnt.companionName ?? 'their mount'} to` : 'moves to';
-  ctx.narrative = `${nextChar.name} ${moveVerb} (${action.to.x}, ${action.to.y}).${oaNarrative}`;
+  const shiftNote = useShift
+    ? ` (Tactical Shift — no Opportunity Attacks; ${shiftFt - costFeet} ft left)`
+    : '';
+  ctx.narrative = `${nextChar.name} ${moveVerb} (${action.to.x}, ${action.to.y}).${shiftNote}${oaNarrative}`;
 };

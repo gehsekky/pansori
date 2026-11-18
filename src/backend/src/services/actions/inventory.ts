@@ -1,18 +1,17 @@
-import { clearInstance, equippedArmorId, equippedShieldId } from '../equipment.js';
 import { commitCharacter, getItemData } from '../gameEngine.js';
 import {
-  computeTotalAc,
   profBonus,
   resolveMysteryConsumable,
   resolveSaveWithAdvantage,
   rollDice,
 } from '../rulesEngine.js';
-import { syncSetAbilities, wornAcBonus } from '../wornEffects.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
-import { defenseAcBonus } from '../fightingStyle.js';
+import { characterAc } from '../armorClass.js';
+import { clearInstance } from '../equipment.js';
 import { fmt } from '../narrativeFmt.js';
 import { maxAttunement } from '../multiclass.js';
+import { syncSetAbilities } from '../wornEffects.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -111,18 +110,7 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
   // AC so it falls off now rather than waiting for the next combat-start / rest.
   next = {
     ...next,
-    ac:
-      computeTotalAc(
-        next.dex,
-        equippedArmorId(next),
-        equippedShieldId(next),
-        next.inventory ?? [],
-        ctx.context.lootTable,
-        next.mage_armor_active ?? false,
-        next.shield_of_faith_active ?? false
-      ) +
-      defenseAcBonus(next, ctx.context.lootTable) +
-      wornAcBonus(next, ctx.context.lootTable),
+    ac: characterAc(next, ctx.context.lootTable),
   };
   updatePcActor(ctx, next);
   ctx.narrative = `You release your attunement to the ${invItem?.name ?? 'item'}.`;

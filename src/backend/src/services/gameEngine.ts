@@ -6,7 +6,6 @@ import {
   abilityMod,
   applyDamageMultiplier,
   canReact,
-  computeTotalAc,
   d,
   d20TestPenalty,
   hasWeaponProficiency,
@@ -93,7 +92,6 @@ import type { EnemyAttackHitFragment, EnemyAttackMissFragment } from './narrativ
 import {
   FIGHTING_STYLE_LABELS,
   OFFERED_FIGHTING_STYLE_IDS,
-  defenseAcBonus,
   fightingStyleSlots,
 } from './fightingStyle.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
@@ -160,12 +158,7 @@ import { consumeStrokeOfLuck, strokeOfLuckAvailable } from './strokeOfLuck.js';
 import { enemyActor, pcActor } from './actions/actor.js';
 import { enemyRef, fillEnemyTokens } from './narrative/enemyName.js';
 import { enemySaveD20, legendaryResist, magicResistanceAdvantage } from './monsterSaves.js';
-import {
-  equipmentFromLegacy,
-  equippedArmorId,
-  equippedShieldId,
-  equippedWeaponId,
-} from './equipment.js';
+import { equipmentFromLegacy, equippedArmorId, equippedWeaponId } from './equipment.js';
 import { evalCondition, visibleResponses } from './dialogueGating.js';
 import { fmt, pronounsForGender, stripForLlm } from './narrativeFmt.js';
 import {
@@ -175,15 +168,17 @@ import {
 } from './unarmedStrike.js';
 import { hasNaturesWard, naturesWardResistance, wildShapeBlocksCasting } from './druidFeatures.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
-import { wornAcBonus, wornSaveBonus } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
 import { availableLootIn } from './placedLoot.js';
 import { canTakeFeat } from './feats.js';
+import { characterAc } from './armorClass.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { randomUUID } from 'crypto';
+import { unarmoredMovementBonus } from './monkFeatures.js';
+import { wornSaveBonus } from './wornEffects.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -770,20 +765,7 @@ export function breakConcentration(
           incapacitated: 1,
         },
       };
-      next.ac =
-        computeTotalAc(
-          next.dex,
-          equippedArmorId(next),
-          equippedShieldId(next),
-          next.inventory ?? [],
-          context.lootTable,
-          next.mage_armor_active ?? false,
-          next.shield_of_faith_active ?? false,
-          false,
-          next.barkskin_active ?? false
-        ) +
-        defenseAcBonus(next, context.lootTable) +
-        wornAcBonus(next, context.lootTable);
+      next.ac = characterAc(next, context.lootTable);
       return next;
     };
     newSt = {
@@ -808,20 +790,7 @@ export function breakConcentration(
     const recomputeFor = (c: Character): Character => {
       if (!c.shield_of_faith_active) return c;
       const cleared: Character = { ...c, shield_of_faith_active: false };
-      cleared.ac =
-        computeTotalAc(
-          cleared.dex,
-          equippedArmorId(cleared),
-          equippedShieldId(cleared),
-          cleared.inventory ?? [],
-          context.lootTable,
-          cleared.mage_armor_active ?? false,
-          false,
-          false,
-          cleared.barkskin_active ?? false
-        ) +
-        defenseAcBonus(cleared, context.lootTable) +
-        wornAcBonus(cleared, context.lootTable);
+      cleared.ac = characterAc(cleared, context.lootTable);
       return cleared;
     };
     newSt = { ...newSt, characters: newSt.characters.map(recomputeFor) };
@@ -2748,6 +2717,9 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // (Roving's "Climb/Swim Speed = Speed" half is deferred — no vertical/liquid
   // traversal model.)
   if (getClassLevel(char, 'ranger') >= 6 && !wearingHeavyArmor(char, lootTable)) base += 10;
+  // SRD Monk Unarmored Movement (L2) — +10..+30 ft while wearing no armor and
+  // wielding no Shield (scales with Monk level).
+  base += unarmoredMovementBonus(char, lootTable);
   // SRD Haste — "the target's Speed is doubled." Multiplies the
   // post-Goliath / post-Mobile base; encumbrance still reduces after.
   // Applies to both walking and any future modes that derive from this
@@ -2769,6 +2741,18 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   if (weight > str * 10) return Math.max(0, base - 20);
   if (weight > str * 5) return Math.max(0, base - 10);
   return base;
+}
+
+/**
+ * Stamp each PC's effective Speed onto `st.speed_ft` for the FE (see the
+ * GameState field). Call wherever a route returns state after a change that
+ * can move Speed (actions, equip / transfer / drop, session load).
+ */
+export function withDerivedSpeeds(st: GameState, lootTable: LootItem[]): GameState {
+  return {
+    ...st,
+    speed_ft: Object.fromEntries(st.characters.map((c) => [c.id, effectiveSpeed(c, lootTable)])),
+  };
 }
 
 // True when `char` has Heavy armor equipped (looked up via the loot table).
@@ -4092,6 +4076,10 @@ export function applyLevelUpForClass(char: Character, className: string, context
     const sub = SRD_SUBCLASS_FOR_CLASS[primaryCls];
     if (sub) out += applySubclass(char, sub);
   }
+
+  // A new class level can change the AC formula (Unarmored Defense on entering
+  // Barbarian / Monk; Draconic Resilience at Sorcerer 3).
+  char.ac = characterAc(char, context.lootTable);
 
   return out;
 }

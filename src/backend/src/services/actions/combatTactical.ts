@@ -14,7 +14,7 @@ import {
   getEnemyById,
   pushEntityAway,
 } from '../gameEngine.js';
-import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
+import { applyGuidanceDie, applyTacticalMind, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
   applyIndomitableMight,
   hasExpertise,
@@ -241,22 +241,26 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
   const useAthletics = athMod >= acrMod;
   const escapeSkill = useAthletics ? 'athletics' : 'acrobatics';
   const gDie = consumeGuidanceDie(ctx);
-  const escapeCheck = applyGuidanceDie(
-    skillCheck(
-      useAthletics ? char.str : char.dex,
-      grapplerRoll + 1,
-      useAthletics ? athProf : acrProf,
-      char.level,
-      false,
-      hasExpertise(char, escapeSkill),
-      hasJackOfAllTrades(char),
-      false,
-      char.species === 'halfling',
-      hasReliableTalent(char),
-      false,
-      d20TestPenalty(char)
+  const escapeCheck = applyTacticalMind(
+    ctx,
+    applyGuidanceDie(
+      skillCheck(
+        useAthletics ? char.str : char.dex,
+        grapplerRoll + 1,
+        useAthletics ? athProf : acrProf,
+        char.level,
+        false,
+        hasExpertise(char, escapeSkill),
+        hasJackOfAllTrades(char),
+        false,
+        char.species === 'halfling',
+        hasReliableTalent(char),
+        false,
+        d20TestPenalty(char)
+      ),
+      gDie,
+      grapplerRoll + 1
     ),
-    gDie,
     grapplerRoll + 1
   );
   const myRoll = useAthletics ? applyIndomitableMight(char, escapeCheck.total) : escapeCheck.total;

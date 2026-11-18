@@ -1,11 +1,5 @@
 import type { Character, Context } from '../../types.js';
-import {
-  abilityMod,
-  computeTotalAc,
-  rageUsesMax,
-  rollDice,
-  spellSlotsForClassLevel,
-} from '../rulesEngine.js';
+import { abilityMod, rageUsesMax, rollDice, spellSlotsForClassLevel } from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
 import {
   channelDivinityUsesMax,
@@ -14,13 +8,11 @@ import {
   hasClass,
   wildShapeUsesMax,
 } from '../multiclass.js';
-import { equippedArmorId, equippedShieldId } from '../equipment.js';
 import type { ActionHandler } from './types.js';
-import { defenseAcBonus } from '../fightingStyle.js';
+import { characterAc } from '../armorClass.js';
 import { resetFeatLongRestResources } from '../feats.js';
 import { syncSubclassSpells } from '../subclassSpells.js';
 import { updatePcActor } from './actor.js';
-import { wornAcBonus } from '../wornEffects.js';
 
 // The level that sizes a class resource pool: the character's levels in the
 // SRD class, or, for a campaign-defined class whose feature list grants the
@@ -312,18 +304,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     syncSubclassSpells(refreshed);
     // Recompute AC after clearing the magical buffs so the stored
     // `ac` field reflects the post-rest state.
-    refreshed.ac =
-      computeTotalAc(
-        refreshed.dex,
-        equippedArmorId(refreshed),
-        equippedShieldId(refreshed),
-        refreshed.inventory ?? [],
-        ctx.context.lootTable,
-        false,
-        false
-      ) +
-      defenseAcBonus(refreshed, ctx.context.lootTable) +
-      wornAcBonus(refreshed, ctx.context.lootTable);
+    refreshed.ac = characterAc(refreshed, ctx.context.lootTable);
     return refreshed;
   });
   // SRD: a long rest is 8 hours. Advance the clock and stamp the completion

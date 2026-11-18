@@ -13,7 +13,7 @@ import {
   shopSellPrice,
   shopStockLeft,
 } from '../gameEngine.js';
-import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
+import { applyGuidanceDie, applyTacticalMind, consumeGuidanceDie, updatePcActor } from './actor.js';
 import { hasExpertise, hasJackOfAllTrades, hasReliableTalent } from '../multiclass.js';
 import { onceKey, visibleResponses } from '../dialogueGating.js';
 import { pathToNode, responsesAtNodePath } from '../conversation.js';
@@ -228,22 +228,26 @@ export const handleTalkResponse: ActionHandler<{
     const chk = response.check;
     const luckActive = consumeLuckForCheck(char);
     const gDie = consumeGuidanceDie(ctx);
-    const result = applyGuidanceDie(
-      skillCheck(
-        char.cha,
-        chk.dc,
-        char.skill_proficiencies?.includes(chk.skill) ?? false,
-        char.level,
-        false,
-        hasExpertise(char, chk.skill),
-        hasJackOfAllTrades(char),
-        luckActive,
-        char.species === 'halfling',
-        hasReliableTalent(char),
-        false,
-        d20TestPenalty(char)
+    const result = applyTacticalMind(
+      ctx,
+      applyGuidanceDie(
+        skillCheck(
+          char.cha,
+          chk.dc,
+          char.skill_proficiencies?.includes(chk.skill) ?? false,
+          char.level,
+          false,
+          hasExpertise(char, chk.skill),
+          hasJackOfAllTrades(char),
+          luckActive,
+          char.species === 'halfling',
+          hasReliableTalent(char),
+          false,
+          d20TestPenalty(char)
+        ),
+        gDie,
+        chk.dc
       ),
-      gDie,
       chk.dc
     );
     const skillLabel = chk.skill.charAt(0).toUpperCase() + chk.skill.slice(1);
@@ -600,22 +604,26 @@ export const handleInfluence: ActionHandler<{
   const gDie = consumeGuidanceDie(ctx);
   // Routed through skillCheck so social checks gain Expertise / Jack of All
   // Trades / Reliable Talent / Halfling Lucky, consistent with other skills.
-  const check = applyGuidanceDie(
-    skillCheck(
-      char.cha,
-      dc,
-      char.skill_proficiencies?.includes(skillName) ?? false,
-      char.level,
-      false,
-      hasExpertise(char, skillName),
-      hasJackOfAllTrades(char),
-      luckActive,
-      char.species === 'halfling',
-      hasReliableTalent(char),
-      false,
-      d20TestPenalty(char)
+  const check = applyTacticalMind(
+    ctx,
+    applyGuidanceDie(
+      skillCheck(
+        char.cha,
+        dc,
+        char.skill_proficiencies?.includes(skillName) ?? false,
+        char.level,
+        false,
+        hasExpertise(char, skillName),
+        hasJackOfAllTrades(char),
+        luckActive,
+        char.species === 'halfling',
+        hasReliableTalent(char),
+        false,
+        d20TestPenalty(char)
+      ),
+      gDie,
+      dc
     ),
-    gDie,
     dc
   );
   const total = check.total;
@@ -724,22 +732,26 @@ export const handleStudy: ActionHandler<{
   // Jack of All Trades / Reliable Talent / Halfling Lucky. The Thaumaturge bonus
   // folds into the DC (lowered by it), mirroring how Bardic dice are handled.
   const studyGuidance = consumeGuidanceDie(ctx);
-  const studyCheck = applyGuidanceDie(
-    skillCheck(
-      char.int,
-      dc - thaumaturgeBonus,
-      char.skill_proficiencies?.includes(skillName) ?? false,
-      char.level,
-      false,
-      hasExpertise(char, skillName),
-      hasJackOfAllTrades(char),
-      studyLuckActive,
-      char.species === 'halfling',
-      hasReliableTalent(char),
-      false,
-      d20TestPenalty(char)
+  const studyCheck = applyTacticalMind(
+    ctx,
+    applyGuidanceDie(
+      skillCheck(
+        char.int,
+        dc - thaumaturgeBonus,
+        char.skill_proficiencies?.includes(skillName) ?? false,
+        char.level,
+        false,
+        hasExpertise(char, skillName),
+        hasJackOfAllTrades(char),
+        studyLuckActive,
+        char.species === 'halfling',
+        hasReliableTalent(char),
+        false,
+        d20TestPenalty(char)
+      ),
+      studyGuidance,
+      dc - thaumaturgeBonus
     ),
-    studyGuidance,
     dc - thaumaturgeBonus
   );
   const total = studyCheck.total + thaumaturgeBonus;

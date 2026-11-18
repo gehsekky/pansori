@@ -22,6 +22,7 @@ import {
   peerlessSkillDie,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { isInSunlight } from '../gridEngine.js';
 import { updatePcActor } from './actor.js';
 
@@ -88,7 +89,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     const bardicRoll = isActive ? consumeBardicForCheck(member) : 0;
     if (isActive) activeChar = member;
     const peerlessRollSneak = isActive ? peerlessSkillDie(member) : 0;
-    const check = skillCheck(
+    const rawCheck = skillCheck(
       member.dex,
       sneakDC - bardicRoll,
       proficient,
@@ -106,8 +107,8 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
     // Only the active PC auto-spends a once-per-rest resource (same policy as
     // Inspiration/Luck/Bardic above). Stroke of Luck and Peerless Skill are
     // mutually exclusive (skillCheck only fires Peerless when SoL didn't).
-    if (isActive && check.strokeOfLuckUsed) activeChar = consumeStrokeOfLuck(member);
-    else if (isActive && check.peerlessSkillUsed) {
+    if (isActive && rawCheck.strokeOfLuckUsed) activeChar = consumeStrokeOfLuck(member);
+    else if (isActive && rawCheck.peerlessSkillUsed) {
       const biSneak = member.class_resource_uses?.bardic_inspiration ?? abilityMod(member.cha);
       activeChar = {
         ...member,
@@ -116,6 +117,14 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
           bardic_inspiration: Math.max(0, biSneak - 1),
         },
       };
+    }
+    // SRD Fighter Tactical Mind — the active PC may rescue a failed check.
+    let check = rawCheck;
+    if (isActive) {
+      const tm = applyTacticalMindTo(activeChar, rawCheck, sneakDC - bardicRoll);
+      activeChar = tm.char;
+      check = tm.check;
+      if (tm.note) ctx.fragments.push({ kind: 'spell_utility', prose: tm.note });
     }
     return { name: member.name, check, mod: abilityMod(member.dex) };
   });

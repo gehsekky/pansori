@@ -629,6 +629,10 @@ export interface TurnActions {
   haste_extra_action_used?: boolean;
   dodging?: boolean; // Dodge action: enemy attacks have disadvantage until next turn
   disengaged?: boolean; // Disengage action: no opportunity attacks this turn
+  // SRD Fighter Tactical Shift (L5) — feet of free movement granted by a Bonus
+  // Action Second Wind: it doesn't count against Speed and provokes no
+  // Opportunity Attacks. A grid move that fits inside it spends it instead.
+  tactical_shift_ft?: number;
   // Barbarian Reckless Attack (SRD): advantage on STR melee attacks this turn,
   // but enemies have advantage on attacks vs the Barbarian until their next turn.
   reckless?: boolean;
@@ -1888,6 +1892,11 @@ export interface GameState {
   // Grid combat (campaign dungeons only)
   entities?: CombatEntity[];
   movement_used?: Record<string, number>; // entityId → feet moved this turn
+  // Derived, not engine input: each PC's effective Speed in feet (armor,
+  // class features, Haste, encumbrance…), stamped by the routes via
+  // `withDerivedSpeeds` so the FE's reachable-square preview matches the
+  // engine's movement budget. The engine never reads it.
+  speed_ft?: Record<string, number>;
   spell_walls?: SpellWall[]; // transient wall/terrain-spell obstacles (Wall of Fire/Force)
   spell_zones?: SpellZone[]; // transient persistent damage zones (Cloud of Daggers, …)
   help_target_id?: string; // char id receiving Help action advantage

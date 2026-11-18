@@ -22,7 +22,6 @@ import {
   DEFAULT_FIGHTING_STYLE,
   FIGHTING_STYLE_LABELS,
   OFFERED_FIGHTING_STYLE_IDS,
-  defenseAcBonus,
   fightingStyleSlotsForClassLevel,
   resolveCreationFightingStyles,
 } from '../services/fightingStyle.js';
@@ -56,6 +55,7 @@ import {
   generateChoices,
   normalizeState,
   takeAction,
+  withDerivedSpeeds,
   xpForLevel,
 } from '../services/gameEngine.js';
 import { applyAbilityScoreIncreases, isValidForMethod } from '../services/abilityScores.js';
@@ -88,15 +88,16 @@ import {
 import { derivedProgressFacts, dialogueFacts } from '../services/dialogueGating.js';
 import { generateSeed, reconcileSeedWithContext } from '../services/procgen.js';
 import { initMapState, pickHookText, regionEnterNarration } from '../services/mapEngine.js';
-import { syncSetAbilities, wornAcBonus } from '../services/wornEffects.js';
 import type { AuthedRequest } from '../auth/middleware.js';
 import { CONTEXTS } from '../services/contextStore.js';
 import type { PoolClient } from 'pg';
 import { applyCreationDivineOrder } from '../services/actions/meta.js';
 import { applyFeatTake } from '../services/feats.js';
+import { characterAc } from '../services/armorClass.js';
 import { listVisibleCampaignIds } from '../services/campaignMembers.js';
 import { pool } from '../db/pool.js';
 import { randomUUID } from 'crypto';
+import { syncSetAbilities } from '../services/wornEffects.js';
 import { withSessionTx } from '../db/sessionTx.js';
 
 // Resolved lazily (not a const) because startup applies DB content overlays
@@ -423,7 +424,15 @@ gameRouter.get('/session/:id', async (req: Request, res: Response) => {
         row.seed = merged;
       }
     }
-    res.json({ ...row, campaignMeta: await campaignMetaFor(ctx) });
+    // Only the derived speed map is added; the stored state is otherwise sent as-is.
+    const state =
+      ctx && row.state
+        ? {
+            ...row.state,
+            speed_ft: withDerivedSpeeds(normalizeState(row.state), ctx.lootTable).speed_ft,
+          }
+        : row.state;
+    res.json({ ...row, state, campaignMeta: await campaignMetaFor(ctx) });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -781,6 +790,10 @@ gameRouter.post('/session/new', async (req: Request, res: Response) => {
         finalChar.xp = xpForLevel(startLevel);
         expandCasterSpellsForLevel(finalChar, startLevel, ctx.spellTable ?? {});
       }
+      // Stored AC from the final build — Unarmored Defense / Draconic
+      // Resilience depend on class levels + subclass, which the level loop
+      // above may have changed.
+      finalChar.ac = characterAc(finalChar, ctx.lootTable);
       // Plot armor: a campaign-required pre-gen member (name+class match) is
       // marked so combat-end revives it to 1 HP and the party can't be wiped
       // while one stands. See endCombatState.
@@ -1005,18 +1018,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
     // dex formula + the persistent buff flags + the Defense fighting style + worn-
     // gear AC bonuses (Cloak / Ring of Protection). Recomputed after any equip
     // change so the stored `ac` reflects worn magic items too.
-    const fullAc = (c: typeof char): number =>
-      computeTotalAc(
-        c.dex,
-        equippedArmorId(c),
-        equippedShieldId(c),
-        c.inventory,
-        ctx.lootTable,
-        c.mage_armor_active ?? false,
-        c.shield_of_faith_active ?? false
-      ) +
-      defenseAcBonus(c, ctx.lootTable) +
-      wornAcBonus(c, ctx.lootTable);
+    const fullAc = (c: typeof char): number => characterAc(c, ctx.lootTable);
 
     // Attunement check: magic items that require attunement cannot be equipped until attuned
     if (loot.requiresAttunement && !(char.attuned_items ?? []).includes(iid)) {
@@ -1088,7 +1090,7 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       JSON.stringify(newState),
       row.id,
     ]);
-    afterCommit(() => res.json({ newState }));
+    afterCommit(() => res.json({ newState: withDerivedSpeeds(newState, ctx.lootTable) }));
   });
 });
 
@@ -1163,7 +1165,14 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
       JSON.stringify(newState),
       row.id,
     ]);
-    afterCommit(() => res.json({ newState }));
+    afterCommit(() =>
+      res.json({
+        newState: withDerivedSpeeds(
+          newState,
+          (CONTEXTS[row.seed.context_id ?? ''] ?? defaultContext()).lootTable
+        ),
+      })
+    );
   });
 });
 
@@ -1212,7 +1221,14 @@ gameRouter.post('/session/:id/drop', async (req: Request, res: Response) => {
       JSON.stringify(newState),
       row.id,
     ]);
-    afterCommit(() => res.json({ newState }));
+    afterCommit(() =>
+      res.json({
+        newState: withDerivedSpeeds(
+          newState,
+          (CONTEXTS[row.seed.context_id ?? ''] ?? defaultContext()).lootTable
+        ),
+      })
+    );
   });
 });
 
@@ -1262,7 +1278,14 @@ gameRouter.post('/session/:id/reorder-inventory', async (req: Request, res: Resp
       JSON.stringify(newState),
       row.id,
     ]);
-    afterCommit(() => res.json({ newState }));
+    afterCommit(() =>
+      res.json({
+        newState: withDerivedSpeeds(
+          newState,
+          (CONTEXTS[row.seed.context_id ?? ''] ?? defaultContext()).lootTable
+        ),
+      })
+    );
   });
 });
 
@@ -1595,6 +1618,7 @@ gameRouter.post('/session/:id/action', async (req: Request, res: Response) => {
       seed: row.seed,
       context: ctx,
     });
+    result.newState = withDerivedSpeeds(result.newState, ctx.lootTable);
 
     // For campaign sessions, evaluate quest steps and save campaign state
     if (ctx.campaign && campaignState) {

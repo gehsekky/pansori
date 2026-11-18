@@ -15,6 +15,7 @@ import { d20TestPenalty, resolveEnemyAttack, skillCheck } from '../rulesEngine.j
 import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { longJumpDistance } from '../jump.js';
 import { updatePcActor } from './actor.js';
 
@@ -105,7 +106,7 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
   const landsInDifficult = (room?.difficultTerrain ?? []).some((dt) => posEqual(dt, to));
   if (landsInDifficult) {
     const proficient = nextChar.skill_proficiencies?.includes('Acrobatics') ?? false;
-    const check = skillCheck(
+    const rawCheck = skillCheck(
       nextChar.dex,
       10,
       proficient,
@@ -119,13 +120,17 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
       false,
       d20TestPenalty(nextChar)
     );
+    // SRD Fighter Tactical Mind — a Second Wind can rescue the failed landing.
+    const tm = applyTacticalMindTo(nextChar, rawCheck, 10);
+    nextChar = tm.char;
+    const check = tm.check;
     if (!check.success) {
       if (!nextChar.conditions.includes('prone')) {
         nextChar = { ...nextChar, conditions: [...nextChar.conditions, 'prone'] };
       }
       landNarrative = ` Lands hard in difficult terrain (Acrobatics ${check.total} vs DC 10) — Prone!`;
     } else {
-      landNarrative = ` Sticks the landing in difficult terrain (Acrobatics ${check.total} vs DC 10).`;
+      landNarrative = ` Sticks the landing in difficult terrain (Acrobatics ${check.total} vs DC 10).${tm.note}`;
     }
   }
 

@@ -18,6 +18,8 @@
 //     monsters from one implementation.
 
 import type { Character, CombatEntity, Enemy } from '../../types.js';
+import type { NarrativeFragment } from '../narrative/fragments.js';
+import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { rollDice } from '../rulesEngine.js';
 
 /**
@@ -101,6 +103,26 @@ export function consumeGuidanceDie(ctx: { actor: Actor }): number {
   if (ctx.actor.kind !== 'pc' || !ctx.actor.char.guidance_die) return 0;
   updatePcActor(ctx, { guidance_die: false });
   return rollDice('1d4');
+}
+
+/**
+ * SRD Fighter Tactical Mind — fold a Second Wind rescue into the acting PC's
+ * failed ability check (see `tacticalMindRescue`). Spends the use on the actor
+ * and queues a narrative note only when the d10 turns the failure into a
+ * success. Call after the check's other riders (Guidance etc.). A no-op for
+ * non-Fighters and for passed checks, so callers can wrap unconditionally.
+ */
+export function applyTacticalMind<T extends { total: number; success: boolean }>(
+  ctx: { actor: Actor; fragments: NarrativeFragment[] },
+  check: T,
+  dc: number
+): T {
+  if (ctx.actor.kind !== 'pc') return check;
+  const tm = applyTacticalMindTo(ctx.actor.char, check, dc);
+  if (!tm.note) return check;
+  updatePcActor(ctx, { class_resource_uses: tm.char.class_resource_uses });
+  ctx.fragments.push({ kind: 'spell_utility', prose: tm.note });
+  return tm.check;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   peerlessSkillDie,
 } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
+import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { pickHookText } from '../mapEngine.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
@@ -99,9 +100,10 @@ export const handleInteractObject: ActionHandler<{
     nextChar.darkvision_ft ?? 0
   );
   const lowLightDisadv = effectiveLight !== 'bright';
-  const check = skillCheck(
+  const searchDc = (obj.searchDC ?? 12) - bardicRoll;
+  const rawCheck = skillCheck(
     abilityScore,
-    (obj.searchDC ?? 12) - bardicRoll,
+    searchDc,
     proficient,
     nextChar.level,
     lowLightDisadv,
@@ -114,8 +116,8 @@ export const handleInteractObject: ActionHandler<{
     d20TestPenalty(nextChar),
     peerlessSkillDie(nextChar)
   );
-  if (check.strokeOfLuckUsed) nextChar = consumeStrokeOfLuck(nextChar);
-  if (check.peerlessSkillUsed) {
+  if (rawCheck.strokeOfLuckUsed) nextChar = consumeStrokeOfLuck(nextChar);
+  if (rawCheck.peerlessSkillUsed) {
     const biUses = nextChar.class_resource_uses?.bardic_inspiration ?? abilityMod(nextChar.cha);
     nextChar = {
       ...nextChar,
@@ -125,6 +127,10 @@ export const handleInteractObject: ActionHandler<{
       },
     };
   }
+  // SRD Fighter Tactical Mind — a Second Wind can rescue the failed search.
+  const tm = applyTacticalMindTo(nextChar, rawCheck, searchDc);
+  nextChar = tm.char;
+  const check = tm.check;
 
   let narrative: string;
   if (check.success) {
@@ -147,7 +153,7 @@ export const handleInteractObject: ActionHandler<{
     nextSt = { ...nextSt, objects_searched: [...(nextSt.objects_searched ?? []), searchKey] };
     const foundDesc =
       pickHookText(obj.foundText) ?? (gained.length ? `You find: ${gained.join(', ')}.` : '');
-    narrative = `${interactText} (${skillName}: ${check.roll}+${abilityMod(abilityScore)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!) ${foundDesc}`;
+    narrative = `${interactText} (${skillName}: ${check.roll}+${abilityMod(abilityScore)}=${check.total} vs DC ${obj.searchDC ?? 12} — success!)${tm.note} ${foundDesc}`;
     // Fire the object's onFound consequences ONCE (after loot). Sync the looted
     // searcher into state first so a consequence (give_xp level-up, etc.) sees
     // the fresh character, then read it back so the post-handler commit keeps it.

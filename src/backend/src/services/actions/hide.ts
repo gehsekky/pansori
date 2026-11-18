@@ -1,6 +1,6 @@
 import type { ActionContext, ActionHandler } from './types.js';
 import { abilityMod, d20TestPenalty, skillCheck } from '../rulesEngine.js';
-import { applyGuidanceDie, consumeGuidanceDie, updatePcActor } from './actor.js';
+import { applyGuidanceDie, applyTacticalMind, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
   canAttemptHide,
   consumeBardicForCheck,
@@ -56,23 +56,27 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
   const peerlessRoll = peerlessSkillDie(pc.char);
   const gDie = consumeGuidanceDie(ctx);
   const hideDc = HIDE_DC - bardicRoll - passWithoutTraceBonus;
-  const check = applyGuidanceDie(
-    skillCheck(
-      pc.char.dex,
-      hideDc,
-      hideProf,
-      pc.char.level,
-      isHeavilyEncumbered(pc.char),
-      hasExpertise(pc.char, 'Stealth'),
-      hasJackOfAllTrades(pc.char),
-      inspAdv || luckAdv,
-      pc.char.species === 'halfling',
-      hasReliableTalent(pc.char),
-      strokeOfLuckAvailable(pc.char),
-      d20TestPenalty(pc.char),
-      peerlessRoll
+  const check = applyTacticalMind(
+    ctx,
+    applyGuidanceDie(
+      skillCheck(
+        pc.char.dex,
+        hideDc,
+        hideProf,
+        pc.char.level,
+        isHeavilyEncumbered(pc.char),
+        hasExpertise(pc.char, 'Stealth'),
+        hasJackOfAllTrades(pc.char),
+        inspAdv || luckAdv,
+        pc.char.species === 'halfling',
+        hasReliableTalent(pc.char),
+        strokeOfLuckAvailable(pc.char),
+        d20TestPenalty(pc.char),
+        peerlessRoll
+      ),
+      gDie,
+      hideDc
     ),
-    gDie,
     hideDc
   );
   if (check.strokeOfLuckUsed) updatePcActor(ctx, consumeStrokeOfLuck(pc.char));

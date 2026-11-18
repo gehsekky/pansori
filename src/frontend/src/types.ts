@@ -171,6 +171,8 @@ export interface Character {
     free_interaction_used: boolean;
     dodging?: boolean;
     disengaged?: boolean;
+    // Fighter Tactical Shift — free, no-Opportunity-Attack movement (ft).
+    tactical_shift_ft?: number;
     reckless?: boolean;
     leveled_spell_cast?: boolean;
     quickened_used?: boolean;
@@ -305,6 +307,8 @@ export interface GameState {
   // Grid combat (campaign dungeons only)
   entities?: CombatEntity[];
   movement_used?: Record<string, number>;
+  // Each PC's effective Speed (ft), derived by the backend.
+  speed_ft?: Record<string, number>;
   help_target_id?: string;
   surprised?: string[];
   metamagic_active?: string;

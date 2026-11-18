@@ -9,6 +9,7 @@ import {
   splitEncounterXp,
 } from '../../gameEngine.js';
 import { getClassLevel, hasClass } from '../../multiclass.js';
+import { hasHeightenedFocus, martialArtsDieSides } from '../../monkFeatures.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
 import { legendaryResistInto } from '../../monsterSaves.js';
@@ -24,6 +25,9 @@ import { legendaryResistInto } from '../../monsterSaves.js';
  *  - `step_of_wind_{free_dash|free_disengage|dash|disengage}`:
  *    SRD. Free variants pick ONE effect; 1-DP variants give
  *    Dash AND Disengage. Free uses share the `monk_free_used` slot.
+ *  - Heightened Focus (L10): Flurry makes 3 strikes; the 1-DP Patient
+ *    Defense grants 2 Martial Arts dice of Temporary HP. Simplification:
+ *    Step of the Wind's carry-a-willing-ally rider isn't modeled.
  *  - `stunning_strike`: 1 ki, once per turn (was per-hit in 2014).
  *    CON save vs Monk DC or stunned until end of caster's next turn.
  */
@@ -62,8 +66,10 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     const martialDie = monkLvl >= 17 ? 12 : monkLvl >= 11 ? 10 : monkLvl >= 5 ? 8 : 6;
     const isOpenHand = char.subclass === 'open_hand';
     const monkDc = 8 + profBonus(char.level) + abilityMod(char.wis);
+    // SRD Heightened Focus (L10) — Flurry of Blows makes three Unarmed Strikes.
+    const flurryStrikes = hasHeightenedFocus(char) ? 3 : 2;
     let flurryNarrative = `${char.name} — Flurry of Blows (${kiPool - 1} ki remaining)!`;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < flurryStrikes; i++) {
       const flurryTarget = ctx.st.entities?.find((e) => e.id === ctx.enemy?.id && e.isEnemy);
       if (!ctx.enemyAlive || !flurryTarget) break;
       const toHit = rollDice('1d20') + abilityMod(char.dex) + profBonus(char.level);
@@ -178,6 +184,15 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
         ki_points: kiPoolPD - 1,
       };
     }
+    // SRD Heightened Focus (L10) — the Focus-Point Patient Defense also grants
+    // Temporary Hit Points equal to two rolls of the Martial Arts die (temp HP
+    // don't stack: keep the larger).
+    let pdTempHp = 0;
+    if (!isFree && hasHeightenedFocus(char)) {
+      const die = martialArtsDieSides(monkLvl2);
+      pdTempHp = rollDice(`1d${die}`) + rollDice(`1d${die}`);
+      char.temp_hp = Math.max(char.temp_hp ?? 0, pdTempHp);
+    }
     char.turn_actions = {
       ...char.turn_actions,
       bonus_action_used: true,
@@ -186,7 +201,9 @@ export function handleMonkFeature(ctx: ActionContext, fid: string): boolean {
     };
     ctx.narrative = isFree
       ? `${char.name} — Patient Defense (free): assumes a defensive stance. Attacks against have disadvantage until next turn.`
-      : `${char.name} — Patient Defense (1 DP): defensive stance + advantage on next DEX save. (${kiPoolPD - 1} DP remaining)`;
+      : `${char.name} — Patient Defense (1 DP): defensive stance + advantage on next DEX save.${
+          pdTempHp > 0 ? ` Heightened Focus: ${pdTempHp} Temporary Hit Points.` : ''
+        } (${kiPoolPD - 1} DP remaining)`;
     return true;
   }
 

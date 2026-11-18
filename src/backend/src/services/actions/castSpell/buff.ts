@@ -1,17 +1,11 @@
 import type { AbilityKey, Spell } from '../../../types.js';
-import {
-  SHILLELAGH_WEAPON_IDS,
-  computeTotalAc,
-  spellSaveDC,
-  upcastDamage,
-} from '../../rulesEngine.js';
+import { SHILLELAGH_WEAPON_IDS, spellSaveDC, upcastDamage } from '../../rulesEngine.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
-import { equippedArmorId, equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import type { ActionContext } from '../types.js';
+import { characterAc } from '../../armorClass.js';
 import { composeNow } from '../../narrative/compose.js';
-import { defenseAcBonus } from '../../fightingStyle.js';
+import { equippedWeaponId } from '../../equipment.js';
 import { invocationDef } from '../../invocations.js';
-import { wornAcBonus } from '../../wornEffects.js';
 
 /**
  * Self / ally / self_or_ally buff branch. Handles spells where the
@@ -198,25 +192,22 @@ export function runBuffSpell(
     spell.id === 'haste' ||
     spell.id === 'barkskin';
   if (grantsAcBump) {
+    // The cast's own flag counts even before it's stamped on the target; Haste
+    // adds +2 AC via the hasted condition, which may land after this runs.
     const recomputeAcFor = (c: typeof buffTarget): number =>
-      computeTotalAc(
-        c.dex,
-        equippedArmorId(c),
-        equippedShieldId(c),
-        c.inventory ?? [],
-        ctx.context.lootTable,
-        (spell.id === 'mage_armor' ? true : (c.mage_armor_active ?? false)) as boolean,
-        (spell.id === 'shield_of_faith' ? true : (c.shield_of_faith_active ?? false)) as boolean,
-        // Haste adds +2 AC via the hasted condition. After this buff
-        // path runs, the target's conditions include 'hasted', so
-        // pass true when this is the Haste cast OR when the target
-        // already had the condition from a prior cast.
-        spell.id === 'haste' || (c.conditions ?? []).includes('hasted'),
-        // SRD Barkskin — floor the AC at 17 (this cast OR an existing barkskin).
-        spell.id === 'barkskin' ? true : (c.barkskin_active ?? false)
-      ) +
-      defenseAcBonus(c, ctx.context.lootTable) +
-      wornAcBonus(c, ctx.context.lootTable);
+      characterAc(
+        {
+          ...c,
+          mage_armor_active: spell.id === 'mage_armor' ? true : c.mage_armor_active,
+          shield_of_faith_active: spell.id === 'shield_of_faith' ? true : c.shield_of_faith_active,
+          barkskin_active: spell.id === 'barkskin' ? true : c.barkskin_active,
+          conditions:
+            spell.id === 'haste' && !(c.conditions ?? []).includes('hasted')
+              ? [...(c.conditions ?? []), 'hasted']
+              : c.conditions,
+        },
+        ctx.context.lootTable
+      );
     if (isCasterTarget) {
       if (spell.id === 'mage_armor') char.mage_armor_active = true;
       if (spell.id === 'shield_of_faith') char.shield_of_faith_active = true;
