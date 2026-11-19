@@ -296,6 +296,29 @@ number the engine already models (Bracers of Defense, Ring of Protection, Belt o
 Giant Strength, Boots of Speed, Weapon of Warning, Ammunition +N, Potion of
 Giant Strength, Potion of Resistance, Spell Scrolls), then activated items.
 
+**Batch 1 done 2026-11-19 — worn passives** (`wornEffects`, derived onto
+`Character.worn_traits` by `syncSetAbilities`): Bracers of Defense, Ring of
+Resistance (all ten types), Boots of the Winterlands, Ring of Warmth, Brooch of
+Shielding, Periapt of Proof against Poison, Mantle of Spell Resistance, Boots of
+Striding and Springing, Ring of Swimming, Gloves of Swimming and Climbing,
+Slippers of Spider Climbing, Boots and Cloak of Elvenkind, Eyes of the Eagle,
+Goggles of Night, Sentinel Shield. New worn-effect kinds: unarmored-only AC,
+resistance, damage immunity, damage reduction, spell immunity, condition
+immunity, skill Advantage (Stealth: Hide / Sneak / surprise; Perception: +5
+passive for traps), Initiative Advantage, Swim / Climb Speed, Speed floor,
+Darkvision, Advantage on saves against spells. Found on the way and fixed:
+enemy spells ignored every PC resistance (Rage, species, Stoneskin, …) — they
+now share `pcDamageResponse` with enemy attacks; worn save bonuses (Cloak / Ring
+of Protection) weren't added to enemy damage-spell saves; Rage resisted every
+damage type (2024: Bludgeoning / Piercing / Slashing only). Simplifications:
+Gloves of Swimming and Climbing's +5 Athletics, the Boots of Striding and
+Springing jump, Winter Strider, and the Cloak of Elvenkind's Disadvantage on
+Perception to spot you aren't modeled; Advantage on Stealth / Perception only
+reaches the checks listed above. Deferred from this batch: Stone of Good Luck
+and Ioun Stones (no body slot fits a carried stone), Ring of Free Action
+(needs a magic-vs-mundane source for Paralyzed / Restrained), Belt of
+Dwarvenkind (needs an ability *increase* effect).
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

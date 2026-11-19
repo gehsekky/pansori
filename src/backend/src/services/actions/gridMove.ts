@@ -134,10 +134,19 @@ export const handleGridMove: ActionHandler<{
   // move along vertical surfaces and across liquids on your turn without
   // falling. Simplification: climb / swim cells cost no extra movement for it.
   const acrobatic = hasAcrobaticMovement(char, ctx.context.lootTable);
-  const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0 || hasSecondStoryWork(char) || acrobatic;
+  // Worn magic items — Slippers of Spider Climbing / Gloves of Swimming and
+  // Climbing / Ring of Swimming.
+  const hasClimbSpeed =
+    (char.climb_speed_ft ?? 0) > 0 ||
+    hasSecondStoryWork(char) ||
+    acrobatic ||
+    !!char.worn_traits?.climbFt;
   // SRD Gift of the Depths (Warlock invocation) — a Swim Speed equal to Speed.
   const hasSwimSpeed =
-    (char.swim_speed_ft ?? 0) > 0 || acrobatic || hasInvocation(char, 'gift_of_the_depths');
+    (char.swim_speed_ft ?? 0) > 0 ||
+    acrobatic ||
+    hasInvocation(char, 'gift_of_the_depths') ||
+    !!char.worn_traits?.swimFt;
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
     const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));

@@ -1,4 +1,4 @@
-import type { AbilityKey, Character, LootItem, WornEffect } from '../types.js';
+import type { AbilityKey, Character, LootItem, WornEffect, WornTraits } from '../types.js';
 import { abilityMod } from './rulesEngine.js';
 
 const ABILITIES: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -44,10 +44,45 @@ export function wornSaveBonus(char: Character, ability: AbilityKey, lootTable: L
  * so it stacks with armor and a shield.
  */
 export function wornAcBonus(char: Character, lootTable: LootItem[]): number {
+  // SRD Bracers of Defense — only while wearing no armor and using no Shield.
+  const unarmored = !char.equipment?.armor && !char.equipment?.shield;
   return activeWornEffects(char, lootTable).reduce(
-    (sum, e) => (e.kind === 'ac_bonus' ? sum + e.bonus : sum),
+    (sum, e) => (e.kind === 'ac_bonus' && (!e.unarmoredOnly || unarmored) ? sum + e.bonus : sum),
     0
   );
+}
+
+/**
+ * Derive the non-numeric worn-item traits (resistances, immunities, Advantage
+ * on a skill or Initiative, Swim / Climb Speed, a Speed floor, Advantage on
+ * saves against spells) from the active worn effects. Undefined when none.
+ */
+export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTraits | undefined {
+  const t: WornTraits = {};
+  const push = (
+    k: 'resistances' | 'immunities' | 'spellImmunities' | 'conditionImmunities' | 'skillAdvantage',
+    v: string
+  ) => {
+    const list = (t[k] ??= []);
+    if (!list.includes(v)) list.push(v);
+  };
+  const better = (a: number | 'walk' | undefined, b: number | 'walk') =>
+    a === 'walk' || b === 'walk' ? 'walk' : Math.max(a ?? 0, b);
+  for (const e of activeWornEffects(char, lootTable)) {
+    if (e.kind === 'resistance') push('resistances', e.damageType);
+    else if (e.kind === 'damage_immunity') push('immunities', e.damageType);
+    else if (e.kind === 'damage_reduction')
+      (t.reductions ??= []).push({ damageType: e.damageType, dice: e.dice });
+    else if (e.kind === 'spell_immunity') push('spellImmunities', e.spellId);
+    else if (e.kind === 'condition_immunity') push('conditionImmunities', e.condition);
+    else if (e.kind === 'skill_advantage') push('skillAdvantage', e.skill);
+    else if (e.kind === 'initiative_advantage') t.initiativeAdvantage = true;
+    else if (e.kind === 'speed_mode' && e.mode === 'swim') t.swimFt = better(t.swimFt, e.feet);
+    else if (e.kind === 'speed_mode' && e.mode === 'climb') t.climbFt = better(t.climbFt, e.feet);
+    else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
+    else if (e.kind === 'spell_save_advantage') t.spellSaveAdvantage = true;
+  }
+  return Object.keys(t).length > 0 ? t : undefined;
 }
 
 /**
@@ -102,10 +137,38 @@ export function syncSetAbilities(char: Character, lootTable: LootItem[]): void {
   // Set to undefined (not `delete`) so a patch-merge persist (updatePcActor does
   // `{...char, ...patch}`) actually clears a previously-stored base map.
   char.ability_set_base = Object.keys(nextBase).length > 0 ? nextBase : undefined;
+  // Worn traits + darkvision (Goggles of Night: Darkvision 60 ft, or +60 ft on
+  // top of existing Darkvision). `darkvision_base` holds the displaced value.
+  char.worn_traits = deriveWornTraits(char, lootTable);
+  const baseDv = char.darkvision_base ?? char.darkvision_ft ?? 0;
+  const dvGain = activeWornEffects(char, lootTable).reduce(
+    (m, e) => (e.kind === 'darkvision' ? Math.max(m, e.feet) : m),
+    0
+  );
+  if (dvGain > 0) {
+    char.darkvision_base = baseDv;
+    char.darkvision_ft = baseDv > 0 ? baseDv + dvGain : dvGain;
+  } else if (char.darkvision_base !== undefined) {
+    char.darkvision_ft = char.darkvision_base;
+    char.darkvision_base = undefined;
+  }
   // 4. A CON change ripples into max HP (Δmod × level), mirroring handleApplyAsi.
   const conDelta = (abilityMod(char.con) - oldConMod) * char.level;
   if (conDelta !== 0) {
     char.max_hp = Math.max(1, char.max_hp + conDelta);
     char.hp = Math.max(0, Math.min(char.max_hp, char.hp + conDelta));
   }
+}
+
+/**
+ * Whether a worn item grants Advantage on checks with `skill` (Boots / Cloak of
+ * Elvenkind → Stealth, Sentinel Shield / Eyes of the Eagle → Perception).
+ */
+export function wornSkillAdvantage(char: Pick<Character, 'worn_traits'>, skill: string): boolean {
+  const key = (x: string) =>
+    x
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '_');
+  return (char.worn_traits?.skillAdvantage ?? []).some((s) => key(s) === key(skill));
 }

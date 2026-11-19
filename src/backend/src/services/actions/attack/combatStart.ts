@@ -14,7 +14,7 @@ import {
   superiorInspirationTopUp,
   uncannyMetabolismRefresh,
 } from '../../multiclass.js';
-import { syncSetAbilities, wornLightRadius } from '../../wornEffects.js';
+import { syncSetAbilities, wornLightRadius, wornSkillAdvantage } from '../../wornEffects.js';
 import type { ActionContext } from '../types.js';
 import { evergreenWildShape } from '../classFeature/druid.js';
 import { fillEnemyTokens } from '../../narrative/enemyName.js';
@@ -76,7 +76,11 @@ export function runCombatStart(
   const partyAvgStealth = Math.round(
     livingParty.reduce((sum, c) => {
       const prof = hasSkillProficiency(c, 'stealth');
-      return sum + rollDice('1d20') + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
+      // Boots / Cloak of Elvenkind — Advantage on Stealth checks.
+      const d20 = wornSkillAdvantage(c, 'stealth')
+        ? Math.max(rollDice('1d20'), rollDice('1d20'))
+        : rollDice('1d20');
+      return sum + d20 + abilityMod(c.dex) + (prof ? profBonus(c.level) : 0);
     }, 0) / Math.max(1, livingParty.length)
   );
   const enemyPassivePerc = Math.max(...enemiesForInit.map((e) => 10 + abilityMod(e.wis ?? 10)));

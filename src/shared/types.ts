@@ -1781,11 +1781,54 @@ export type ItemSlot =
  *     the bearer's combat entity at combat-start seeding, like the Light cantrip.
  * Extend the union as new worn-item mechanics land.
  */
+//   - `ac_bonus` with `unarmoredOnly`: only while wearing no armor and no Shield
+//     (Bracers of Defense).
+//   - `resistance` / `damage_immunity`: to a damage type (Ring of Resistance,
+//     Periapt of Proof against Poison). `damage_reduction` subtracts a roll from
+//     that type's damage (Ring of Warmth). `spell_immunity`: no damage from one
+//     spell (Brooch of Shielding vs Magic Missile).
+//   - `condition_immunity`: the condition can't be applied (Periapt → Poisoned).
+//   - `skill_advantage`: Advantage on checks with a skill (Boots of Elvenkind →
+//     Stealth). `initiative_advantage`: Advantage on Initiative (Sentinel Shield).
+//   - `speed_mode`: a Swim / Climb Speed (`feet: 'walk'` = equal to Speed).
+//     `speed_floor`: Speed becomes at least `feet` (Boots of Striding and
+//     Springing). `darkvision`: Darkvision `feet`, or +`feet` if you already
+//     have it (Goggles of Night).
+//   - `spell_save_advantage`: Advantage on saves against spells (Mantle of
+//     Spell Resistance).
+// The non-numeric effects are derived onto `Character.worn_traits` by
+// `syncSetAbilities` on every equip / unequip / attune.
 export type WornEffect =
   | { kind: 'save_bonus'; ability: AbilityKey | 'all'; bonus: number }
-  | { kind: 'ac_bonus'; bonus: number }
+  | { kind: 'ac_bonus'; bonus: number; unarmoredOnly?: boolean }
   | { kind: 'set_ability'; ability: AbilityKey; value: number }
-  | { kind: 'light'; radiusFt: number };
+  | { kind: 'light'; radiusFt: number }
+  | { kind: 'resistance'; damageType: string }
+  | { kind: 'damage_immunity'; damageType: string }
+  | { kind: 'damage_reduction'; damageType: string; dice: string }
+  | { kind: 'spell_immunity'; spellId: string }
+  | { kind: 'condition_immunity'; condition: string }
+  | { kind: 'skill_advantage'; skill: string }
+  | { kind: 'initiative_advantage' }
+  | { kind: 'speed_mode'; mode: 'swim' | 'climb'; feet: number | 'walk' }
+  | { kind: 'speed_floor'; feet: number }
+  | { kind: 'darkvision'; feet: number }
+  | { kind: 'spell_save_advantage' };
+
+/** Worn-item traits derived from `wornEffects` (see `syncSetAbilities`). */
+export interface WornTraits {
+  resistances?: string[];
+  immunities?: string[];
+  reductions?: Array<{ damageType: string; dice: string }>;
+  spellImmunities?: string[];
+  conditionImmunities?: string[];
+  skillAdvantage?: string[];
+  initiativeAdvantage?: boolean;
+  swimFt?: number | 'walk';
+  climbFt?: number | 'walk';
+  speedFloor?: number;
+  spellSaveAdvantage?: boolean;
+}
 
 // The 12 SRD classes (ids as used by Character.character_class + the keys
 // of the per-class context maps). Canonical here so the creator's

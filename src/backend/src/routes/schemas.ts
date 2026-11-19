@@ -597,7 +597,14 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   // Flat AC bonus while worn + attuned (Cloak / Ring of Protection's +1 AC).
-  z.object({ kind: z.literal('ac_bonus'), bonus: z.number().int().min(-5).max(5) }).strict(),
+  z
+    .object({
+      kind: z.literal('ac_bonus'),
+      bonus: z.number().int().min(-5).max(5),
+      // Bracers of Defense — only with no armor and no Shield.
+      unarmoredOnly: z.boolean().optional(),
+    })
+    .strict(),
   // SET an ability score (Amulet of Health CON 19, Belt of Giant Strength STR
   // 21–29). No effect if the base is already ≥ value (handled at apply time).
   z
@@ -608,6 +615,37 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ kind: z.literal('light'), radiusFt: z.number().positive() }).strict(),
+  // Resistance / immunity / flat reduction to a damage type, immunity to one
+  // spell's damage, immunity to a condition (Ring of Resistance, Periapt of
+  // Proof against Poison, Ring of Warmth, Brooch of Shielding).
+  z.object({ kind: z.literal('resistance'), damageType: z.string().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal('damage_immunity'), damageType: z.string().min(1).max(20) }).strict(),
+  z
+    .object({
+      kind: z.literal('damage_reduction'),
+      damageType: z.string().min(1).max(20),
+      dice: DICE,
+    })
+    .strict(),
+  z.object({ kind: z.literal('spell_immunity'), spellId: z.string().min(1).max(60) }).strict(),
+  z
+    .object({ kind: z.literal('condition_immunity'), condition: z.string().min(1).max(30) })
+    .strict(),
+  // Advantage on a skill's checks / on Initiative (Boots of Elvenkind,
+  // Sentinel Shield).
+  z.object({ kind: z.literal('skill_advantage'), skill: z.string().min(1).max(30) }).strict(),
+  z.object({ kind: z.literal('initiative_advantage') }).strict(),
+  // Movement: a Swim / Climb Speed ('walk' = equal to Speed), a Speed floor.
+  z
+    .object({
+      kind: z.literal('speed_mode'),
+      mode: z.enum(['swim', 'climb']),
+      feet: z.union([z.number().int().positive().max(120), z.literal('walk')]),
+    })
+    .strict(),
+  z.object({ kind: z.literal('speed_floor'), feet: z.number().int().positive().max(120) }).strict(),
+  z.object({ kind: z.literal('darkvision'), feet: z.number().int().positive().max(300) }).strict(),
+  z.object({ kind: z.literal('spell_save_advantage') }).strict(),
 ]);
 
 const LootItemSchema = z

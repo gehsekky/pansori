@@ -33,6 +33,7 @@ import type {
   StructuredAction,
   TerrainArtMap,
   TerrainCell,
+  WornTraits,
 } from './shared-types.js';
 
 // `LootItem` is re-exported from ./shared-types (see src/shared/types.ts).
@@ -1251,6 +1252,11 @@ export interface Character {
   // restore on removal. Managed solely by `syncSetAbilities`; absent/empty when
   // no set-ability item is worn. ASIs apply to the base here when overridden.
   ability_set_base?: Partial<Record<AbilityKey, number>>;
+  // Worn magic items' derived traits (resistances, advantages, movement modes)
+  // and the darkvision a worn item displaced — kept in step with the gear by
+  // `syncSetAbilities` (services/wornEffects.ts).
+  worn_traits?: WornTraits;
+  darkvision_base?: number;
   xp: number;
   level: number;
   gold: number;

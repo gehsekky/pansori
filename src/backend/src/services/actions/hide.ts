@@ -18,6 +18,7 @@ import {
   peerlessSkillDie,
 } from '../multiclass.js';
 import { primalKnowledgeScore } from '../barbarianFeatures.js';
+import { wornSkillAdvantage } from '../wornEffects.js';
 
 /**
  * Result of a Hide attempt:
@@ -70,7 +71,7 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
         isHeavilyEncumbered(pc.char),
         hasExpertise(pc.char, 'Stealth'),
         hasJackOfAllTrades(pc.char),
-        inspAdv || luckAdv,
+        inspAdv || luckAdv || wornSkillAdvantage(pc.char, 'stealth'),
         pc.char.species === 'halfling',
         hasReliableTalent(pc.char),
         strokeOfLuckAvailable(pc.char),

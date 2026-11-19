@@ -27,6 +27,7 @@ import { applyTacticalMindTo } from '../fighterFeatures.js';
 import { isInSunlight } from '../gridEngine.js';
 import { primalKnowledgeScore } from '../barbarianFeatures.js';
 import { updatePcActor } from './actor.js';
+import { wornSkillAdvantage } from '../wornEffects.js';
 
 /**
  * `sneak`: SRD group ability check. Every living party member
@@ -99,7 +100,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       checkDisadv,
       hasExpertise(member, 'Stealth'),
       hasJackOfAllTrades(member),
-      inspAdv || luckAdv,
+      inspAdv || luckAdv || wornSkillAdvantage(member, 'stealth'),
       member.species === 'halfling',
       hasReliableTalent(member),
       isActive && strokeOfLuckAvailable(member),

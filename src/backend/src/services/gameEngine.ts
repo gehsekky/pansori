@@ -212,6 +212,7 @@ import {
   withinUnarmedSizeLimit,
 } from './unarmedStrike.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
+import { wornSaveBonus, wornSkillAdvantage } from './wornEffects.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
 import { applyStateMigrations } from './stateSchema.js';
@@ -224,7 +225,6 @@ import { pendingBonusSkills } from './bonusSkills.js';
 import { pendingFeatSpellPicks } from './actions/lessons.js';
 import { randomUUID } from 'crypto';
 import { unarmoredMovementBonus } from './monkFeatures.js';
-import { wornSaveBonus } from './wornEffects.js';
 
 // Central enemy-damage floor (Undead Fortitude + future on-"reduced to 0"
 // traits). Re-exported here so combat handlers pull it from the same module
@@ -1252,6 +1252,8 @@ function isRoundScopedBrutalTag(c: string): boolean {
 export function conditionImmunitiesFor(char: Character, st: GameState): Set<string> {
   const out = auraConditionImmunity(char, st);
   for (const c of char.condition_immunities ?? []) out.add(c);
+  // Worn magic items (Periapt of Proof against Poison → Poisoned).
+  for (const c of char.worn_traits?.conditionImmunities ?? []) out.add(c);
   // SRD Circle of the Land Nature's Ward (L10) — immune to Poisoned.
   if (hasNaturesWard(char)) out.add('poisoned');
   // SRD Path of the Berserker Mindless Rage (L6) — immune to Charmed and
@@ -1356,7 +1358,9 @@ function conditionSavingThrow(
     (effect.condition === 'poisoned' && speciesId === 'dwarf') ||
     // SRD Protection from Evil and Good — Advantage on saves vs Charmed/Frightened.
     (!!char.protected_from_evil &&
-      (effect.condition === 'charmed' || effect.condition === 'frightened'));
+      (effect.condition === 'charmed' || effect.condition === 'frightened')) ||
+    // SRD Mantle of Spell Resistance — Advantage on saves against spells.
+    (!!(effect as { fromSpell?: boolean }).fromSpell && !!char.worn_traits?.spellSaveAdvantage);
   // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
   const dangerSenseAdv = effect.ability === 'dex' && hasDangerSense(char);
   let applied = rollConditionSave(
@@ -1915,8 +1919,10 @@ function computeEnemyAttack(
         };
       }
     }
-    // Rage resistance: halve physical damage while raging (SRD)
-    const isRaging = char.conditions.includes('raging');
+    // SRD Rage — Resistance to Bludgeoning, Piercing and Slashing damage.
+    const isRaging =
+      char.conditions.includes('raging') &&
+      PHYSICAL_DAMAGE.includes(enemy.damageType ?? 'bludgeoning');
     // Petrified: resistance to all damage (SRD)
     const isPetrified = char.conditions.includes('petrified');
     // SRD Beast Form (Bear / Brown Bear) — physical damage resistance
@@ -1955,7 +1961,16 @@ function computeEnemyAttack(
     const sanctuaryType = sanctuaryResistance(st, char);
     const wardResist =
       !!enemy.damageType && (wardType === enemy.damageType || sanctuaryType === enemy.damageType);
+    // Worn magic items — Ring of Resistance, Boots of the Winterlands, …
+    const wornResist =
+      !!enemy.damageType && (char.worn_traits?.resistances ?? []).includes(enemy.damageType);
+    const wornImmune =
+      !!enemy.damageType && (char.worn_traits?.immunities ?? []).includes(enemy.damageType);
+    const wornReduction = (char.worn_traits?.reductions ?? [])
+      .filter((r) => r.damageType === enemy.damageType)
+      .reduce((sum, r) => sum + rollDice(r.dice), 0);
     const anyResist =
+      wornResist ||
       wardResist ||
       isRaging ||
       isPetrified ||
@@ -1965,7 +1980,9 @@ function computeEnemyAttack(
       affinityResist ||
       fiendishResist ||
       spellResist;
-    const postResistDmg = anyResist ? Math.ceil(result.damage / 2) : result.damage;
+    const postResistDmg = wornImmune
+      ? 0
+      : Math.max(0, (anyResist ? Math.ceil(result.damage / 2) : result.damage) - wornReduction);
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
     const petrNote = isPetrified
       ? ` (Petrified resistance: ${result.damage}→${postResistDmg})`
@@ -2040,6 +2057,7 @@ function computeEnemyAttack(
       const resistsBonus =
         isPetrified ||
         (!!bt && (char.spell_resistances ?? []).includes(bt)) ||
+        (!!bt && (char.worn_traits?.resistances ?? []).includes(bt)) ||
         (!!bt && wardType === bt) ||
         speciesData?.resistances?.includes(bt ?? '') === true;
       bonusDmg = resistsBonus ? Math.ceil(rolled / 2) : rolled;
@@ -2062,6 +2080,7 @@ function computeEnemyAttack(
       const resistsCharge =
         isPetrified ||
         (!!ct && (char.spell_resistances ?? []).includes(ct)) ||
+        (!!ct && (char.worn_traits?.resistances ?? []).includes(ct)) ||
         (!!ct && wardType === ct) ||
         speciesData?.resistances?.includes(ct ?? '') === true;
       chargeDmg = resistsCharge ? Math.ceil(rolled / 2) : rolled;
@@ -2801,6 +2820,10 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // SRD Monk Unarmored Movement (L2) — +10..+30 ft while wearing no armor and
   // wielding no Shield (scales with Monk level).
   base += unarmoredMovementBonus(char, lootTable);
+  // SRD Boots of Striding and Springing — Speed becomes 30 ft unless higher,
+  // and carried weight doesn't reduce it.
+  const speedFloor = char.worn_traits?.speedFloor ?? 0;
+  base = Math.max(base, speedFloor);
   // SRD Haste — "the target's Speed is doubled." Multiplies the
   // post-Goliath / post-Mobile base; encumbrance still reduces after.
   // Applies to both walking and any future modes that derive from this
@@ -2813,6 +2836,7 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   if (char.conditions?.includes('slowed')) base = Math.floor(base / 2);
   // SRD Exhaustion — Speed is reduced by 5 ft per Exhaustion level.
   base = Math.max(0, base - 5 * (char.exhaustion_level ?? 0));
+  if (speedFloor > 0) return base;
   const weight = charCarriedWeight(char);
   // SRD Goliath Powerful Build: count as one size larger for carrying
   // capacity. Mechanically: double the effective STR-based thresholds.
@@ -3732,8 +3756,9 @@ export function buildInitiativeOrder(
         // immunity to the Surprised condition (so no Disadvantage from it).
         const isAlert = (c.feats ?? []).includes('alert');
         const alertBonus = isAlert ? profBonus(c.level) : 0;
-        // SRD Barbarian Feral Instinct (L7) — Advantage on Initiative rolls.
-        const feralAdv = getClassLevel(c, 'barbarian') >= 7;
+        // SRD Barbarian Feral Instinct (L7) — Advantage on Initiative rolls —
+        // or a worn Sentinel Shield.
+        const feralAdv = getClassLevel(c, 'barbarian') >= 7 || !!c.worn_traits?.initiativeAdvantage;
         const surprised = !isAlert && surprisedIds.has(c.id);
         const d20 = rollInit(feralAdv, surprised);
         return {
@@ -4284,7 +4309,10 @@ export function partyDetectsTrap(characters: Character[], trap: Trap, paceMod = 
   return characters.some((c) => {
     if (c.dead) return false;
     const proficient = hasSkillProficiency(c, 'perception');
-    return passivePerception(c.wis, c.level, proficient) + paceMod >= trap.dc;
+    // SRD — Advantage on Perception (Sentinel Shield, Eyes of the Eagle) adds 5
+    // to Passive Perception.
+    const adv = wornSkillAdvantage(c, 'perception') ? 5 : 0;
+    return passivePerception(c.wis, c.level, proficient) + adv + paceMod >= trap.dc;
   });
 }
 
@@ -9646,6 +9674,69 @@ export function attemptEnemyApproach(args: {
  * open the interactive Indomitable reroll window (saves resolve immediately);
  * Counterspell still gates the whole spell upstream in `attemptEnemySpellCast`.
  */
+const PHYSICAL_DAMAGE = ['bludgeoning', 'piercing', 'slashing'];
+
+/**
+ * How a PC takes damage of `type` from every source the engine models:
+ * 'immune' (a worn Periapt of Proof against Poison, the Brooch of Shielding vs
+ * Magic Missile), 'resist' (Rage vs B/P/S, Petrified, a physical-resistant
+ * beast form, species, Superior Defense, Elemental Affinity, Fiendish
+ * Resilience, spell buffs, Nature's Ward / Sanctuary, worn items) or 'normal'.
+ */
+export function pcDamageResponse(
+  char: Character,
+  st: GameState,
+  type: string | undefined,
+  spellId?: string
+): 'immune' | 'resist' | 'normal' {
+  const worn = char.worn_traits;
+  if (spellId && worn?.spellImmunities?.includes(spellId)) return 'immune';
+  if (!type) return char.conditions.includes('petrified') ? 'resist' : 'normal';
+  if (worn?.immunities?.includes(type)) return 'immune';
+  const physical = PHYSICAL_DAMAGE.includes(type);
+  const beast =
+    char.conditions.includes('wild_shaped') && char.wild_shape_form
+      ? BEAST_FORMS[char.wild_shape_form]
+      : undefined;
+  const incapacitated = char.conditions.some((c) =>
+    ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+  );
+  const resists =
+    (char.conditions.includes('raging') && physical) ||
+    char.conditions.includes('petrified') ||
+    (!!beast?.physicalResistance && physical) ||
+    (char.species ? SRD_SPECIES[char.species]?.resistances?.includes(type) === true : false) ||
+    (char.conditions.includes('superior_defense') && type !== 'force' && !incapacitated) ||
+    elementalAffinityType(char) === type ||
+    char.fiendish_resilience === type ||
+    (char.spell_resistances ?? []).includes(type) ||
+    naturesWardResistance(char) === type ||
+    sanctuaryResistance(st, char) === type ||
+    (worn?.resistances?.includes(type) ?? false);
+  return resists ? 'resist' : 'normal';
+}
+
+/**
+ * Damage of `type` after the PC's immunity / resistance and any worn damage
+ * reduction (Ring of Warmth: −2d8 Cold). Never below 0.
+ */
+export function pcDamageTaken(
+  char: Character,
+  st: GameState,
+  dmg: number,
+  type: string | undefined,
+  spellId?: string
+): number {
+  if (dmg <= 0) return 0;
+  const response = pcDamageResponse(char, st, type, spellId);
+  if (response === 'immune') return 0;
+  let out = response === 'resist' ? Math.floor(dmg / 2) : dmg;
+  for (const r of char.worn_traits?.reductions ?? []) {
+    if (r.damageType === type) out -= rollDice(r.dice);
+  }
+  return Math.max(0, out);
+}
+
 /**
  * SRD monster Spellcasting — the spell as this enemy casts it: at the level its
  * stat block gives ("level N version", `spellLevels`), with the damage scaled
@@ -9770,9 +9861,11 @@ function resolveEnemyAoeSpell(args: {
     const saveScore = (c[save] ?? 10) as number;
     const saveProf =
       args.context && hasSaveProficiency(c, save, args.context) ? profBonus(c.level) : 0;
-    const dangerSenseAdv = save === 'dex' && hasDangerSense(c);
-    const d20 = dangerSenseAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
-    const total = d20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(c, st);
+    // Danger Sense (DEX) / Mantle of Spell Resistance — Advantage on the save.
+    const saveAdv = (save === 'dex' && hasDangerSense(c)) || !!c.worn_traits?.spellSaveAdvantage;
+    const d20 = saveAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
+    const wornBonus = args.context ? wornSaveBonus(c, save, args.context.lootTable) : 0;
+    const total = d20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(c, st) + wornBonus;
     const saved = total >= dc;
     const evasion = save === 'dex' && spell.saveEffect === 'half' && hasEvasion(c);
     const effOf = (rolled: number): number => {
@@ -9780,7 +9873,10 @@ function resolveEnemyAoeSpell(args: {
       if (saved) return spell.saveEffect === 'half' ? half(rolled) : 0;
       return rolled;
     };
-    const dmg = effOf(dmgRoll) + effOf(dmgRoll2);
+    // The PC's resistances / immunities / worn reductions, per damage component.
+    const dmg =
+      pcDamageTaken(c, st, effOf(dmgRoll), spell.damageType, spell.id) +
+      pcDamageTaken(c, st, effOf(dmgRoll2), spell.damageType2 ?? spell.damageType, spell.id);
     const evasionNote = evasion ? ' ✦ Evasion' : '';
     const newHp = Math.max(0, c.hp - dmg);
     st = commitCharacter(st, { ...c, hp: newHp });
@@ -9841,7 +9937,10 @@ function resolveEnemyConditionCast(args: {
   let applied: boolean;
   if (ability && args.context) {
     const res = conditionSavingThrow(
-      { condition: cond, ability, dc } as OnHitEffect & { ability: AbilityKey; dc: number },
+      { condition: cond, ability, dc, fromSpell: true } as OnHitEffect & {
+        ability: AbilityKey;
+        dc: number;
+      },
       updated,
       st,
       args.context,
@@ -9978,12 +10077,23 @@ export function resolveEnemySpell(args: {
         ? profBonus(target.level)
         : 0;
     // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
-    const dangerSenseAdv = spell.savingThrow === 'dex' && hasDangerSense(target);
+    // Mantle of Spell Resistance — Advantage on saves against spells.
+    const dangerSenseAdv =
+      (spell.savingThrow === 'dex' && hasDangerSense(target)) ||
+      !!target.worn_traits?.spellSaveAdvantage;
     const saveD20 = dangerSenseAdv
       ? Math.max(rollDice('1d20'), rollDice('1d20'))
       : rollDice('1d20');
+    // Worn save bonuses (Cloak / Ring of Protection) apply to spell saves too.
+    const wornBonus = args.context
+      ? wornSaveBonus(target, spell.savingThrow, args.context.lootTable)
+      : 0;
     const save =
-      saveD20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(target, args.st);
+      saveD20 +
+      abilityMod(saveScore) +
+      saveProf +
+      auraOfProtectionBonus(target, args.st) +
+      wornBonus;
     let saved = save >= dc;
     let workingTarget = target;
     let rescueNote = '';
@@ -10033,13 +10143,14 @@ export function resolveEnemySpell(args: {
       }
     }
     const evasionNote = evasion ? ' ✦ Evasion' : '';
-    const dmg = dmgFor(saved);
+    const dmg = pcDamageTaken(target, args.st, dmgFor(saved), spell.damageType, spell.id);
     newTarget = { ...workingTarget, hp: Math.max(0, workingTarget.hp - dmg) };
     riderOnFailedSave = !saved && !!spell.condition;
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${rescueNote}${evasionNote}`;
   } else {
-    newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
-    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
+    const dmg = pcDamageTaken(target, args.st, dmgRoll, spell.damageType, spell.id);
+    newTarget = { ...target, hp: Math.max(0, target.hp - dmg) };
+    narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.`;
   }
   let st = commitCharacter(args.st, newTarget);
   if (riderOnFailedSave && newTarget.hp > 0) {
@@ -10086,7 +10197,8 @@ function resolveEnemySpellAttack(args: {
       parts.push(`${fmt.roll(total)} vs ${fmt.ac(ac)} — miss`);
       continue;
     }
-    const dmg = d20 === 20 ? rollCritical(dice) : rollDice(dice);
+    const rolled = d20 === 20 ? rollCritical(dice) : rollDice(dice);
+    const dmg = pcDamageTaken(target, args.st, rolled, spell.damageType, spell.id);
     hp = Math.max(0, hp - dmg);
     hits++;
     parts.push(
