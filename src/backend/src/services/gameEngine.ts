@@ -102,6 +102,17 @@ import {
   OFFERED_FIGHTING_STYLE_IDS,
   fightingStyleSlots,
 } from './fightingStyle.js';
+import {
+  NATURES_SANCTUARY_MOVE_FT,
+  NATURES_SANCTUARY_RANGE_FT,
+  hasNaturesSanctuary,
+  hasNaturesWard,
+  naturesWardResistance,
+  sanctuaryCoverAc,
+  sanctuaryResistance,
+  sanctuaryStands,
+  wildShapeBlocksCasting,
+} from './druidFeatures.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -183,7 +194,6 @@ import {
   unarmedStrikeDc,
   withinUnarmedSizeLimit,
 } from './unarmedStrike.js';
-import { hasNaturesWard, naturesWardResistance, wildShapeBlocksCasting } from './druidFeatures.js';
 import { pickHookText, returnFromEncounter, revealRegional } from './mapEngine.js';
 import { Engine } from 'json-rules-engine';
 import { applyDamage } from './damage.js';
@@ -1808,7 +1818,10 @@ function computeEnemyAttack(
     attackerSelfDisadv ||
     darknessDisadv ||
     sunlightSensitivityDisadv;
-  const result = resolveEnemyAttack(enemy, char.ac, hasAdvantage, hasDisadvantage);
+  // SRD Nature's Sanctuary — Half Cover (+2 AC) inside a Druid's cube.
+  const sanctuaryAc = sanctuaryCoverAc(st, char.id);
+  const effectiveAc = char.ac + sanctuaryAc;
+  const result = resolveEnemyAttack(enemy, effectiveAc, hasAdvantage, hasDisadvantage);
   // SRD Enlarge/Reduce — a Reduced enemy's weapon attacks deal -1d4 (floored at
   // 1), an Enlarged enemy's +1d4. Keyed off the attacker's grid-entity condition.
   if (result.damage > 0) {
@@ -1847,7 +1860,7 @@ function computeEnemyAttack(
           targetCharId: char.id,
           targetName: char.name,
           atkTotal: result.total,
-          targetAc: char.ac,
+          targetAc: effectiveAc,
           prose: ` ${enemy.name}'s blow passes through empty air — ${char.name} has blinked out of reality!`,
         },
         atkTotal: result.total,
@@ -1878,7 +1891,7 @@ function computeEnemyAttack(
             targetCharId: char.id,
             targetName: char.name,
             atkTotal: result.total,
-            targetAc: char.ac,
+            targetAc: effectiveAc,
             prose: ` ${enemy.name}'s blow strikes one of ${char.name}'s mirror images — it shatters!${left > 0 ? ` (${left} left)` : ' (the last one)'}`,
           },
           atkTotal: result.total,
@@ -1924,7 +1937,10 @@ function computeEnemyAttack(
       !!enemy.damageType && (char.spell_resistances ?? []).includes(enemy.damageType);
     // SRD Circle of the Land Nature's Ward (L10) — the current land's type.
     const wardType = naturesWardResistance(char);
-    const wardResist = !!enemy.damageType && wardType === enemy.damageType;
+    // SRD Nature's Sanctuary — an ally inside the cube shares the Druid's Ward.
+    const sanctuaryType = sanctuaryResistance(st, char);
+    const wardResist =
+      !!enemy.damageType && (wardType === enemy.damageType || sanctuaryType === enemy.damageType);
     const anyResist =
       wardResist ||
       isRaging ||
@@ -3329,7 +3345,7 @@ export function applyZoneTick(
   if (!st.entities) return { st, narrative: '', dealt: 0 };
   // SRD Darkness — a sight-blocking zone deals no damage; it only affects
   // visibility (read via `magicalDarknessCells` / `canSeeTarget`). Nothing to tick.
-  if (zone.blocksSight) return { st, narrative: '', dealt: 0 };
+  if (zone.blocksSight || zone.sanctuary) return { st, narrative: '', dealt: 0 };
   // Caster-following auras (Spirit Guardians) recompute their footprint from
   // the caster's CURRENT cell each tick, so the aura moves with the caster.
   let cells = zone.cells;
@@ -3471,6 +3487,11 @@ export function fireSpellZones(
   for (const zone of st.spell_zones) {
     if (zone.roomId !== workingSt.current_room) {
       survivors.push(zone); // zones in other rooms aren't active here
+      continue;
+    }
+    // SRD Nature's Sanctuary ends when its Druid is Incapacitated or dies.
+    if (zone.sanctuary && !sanctuaryStands(workingSt, zone)) {
+      expiredNote += ` ${zone.name} fades.`;
       continue;
     }
     const res = applyZoneTick(workingSt, zone, seed, context);
@@ -6491,6 +6512,39 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
 
     const druidLvl = getClassLevel(char, 'druid');
+    // SRD Nature's Sanctuary (Land L14) — Magic action, one Wild Shape use.
+    if (
+      state.combat_active &&
+      hasNaturesSanctuary(char) &&
+      wsUses > 0 &&
+      !char.turn_actions.action_used &&
+      state.entities
+    ) {
+      const selfPos = state.entities.find((e) => e.id === char.id)?.pos;
+      const sheltered = selfPos
+        ? state.characters.filter((c) => {
+            if (c.dead || c.hp <= 0) return false;
+            const pos = state.entities?.find((e) => e.id === c.id && !e.isEnemy)?.pos;
+            return !!pos && distanceFeet(selfPos, pos) <= NATURES_SANCTUARY_RANGE_FT;
+          })
+        : [];
+      if (sheltered.length > 0) {
+        choices.push({
+          label:
+            "Nature's Sanctuary — spend a Wild Shape use: a 15-ft cube of spectral trees (Half Cover; allies share your Nature's Ward)",
+          action: { type: 'use_class_feature', featureId: 'natures_sanctuary' },
+          kind: 'class_feature',
+          pickOption: {
+            param: 'option',
+            title: "Nature's Sanctuary: center it on whom?",
+            options: sheltered.map((c) => ({
+              id: c.id,
+              label: c.id === char.id ? `${c.name} (yourself)` : c.name,
+            })),
+          },
+        });
+      }
+    }
     const openSlot = Object.keys(char.spell_slots_max ?? {}).some(
       (l) => (char.spell_slots_used?.[+l] ?? 0) < (char.spell_slots_max?.[+l] ?? 0)
     );
@@ -7662,6 +7716,25 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
   if (state.combat_active && (state.spell_zones?.length ?? 0) > 0 && state.entities) {
     for (const z of state.spell_zones ?? []) {
       if (z.casterId !== char.id || z.followsCaster || !z.center) continue;
+      // SRD Nature's Sanctuary — Bonus Action: move the cube onto a party
+      // member up to 60 ft away (and within 120 ft of the Druid).
+      if (z.sanctuary) {
+        if (char.turn_actions.bonus_action_used) continue;
+        const selfPos = state.entities.find((e) => e.id === char.id)?.pos;
+        for (const c of state.characters) {
+          if (c.dead || c.hp <= 0 || !selfPos) continue;
+          const pos = state.entities.find((e) => e.id === c.id && !e.isEnemy)?.pos;
+          if (!pos || (pos.x === z.center.x && pos.y === z.center.y)) continue;
+          if (distanceFeet(z.center, pos) > NATURES_SANCTUARY_MOVE_FT) continue;
+          if (distanceFeet(selfPos, pos) > NATURES_SANCTUARY_RANGE_FT) continue;
+          choices.push({
+            label: `Move ${z.name} to ${c.id === char.id ? 'yourself' : c.name} (bonus action)`,
+            action: { type: 'move_zone', zoneId: z.id, to: pos },
+            kind: 'move_zone',
+          });
+        }
+        continue;
+      }
       const zoneSpell = context.spellTable?.[z.spellId];
       const moveFt = zoneSpell?.zoneMoveFt;
       const moveCost = zoneSpell?.zoneMoveCost;

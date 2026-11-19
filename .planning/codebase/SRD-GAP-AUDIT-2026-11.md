@@ -99,7 +99,14 @@ Missing (no code path):
   Discoveries picks are always prepared via `alwaysPreparedSpells`.
   Simplifications: neither Magical Secrets' nor Magical Discoveries' "replace a
   spell on level-up" is modeled (pansori has no known-spell swap for Bards).
-- **Druid:** Nature's Sanctuary (L14). (Done 2026-11-12: Primal Order,
+- ~~**Druid:** Nature's Sanctuary (L14).~~ Done 2026-11-18
+  (`druidFeatures.ts`, a `sanctuary` SpellZone). Magic action + a Wild Shape
+  use; the 3×3 cube is centered on a chosen party member within 120 ft, lasts
+  10 rounds, and moves 60 ft via `move_zone` for a Bonus Action. Half Cover is
+  +2 AC against enemy attacks; allies share the Ward Resistance against enemy
+  attacks. Simplifications: the cover's +2 to DEX saves and the Resistance
+  against enemy spells / zones aren't applied; the cube centers on a creature,
+  not an arbitrary ground cell. (Earlier, done 2026-11-12: Primal Order,
   Wild Companion, Wild Resurgence, Elemental Fury + Improved, Archdruid's
   Evergreen Wild Shape and Nature Magician, Nature's Ward, Beast Spells —
   `services/druidFeatures.ts`, `actions/classFeature/druid.ts`. Wild Shape

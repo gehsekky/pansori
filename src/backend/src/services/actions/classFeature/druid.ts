@@ -5,10 +5,19 @@ import {
   circleLandSpells,
   syncSubclassSpells,
 } from '../../subclassSpells.js';
+import type { Character, SpellZone } from '../../../types.js';
+import {
+  NATURES_SANCTUARY_ID,
+  NATURES_SANCTUARY_RADIUS_FT,
+  NATURES_SANCTUARY_RANGE_FT,
+  hasNaturesSanctuary,
+  naturesWardResistance,
+} from '../../druidFeatures.js';
+import { combatGridDims, zoneCells } from '../../gameEngine.js';
 import { getClassLevel, hasClass, wildShapeUsesMax } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
-import type { Character } from '../../../types.js';
+import { distanceFeet } from '../../gridEngine.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -124,6 +133,72 @@ export function handleDruidFeature(ctx: ActionContext, fid: string, option?: str
     char.wild_shape_form = undefined;
     char.conditions = char.conditions.filter((c) => c !== 'wild_shaped');
     ctx.narrative = `${char.name} reverts to their normal form.`;
+    return true;
+  }
+
+  // SRD Nature's Sanctuary (Circle of the Land L14) — Magic action, one Wild
+  // Shape use: a 15-ft cube of spectral trees on the ground within 120 ft,
+  // for 1 minute. `option` is the party member to center it on (default: the
+  // Druid). A new cube replaces the Druid's previous one.
+  if (fid === 'natures_sanctuary') {
+    if (!hasNaturesSanctuary(char)) {
+      ctx.narrative = "Nature's Sanctuary requires a Circle of the Land Druid of level 14.";
+      return true;
+    }
+    if (!ctx.st.combat_active || !ctx.st.entities) {
+      ctx.narrative = "Nature's Sanctuary can only be raised in combat.";
+      return true;
+    }
+    if (char.turn_actions.action_used) {
+      ctx.narrative = 'You have already used your action this turn.';
+      return true;
+    }
+    const ws = wildShapeUsesLeft(char);
+    if (ws <= 0) {
+      ctx.narrative = 'No Wild Shape uses left.';
+      return true;
+    }
+    const selfEnt = ctx.st.entities.find((e) => e.id === char.id);
+    const anchorId = option || char.id;
+    const anchorEnt = ctx.st.entities.find((e) => e.id === anchorId && !e.isEnemy);
+    const anchor = ctx.st.characters.find((c) => c.id === anchorId);
+    if (!selfEnt || !anchorEnt || !anchor) {
+      ctx.narrative = "Choose who Nature's Sanctuary should shelter.";
+      return true;
+    }
+    if (distanceFeet(selfEnt.pos, anchorEnt.pos) > NATURES_SANCTUARY_RANGE_FT) {
+      ctx.narrative = `${anchor.name} is more than ${NATURES_SANCTUARY_RANGE_FT} ft away.`;
+      return true;
+    }
+    const { w, h } = combatGridDims(ctx.roomId, ctx.seed, ctx.context);
+    const zone: SpellZone = {
+      id: randomUUID(),
+      casterId: char.id,
+      spellId: NATURES_SANCTUARY_ID,
+      name: "Nature's Sanctuary",
+      roomId: ctx.st.current_room,
+      cells: zoneCells(anchorEnt.pos, NATURES_SANCTUARY_RADIUS_FT, w, h),
+      damage: '0',
+      damageType: 'none',
+      sanctuary: true,
+      radiusFt: NATURES_SANCTUARY_RADIUS_FT,
+      center: anchorEnt.pos,
+      rounds_left: 10, // 1 minute
+    };
+    ctx.st = {
+      ...ctx.st,
+      spell_zones: [
+        ...(ctx.st.spell_zones ?? []).filter(
+          (z) => !(z.spellId === NATURES_SANCTUARY_ID && z.casterId === char.id)
+        ),
+        zone,
+      ],
+    };
+    char.class_resource_uses = { ...(char.class_resource_uses ?? {}), wild_shape: ws - 1 };
+    char.turn_actions = { ...char.turn_actions, action_used: true };
+    ctx.usedInitiative = true;
+    const ward = naturesWardResistance(char);
+    ctx.narrative = `${char.name} spends a Wild Shape use — spectral trees and vines rise around ${anchor.id === char.id ? 'them' : anchor.name}. Nature's Sanctuary: Half Cover inside${ward ? `, and allies there resist ${ward} damage` : ''}.`;
     return true;
   }
 

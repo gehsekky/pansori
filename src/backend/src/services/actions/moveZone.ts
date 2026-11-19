@@ -1,3 +1,4 @@
+import { NATURES_SANCTUARY_MOVE_FT, NATURES_SANCTUARY_RANGE_FT } from '../druidFeatures.js';
 import { applyZoneTick, combatGridDims, zoneCells } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
 import type { GridPos } from '../../types.js';
@@ -10,7 +11,8 @@ import { distanceFeet } from '../gridEngine.js';
  * Sphere; a Magic action for Moonbeam / Call Lightning). Recomputes the
  * footprint at the new center and ticks the zone there — moving the zone into
  * a creature's space triggers its damage (SRD). Caster-following auras (Spirit
- * Guardians) and stationary zones (Spike Growth) aren't repositionable.
+ * Guardians) and stationary zones (Spike Growth) aren't repositionable. A
+ * Nature's Sanctuary cube moves 60 ft for a Bonus Action and deals no damage.
  */
 export const handleMoveZone: ActionHandler<{ type: 'move_zone'; zoneId: string; to: GridPos }> = (
   ctx,
@@ -28,8 +30,10 @@ export const handleMoveZone: ActionHandler<{ type: 'move_zone'; zoneId: string; 
     return { rejected: `${zone.name} can't be repositioned.` };
   }
   const spell = ctx.context.spellTable?.[zone.spellId];
-  const moveFt = spell?.zoneMoveFt;
-  const moveCost = spell?.zoneMoveCost;
+  // SRD Nature's Sanctuary — a Bonus Action moves the cube up to 60 ft (to
+  // ground within 120 ft of the Druid).
+  const moveFt = zone.sanctuary ? NATURES_SANCTUARY_MOVE_FT : spell?.zoneMoveFt;
+  const moveCost = zone.sanctuary ? 'bonus_action' : spell?.zoneMoveCost;
   if (!moveFt || !moveCost) {
     return { rejected: `${zone.name} can't be repositioned.` };
   }
@@ -51,6 +55,12 @@ export const handleMoveZone: ActionHandler<{ type: 'move_zone'; zoneId: string; 
   if (distanceFeet(zone.center, to) > moveFt) {
     return { rejected: `${zone.name} can move at most ${moveFt} ft.` };
   }
+  if (zone.sanctuary) {
+    const selfPos = ctx.st.entities?.find((e) => e.id === pc.char.id)?.pos;
+    if (!selfPos || distanceFeet(selfPos, to) > NATURES_SANCTUARY_RANGE_FT) {
+      return { rejected: `${zone.name} must stay within ${NATURES_SANCTUARY_RANGE_FT} ft of you.` };
+    }
+  }
 
   // Reposition: recompute the footprint around the new center.
   const movedZone = { ...zone, center: to, cells: zoneCells(to, zone.radiusFt ?? 5, gridW, gridH) };
@@ -63,6 +73,8 @@ export const handleMoveZone: ActionHandler<{ type: 'move_zone'; zoneId: string; 
     ...(moveCost === 'bonus_action' ? { bonus_action_used: true } : { action_used: true }),
   };
   ctx.narrative = `${pc.char.name} repositions ${zone.name}.`;
+
+  if (zone.sanctuary) return; // no damage to tick
 
   // SRD: moving the zone into a creature's space triggers its damage.
   const tick = applyZoneTick(ctx.st, movedZone, ctx.seed, ctx.context);

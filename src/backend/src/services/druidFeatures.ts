@@ -1,4 +1,4 @@
-import type { Character, Spell } from '../types.js';
+import type { Character, GameState, Spell, SpellZone } from '../types.js';
 import { abilityMod } from './rulesEngine.js';
 import { getClassLevel } from './multiclass.js';
 
@@ -96,4 +96,64 @@ export function naturesWardResistance(char: Character): string | null {
 
 export function hasNaturesWard(char: Character): boolean {
   return char.subclass === 'land' && getClassLevel(char, 'druid') >= 10;
+}
+
+// ── Nature's Sanctuary (Circle of the Land L14) ─────────────────────────────
+
+/** `SpellZone.spellId` of a Nature's Sanctuary cube. */
+export const NATURES_SANCTUARY_ID = 'natures_sanctuary';
+/** The cube's footprint radius for `zoneCells`: 10 ft → a 3×3 (15-ft) square. */
+export const NATURES_SANCTUARY_RADIUS_FT = 10;
+/** How far the cube can be placed from, and moved by, the Druid. */
+export const NATURES_SANCTUARY_RANGE_FT = 120;
+export const NATURES_SANCTUARY_MOVE_FT = 60;
+
+/** SRD Nature's Sanctuary — a Circle of the Land Druid of level 14+. */
+export function hasNaturesSanctuary(char: Character): boolean {
+  return char.subclass === 'land' && getClassLevel(char, 'druid') >= 14;
+}
+
+const INCAPACITATING = ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified'];
+
+/**
+ * Whether a sanctuary cube is still standing: it ends early if its Druid dies
+ * or has the Incapacitated condition (or one that includes it).
+ */
+export function sanctuaryStands(st: GameState, zone: SpellZone): boolean {
+  const druid = st.characters.find((c) => c.id === zone.casterId);
+  if (!druid || druid.dead || druid.hp <= 0) return false;
+  return !(druid.conditions ?? []).some((c) => INCAPACITATING.includes(c));
+}
+
+/** The standing sanctuary (if any) covering the PC `charId`'s grid cell. */
+export function sanctuaryAt(st: GameState, charId: string): SpellZone | undefined {
+  const ent = st.entities?.find((e) => e.id === charId && !e.isEnemy);
+  if (!ent) return undefined;
+  return (st.spell_zones ?? []).find(
+    (z) =>
+      z.spellId === NATURES_SANCTUARY_ID &&
+      z.roomId === st.current_room &&
+      z.cells.some((c) => c.x === ent.pos.x && c.y === ent.pos.y) &&
+      sanctuaryStands(st, z)
+  );
+}
+
+/**
+ * SRD Nature's Sanctuary — the Druid and allies inside the cube have Half
+ * Cover (+2 AC). Returns the AC bonus for the PC `charId`.
+ */
+export function sanctuaryCoverAc(st: GameState, charId: string): number {
+  return sanctuaryAt(st, charId) ? 2 : 0;
+}
+
+/**
+ * SRD Nature's Sanctuary — allies inside the cube gain the Druid's current
+ * Nature's Ward Resistance. Returns that damage type for `char`, or null (the
+ * Druid already has the Ward, so it gets nothing extra here).
+ */
+export function sanctuaryResistance(st: GameState, char: Character): string | null {
+  const zone = sanctuaryAt(st, char.id);
+  if (!zone || zone.casterId === char.id) return null;
+  const druid = st.characters.find((c) => c.id === zone.casterId);
+  return druid ? naturesWardResistance(druid) : null;
 }

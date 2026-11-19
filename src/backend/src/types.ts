@@ -1836,6 +1836,10 @@ export interface SpellZone {
   // SRD Silence — a zone of utter quiet (no damage). A creature standing in its
   // cells can't cast a spell with a Verbal component (checked in precast).
   blocksVerbal?: boolean;
+  // SRD Nature's Sanctuary (Circle of the Land L14) — a cover zone (no damage):
+  // the Druid and allies inside have Half Cover, and allies gain the Druid's
+  // Nature's Ward Resistance (see `druidFeatures.ts`).
+  sanctuary?: boolean;
 }
 
 export interface GameState {
