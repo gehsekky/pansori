@@ -76,7 +76,10 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'spell_immunity') push('spellImmunities', e.spellId);
     else if (e.kind === 'condition_immunity') push('conditionImmunities', e.condition);
     else if (e.kind === 'skill_advantage') push('skillAdvantage', e.skill);
+    else if (e.kind === 'initiative_advantage' && e.party) t.partyInitiativeAdvantage = true;
     else if (e.kind === 'initiative_advantage') t.initiativeAdvantage = true;
+    else if (e.kind === 'ranged_ac_bonus') t.rangedAcBonus = (t.rangedAcBonus ?? 0) + e.bonus;
+    else if (e.kind === 'spell_attack_disadvantage') t.spellAttackDisadvantage = true;
     else if (e.kind === 'speed_mode' && e.mode === 'swim') t.swimFt = better(t.swimFt, e.feet);
     else if (e.kind === 'speed_mode' && e.mode === 'climb') t.climbFt = better(t.climbFt, e.feet);
     else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);

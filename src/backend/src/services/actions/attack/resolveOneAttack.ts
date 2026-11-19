@@ -13,6 +13,7 @@ import {
   sneakAttackDice,
   unarmedDamage,
 } from '../../rulesEngine.js';
+import { SQUARE_SIZE, distanceFeet } from '../../gridEngine.js';
 import {
   applyPartyLevelUps,
   dominatedDamageReSave,
@@ -45,7 +46,6 @@ import {
 } from '../../feats.js';
 import { primalStrikeDie, primalStrikeType } from '../../druidFeatures.js';
 import type { ActionContext } from '../types.js';
-import { SQUARE_SIZE } from '../../gridEngine.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -684,6 +684,29 @@ export function resolveOneAttack(
     });
   }
 
+  // SRD magic weapon riders (Vicious Weapon, Flame Tongue, Dragon / Giant
+  // Slayer, Mace of Disruption, Sun Blade, Holy Avenger, …): extra damage on a
+  // hit, doubled on a Critical Hit (an `onCrit` rider fires only on a 20, flat).
+  let itemRiderDmg = 0;
+  const itemRiderLabels: string[] = [];
+  if (atk.hit && weaponItem?.magicRiders?.length) {
+    const pcPos = ctx.st.entities?.find((e) => e.id === pc.char.id)?.pos;
+    const tgtPos = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.pos;
+    const rangedAttack =
+      weaponItem.range === 'ranged' ||
+      (!!weaponItem.thrown && !!pcPos && !!tgtPos && distanceFeet(pcPos, tgtPos) > 5);
+    for (const r of weaponItem.magicRiders) {
+      if (r.vsCreatureTypes && !r.vsCreatureTypes.includes(target.creatureType ?? '')) continue;
+      if (r.onCrit && !isCrit) continue;
+      if (r.rangedOnly && !rangedAttack) continue;
+      const type = r.damageType ?? weaponItem.damageType ?? 'bludgeoning';
+      const rolled = isCrit && !r.onCrit ? rollCritical(r.dice) : rollDice(r.dice);
+      const dmg = applyDamageMultiplier(rolled, type, target, { magical: true }).damage;
+      itemRiderDmg += dmg;
+      itemRiderLabels.push(`${r.label} ${r.dice}: +${dmg} ${type}`);
+    }
+  }
+
   const rawDmg =
     baseHit +
     sneakDmg +
@@ -702,7 +725,8 @@ export function resolveOneAttack(
   const overcomeResist = overcomeDefensesApplies(pc.char, effectiveDamageType);
   // The attack counts as magical — bypassing nonmagical-only resistance — when it
   // comes from a +N / Magic Weapon-buffed weapon or monk Empowered Strikes.
-  const magicalAttack = weaponMagicBonus > 0 || empoweredStrikes;
+  // A named magic weapon (riders listed, even none — Weapon of Warning) is magical too.
+  const magicalAttack = weaponMagicBonus > 0 || empoweredStrikes || !!weaponItem?.magicRiders;
   const { damage: finalDmg, note: dmgNote } = applyDamageMultiplier(
     rawDmg,
     effectiveDamageType,
@@ -717,7 +741,12 @@ export function resolveOneAttack(
   // Divine Favor / smite riders also ride on top of the weapon multiplier (same
   // resistance simplification as the radiant riders above).
   const spellWeaponRider =
-    weaponRiderDmg + smiteRiderDmg + eldritchSmiteDmg + lifedrinkerDmg + primalStrikeDmg;
+    weaponRiderDmg +
+    smiteRiderDmg +
+    eldritchSmiteDmg +
+    lifedrinkerDmg +
+    primalStrikeDmg +
+    itemRiderDmg;
   const totalDmg = finalDmg + radiantRider + spellWeaponRider;
   const enemyEnt = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy);
   const curEnemyHp = enemyEnt?.hp ?? 0;
@@ -804,6 +833,7 @@ export function resolveOneAttack(
     });
   }
   if (primalStrikeLabel) hitBonuses.push({ label: primalStrikeLabel });
+  for (const label of itemRiderLabels) hitBonuses.push({ label });
   if (lifedrinkerDmg > 0) {
     hitBonuses.push({ label: `Lifedrinker 1d6: +${lifedrinkerDmg} necrotic` });
   }

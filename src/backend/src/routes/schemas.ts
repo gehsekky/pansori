@@ -634,7 +634,9 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   // Advantage on a skill's checks / on Initiative (Boots of Elvenkind,
   // Sentinel Shield).
   z.object({ kind: z.literal('skill_advantage'), skill: z.string().min(1).max(30) }).strict(),
-  z.object({ kind: z.literal('initiative_advantage') }).strict(),
+  z.object({ kind: z.literal('initiative_advantage'), party: z.boolean().optional() }).strict(),
+  z.object({ kind: z.literal('ranged_ac_bonus'), bonus: z.number().int().min(1).max(5) }).strict(),
+  z.object({ kind: z.literal('spell_attack_disadvantage') }).strict(),
   // Movement: a Swim / Climb Speed ('walk' = equal to Speed), a Speed floor.
   z
     .object({
@@ -700,6 +702,23 @@ const LootItemSchema = z
     // SRD +1/+2/+3 magic bonus (weapon: attack + damage + counts as magical;
     // armor/shield: AC). Capped at the SRD's +3.
     magicBonus: z.number().int().min(1).max(3).optional(),
+    magicRiders: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(60),
+            dice: DICE,
+            damageType: z.string().min(1).max(20).optional(),
+            vsCreatureTypes: z.array(z.string().min(1).max(20)).max(6).optional(),
+            onCrit: z.boolean().optional(),
+            rangedOnly: z.boolean().optional(),
+          })
+          .strict()
+      )
+      .max(4)
+      .optional(),
+    conjuresAmmo: z.boolean().optional(),
+    noArmorTrainingNeeded: z.boolean().optional(),
     versatileDamage: DICE.optional(),
     damageType: z.string().min(1).max(20).optional(),
     thrown: z
@@ -890,7 +909,7 @@ const EnemyTemplateSchema = z
     toHit: z.number().int().min(0).max(20),
     xp: z.number().int().nonnegative(),
     creatureType: z
-      .enum(['undead', 'fiend', 'beast', 'humanoid', 'construct', 'dragon'])
+      .enum(['undead', 'fiend', 'beast', 'humanoid', 'construct', 'dragon', 'giant'])
       .optional(),
     str: AbilityScore.optional(),
     dex: AbilityScore.optional(),

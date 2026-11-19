@@ -319,6 +319,35 @@ and Ioun Stones (no body slot fits a carried stone), Ring of Free Action
 (needs a magic-vs-mundane source for Paralyzed / Restrained), Belt of
 Dwarvenkind (needs an ability *increase* effect).
 
+**Batch 2 done 2026-11-19 — magic weapons and armor.** +1 / +2 / +3 of every
+SRD weapon and armor (and the Shield); Ammunition +1 / +2 / +3 for every
+ammunition type (the bonus is folded into the shot's weapon in
+`runPreattack`); named weapons via a new `magicRiders` field (extra damage on a
+hit, doubled on a crit; `vsCreatureTypes`, `onCrit`, `rangedOnly`): Vicious
+Weapon, Dragon Slayer, Giant Slayer, Flame Tongue, Holy Avenger, Weapon of
+Warning (party Advantage on Initiative), Defender, Energy Bow (Force, no
+ammunition), Mace of Disruption, Mace of Smiting, Sun Blade, Thunderous
+Greatclub, Dwarven Thrower; named armor: Armor of Resistance (studded leather /
+half plate / plate × ten types), Armor of Invulnerability, Dragon Scale Mail
+(ten dragons), Dwarven Plate, Elven Chain (no armor training needed),
+Glamoured Studded Leather, Arrow-Catching Shield (+2 AC vs ranged attacks),
+Spellguard Shield, Shield of the Cavalier. The SRD Giants are now typed
+`creatureType: 'giant'`. Found on the way: ammunition matching was by id
+substring, so an Arrow-Catching Shield would have been fired as an arrow — only
+quiver items are ammunition now. Simplifications: the "any weapon" items are
+generated on a few representative bases; Flame Tongue is always ablaze;
+Giant Slayer's Prone save, Mace of Disruption's / Smiting's destroy riders,
+Smiting's +2 to hit Constructs, Defender's AC transfer, Holy Avenger's aura,
+Dragon Scale Mail's breath Advantage, Dwarven Plate's push reduction,
+Arrow-Catching's redirect and the Cavalier's bash aren't modeled; riders
+don't apply to off-hand attacks. Deferred: Adamantine Armor (enemy Critical
+Hits aren't modeled), Scimitar of Speed (Bonus Action attack), the cursed items
+(Berserker Axe, Demon Armor, Armor of Vulnerability, Shield of Missile
+Attraction) and the activated weapons (Javelin of Lightning, Dagger of Venom,
+Mace of Terror, Nine Lives Stealer, Oathbow, Hammer of Thunderbolts, Trident of
+Fish Command, Quarterstaff of the Acrobat, Animated Shield, Plate Armor of
+Etherealness, Ammunition of Slaying).
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

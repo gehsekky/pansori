@@ -2243,26 +2243,446 @@ function magicVariant(
   ];
 }
 
+// Every SRD Simple / Martial weapon and every suit of armor gets its +1 / +2 / +3
+// variant ("Weapon, +1, +2, or +3" and "Armor, +1, +2, or +3" apply to any).
+const WEAPON_RARITY: Array<[1 | 2 | 3, number, string]> = [
+  [1, 400, 'Uncommon'],
+  [2, 2000, 'Rare'],
+  [3, 12000, 'Very Rare'],
+];
+const ARMOR_RARITY: Array<[1 | 2 | 3, number, string]> = [
+  [1, 2000, 'Rare'],
+  [2, 12000, 'Very Rare'],
+  [3, 50000, 'Legendary'],
+];
+const BASE_WEAPON_IDS = Object.values(BASE_ITEMS)
+  .filter((i) => i.type === 'weapon')
+  .map((i) => i.id);
+const BASE_ARMOR_IDS = Object.values(BASE_ITEMS)
+  .filter((i) => i.type === 'armor' && i.armorCategory !== 'shield')
+  .map((i) => i.id);
+
+// SRD Ammunition, +1 / +2 / +3 — the bonus applies to the shot fired with it
+// (folded into the weapon's bonus in runPreattack). Found in bundles of ten.
+function magicAmmo(baseId: string, bonus: 1 | 2 | 3, value: number, rarity: string) {
+  const base = BASE_ITEMS[baseId];
+  const id = `${baseId}_plus_${bonus}`;
+  const lower = base.name.toLowerCase();
+  return [
+    id,
+    {
+      ...base,
+      id,
+      name: `${base.name} +${bonus}`,
+      value,
+      count: 10,
+      magicBonus: bonus,
+      desc: `${base.desc} Magic ammunition: +${bonus} to the attack and damage rolls of a shot fired with it. (${rarity}.)`,
+      aliases: [`${lower} +${bonus}`, `+${bonus} ${lower}`],
+    } as LootItem,
+  ] as [string, LootItem];
+}
+
+/**
+ * A named magic weapon / armor / shield built on a base item (the base's
+ * damage, properties, mastery and AC carry through). `desc` is our own summary.
+ */
+function namedMagic(
+  baseId: string,
+  id: string,
+  name: string,
+  value: number,
+  desc: string,
+  extra: Partial<LootItem>
+): [string, LootItem] {
+  const base = BASE_ITEMS[baseId];
+  if (!base) throw new Error(`namedMagic: unknown base item "${baseId}"`);
+  return [
+    id,
+    { ...base, id, name, value, desc, aliases: [name.toLowerCase()], ...extra } as LootItem,
+  ];
+}
+
+const named = (ids: string[], f: (b: LootItem) => [string, LootItem]) =>
+  ids.map((b) => f(BASE_ITEMS[b]));
+
+const RESIST_TYPES = [
+  'acid',
+  'cold',
+  'fire',
+  'force',
+  'lightning',
+  'necrotic',
+  'poison',
+  'psychic',
+  'radiant',
+  'thunder',
+];
+// SRD Dragon Scale Mail — the dragon kind sets the Resistance.
+const DRAGON_SCALES: Record<string, string> = {
+  black: 'acid',
+  blue: 'lightning',
+  brass: 'fire',
+  bronze: 'lightning',
+  copper: 'acid',
+  gold: 'fire',
+  green: 'poison',
+  red: 'fire',
+  silver: 'cold',
+  white: 'cold',
+};
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
-  // Weapons — a spread of properties (versatile, finesse/thrown, heavy two-
-  // handed, ranged, simple) so the +N attack/damage path is exercised broadly.
-  magicVariant('longsword', 1, 400, 'Uncommon', 'weapon'),
-  magicVariant('longsword', 2, 2000, 'Rare', 'weapon'),
-  magicVariant('longsword', 3, 12000, 'Very Rare', 'weapon'),
-  magicVariant('dagger', 1, 400, 'Uncommon', 'weapon'),
-  magicVariant('greataxe', 1, 400, 'Uncommon', 'weapon'),
-  magicVariant('longbow', 1, 400, 'Uncommon', 'weapon'),
-  magicVariant('mace', 1, 400, 'Uncommon', 'weapon'),
-  // Armor — one per category (light / medium / heavy) + the heavy +2. SRD: +N
-  // armor is Rare (+1) / Very Rare (+2) / Legendary (+3).
-  magicVariant('studded_leather', 1, 2000, 'Rare', 'armor'),
-  magicVariant('half_plate', 1, 2000, 'Rare', 'armor'),
-  magicVariant('plate_armor', 1, 2000, 'Rare', 'armor'),
-  magicVariant('plate_armor', 2, 12000, 'Very Rare', 'armor'),
+  ...BASE_WEAPON_IDS.flatMap((b) =>
+    WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
+  ),
+  ...BASE_ARMOR_IDS.flatMap((b) =>
+    ARMOR_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'armor'))
+  ),
   // Shields — +N adds to the shield's normal +2 AC. Uncommon / Rare / Very Rare.
-  magicVariant('shield', 1, 400, 'Uncommon', 'armor'),
-  magicVariant('shield', 2, 2000, 'Rare', 'armor'),
-  magicVariant('shield', 3, 12000, 'Very Rare', 'armor'),
+  ...WEAPON_RARITY.map(([n, v, r]) => magicVariant('shield', n, v, r, 'armor')),
+  ...['arrows', 'crossbow_bolts', 'sling_bullets', 'blowgun_needles', 'firearm_bullets'].flatMap(
+    (b) =>
+      (
+        [
+          [1, 100, 'Uncommon'],
+          [2, 500, 'Rare'],
+          [3, 2500, 'Very Rare'],
+        ] as const
+      ).map(([n, v, r]) => magicAmmo(b, n, v, r))
+  ),
+
+  // ── Named magic weapons (SRD 5.2.1) ────────────────────────────────────────
+  // SRD Vicious Weapon (Rare) — +2d6 of the weapon's type on every hit.
+  ...named(['longsword', 'greataxe', 'rapier', 'longbow', 'dagger'], (b) =>
+    namedMagic(
+      b.id,
+      `vicious_${b.id}`,
+      `Vicious ${b.name}`,
+      3500,
+      `${b.desc} A magic weapon: every hit deals an extra 2d6 damage of its type. (Rare.)`,
+      { magicRiders: [{ label: 'Vicious', dice: '2d6' }] }
+    )
+  ),
+  // SRD Dragon Slayer (Rare) — +1; +3d6 of its type against Dragons.
+  ...named(['longsword', 'greatsword', 'longbow'], (b) =>
+    namedMagic(
+      b.id,
+      `dragon_slayer_${b.id}`,
+      `Dragon Slayer ${b.name}`,
+      3500,
+      `${b.desc} A magic weapon: +1 to attack and damage, and +3d6 damage against Dragons. (Rare.)`,
+      {
+        magicBonus: 1,
+        magicRiders: [{ label: 'Dragon Slayer', dice: '3d6', vsCreatureTypes: ['dragon'] }],
+      }
+    )
+  ),
+  // SRD Giant Slayer (Rare) — +1; +2d6 of its type against Giants.
+  // Simplification: the DC 15 STR save against Prone isn't modeled.
+  ...named(['greataxe', 'longsword', 'longbow'], (b) =>
+    namedMagic(
+      b.id,
+      `giant_slayer_${b.id}`,
+      `Giant Slayer ${b.name}`,
+      3500,
+      `${b.desc} A magic weapon: +1 to attack and damage, and +2d6 damage against Giants. (Rare.)`,
+      {
+        magicBonus: 1,
+        magicRiders: [{ label: 'Giant Slayer', dice: '2d6', vsCreatureTypes: ['giant'] }],
+      }
+    )
+  ),
+  // SRD Flame Tongue (Rare, attunement) — +2d6 Fire while ablaze; sheds light.
+  // Simplification: always ablaze while wielded (no Bonus Action toggle).
+  ...named(['longsword', 'greatsword', 'scimitar', 'rapier'], (b) =>
+    namedMagic(
+      b.id,
+      `flame_tongue_${b.id}`,
+      `Flame Tongue ${b.name}`,
+      3500,
+      `${b.desc} A magic weapon wreathed in flame: +2d6 Fire damage on a hit, and bright light out to 40 ft. (Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicRiders: [{ label: 'Flame Tongue', dice: '2d6', damageType: 'fire' }],
+        wornEffects: [{ kind: 'light', radiusFt: 40 }],
+      }
+    )
+  ),
+  // SRD Holy Avenger (Legendary, attunement by a Paladin) — +3; +2d10 Radiant
+  // vs Fiends and Undead. Simplification: the save aura isn't modeled.
+  ...named(['longsword', 'greatsword'], (b) =>
+    namedMagic(
+      b.id,
+      `holy_avenger_${b.id}`,
+      `Holy Avenger ${b.name}`,
+      50000,
+      `${b.desc} A holy weapon: +3 to attack and damage, and +2d10 Radiant damage against Fiends and Undead. (Legendary; requires attunement by a Paladin.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 3,
+        magicRiders: [
+          {
+            label: 'Holy Avenger',
+            dice: '2d10',
+            damageType: 'radiant',
+            vsCreatureTypes: ['fiend', 'undead'],
+          },
+        ],
+      }
+    )
+  ),
+  // SRD Weapon of Warning (Uncommon, attunement) — you and nearby allies have
+  // Advantage on Initiative.
+  ...named(['longsword', 'shortsword', 'longbow'], (b) =>
+    namedMagic(
+      b.id,
+      `weapon_of_warning_${b.id}`,
+      `${b.name} of Warning`,
+      500,
+      `${b.desc} A magic weapon: you and your allies have Advantage on Initiative rolls. (Uncommon; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicRiders: [],
+        wornEffects: [{ kind: 'initiative_advantage', party: true }],
+      }
+    )
+  ),
+  // SRD Defender (Legendary, attunement) — +3. Simplification: moving the bonus
+  // to AC isn't modeled.
+  ...named(['longsword', 'greatsword'], (b) =>
+    namedMagic(
+      b.id,
+      `defender_${b.id}`,
+      `Defender ${b.name}`,
+      50000,
+      `${b.desc} A magic weapon: +3 to attack and damage. (Legendary; requires attunement.)`,
+      { requiresAttunement: true, magicBonus: 3 }
+    )
+  ),
+  // SRD Energy Bow (Very Rare, attunement) — +1; conjures Force arrows.
+  ...named(['longbow', 'shortbow'], (b) =>
+    namedMagic(
+      b.id,
+      `energy_bow_${b.id}`,
+      `Energy ${b.name}`,
+      15000,
+      `${b.desc} A stringless magic bow: +1 to attack and damage, and it conjures arrows of Force — no ammunition needed. (Very Rare; requires attunement.)`,
+      { requiresAttunement: true, magicBonus: 1, damageType: 'force', conjuresAmmo: true }
+    )
+  ),
+  // SRD Mace of Disruption (Rare, attunement) — +2d6 Radiant vs Fiends and
+  // Undead; sheds light. Simplification: the destroy-at-25-HP save isn't modeled.
+  namedMagic(
+    'mace',
+    'mace_of_disruption',
+    'Mace of Disruption',
+    3500,
+    'A magic mace: +2d6 Radiant damage against Fiends and Undead, and bright light out to 20 ft. (Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      wornEffects: [{ kind: 'light', radiusFt: 20 }],
+      magicRiders: [
+        {
+          label: 'Disruption',
+          dice: '2d6',
+          damageType: 'radiant',
+          vsCreatureTypes: ['fiend', 'undead'],
+        },
+      ],
+    }
+  ),
+  // SRD Mace of Smiting (Rare) — +1 (+3 vs Constructs); a 20 deals +7 (+14 vs
+  // Constructs). Simplification: the extra +2 to hit Constructs and the
+  // destroy-at-25-HP rider aren't modeled (the +2 damage is).
+  namedMagic(
+    'mace',
+    'mace_of_smiting',
+    'Mace of Smiting',
+    3500,
+    'A magic mace: +1 to attack and damage (+3 against Constructs); a natural 20 deals an extra 7 Bludgeoning damage (14 against Constructs). (Rare.)',
+    {
+      magicBonus: 1,
+      magicRiders: [
+        { label: 'Smiting', dice: '2', vsCreatureTypes: ['construct'] },
+        { label: 'Smiting (20)', dice: '7', onCrit: true },
+        { label: 'Smiting (20)', dice: '7', onCrit: true, vsCreatureTypes: ['construct'] },
+      ],
+    }
+  ),
+  // SRD Sun Blade (Rare, attunement) — a +2 finesse Longsword of Radiant
+  // damage; +1d8 Radiant vs Undead; sheds sunlight.
+  namedMagic(
+    'longsword',
+    'sun_blade',
+    'Sun Blade',
+    3500,
+    'A hilt that sprouts a blade of radiance: a +2 Longsword with Finesse that deals Radiant damage, +1d8 Radiant against Undead, and sheds bright light. (Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      magicBonus: 2,
+      finesse: true,
+      damageType: 'radiant',
+      wornEffects: [{ kind: 'light', radiusFt: 15 }],
+      magicRiders: [
+        { label: 'Sun Blade', dice: '1d8', damageType: 'radiant', vsCreatureTypes: ['undead'] },
+      ],
+    }
+  ),
+  // SRD Thunderous Greatclub (Very Rare, attunement) — Strength 20; +1d8
+  // Thunder on a hit. Simplification: Clap of Thunder / Earthquake not modeled.
+  namedMagic(
+    'greatclub',
+    'thunderous_greatclub',
+    'Thunderous Greatclub',
+    15000,
+    'A magic greatclub: while attuned, your Strength is 20, and every hit deals an extra 1d8 Thunder damage. (Very Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      wornEffects: [{ kind: 'set_ability', ability: 'str', value: 20 }],
+      magicRiders: [{ label: 'Thunderous', dice: '1d8', damageType: 'thunder' }],
+    }
+  ),
+  // SRD Dwarven Thrower (Very Rare, attunement) — +3 Warhammer, Thrown 20/60;
+  // a ranged hit adds 1d8 Force (2d8 vs Giants).
+  namedMagic(
+    'warhammer',
+    'dwarven_thrower',
+    'Dwarven Thrower',
+    15000,
+    'A +3 magic warhammer that can be thrown (20/60 ft) and returns to your hand; a thrown hit deals an extra 1d8 Force damage (2d8 against Giants). (Very Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      magicBonus: 3,
+      thrown: { normalRange: 20, longRange: 60 },
+      magicRiders: [
+        { label: 'Dwarven Thrower', dice: '1d8', damageType: 'force', rangedOnly: true },
+        {
+          label: 'Dwarven Thrower (Giant)',
+          dice: '1d8',
+          damageType: 'force',
+          rangedOnly: true,
+          vsCreatureTypes: ['giant'],
+        },
+      ],
+    }
+  ),
+
+  // ── Named magic armor and shields (SRD 5.2.1) ─────────────────────────────
+  // SRD Armor of Resistance (Rare, attunement) — Resistance to one type.
+  ...['studded_leather', 'half_plate', 'plate_armor'].flatMap((b) =>
+    RESIST_TYPES.map((t) =>
+      namedMagic(
+        b,
+        `${b}_of_${t}_resistance`,
+        `${BASE_ITEMS[b].name} of ${cap(t)} Resistance`,
+        3500,
+        `${BASE_ITEMS[b].desc} Magic armor: while worn and attuned, you have Resistance to ${cap(t)} damage. (Rare; requires attunement.)`,
+        { requiresAttunement: true, wornEffects: [{ kind: 'resistance', damageType: t }] }
+      )
+    )
+  ),
+  // SRD Armor of Invulnerability (Legendary, attunement) — Resistance to
+  // Bludgeoning, Piercing and Slashing. Simplification: Metal Shell not modeled.
+  namedMagic(
+    'plate_armor',
+    'armor_of_invulnerability',
+    'Armor of Invulnerability',
+    50000,
+    'Magic plate: while worn and attuned, you have Resistance to Bludgeoning, Piercing, and Slashing damage. (Legendary; requires attunement.)',
+    {
+      requiresAttunement: true,
+      wornEffects: [
+        { kind: 'resistance', damageType: 'bludgeoning' },
+        { kind: 'resistance', damageType: 'piercing' },
+        { kind: 'resistance', damageType: 'slashing' },
+      ],
+    }
+  ),
+  // SRD Dragon Scale Mail (Very Rare, attunement) — +1 AC and Resistance to the
+  // dragon's damage type. Simplification: Advantage vs breath weapons and the
+  // dragon-sensing property aren't modeled.
+  ...Object.entries(DRAGON_SCALES).map(([color, t]) =>
+    namedMagic(
+      'scale_mail',
+      `dragon_scale_mail_${color}`,
+      `${cap(color)} Dragon Scale Mail`,
+      15000,
+      `Scale mail of ${color} dragon scales: +1 AC and, while attuned, Resistance to ${cap(t)} damage. (Very Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 1,
+        wornEffects: [{ kind: 'resistance', damageType: t }],
+      }
+    )
+  ),
+  // SRD Dwarven Plate (Very Rare) — +2 AC. Simplification: the push reduction
+  // isn't modeled.
+  ...named(['plate_armor', 'half_plate'], (b) =>
+    namedMagic(
+      b.id,
+      `dwarven_${b.id}`,
+      `Dwarven ${b.name}`,
+      15000,
+      `${b.desc} Dwarven-forged magic armor: +2 bonus to Armor Class. (Very Rare.)`,
+      { magicBonus: 2 }
+    )
+  ),
+  // SRD Elven Chain (Rare) — +1 AC, wearable without armor training.
+  ...named(['chain_shirt', 'chain_mail'], (b) =>
+    namedMagic(
+      b.id,
+      `elven_${b.id}`,
+      `Elven ${b.name}`,
+      3500,
+      `${b.desc} Elven magic mail: +1 bonus to Armor Class, and you can wear it without armor training. (Rare.)`,
+      { magicBonus: 1, noArmorTrainingNeeded: true }
+    )
+  ),
+  // SRD Glamoured Studded Leather (Rare) — +1 AC. Simplification: the
+  // appearance-changing illusion is narrative.
+  namedMagic(
+    'studded_leather',
+    'glamoured_studded_leather',
+    'Glamoured Studded Leather',
+    3500,
+    'Magic studded leather: +1 bonus to Armor Class, and it can look like any clothing you choose. (Rare.)',
+    { magicBonus: 1 }
+  ),
+  // SRD Arrow-Catching Shield (Rare, attunement) — +2 AC against ranged
+  // attacks. Simplification: redirecting attacks at adjacent allies isn't modeled.
+  namedMagic(
+    'shield',
+    'arrow_catching_shield',
+    'Arrow-Catching Shield',
+    3500,
+    'A magic shield: +2 AC against ranged attacks, on top of its normal +2. (Rare; requires attunement.)',
+    { requiresAttunement: true, wornEffects: [{ kind: 'ranged_ac_bonus', bonus: 2 }] }
+  ),
+  // SRD Spellguard Shield (Very Rare, attunement) — Advantage on saves against
+  // spells; spell attacks against you have Disadvantage.
+  namedMagic(
+    'shield',
+    'spellguard_shield',
+    'Spellguard Shield',
+    15000,
+    'A magic shield: Advantage on saving throws against spells, and spell attack rolls against you have Disadvantage. (Very Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      wornEffects: [{ kind: 'spell_save_advantage' }, { kind: 'spell_attack_disadvantage' }],
+    }
+  ),
+  // SRD Shield of the Cavalier (Very Rare, attunement) — +2 AC on top of the
+  // Shield's. Simplification: Forceful Bash / Protective Field not modeled.
+  namedMagic(
+    'shield',
+    'shield_of_the_cavalier',
+    'Shield of the Cavalier',
+    15000,
+    'A magic shield: +2 AC on top of its normal +2. (Very Rare; requires attunement.)',
+    { requiresAttunement: true, magicBonus: 2 }
+  ),
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

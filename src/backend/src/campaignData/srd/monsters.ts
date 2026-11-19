@@ -390,6 +390,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   ogre: {
     name: 'Ogre',
+    creatureType: 'giant',
     size: 'large',
     cr: 2,
     hp: 68,
@@ -1117,6 +1118,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   hill_giant: {
     name: 'Hill Giant',
+    creatureType: 'giant',
     size: 'huge',
     darkvision_ft: 0, // no darkvision
     cr: 5,
@@ -1143,6 +1145,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // ─── High-end SRD bestiary (CR 4–6) ──────────────────────────────────────────
   ettin: {
     name: 'Ettin',
+    creatureType: 'giant',
     size: 'large',
     cr: 4,
     hp: 85,
@@ -1500,6 +1503,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   stone_giant: {
     name: 'Stone Giant',
+    creatureType: 'giant',
     size: 'huge',
     cr: 7,
     hp: 126,
@@ -1581,6 +1585,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   frost_giant: {
     name: 'Frost Giant',
+    creatureType: 'giant',
     size: 'huge',
     cr: 8,
     hp: 149,
@@ -1608,6 +1613,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // Fire-immune. (Hammer Throw deferred.)
   fire_giant: {
     name: 'Fire Giant',
+    creatureType: 'giant',
     size: 'huge',
     cr: 9,
     hp: 162,
@@ -1635,6 +1641,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   // thunder rider). (Thundercloud, Spellcasting + Misty Step deferred/narrated.)
   cloud_giant: {
     name: 'Cloud Giant',
+    creatureType: 'giant',
     size: 'huge',
     cr: 9,
     hp: 200,
@@ -4623,7 +4630,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   troll_limb: {
     name: 'Troll Limb',
     size: 'small',
-    // SRD 5.2.1 type: Giant â not in the creatureType union; left unspecified.
+    creatureType: 'giant',
     cr: 0.5,
     hp: 14,
     ac: 13,
@@ -5552,8 +5559,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
 
   troll: {
     name: 'Troll',
+    creatureType: 'giant',
     size: 'large',
-    // SRD 5.2.1 type: Giant â not in the creatureType union; left unspecified.
     cr: 5,
     hp: 94,
     ac: 15,
@@ -8487,7 +8494,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   storm_giant: {
     name: 'Storm Giant',
     size: 'huge',
-    // SRD 5.2.1 type: Giant — not in the creatureType union; left unspecified.
+    creatureType: 'giant',
     cr: 13,
     hp: 230,
     ac: 16,

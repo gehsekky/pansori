@@ -509,9 +509,11 @@ export function canDonArmor(combatActive: boolean, armorCategory: string) {
 // SRD: non-proficient armor → disadvantage on STR/DEX checks and attack rolls, cannot cast spells
 export function hasArmorProficiency(
   armorProficiencies: string[],
-  armorCategory: string | undefined
+  armorCategory: string | undefined,
+  // SRD Elven Chain — "considered trained with this armor".
+  noTrainingNeeded = false
 ): boolean {
-  if (!armorCategory) return true;
+  if (!armorCategory || noTrainingNeeded) return true;
   return armorProficiencies.includes(armorCategory);
 }
 

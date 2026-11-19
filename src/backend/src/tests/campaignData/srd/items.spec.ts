@@ -17,23 +17,25 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (45 weapons + 21 armor + 73 gear)', () => {
+  it('has the expected catalog size (181 weapons + 102 armor + 88 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
     // plus consumable/misc gear, tools, foci, light sources, thrown splash
     // weapons, ammunition (arrows / bolts / bullets / needles), and magic items
     // (Cloak / Ring of Protection, the Healing Potion ladder, the stat-set
     // wondrous items, and the +N magic weapons/armor/shields). Counts include
-    // the 7 magic weapons (weapon type) and 8 magic armor/shields (armor type,
-    // incl. the Sentinel Shield), plus 24 worn wondrous items / rings (batch 1).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(139);
+    // +1/+2/+3 variants of every weapon (38 × 3) and armor (12 × 3) and the
+    // shield (3), 29 named magic weapons, 50 named magic armors / shields
+    // (incl. the Sentinel Shield), 15 +N ammunition bundles, and 24 worn
+    // wondrous items / rings.
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(371);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
     const gear = Object.values(SRD_ITEMS).filter(
       (i) => i.type === 'misc' || i.type === 'consumable'
     );
-    expect(weapons).toHaveLength(45); // 38 base + 7 magic
-    expect(armor).toHaveLength(21); // 13 base + 8 magic (incl. shields)
-    expect(gear).toHaveLength(73);
+    expect(weapons).toHaveLength(181); // 38 base + 114 +N + 29 named
+    expect(armor).toHaveLength(102); // 13 base + 39 +N + 50 named (incl. shields)
+    expect(gear).toHaveLength(88);
   });
 
   it('covers the full SRD 5.2.1 weapon + armor tables', () => {

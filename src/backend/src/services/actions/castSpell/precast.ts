@@ -93,7 +93,11 @@ export function runPrecast(
     : null;
   if (
     spellArmorItem &&
-    !hasArmorProficiency(pc.char.armor_proficiencies ?? [], spellArmorItem.armorCategory)
+    !hasArmorProficiency(
+      pc.char.armor_proficiencies ?? [],
+      spellArmorItem.armorCategory,
+      !!spellArmorItem.noArmorTrainingNeeded
+    )
   ) {
     ctx.narrative = `You cannot cast spells while wearing ${spellArmorItem.name} — you are not proficient with ${spellArmorItem.armorCategory ?? 'this'} armor.`;
     return { done: true };

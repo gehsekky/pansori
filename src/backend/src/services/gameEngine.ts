@@ -1838,7 +1838,10 @@ function computeEnemyAttack(
   // Half Cover (+2 AC) — inside a Druid's Nature's Sanctuary cube, or in the
   // aura of a Paladin whose Smite of Protection is up. Cover doesn't stack.
   const coverAc = Math.max(sanctuaryCoverAc(st, char.id), smiteOfProtectionAc(st, char.id));
-  const effectiveAc = char.ac + coverAc;
+  // SRD Arrow-Catching Shield — +2 AC against ranged attacks (an enemy whose
+  // attack reaches 20 ft or more is treated as attacking at range).
+  const rangedAc = (enemy.attackReachFt ?? 5) >= 20 ? (char.worn_traits?.rangedAcBonus ?? 0) : 0;
+  const effectiveAc = char.ac + coverAc + rangedAc;
   const result = resolveEnemyAttack(enemy, effectiveAc, hasAdvantage, hasDisadvantage);
   // SRD Enlarge/Reduce — a Reduced enemy's weapon attacks deal -1d4 (floored at
   // 1), an Enlarged enemy's +1d4. Keyed off the attacker's grid-entity condition.
@@ -3748,6 +3751,9 @@ export function buildInitiativeOrder(
   const dexById = new Map<string, number>();
   for (const c of chars) dexById.set(c.id, c.dex);
   for (const e of enemies) dexById.set(e.id, e.dex ?? 10);
+  // SRD Weapon of Warning — you and allies near you have Advantage on
+  // Initiative (the party is assumed to be together when combat starts).
+  const partyWarned = chars.some((c) => !c.dead && !!c.worn_traits?.partyInitiativeAdvantage);
   const entries: InitEntry[] = [
     ...chars
       .filter((c) => !c.dead)
@@ -3758,7 +3764,8 @@ export function buildInitiativeOrder(
         const alertBonus = isAlert ? profBonus(c.level) : 0;
         // SRD Barbarian Feral Instinct (L7) — Advantage on Initiative rolls —
         // or a worn Sentinel Shield.
-        const feralAdv = getClassLevel(c, 'barbarian') >= 7 || !!c.worn_traits?.initiativeAdvantage;
+        const feralAdv =
+          getClassLevel(c, 'barbarian') >= 7 || !!c.worn_traits?.initiativeAdvantage || partyWarned;
         const surprised = !isAlert && surprisedIds.has(c.id);
         const d20 = rollInit(feralAdv, surprised);
         return {
@@ -10189,8 +10196,10 @@ function resolveEnemySpellAttack(args: {
   const parts: string[] = [];
   let hp = target.hp;
   let hits = 0;
+  // SRD Spellguard Shield — spell attacks against you have Disadvantage.
+  const disadv = !!target.worn_traits?.spellAttackDisadvantage;
   for (let i = 0; i < count; i++) {
-    const d20 = rollDice('1d20');
+    const d20 = disadv ? Math.min(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
     const total = d20 + bonus;
     const hit = d20 !== 1 && (d20 === 20 || total >= ac);
     if (!hit) {

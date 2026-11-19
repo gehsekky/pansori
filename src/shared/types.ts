@@ -1795,7 +1795,10 @@ export type ItemSlot =
 //     Springing). `darkvision`: Darkvision `feet`, or +`feet` if you already
 //     have it (Goggles of Night).
 //   - `spell_save_advantage`: Advantage on saves against spells (Mantle of
-//     Spell Resistance).
+//     Spell Resistance). `spell_attack_disadvantage`: spell attacks against you
+//     have Disadvantage (Spellguard Shield). `ranged_ac_bonus`: AC against
+//     ranged attacks (Arrow-Catching Shield). `initiative_advantage` with
+//     `party`: you and your allies (Weapon of Warning).
 // The non-numeric effects are derived onto `Character.worn_traits` by
 // `syncSetAbilities` on every equip / unequip / attune.
 export type WornEffect =
@@ -1809,11 +1812,22 @@ export type WornEffect =
   | { kind: 'spell_immunity'; spellId: string }
   | { kind: 'condition_immunity'; condition: string }
   | { kind: 'skill_advantage'; skill: string }
-  | { kind: 'initiative_advantage' }
+  | { kind: 'initiative_advantage'; party?: boolean }
+  | { kind: 'ranged_ac_bonus'; bonus: number }
+  | { kind: 'spell_attack_disadvantage' }
   | { kind: 'speed_mode'; mode: 'swim' | 'climb'; feet: number | 'walk' }
   | { kind: 'speed_floor'; feet: number }
   | { kind: 'darkvision'; feet: number }
   | { kind: 'spell_save_advantage' };
+
+export interface MagicRider {
+  label: string;
+  dice: string;
+  damageType?: string;
+  vsCreatureTypes?: string[];
+  onCrit?: boolean;
+  rangedOnly?: boolean;
+}
 
 /** Worn-item traits derived from `wornEffects` (see `syncSetAbilities`). */
 export interface WornTraits {
@@ -1824,6 +1838,9 @@ export interface WornTraits {
   conditionImmunities?: string[];
   skillAdvantage?: string[];
   initiativeAdvantage?: boolean;
+  partyInitiativeAdvantage?: boolean;
+  rangedAcBonus?: number;
+  spellAttackDisadvantage?: boolean;
   swimFt?: number | 'walk';
   climbFt?: number | 'walk';
   speedFloor?: number;
@@ -2049,6 +2066,17 @@ export interface LootItem {
   // or a SHIELD: a bonus to AC (folded into computeTotalAc, on top of a shield's
   // normal ac_bonus). Absent / 0 ⇒ a mundane item.
   magicBonus?: number;
+  // SRD magic weapon riders — extra damage on a hit (Vicious Weapon +2d6, Flame
+  // Tongue +2d6 Fire, Dragon Slayer +3d6 vs Dragons, …). `damageType` omitted =
+  // the weapon's own type; `vsCreatureTypes` limits it to those targets;
+  // `onCrit` only on a natural 20 (Mace of Smiting; flat, not doubled);
+  // `rangedOnly` only on a ranged / thrown attack (Dwarven Thrower). Dice are
+  // doubled on a Critical Hit (except `onCrit` riders).
+  magicRiders?: MagicRider[];
+  // SRD Energy Bow — conjures its own arrows: no ammunition needed.
+  conjuresAmmo?: boolean;
+  // SRD Elven Chain — wearable without armor training.
+  noArmorTrainingNeeded?: boolean;
   versatileDamage?: string; // two-handed damage for versatile weapons (e.g. '1d8' for quarterstaff)
   damageType?: string; // piercing / slashing / bludgeoning / fire / etc.
   thrown?: { normalRange: number; longRange: number }; // melee weapon usable as ranged

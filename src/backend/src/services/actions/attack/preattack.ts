@@ -160,7 +160,10 @@ export function runPreattack(
   const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
 
   // ── Ammunition check (SRD) ──────────────────────────────────────
-  if (weaponItem?.range === 'ranged' && !weaponItem.thrown) {
+  // SRD Ammunition +N — the shot fired gets its bonus to attack + damage.
+  let ammoMagicBonus = 0;
+  // SRD Energy Bow — conjures its own arrows.
+  if (weaponItem?.range === 'ranged' && !weaponItem.thrown && !weaponItem.conjuresAmmo) {
     // NOTE: order matters. 'hand_crossbow' includes both 'bow' and 'crossbow',
     // so 'crossbow' (and 'blowgun', which must beat 'bow') are checked first.
     // Firearms (musket/pistol) use their own bullets, distinct from a sling's.
@@ -174,7 +177,10 @@ export function runPreattack(
     };
     const wepKey = Object.keys(ammoTypes).find((k) => weaponItem.id.includes(k)) ?? 'arrow';
     const ammoIds = ammoTypes[wepKey] ?? ['arrow', 'arrows'];
-    const matches = (i: InventoryItem) => ammoIds.some((a) => i.id.includes(a));
+    // Only quiver items are ammunition (an Arrow-Catching Shield is not an arrow).
+    const isAmmo = (i: InventoryItem) =>
+      (ctx.context.lootTable.find((l) => l.id === i.id)?.slot ?? 'quiver') === 'quiver';
+    const matches = (i: InventoryItem) => ammoIds.some((a) => i.id.includes(a)) && isAmmo(i);
     // Prefer the ammo equipped in the quiver slot; fall back to any matching
     // bundle loose in the pack (so unequipped ammo still fires).
     const quiverInst = pc.char.equipment?.quiver;
@@ -187,6 +193,7 @@ export function runPreattack(
       return { done: true };
     }
     const ammoItem = pc.char.inventory[ammoIdx];
+    ammoMagicBonus = ctx.context.lootTable.find((l) => l.id === ammoItem.id)?.magicBonus ?? 0;
     const ammoCount = ammoItem.count ?? 1;
     if (ammoCount <= 1) {
       // Stack spent — drop the bundle, and clear the quiver slot if this was
@@ -207,5 +214,18 @@ export function runPreattack(
     }
   }
 
-  return { done: false, target, targetId, weaponItem, weaponDamage, isVersatile, weaponLabel };
+  // The shot's effective weapon: magic ammunition stacks its +N on the bow's.
+  const shotWeapon =
+    weaponItem && ammoMagicBonus > 0
+      ? { ...weaponItem, magicBonus: (weaponItem.magicBonus ?? 0) + ammoMagicBonus }
+      : weaponItem;
+  return {
+    done: false,
+    target,
+    targetId,
+    weaponItem: shotWeapon,
+    weaponDamage,
+    isVersatile,
+    weaponLabel,
+  };
 }

@@ -93,7 +93,8 @@ export function computeToHitContext(
     : undefined;
   const armorProficient = hasArmorProficiency(
     pc.char.armor_proficiencies ?? [],
-    equippedArmorLootItem?.armorCategory
+    equippedArmorLootItem?.armorCategory,
+    !!equippedArmorLootItem?.noArmorTrainingNeeded
   );
   // SRD Pact of the Blade — you have proficiency with your pact weapon.
   const weaponProficient =

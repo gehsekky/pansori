@@ -85,7 +85,8 @@ export const handleTwoWeaponAttack: ActionHandler<{
     : null;
   const armorProf = hasArmorProficiency(
     pc.char.armor_proficiencies ?? [],
-    armorLootItem?.armorCategory
+    armorLootItem?.armorCategory,
+    !!armorLootItem?.noArmorTrainingNeeded
   );
   // SRD Grappled — Disadvantage against anyone but the grappler.
   const grappledDisadv = grappledAttackDisadvantage(
