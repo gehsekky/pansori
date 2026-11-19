@@ -2,6 +2,7 @@ import { getClassLevel, layOnHandsRemaining } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import type { Character } from '../../types.js';
 import { fmt } from '../narrativeFmt.js';
+import { layOnHandsCurable } from '../paladinFeatures.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -11,16 +12,34 @@ import { updatePcActor } from './actor.js';
  * remaining pool, spending only what's used. A bonus action in combat
  * (self-managed so it stays usable out of combat); the pool is tracked as
  * points spent on `class_resource_uses.lay_on_hands`. With `cure`, spends a
- * flat 5 points to end the Poisoned condition instead of restoring HP (SRD:
- * those points don't also restore Hit Points). (RE-2.)
+ * flat 5 points to end the Poisoned condition (or, from L14 with Restoring
+ * Touch, Blinded / Charmed / Deafened / Frightened / Paralyzed / Stunned)
+ * instead of restoring HP (SRD: those points don't also restore Hit Points).
+ * (RE-2.)
  */
-// SRD: Lay On Hands poison-cure — a flat cost to end the Poisoned condition.
+// SRD: Lay On Hands — a flat 5 pool points ends Poisoned (and, with Restoring
+// Touch, each of its conditions).
 const LAY_ON_HANDS_CURE_COST = 5;
+
+/** The condition fields a cure clears: the tag, its duration, its source. */
+function withoutCondition(c: Character, condition: string): Partial<Character> {
+  const durations = { ...(c.condition_durations ?? {}) };
+  delete durations[condition];
+  const sources = { ...(c.condition_sources ?? {}) };
+  delete sources[condition];
+  return {
+    conditions: (c.conditions ?? []).filter((x) => x !== condition),
+    condition_durations: durations,
+    condition_sources: sources,
+    ...(condition === 'charmed' ? { charmer_id: undefined } : {}),
+  };
+}
 
 export const handleLayOnHands: ActionHandler<{
   type: 'lay_on_hands';
   targetCharId: string;
   cure?: boolean;
+  condition?: string;
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can use Lay on Hands.' };
   const { char } = ctx.actor;
@@ -37,20 +56,26 @@ export const handleLayOnHands: ActionHandler<{
     return;
   }
 
-  // Poison-cure branch: a flat 5 points ends Poisoned and restores no HP.
+  // Cure branch: a flat 5 points ends one condition and restores no HP —
+  // Poisoned, or (SRD Restoring Touch, L14) one of six more.
   if (action.cure) {
+    const condition = action.condition ?? 'poisoned';
+    if (!layOnHandsCurable(char).includes(condition)) {
+      return { rejected: `Lay on Hands can't end ${condition} at your level.` };
+    }
     if (remaining < LAY_ON_HANDS_CURE_COST) {
-      ctx.narrative = `Curing poison costs ${LAY_ON_HANDS_CURE_COST} HP from the pool — only ${remaining} left.`;
+      ctx.narrative = `Ending a condition costs ${LAY_ON_HANDS_CURE_COST} HP from the pool — only ${remaining} left.`;
       return;
     }
     const target = ctx.st.characters.find((c) => c.id === action.targetCharId && !c.dead);
     if (!target) return { rejected: 'No such ally to cure.' };
-    if (!(target.conditions ?? []).includes('poisoned')) {
-      ctx.narrative = `${target.id === char.id ? 'You are' : `${target.name} is`} not Poisoned.`;
+    const label = condition.charAt(0).toUpperCase() + condition.slice(1);
+    if (!(target.conditions ?? []).includes(condition)) {
+      ctx.narrative = `${target.id === char.id ? 'You are' : `${target.name} is`} not ${label}.`;
       return;
     }
     const isSelf = target.id === char.id;
-    const curedConditions = (target.conditions ?? []).filter((c) => c !== 'poisoned');
+    const cured = withoutCondition(target, condition);
 
     const casterPatch: Partial<Character> = {
       class_resource_uses: {
@@ -61,23 +86,27 @@ export const handleLayOnHands: ActionHandler<{
     if (ctx.st.combat_active) {
       casterPatch.turn_actions = { ...char.turn_actions, bonus_action_used: true };
     }
-    if (isSelf) casterPatch.conditions = curedConditions;
+    if (isSelf) Object.assign(casterPatch, cured);
     updatePcActor(ctx, casterPatch);
 
     if (!isSelf) {
       ctx.st = {
         ...ctx.st,
-        characters: ctx.st.characters.map((c) =>
-          c.id === target.id ? { ...c, conditions: curedConditions } : c
-        ),
+        characters: ctx.st.characters.map((c) => (c.id === target.id ? { ...c, ...cured } : c)),
         entities: (ctx.st.entities ?? []).map((e) =>
-          e.id === target.id && !e.isEnemy ? { ...e, conditions: curedConditions } : e
+          e.id === target.id && !e.isEnemy
+            ? { ...e, conditions: e.conditions.filter((c) => c !== condition) }
+            : e
         ),
       };
     }
 
     const who = isSelf ? 'themselves' : target.name;
-    ctx.narrative = `${char.name} draws the poison out of ${who} — the Poisoned condition ends. (${remaining - LAY_ON_HANDS_CURE_COST} HP left in the pool)`;
+    const verb =
+      condition === 'poisoned'
+        ? `draws the poison out of ${who} — the Poisoned condition ends`
+        : `lays on hands — ${who} is no longer ${label} (Restoring Touch)`;
+    ctx.narrative = `${char.name} ${verb}. (${remaining - LAY_ON_HANDS_CURE_COST} HP left in the pool)`;
     return;
   }
 

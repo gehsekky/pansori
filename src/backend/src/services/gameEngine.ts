@@ -1,4 +1,11 @@
 import {
+  ABJURED_TAG,
+  abjureFoesTargetCount,
+  layOnHandsCurable,
+  paladinAuraRangeFt,
+  smiteOfProtectionAc,
+} from './paladinFeatures.js';
+import {
   ADVANTAGE_CONDITIONS,
   DISADV_CONDITIONS,
   ENEMY_DISADV_CONDITIONS,
@@ -1066,11 +1073,6 @@ export function hasSaveProficiency(
   );
 }
 
-// SRD Paladin aura radius — 10 ft, expanding to 30 ft at L18 (Aura Expansion).
-function paladinAuraRangeFt(p: Character): number {
-  return getClassLevel(p, 'paladin') >= 18 ? 30 : 10;
-}
-
 /**
  * SRD Aura of Protection (Paladin L6): a creature gains a bonus to saving
  * throws equal to the Charisma modifier (minimum +1) of a Paladin L6+ within
@@ -1818,9 +1820,10 @@ function computeEnemyAttack(
     attackerSelfDisadv ||
     darknessDisadv ||
     sunlightSensitivityDisadv;
-  // SRD Nature's Sanctuary — Half Cover (+2 AC) inside a Druid's cube.
-  const sanctuaryAc = sanctuaryCoverAc(st, char.id);
-  const effectiveAc = char.ac + sanctuaryAc;
+  // Half Cover (+2 AC) — inside a Druid's Nature's Sanctuary cube, or in the
+  // aura of a Paladin whose Smite of Protection is up. Cover doesn't stack.
+  const coverAc = Math.max(sanctuaryCoverAc(st, char.id), smiteOfProtectionAc(st, char.id));
+  const effectiveAc = char.ac + coverAc;
   const result = resolveEnemyAttack(enemy, effectiveAc, hasAdvantage, hasDisadvantage);
   // SRD Enlarge/Reduce — a Reduced enemy's weapon attacks deal -1d4 (floored at
   // 1), an Enlarged enemy's +1d4. Keyed off the attacker's grid-entity condition.
@@ -2608,6 +2611,28 @@ export function breakCharmOnDamage(st: GameState, prevHp: Map<string, number>): 
     }
   }
   return next;
+}
+
+// SRD Paladin Abjure Foes — its Frightened ends early when the creature takes
+// any damage. Same end-of-action HP-snapshot choke point as the charm break:
+// an enemy tagged `abjured` whose HP dropped loses the tag and Frightened.
+export function breakAbjureOnDamage(st: GameState, prevHp: Map<string, number>): GameState {
+  if (!st.entities?.some((e) => e.isEnemy && e.conditions.includes(ABJURED_TAG))) return st;
+  return {
+    ...st,
+    entities: st.entities.map((e) => {
+      if (!e.isEnemy || !e.conditions.includes(ABJURED_TAG)) return e;
+      if (e.hp >= (prevHp.get(e.id) ?? e.hp)) return e;
+      const durations = { ...e.condition_durations };
+      delete durations.frightened;
+      delete durations[ABJURED_TAG];
+      return {
+        ...e,
+        conditions: e.conditions.filter((c) => c !== 'frightened' && c !== ABJURED_TAG),
+        condition_durations: durations,
+      };
+    }),
+  };
 }
 
 // SRD Warding Bond — whenever a warded creature takes damage, its warder takes
@@ -5894,19 +5919,32 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           requiresBonusAction: state.combat_active || undefined,
         });
       }
-      // SRD poison-cure: a flat 5 points ends Poisoned (no HP restored) — one
-      // choice per Poisoned member, only when the pool can pay the flat cost.
+      // SRD cure: a flat 5 points ends Poisoned (no HP restored) — and from
+      // L14, Restoring Touch's six conditions. One choice per afflicted member
+      // and condition, only when the pool can pay the flat cost.
       if (lohPool >= 5) {
+        const curable = layOnHandsCurable(char);
         for (const member of state.characters) {
-          if (member.dead || !(member.conditions ?? []).includes('poisoned')) continue;
-          if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
-          const selfTag = member.id === char.id ? ' (self)' : '';
-          choices.push({
-            label: `Lay on Hands — cure poison${selfTag} → ${member.name} (5 HP from pool)`,
-            action: { type: 'lay_on_hands', targetCharId: member.id, cure: true },
-            kind: 'class_feature',
-            requiresBonusAction: state.combat_active || undefined,
-          });
+          if (member.dead) continue;
+          for (const cond of curable) {
+            if (!(member.conditions ?? []).includes(cond)) continue;
+            if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+            const selfTag = member.id === char.id ? ' (self)' : '';
+            choices.push({
+              label:
+                cond === 'poisoned'
+                  ? `Lay on Hands — cure poison${selfTag} → ${member.name} (5 HP from pool)`
+                  : `Lay on Hands — Restoring Touch: end ${cond}${selfTag} → ${member.name} (5 HP from pool)`,
+              action: {
+                type: 'lay_on_hands',
+                targetCharId: member.id,
+                cure: true,
+                ...(cond === 'poisoned' ? {} : { condition: cond }),
+              },
+              kind: 'class_feature',
+              requiresBonusAction: state.combat_active || undefined,
+            });
+          }
         }
       }
     }
@@ -6943,6 +6981,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Sacred Weapon — +${abilityMod(char.cha ?? 10)} to attack rolls for 10 rounds (Channel Divinity, ${cdLeft} left)`,
         action: { type: 'use_class_feature', featureId: 'sacred_weapon' },
+        kind: 'class_feature',
+      });
+    }
+
+    // SRD Paladin Abjure Foes (L9) — Magic action, Channel Divinity.
+    if (getClassLevel(char, 'paladin') >= 9 && cdLeft > 0 && !char.turn_actions.action_used) {
+      const n = abjureFoesTargetCount(char);
+      choices.push({
+        label: `Abjure Foes — up to ${n} foe${n === 1 ? '' : 's'} within 60 ft: WIS save or Frightened (Channel Divinity, ${cdLeft} left)`,
+        action: { type: 'use_class_feature', featureId: 'abjure_foes' },
         kind: 'class_feature',
       });
     }
@@ -12315,6 +12363,7 @@ export async function takeAction({
 
   // SRD — break Charm on any creature that took damage this action.
   st = breakCharmOnDamage(st, prevHpForCharm);
+  st = breakAbjureOnDamage(st, prevHpForCharm);
   // SRD Warding Bond — redirect a warded ally's damage to its warder.
   st = redirectWardingBondDamage(st, prevHpForCharm);
 

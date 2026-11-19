@@ -1,8 +1,17 @@
+import { ABJURED_TAG, ABJURE_FOES_RANGE_FT, abjureFoesTargetCount } from '../../paladinFeatures.js';
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { bardicInspirationLeft, bardicInspirationMax, lowestOpenSlot } from '../../bardFeatures.js';
 import { channelDivinityUsesMax, getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
-import { endCombatState, enemyHpAfterDamage, isRoomCleared } from '../../gameEngine.js';
+import {
+  endCombatState,
+  enemyHpAfterDamage,
+  getEnemyById,
+  isRoomCleared,
+} from '../../gameEngine.js';
+import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import type { ActionContext } from '../types.js';
+import { composeNow } from '../../narrative/compose.js';
+import { distanceFeet } from '../../gridEngine.js';
 import { fmt } from '../../narrativeFmt.js';
 
 /**
@@ -26,7 +35,8 @@ import { fmt } from '../../narrativeFmt.js';
  *  Paladin Channel Divinity:
  *   - `sacred_weapon` (Devotion): +CHA to attack rolls for 1 minute.
  *     Read by attack.ts via state.sacred_weapon_active flag.
- *   - `abjure_enemy` (Vengeance): WIS save → frightened.
+ *   - `abjure_foes` (L9): CHA-mod foes within 60 ft, WIS save → Frightened
+ *     until damaged (1 minute).
  */
 export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string): boolean {
   if (ctx.actor.kind !== 'pc') return false;
@@ -167,6 +177,105 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
     };
     const chaMod = abilityMod(char.cha);
     ctx.narrative = `${char.name} — Sacred Weapon! +${chaMod} to attack rolls for 1 minute (10 rounds). Your weapon gleams with divine light. (${cdUsesDev - 1} Channel Divinity remaining)`;
+    return true;
+  }
+
+  // SRD Abjure Foes (Paladin L9) — Magic action, one Channel Divinity use:
+  // up to CHA-mod (min 1) visible creatures within 60 ft make a WIS save or are
+  // Frightened for 1 minute, ending early if the creature takes damage. The
+  // nearest enemies are chosen.
+  if (fid === 'abjure_foes') {
+    if (getClassLevel(char, 'paladin') < 9) {
+      ctx.narrative = 'Abjure Foes requires Paladin level 9.';
+      return true;
+    }
+    const cdLeft = char.class_resource_uses?.channel_divinity ?? channelDivinityUsesMax(char);
+    if (cdLeft <= 0) {
+      ctx.narrative = 'No Channel Divinity uses remaining.';
+      return true;
+    }
+    if (char.turn_actions.action_used) {
+      ctx.narrative = 'Action already used this turn.';
+      return true;
+    }
+    const selfEnt = ctx.st.entities?.find((e) => e.id === char.id);
+    if (!ctx.st.combat_active || !selfEnt) {
+      ctx.narrative = 'Abjure Foes needs foes in sight.';
+      return true;
+    }
+    const targets = (ctx.st.entities ?? [])
+      .filter(
+        (e) =>
+          e.isEnemy &&
+          e.hp > 0 &&
+          !e.conditions.includes('invisible') &&
+          distanceFeet(selfEnt.pos, e.pos) <= ABJURE_FOES_RANGE_FT
+      )
+      .sort((a, b) => distanceFeet(selfEnt.pos, a.pos) - distanceFeet(selfEnt.pos, b.pos))
+      .slice(0, abjureFoesTargetCount(char));
+    if (targets.length === 0) {
+      ctx.narrative = `No foes within ${ABJURE_FOES_RANGE_FT} ft to abjure.`;
+      return true;
+    }
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
+      channel_divinity: cdLeft - 1,
+    };
+    char.turn_actions = { ...char.turn_actions, action_used: true };
+    const dc = 8 + profBonus(char.level) + abilityMod(char.cha);
+    const frightened = new Set<string>();
+    const lines: string[] = [];
+    for (const e of targets) {
+      const data = getEnemyById(ctx.seed, e.id);
+      if (!data) continue;
+      if ((data.condition_immunities ?? []).includes('frightened')) {
+        lines.push(`${data.name} can't be Frightened.`);
+        continue;
+      }
+      const wis = (data as unknown as Record<string, number>).wis ?? 10;
+      const save = enemySaveD20(data, true, () => rollDice('1d20')) + abilityMod(wis);
+      const lr = legendaryResist(ctx.st, { ...data, id: e.id }, save < dc);
+      composeNow(ctx, {
+        kind: 'save',
+        characterId: e.id,
+        characterName: data.name,
+        ability: 'wis',
+        roll: save,
+        dc,
+        success: !lr.failed,
+        vs: 'Abjure Foes',
+        prose: '',
+      });
+      if (lr.failed) {
+        frightened.add(e.id);
+        lines.push(`${data.name}: WIS ${save} vs DC ${dc} — Frightened!`);
+      } else {
+        lines.push(`${data.name}: WIS ${save} vs DC ${dc} — resists.${lr.note}`);
+      }
+    }
+    if (frightened.size > 0) {
+      ctx.st = {
+        ...ctx.st,
+        entities: (ctx.st.entities ?? []).map((e) =>
+          frightened.has(e.id)
+            ? {
+                ...e,
+                conditions: [
+                  ...e.conditions.filter((c) => c !== 'frightened' && c !== ABJURED_TAG),
+                  'frightened',
+                  ABJURED_TAG,
+                ],
+                condition_durations: {
+                  ...e.condition_durations,
+                  frightened: 10,
+                  [ABJURED_TAG]: 10,
+                },
+              }
+            : e
+        ),
+      };
+    }
+    ctx.narrative = `✦ ${char.name} presents their holy symbol — Abjure Foes! ${lines.join(' ')} (${cdLeft - 1} Channel Divinity remaining)`;
     return true;
   }
 

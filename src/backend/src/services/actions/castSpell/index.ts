@@ -15,6 +15,7 @@ import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from '../attack/toHit.js';
+import { hasSmiteOfProtection } from '../../paladinFeatures.js';
 import { pickCastPrefix } from './utils.js';
 import { runAoeConditionSpell } from './aoeCondition.js';
 import { runAoeSpell } from './aoe.js';
@@ -172,9 +173,15 @@ export const handleCastSpell: ActionHandler<{
     const upcastBonus = Math.max(0, slotLevel - 1);
     const dice = 2 + upcastBonus;
     pc.char.divine_smite_dice = dice;
+    // SRD Smite of Protection (Paladin L15) — casting Divine Smite gives the
+    // Paladin and allies in the aura Half Cover until the Paladin's next turn.
+    const protects = hasSmiteOfProtection(pc.char);
+    if (protects) {
+      pc.char.turn_actions = { ...pc.char.turn_actions, smite_of_protection: true };
+    }
     composeNow(ctx, {
       kind: 'spell_utility',
-      prose: `${pc.char.name} channels divine power${slotNote}! Their next weapon hit will deal an additional ${dice}d8 radiant damage.`,
+      prose: `${pc.char.name} channels divine power${slotNote}! Their next weapon hit will deal an additional ${dice}d8 radiant damage.${protects ? ' Smite of Protection: the aura grants Half Cover until their next turn.' : ''}`,
     });
     return;
   }

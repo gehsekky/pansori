@@ -125,8 +125,19 @@ Missing (no code path):
   movement (no verticality model); Slow Fall is auto-used inside
   `applyFallingDamage`, which nothing triggers yet; Heightened Focus's Step of
   the Wind carry-an-ally rider isn't modeled.
-- **Paladin:** Abjure Foes (L9), Restoring Touch (L14), Smite of Protection
-  (Devotion L15).
+- ~~**Paladin:** Abjure Foes (L9), Restoring Touch (L14), Smite of Protection
+  (Devotion L15).~~ Done 2026-11-18 (`services/paladinFeatures.ts`). Abjure
+  Foes targets the nearest CHA-mod non-invisible foes within 60 ft; an
+  `abjured` tag ends the Frightened when the creature takes damage
+  (`breakAbjureOnDamage`, the same end-of-action choke point as the charm
+  break). Restoring Touch extends Lay on Hands' 5-point cure with a
+  `condition`. Smite of Protection (Oath of Devotion L15) sets
+  `turn_actions.smite_of_protection` on casting Divine Smite: Half Cover
+  (+2 AC against enemy attacks, not stacking with Nature's Sanctuary) for the
+  aura. Simplifications: Abjure Foes' "only one of move / action / Bonus
+  Action" limit isn't enforced on enemy turns; Smite of Protection's cover
+  lasts until the round wraps (where `turn_actions` reset), not exactly the
+  Paladin's next turn, and doesn't add +2 to DEX saves.
 - **Ranger:** Deft Explorer (L2), Nature's Veil (L14), Hunter's Lore (L3).
 - **Rogue:** Thief's Reflexes (Thief L17). Thieves' Cant exists only as a
   language (fine; it's narrative).

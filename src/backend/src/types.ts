@@ -640,6 +640,9 @@ export interface TurnActions {
   // Barbarian Reckless Attack (SRD): advantage on STR melee attacks this turn,
   // but enemies have advantage on attacks vs the Barbarian until their next turn.
   reckless?: boolean;
+  // SRD Smite of Protection (Paladin L15) — cast Divine Smite this turn: the
+  // Paladin and allies in the aura have Half Cover until this resets.
+  smite_of_protection?: boolean;
   // SRD 5.2.1 Quickened Spell metamagic: you can't use Quickened if a
   // level 1+ spell was already cast this turn, AND you can't cast a level 1+
   // spell on the same turn that you used Quickened.

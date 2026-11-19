@@ -1052,9 +1052,11 @@ export type StructuredAction =
   | { type: 'choose_mystic_arcanum'; spellId: string }
   // SRD 5.2.1 Paladin Lay on Hands (L1): bonus-action touch heal drawing from
   // a pool of 5 × Paladin level HP. `targetCharId` is the healed party member
-  // (may be the paladin). `cure` spends 5 points to end the Poisoned condition
-  // instead of restoring HP (SRD: those points don't also restore HP). (RE-2.)
-  | { type: 'lay_on_hands'; targetCharId: string; cure?: boolean }
+  // (may be the paladin). `cure` spends 5 points to end a condition instead of
+  // restoring HP (SRD: those points don't also restore HP) — `condition`, or
+  // Poisoned when omitted. From L14, Restoring Touch adds Blinded, Charmed,
+  // Deafened, Frightened, Paralyzed and Stunned. (RE-2.)
+  | { type: 'lay_on_hands'; targetCharId: string; cure?: boolean; condition?: string }
   | { type: 'prepare_spells'; spellIds: string[] }
   | { type: 'resolve_reaction'; accept: boolean; source?: 'inspiration' | 'stroke_of_luck' }
   // RAW player-command for a summoned creature (Animate Dead, etc.). On the
