@@ -127,6 +127,10 @@ export function syncSetAbilities(char: Character, lootTable: LootItem[]): void {
     if (e.kind !== 'set_ability') continue;
     want[e.ability] = Math.max(want[e.ability] ?? 0, e.value);
   }
+  // SRD Potion of Giant Strength — while it lasts, it competes with worn items.
+  if (char.conditions?.includes('giant_strength') && char.potion_strength) {
+    want.str = Math.max(want.str ?? 0, char.potion_strength.score);
+  }
   // 3. Apply — set the effective score where the item beats the base; stash the
   //    displaced base. "No effect if base already ≥ value" falls out of the >.
   const nextBase: Partial<Record<AbilityKey, number>> = {};

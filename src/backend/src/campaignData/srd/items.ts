@@ -2333,6 +2333,237 @@ const DRAGON_SCALES: Record<string, string> = {
 };
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
+// ─── Potions (SRD 5.2.1) ─────────────────────────────────────────────────────
+// SRD Magic Item Rarities and Values — a consumable is worth half its rarity's
+// value. Drinking or administering one is a Bonus Action (handleUse); each
+// potion's effect is data (`potion`, resolved in services/potions.ts).
+const POTION_VALUE = {
+  Common: 50,
+  Uncommon: 200,
+  Rare: 2000,
+  'Very Rare': 20000,
+  Legendary: 100000,
+} as const;
+
+function potionItem(
+  id: string,
+  name: string,
+  rarity: keyof typeof POTION_VALUE,
+  desc: string,
+  potion: NonNullable<LootItem['potion']>,
+  aliases: string[] = []
+): [string, LootItem] {
+  return [
+    id,
+    {
+      id,
+      name,
+      value: POTION_VALUE[rarity],
+      desc: `${desc} (${rarity}.)`,
+      weight: 0.5,
+      type: 'consumable',
+      slot: null,
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      potion,
+      aliases: [name.toLowerCase(), ...aliases],
+    },
+  ];
+}
+
+const HOUR = 600; // rounds
+const GIANT_STRENGTH: [string, number, keyof typeof POTION_VALUE][] = [
+  ['hill', 21, 'Uncommon'],
+  ['frost', 23, 'Rare'],
+  ['stone', 23, 'Rare'],
+  ['fire', 25, 'Rare'],
+  ['cloud', 27, 'Very Rare'],
+  ['storm', 29, 'Legendary'],
+];
+
+const POTIONS: [string, LootItem][] = [
+  potionItem(
+    'potion_of_climbing',
+    'Potion of Climbing',
+    'Common',
+    'A banded brown-and-silver draught: a Climb Speed equal to your Speed for 1 hour.',
+    { kind: 'condition', conditions: ['potion_climbing'], rounds: HOUR }
+  ),
+  potionItem(
+    'potion_of_flying',
+    'Potion of Flying',
+    'Very Rare',
+    'A clear, cloud-flecked draught: a Fly Speed equal to your Speed (and hover) for 1 hour.',
+    { kind: 'condition', conditions: ['potion_flying'], rounds: HOUR }
+  ),
+  ...GIANT_STRENGTH.map(([giant, score, rarity]) =>
+    potionItem(
+      `potion_of_giant_strength_${giant}`,
+      `Potion of Giant Strength (${giant})`,
+      rarity,
+      `Your Strength becomes ${score} for 1 hour (no effect if it is already that high).`,
+      { kind: 'giant_strength', score },
+      [`${giant} giant strength potion`]
+    )
+  ),
+  potionItem(
+    'potion_of_growth',
+    'Potion of Growth',
+    'Uncommon',
+    'You gain the "enlarge" effect of Enlarge/Reduce for 10 minutes, no Concentration needed.',
+    { kind: 'condition', conditions: ['enlarged'], rounds: 100 }
+  ),
+  potionItem(
+    'potion_of_diminution',
+    'Potion of Diminution',
+    'Rare',
+    'You gain the "reduce" effect of Enlarge/Reduce for 1d4 hours, no Concentration needed.',
+    { kind: 'condition', conditions: ['reduced'], rounds: '1d4h' }
+  ),
+  potionItem(
+    'potion_of_heroism',
+    'Potion of Heroism',
+    'Rare',
+    'A boiling blue draught: 10 Temporary Hit Points and the effect of Bless for 1 hour, no Concentration needed.',
+    { kind: 'condition', conditions: ['blessed'], rounds: HOUR, tempHp: 10 }
+  ),
+  potionItem(
+    'potion_of_invisibility',
+    'Potion of Invisibility',
+    'Rare',
+    'You are Invisible for 1 hour; it ends early if you attack, deal damage, or cast a spell.',
+    { kind: 'condition', conditions: ['invisible'], rounds: HOUR }
+  ),
+  potionItem(
+    'potion_of_invulnerability',
+    'Potion of Invulnerability',
+    'Rare',
+    'A syrupy, iron-grey draught: Resistance to all damage for 1 minute.',
+    { kind: 'condition', conditions: ['potion_invulnerable'], rounds: 10 }
+  ),
+  ...RESIST_TYPES.map((t) =>
+    potionItem(
+      `potion_of_resistance_${t}`,
+      `Potion of Resistance (${t})`,
+      'Uncommon',
+      `Resistance to ${t} damage for 1 hour.`,
+      { kind: 'resistance', damageType: t },
+      [`${t} resistance potion`]
+    )
+  ),
+  potionItem(
+    'potion_of_speed',
+    'Potion of Speed',
+    'Very Rare',
+    'A black-streaked yellow draught: the effect of Haste for 1 minute, no Concentration needed and no lethargy when it ends.',
+    { kind: 'condition', conditions: ['hasted'], rounds: 10 }
+  ),
+  potionItem(
+    'potion_of_vitality',
+    'Potion of Vitality',
+    'Very Rare',
+    'Removes all Exhaustion and ends Poisoned; for 24 hours every Hit Point Die you spend heals its maximum.',
+    { kind: 'cure', conditions: ['poisoned'], exhaustion: true, vitality: true }
+  ),
+  potionItem(
+    'potion_of_water_breathing',
+    'Potion of Water Breathing',
+    'Uncommon',
+    'A sea-smelling green draught: you can breathe underwater for 24 hours.',
+    { kind: 'condition', conditions: ['water_breathing'], rounds: 24 * HOUR }
+  ),
+  potionItem(
+    'elixir_of_health',
+    'Elixir of Health',
+    'Rare',
+    'A bubbling red elixir that ends the Blinded, Deafened, Paralyzed, and Poisoned conditions on you.',
+    { kind: 'cure', conditions: ['blinded', 'deafened', 'paralyzed', 'poisoned'] }
+  ),
+  // SRD Potion of Poison — illusion-masked as a beneficial potion. Simplification:
+  // it is listed under its true name (no unidentified-item system).
+  potionItem(
+    'potion_of_poison',
+    'Potion of Poison',
+    'Uncommon',
+    'Poison disguised as a helpful potion: 4d6 Poison damage, and a DC 13 Constitution save or Poisoned for 1 hour.',
+    { kind: 'poison', damage: '4d6', dc: 13 }
+  ),
+  potionItem(
+    'oil_of_sharpness',
+    'Oil of Sharpness',
+    'Very Rare',
+    'Coats a nonmagical slashing or piercing melee weapon (the one in your main hand), or twenty pieces of piercing ammunition, making it +3. Takes a minute to apply.',
+    { kind: 'sharpness' }
+  ),
+  // SRD Oil of Slipperiness — Simplification: the Freedom of Movement
+  // immunities only (no Grease pour, no movement-cost or escape effects).
+  potionItem(
+    'oil_of_slipperiness',
+    'Oil of Slipperiness',
+    'Uncommon',
+    "For 8 hours you can't be Paralyzed, Restrained, or Grappled (Freedom of Movement). Takes minutes to apply.",
+    { kind: 'condition', conditions: ['slippery'], rounds: 8 * HOUR }
+  ),
+  // Narrative potions — the effect is described and adjudicated at the table.
+  potionItem(
+    'potion_of_animal_friendship',
+    'Potion of Animal Friendship',
+    'Uncommon',
+    'Lets you cast the level 3 Animal Friendship (save DC 13) once.',
+    {
+      kind: 'narrative',
+      text: 'feels a kinship with beasts — you may charm up to three Beasts with Animal Friendship (DC 13)',
+    }
+  ),
+  potionItem(
+    'potion_of_clairvoyance',
+    'Potion of Clairvoyance',
+    'Rare',
+    'Grants the effect of Clairvoyance, no Concentration needed.',
+    { kind: 'narrative', text: 'sends their senses to a distant place they know (Clairvoyance)' }
+  ),
+  potionItem(
+    'potion_of_mind_reading',
+    'Potion of Mind Reading',
+    'Rare',
+    'Grants the effect of Detect Thoughts (save DC 13) for 10 minutes, no Concentration needed.',
+    {
+      kind: 'narrative',
+      text: 'hears the surface thoughts of those nearby (Detect Thoughts, DC 13)',
+    }
+  ),
+  potionItem(
+    'potion_of_gaseous_form',
+    'Potion of Gaseous Form',
+    'Rare',
+    'Grants the effect of Gaseous Form for 1 hour, no Concentration needed.',
+    { kind: 'narrative', text: 'dissolves into drifting mist (Gaseous Form, 1 hour)' }
+  ),
+  potionItem(
+    'potion_of_longevity',
+    'Potion of Longevity',
+    'Very Rare',
+    'Makes you 1d6 + 6 years younger — though repeated doses risk the reverse.',
+    { kind: 'narrative', text: 'feels years fall away' }
+  ),
+  potionItem(
+    'oil_of_etherealness',
+    'Oil of Etherealness',
+    'Rare',
+    'Grants the effect of Etherealness for 1 hour. Takes minutes to apply.',
+    { kind: 'narrative', text: 'fades half a step into the Ethereal Plane (Etherealness, 1 hour)' }
+  ),
+  potionItem(
+    'philter_of_love',
+    'Philter of Love',
+    'Uncommon',
+    'You are Charmed for 1 hour by the next creature you see within 10 minutes of drinking it.',
+    { kind: 'narrative', text: 'will be smitten with the next creature they lay eyes on' }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -2683,6 +2914,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
     'A magic shield: +2 AC on top of its normal +2. (Very Rare; requires attunement.)',
     { requiresAttunement: true, magicBonus: 2 }
   ),
+  ...POTIONS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

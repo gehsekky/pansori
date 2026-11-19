@@ -348,6 +348,28 @@ Mace of Terror, Nine Lives Stealer, Oathbow, Hammer of Thunderbolts, Trident of
 Fish Command, Quarterstaff of the Acrobat, Animated Shield, Plate Armor of
 Etherealness, Ammunition of Slaying).
 
+**Batch 3 done 2026-11-19 — potions** (`LootItem.potion`, resolved in
+`services/potions.ts`; `use` drinks it as a Bonus Action, or administers it to
+an ally; oils apply out of combat only). Timed effects are conditions sourced
+to `'potion'`, so they tick in combat, survive another caster's Concentration
+ending (Haste's lethargy sweep, Bless, Enlarge/Reduce), and — new — run down
+with in-world time out of combat (`elapsePotionTime`, called on a Short Rest
+and on overland travel; other round durations still freeze between fights).
+Mechanical: Potion of Climbing, Flying, Giant Strength (all six; competes with
+a worn Belt and restores the displaced score when it ends), Growth,
+Diminution, Heroism, Invisibility, Invulnerability, Resistance (ten types),
+Speed (no lethargy), Vitality (clears Exhaustion and Poisoned; Hit Point Dice
+heal their maximum for 24 in-world hours), Water Breathing, Elixir of Health,
+Potion of Poison, Oil of Sharpness (the wielded weapon or 20 piercing
+ammunition becomes the +3 version), Oil of Slipperiness. Narrative: Animal
+Friendship, Clairvoyance, Mind Reading, Gaseous Form, Longevity, Oil of
+Etherealness, Philter of Love. Simplifications: Potion of Poison is listed
+under its true name (no unidentified items); Climbing's Athletics Advantage,
+Slipperiness's Grease pour, Water Breathing (no drowning rules) and the Potion
+Miscibility table aren't modeled; Heroism's Bless, like the spell's, adds to
+attack rolls only (Bless on saves is an existing gap); the healing ladder keeps
+its existing prices.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

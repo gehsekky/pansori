@@ -25,6 +25,7 @@ import {
   type Town,
 } from '../types.js';
 import { findPath, posEqual } from './gridEngine.js';
+import { elapsePotionTime } from './potions.js';
 
 /**
  * The grid's impassable set: legacy `obstacles` + impassable terrain cells
@@ -659,6 +660,8 @@ export function resolveMarkerMove(
       marker_pos: stopCell,
       world_minute: (st.world_minute ?? 0) + elapsedMin,
     };
+    // Potion effects run down with the march (round durations freeze otherwise).
+    next = elapsePotionTime(next, elapsedMin);
     // Fog of war — reveal only the cells actually crossed (the marker may have
     // stopped short). Done before any transition flips map_level to 'town'.
     if (st.current_region_id) {

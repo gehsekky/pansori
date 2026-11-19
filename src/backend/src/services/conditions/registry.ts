@@ -1,4 +1,5 @@
 import type { Character } from '../../types.js';
+import { endGiantStrength } from '../potions.js';
 
 /**
  * Single source of truth for D&D 5.5e condition rules.
@@ -229,6 +230,13 @@ const defs: ConditionDef[] = [
   { id: 'reduced', duration: 'permanent', disadvantageSaves: ['str'] },
   // Engine-internal: Shield spell bumps AC +5 on cast (in reaction.ts);
   // ticking the condition off must reverse the bump.
+  // SRD Potion of Giant Strength — Strength returns to its prior score when it
+  // wears off (see services/potions.ts; durations come from the potion).
+  {
+    id: 'giant_strength',
+    duration: 'permanent',
+    onExpire: (char) => endGiantStrength(char),
+  },
   {
     id: 'shield_spell',
     duration: 1,

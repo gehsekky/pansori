@@ -1825,6 +1825,31 @@ export type WornEffect =
   | { kind: 'darkvision'; feet: number }
   | { kind: 'spell_save_advantage' };
 
+/**
+ * SRD Potions — what drinking (or applying) a potion does. Timed effects ride
+ * as conditions sourced to `'potion'` (`condition_sources[c] === 'potion'`),
+ * so they tick in combat rounds, elapse with in-world time out of combat, and
+ * aren't torn down by anyone's Concentration ending.
+ * - `condition`: gain the listed conditions for `rounds` (a number, or dice
+ *   counted in hours: `'1d4h'`), plus optional Temporary Hit Points.
+ * - `resistance`: Resistance to one damage type for 1 hour.
+ * - `giant_strength`: Strength becomes `score` for 1 hour (no effect if higher).
+ * - `cure`: end the listed conditions; optionally clear Exhaustion and grant
+ *   Vitality's 24 hours of maximum Hit Point Dice.
+ * - `poison`: Poison damage plus a Constitution save against Poisoned.
+ * - `sharpness`: turn a nonmagical Slashing/Piercing melee weapon or
+ *   ammunition into its +3 version.
+ * - `narrative`: an effect described and adjudicated at the table.
+ */
+export type PotionEffect =
+  | { kind: 'condition'; conditions: string[]; rounds: number | string; tempHp?: number }
+  | { kind: 'resistance'; damageType: string }
+  | { kind: 'giant_strength'; score: number }
+  | { kind: 'cure'; conditions: string[]; exhaustion?: boolean; vitality?: boolean }
+  | { kind: 'poison'; damage: string; dc: number }
+  | { kind: 'sharpness' }
+  | { kind: 'narrative'; text: string };
+
 export interface MagicRider {
   label: string;
   dice: string;
@@ -2078,6 +2103,8 @@ export interface LootItem {
   // `rangedOnly` only on a ranged / thrown attack (Dwarven Thrower). Dice are
   // doubled on a Critical Hit (except `onCrit` riders).
   magicRiders?: MagicRider[];
+  // SRD Potions — the effect of drinking / applying it (see PotionEffect).
+  potion?: PotionEffect;
   // SRD Energy Bow — conjures its own arrows: no ammunition needed.
   conjuresAmmo?: boolean;
   // SRD Elven Chain — wearable without armor training.

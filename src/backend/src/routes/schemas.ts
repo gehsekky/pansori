@@ -717,6 +717,35 @@ const LootItemSchema = z
       )
       .max(4)
       .optional(),
+    potion: z
+      .discriminatedUnion('kind', [
+        z
+          .object({
+            kind: z.literal('condition'),
+            conditions: z.array(z.string().min(1).max(40)).min(1).max(4),
+            rounds: z.union([z.number().int().positive(), z.string().min(1).max(12)]),
+            tempHp: z.number().int().positive().max(100).optional(),
+          })
+          .strict(),
+        z.object({ kind: z.literal('resistance'), damageType: z.string().min(1).max(20) }).strict(),
+        z
+          .object({ kind: z.literal('giant_strength'), score: z.number().int().min(1).max(30) })
+          .strict(),
+        z
+          .object({
+            kind: z.literal('cure'),
+            conditions: z.array(z.string().min(1).max(40)).max(8),
+            exhaustion: z.boolean().optional(),
+            vitality: z.boolean().optional(),
+          })
+          .strict(),
+        z
+          .object({ kind: z.literal('poison'), damage: DICE, dc: z.number().int().min(1).max(30) })
+          .strict(),
+        z.object({ kind: z.literal('sharpness') }).strict(),
+        z.object({ kind: z.literal('narrative'), text: z.string().min(1).max(500) }).strict(),
+      ])
+      .optional(),
     conjuresAmmo: z.boolean().optional(),
     noArmorTrainingNeeded: z.boolean().optional(),
     versatileDamage: DICE.optional(),

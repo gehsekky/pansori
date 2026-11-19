@@ -1,3 +1,4 @@
+import { applyOilOfSharpness, resolvePotion } from '../potions.js';
 import { commitCharacter, getItemData } from '../gameEngine.js';
 import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
 import {
@@ -150,6 +151,45 @@ export const handleUse: ActionHandler<{
     narrative = `The ${held.name} is ready. Use "attack" to strike, or "equip" to make it your active weapon.`;
   } else if (itemData.slot === 'armor') {
     narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;
+  } else if (itemData.type === 'consumable' && itemData.potion) {
+    // SRD Potions — drink it or administer it to an ally (a Bonus Action in
+    // combat). Oils take minutes to apply, so not mid-fight.
+    const potion = itemData.potion;
+    const isOil = itemData.id.startsWith('oil_');
+    const targetIdx = action.targetCharId
+      ? nextSt.characters.findIndex((c) => c.id === action.targetCharId)
+      : safeIdx;
+    const isSelf = targetIdx < 0 || targetIdx === safeIdx;
+    const consume = (c: typeof nextChar) => ({
+      ...c,
+      inventory: c.inventory.filter((_, i) => i !== firstIdx),
+    });
+    if (isOil && nextSt.combat_active) {
+      ctx.narrative = `Applying the ${held.name} takes minutes — not something to do mid-fight.`;
+      return;
+    }
+    if (potion.kind === 'sharpness') {
+      const oiled = applyOilOfSharpness(nextChar, ctx.context.lootTable);
+      if (!oiled) {
+        ctx.narrative = `The ${held.name} needs a nonmagical slashing or piercing melee weapon in hand, or piercing ammunition, to coat.`;
+        return;
+      }
+      nextChar = consume(oiled.char);
+      narrative = oiled.note;
+    } else {
+      const drinker = isSelf ? nextChar : nextSt.characters[targetIdx];
+      const res = resolvePotion(potion, drinker, nextSt, ctx.context);
+      nextSt = res.st;
+      const verb = isOil ? 'applies' : 'drinks';
+      if (isSelf) {
+        nextChar = consume(res.target);
+        narrative = `${nextChar.name} ${verb} the ${held.name} and ${res.note}.`;
+      } else {
+        nextSt = commitCharacter(nextSt, res.target);
+        nextChar = consume(nextChar);
+        narrative = `${nextChar.name} gives ${res.target.name} the ${held.name}; ${res.target.name} ${res.note}.`;
+      }
+    }
   } else if (itemData.type === 'consumable') {
     if (itemData.heal) {
       const hasMedicine = hasSkillProficiency(nextChar, 'medicine');
@@ -237,6 +277,7 @@ export const handleUse: ActionHandler<{
     const isPotionLike =
       itemData.type === 'consumable' &&
       (itemData.heal != null ||
+        itemData.potion != null ||
         itemData.effect === 'con_advantage' ||
         itemData.effect === 'mystery');
     nextChar = {

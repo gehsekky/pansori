@@ -1554,6 +1554,16 @@ export interface Character {
   // resisted and the round the reaction fired. While `round` equals the current
   // round, damage of `type` is halved (free); the round stamp self-expires.
   superior_hunters_def?: { type: string; round: number };
+  // SRD Potion of Resistance — the damage type resisted while the
+  // `potion_resistance` condition lasts (read only while it's present).
+  potion_resistance?: string;
+  // SRD Potion of Giant Strength — the Strength score while the
+  // `giant_strength` condition lasts, plus the score and stashed base it
+  // displaced (restored when the potion wears off).
+  potion_strength?: { score: number; prev: number; prevBase?: number };
+  // SRD Potion of Vitality — Hit Point Dice spent before this world minute
+  // restore their maximum.
+  vitality_until_minute?: number;
   // Extended 5e fields
   subclass?: string; // e.g. 'champion', 'evoker', 'thief'
   // SRD 5.2.1 Fighting Style feats chosen via class features (Fighter L1 +

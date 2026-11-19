@@ -1,5 +1,4 @@
 import type { Character, Context } from '../../types.js';
-import { abilityMod, rageUsesMax, rollDice, spellSlotsForClassLevel } from '../rulesEngine.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
 import {
   channelDivinityUsesMax,
@@ -8,6 +7,13 @@ import {
   hasClass,
   wildShapeUsesMax,
 } from '../multiclass.js';
+import {
+  elapseCharPotionTime,
+  elapsePotionTime,
+  endGiantStrength,
+  hitDieHealing,
+} from '../potions.js';
+import { rageUsesMax, spellSlotsForClassLevel } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
 import { characterAc } from '../armorClass.js';
 import { resetFeatLongRestResources } from '../feats.js';
@@ -75,18 +81,22 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
     return;
   }
 
-  const hdRoll = rollDice(`1d${char.hit_die ?? 8}`) + abilityMod(char.con);
-  const hdHealed = Math.max(1, hdRoll);
-  const next = { ...char };
+  // SRD Potion of Vitality — a spent Hit Point Die restores its maximum.
+  const hdHealed = Math.max(1, hitDieHealing(char, ctx.st));
+  // SRD: a short rest is 1 hour — potion effects run down with it.
+  const next = elapseCharPotionTime({ ...char }, 60);
   next.hp = Math.min(next.max_hp, next.hp + hdHealed);
   next.hit_dice_remaining = Math.max(0, (next.hit_dice_remaining ?? 1) - 1);
-  ctx.st = {
-    ...ctx.st,
-    short_rested_rooms: [...(ctx.st.short_rested_rooms ?? []), ctx.roomId],
-    // SRD: a short rest is 1 hour. Advance the in-game clock (only reached on a
-    // rest that actually happens — the guards above already returned otherwise).
-    world_minute: (ctx.st.world_minute ?? 0) + 60,
-  };
+  ctx.st = elapsePotionTime(
+    {
+      ...ctx.st,
+      short_rested_rooms: [...(ctx.st.short_rested_rooms ?? []), ctx.roomId],
+      // SRD: a short rest is 1 hour. Advance the in-game clock (only reached on a
+      // rest that actually happens — the guards above already returned otherwise).
+      world_minute: (ctx.st.world_minute ?? 0) + 60,
+    },
+    60
+  );
 
   // Short-rest resource refreshes. Multiclass: a Fighter / Cleric
   // short rest refreshes BOTH classes' short-rest pools — so use
@@ -273,7 +283,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     // maximum, restoring `max_hp` and bringing the character to that full value.
     const restoredMaxHp = c.max_hp + (c.life_drain_reduction ?? 0);
     const refreshed = {
-      ...c,
+      // A Long Rest clears every condition — a Giant Strength potion included.
+      ...endGiantStrength(c),
       max_hp: restoredMaxHp,
       life_drain_reduction: 0,
       hp: restoredMaxHp,

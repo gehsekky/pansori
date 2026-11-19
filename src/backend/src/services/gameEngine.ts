@@ -124,6 +124,7 @@ import {
   wildShapeBlocksCasting,
 } from './druidFeatures.js';
 import { NATURES_VEIL_SOURCE, naturesVeilLeft } from './rangerFeatures.js';
+import { POTION_CONDITIONS, POTION_SOURCE, SLIPPERY_IMMUNITIES, potionResists } from './potions.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -803,6 +804,8 @@ export function breakConcentration(
     // mirror is updated for FE rendering parity.
     const dropHaste = (c: Character): Character => {
       if (!(c.conditions ?? []).includes('hasted')) return c;
+      // SRD Potion of Speed — its Haste isn't this caster's to end.
+      if (c.condition_sources?.hasted === POTION_SOURCE) return c;
       const next: Character = {
         ...c,
         conditions: [...(c.conditions ?? []).filter((x) => x !== 'hasted'), 'incapacitated'],
@@ -818,7 +821,9 @@ export function breakConcentration(
       ...newSt,
       characters: newSt.characters.map(dropHaste),
       entities: (newSt.entities ?? []).map((e) =>
-        !e.isEnemy && e.conditions.includes('hasted')
+        !e.isEnemy &&
+        e.conditions.includes('hasted') &&
+        newSt.characters.find((c) => c.id === e.id)?.condition_sources?.hasted !== POTION_SOURCE
           ? {
               ...e,
               conditions: [...e.conditions.filter((x) => x !== 'hasted'), 'incapacitated'],
@@ -1254,6 +1259,10 @@ export function conditionImmunitiesFor(char: Character, st: GameState): Set<stri
   for (const c of char.condition_immunities ?? []) out.add(c);
   // Worn magic items (Periapt of Proof against Poison → Poisoned).
   for (const c of char.worn_traits?.conditionImmunities ?? []) out.add(c);
+  // SRD Oil of Slipperiness — the Freedom of Movement immunities.
+  if (char.conditions?.includes(POTION_CONDITIONS.slippery)) {
+    for (const c of SLIPPERY_IMMUNITIES) out.add(c);
+  }
   // SRD Circle of the Land Nature's Ward (L10) — immune to Poisoned.
   if (hasNaturesWard(char)) out.add('poisoned');
   // SRD Path of the Berserker Mindless Rage (L6) — immune to Charmed and
@@ -1957,7 +1966,8 @@ function computeEnemyAttack(
     // Buff-granted Resistance (Stoneskin → B/P/S, Protection from Energy → an
     // element). Cleared when the granting spell's concentration ends.
     const spellResist =
-      !!enemy.damageType && (char.spell_resistances ?? []).includes(enemy.damageType);
+      (!!enemy.damageType && (char.spell_resistances ?? []).includes(enemy.damageType)) ||
+      potionResists(char, enemy.damageType);
     // SRD Circle of the Land Nature's Ward (L10) — the current land's type.
     const wardType = naturesWardResistance(char);
     // SRD Nature's Sanctuary — an ally inside the cube shares the Druid's Ward.
@@ -2060,6 +2070,7 @@ function computeEnemyAttack(
       const resistsBonus =
         isPetrified ||
         (!!bt && (char.spell_resistances ?? []).includes(bt)) ||
+        potionResists(char, bt) ||
         (!!bt && (char.worn_traits?.resistances ?? []).includes(bt)) ||
         (!!bt && wardType === bt) ||
         speciesData?.resistances?.includes(bt ?? '') === true;
@@ -2083,6 +2094,7 @@ function computeEnemyAttack(
       const resistsCharge =
         isPetrified ||
         (!!ct && (char.spell_resistances ?? []).includes(ct)) ||
+        potionResists(char, ct) ||
         (!!ct && (char.worn_traits?.resistances ?? []).includes(ct)) ||
         (!!ct && wardType === ct) ||
         speciesData?.resistances?.includes(ct ?? '') === true;
@@ -5406,6 +5418,26 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           });
         }
       }
+    }
+  }
+  // SRD Potions — drink one (a Bonus Action in combat), or apply an oil (out of
+  // combat only: oils take minutes). One choice per distinct potion carried.
+  if (potionBonusAvailable) {
+    const seen = new Set<string>();
+    for (const inv of char.inventory ?? []) {
+      if (seen.has(inv.id) || (MAX_CHOICES && choices.length >= MAX_CHOICES)) continue;
+      const data = context.lootTable.find((l) => l.id === inv.id);
+      if (!data?.potion) continue;
+      seen.add(inv.id);
+      const isOil = inv.id.startsWith('oil_');
+      if (isOil && state.combat_active) continue;
+      choices.push({
+        label: isOil
+          ? `Apply the ${data.name}`
+          : `Drink the ${data.name}${state.combat_active ? ' (bonus action)' : ''}`,
+        action: { type: 'use', itemId: inv.id },
+        requiresBonusAction: (state.combat_active && !isOil) || undefined,
+      });
     }
   }
   // Rest choices — only when no alive enemy in room and room allows it
@@ -9717,6 +9749,7 @@ export function pcDamageResponse(
     elementalAffinityType(char) === type ||
     char.fiendish_resilience === type ||
     (char.spell_resistances ?? []).includes(type) ||
+    potionResists(char, type) ||
     naturesWardResistance(char) === type ||
     sanctuaryResistance(st, char) === type ||
     (worn?.resistances?.includes(type) ?? false);

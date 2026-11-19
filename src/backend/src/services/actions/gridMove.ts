@@ -1,6 +1,7 @@
 import { SQUARE_SIZE, findPath, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
 import { combatGridDims, effectiveSpeed, getEnemyById, wallObstacleCells } from '../gameEngine.js';
 import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
+import { potionClimbs, potionFlyFt } from '../potions.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { hasAcrobaticMovement } from '../monkFeatures.js';
@@ -91,7 +92,8 @@ export const handleGridMove: ActionHandler<{
   // penalty. We still block on living entities (no flying through
   // someone in the same square) and require the final cell to be
   // an empty space — flying doesn't let you land in a wall.
-  const flySpeedFt = char.fly_speed_ft ?? 0;
+  // SRD Potion of Flying — a Fly Speed equal to Speed while it lasts.
+  const flySpeedFt = Math.max(char.fly_speed_ft ?? 0, potionFlyFt(char));
   const isFlying = flySpeedFt > 0 && flySpeedFt >= walkSpeedFt;
   // Transient wall spells that block movement (Wall of Force) stop everyone,
   // including flyers — nothing physically passes through. Opaque-only walls
@@ -138,6 +140,7 @@ export const handleGridMove: ActionHandler<{
   // Climbing / Ring of Swimming.
   const hasClimbSpeed =
     (char.climb_speed_ft ?? 0) > 0 ||
+    potionClimbs(char) ||
     hasSecondStoryWork(char) ||
     acrobatic ||
     !!char.worn_traits?.climbFt;
