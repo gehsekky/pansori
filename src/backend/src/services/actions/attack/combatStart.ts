@@ -21,6 +21,7 @@ import { fillEnemyTokens } from '../../narrative/enemyName.js';
 import { improveFateRefresh } from '../../improveFate.js';
 import { inRange } from '../../gridEngine.js';
 import { updatePcActor } from '../actor.js';
+import { withThiefsReflexes } from '../../rogueFeatures.js';
 
 /**
  * Optional combat-start tuning. `openingBlow.weapon` is supplied by the Attack
@@ -83,7 +84,11 @@ export function runCombatStart(
     partyAvgStealth > enemyPassivePerc ? enemiesForInit.map((e) => e.id) : []
   );
 
-  const order = buildInitiativeOrder(ctx.st.characters, enemiesForInit, surprisedIds);
+  const order = withThiefsReflexes(
+    buildInitiativeOrder(ctx.st.characters, enemiesForInit, surprisedIds),
+    ctx.st.characters,
+    ctx.st.round ?? 1
+  );
   ctx.st = { ...ctx.st, combat_active: true, surprised: [...surprisedIds] };
 
   const updatedCharsForInit = ctx.st.characters.map((c) => {
@@ -169,7 +174,9 @@ export function runCombatStart(
       const name = e.is_enemy
         ? (enemiesForInit.find((en) => en.id === e.id)?.name ?? 'Enemy')
         : (ctx.st.characters.find((c) => c.id === e.id)?.name ?? 'Hero');
-      return `${name}(${e.roll})`;
+      return e.extra_turn_round !== undefined
+        ? `${name}(${e.roll}, Thief's Reflexes)`
+        : `${name}(${e.roll})`;
     })
     .join(' → ');
   const surpriseLabel =

@@ -3662,7 +3662,35 @@ export function isRoomCleared(state: GameState, seed: Seed, roomId: string): boo
 
 // ─── Initiative helpers ───────────────────────────────────────────────────────
 
-export type InitEntry = { id: string; roll: number; is_enemy: boolean };
+export type InitEntry = { id: string; roll: number; is_enemy: boolean; extra_turn_round?: number };
+
+/**
+ * An initiative slot that only exists for one round (Thief's Reflexes' second
+ * turn) and whose round has passed — `wrapped` is true once the turn loop has
+ * crossed into the next round but before `round` is bumped.
+ */
+export function isSpentExtraTurn(
+  entry: InitEntry | undefined,
+  round: number,
+  wrapped: boolean
+): boolean {
+  if (entry?.extra_turn_round === undefined) return false;
+  return wrapped || round > entry.extra_turn_round;
+}
+
+/**
+ * Drop the one-round extra initiative slots (Thief's Reflexes) once their round
+ * has wrapped, re-pointing `idx` at the same entry in the shortened order.
+ */
+export function dropExtraTurns(st: GameState, idx: number): { st: GameState; idx: number } {
+  if (!st.initiative_order.some((e) => e.extra_turn_round !== undefined)) return { st, idx };
+  const keep = st.initiative_order[idx];
+  const order = st.initiative_order.filter((e) => e.extra_turn_round === undefined);
+  return {
+    st: { ...st, initiative_order: order },
+    idx: Math.max(0, keep ? order.indexOf(keep) : 0),
+  };
+}
 
 export function buildInitiativeOrder(
   chars: Character[],
@@ -10513,7 +10541,10 @@ export async function runEnemyTurns(args: {
       st.entities?.some(
         (e) => e.id === st.initiative_order[advIdx].id && entitySide(e) === 'ally' && e.hp > 0
       ) ||
-      (st.characters.find((c) => c.id === st.initiative_order[advIdx].id)?.dead ?? false))
+      (st.characters.find((c) => c.id === st.initiative_order[advIdx].id)?.dead ?? false) ||
+      // A spent one-round extra slot (Thief's Reflexes) is passed over like a
+      // dead PC's.
+      isSpentExtraTurn(st.initiative_order[advIdx], st.round ?? 1, roundWrapped))
   ) {
     const eEntry = st.initiative_order[advIdx];
     const rm = getEnemyById(args.seed, eEntry.id);
@@ -11950,8 +11981,10 @@ export async function takeAction({
     });
     st = turnRes.st;
     narrative += turnRes.narrative;
-    const advIdx = turnRes.exitAdvIdx;
+    let advIdx = turnRes.exitAdvIdx;
     const roundWrapped = turnRes.roundWrapped && !turnRes.paused;
+    // SRD Thief's Reflexes — the round-one extra slot goes away with its round.
+    if (roundWrapped) ({ st, idx: advIdx } = dropExtraTurns(st, advIdx));
 
     // Save the resume point in initiative_idx so a pause leaves a coherent
     // state; the resolve_reaction handler will re-enter runEnemyTurns from

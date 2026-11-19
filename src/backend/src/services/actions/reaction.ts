@@ -4,6 +4,7 @@ import {
   applyEnemySpellDamage,
   applyPartyLevelUps,
   breakConcentration,
+  dropExtraTurns,
   endCombatState,
   getEnemyById,
   isRoomCleared,
@@ -621,6 +622,7 @@ export const handleResolveReaction: ActionHandler<{
   ctx.st = resume.st;
   ctx.narrative += resume.narrative;
   if (!resume.paused) {
+    let exitIdx = resume.exitAdvIdx;
     if (resume.roundWrapped) {
       ctx.st = {
         ...ctx.st,
@@ -628,9 +630,11 @@ export const handleResolveReaction: ActionHandler<{
         surprised: [],
         characters: ctx.st.characters.map((c) => ({ ...c, turn_actions: { ...FRESH_TURN } })),
       };
+      // SRD Thief's Reflexes — the round-one extra slot ends with its round.
+      ({ st: ctx.st, idx: exitIdx } = dropExtraTurns(ctx.st, exitIdx));
     }
-    ctx.st.initiative_idx = resume.exitAdvIdx;
-    const nextEntry = ctx.st.initiative_order[resume.exitAdvIdx];
+    ctx.st.initiative_idx = exitIdx;
+    const nextEntry = ctx.st.initiative_order[exitIdx];
     if (nextEntry && !nextEntry.is_enemy) {
       const nextCharIdx = ctx.st.characters.findIndex((c) => c.id === nextEntry.id && !c.dead);
       if (nextCharIdx >= 0) {

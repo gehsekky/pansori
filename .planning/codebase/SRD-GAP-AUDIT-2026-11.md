@@ -147,8 +147,15 @@ Missing (no code path):
   begins) that attacking doesn't end; WIS-mod uses per Long Rest.
   Simplification: Deft Explorer's two languages aren't modeled (pansori has no
   languages).
-- **Rogue:** Thief's Reflexes (Thief L17). Thieves' Cant exists only as a
-  language (fine; it's narrative).
+- ~~**Rogue:** Thief's Reflexes (Thief L17).~~ Done 2026-11-18
+  (`services/rogueFeatures.ts`): combat start adds a second initiative slot at
+  Initiative − 10 tagged `extra_turn_round`; the turn loop passes over it once
+  that round has wrapped, and both wrap paths (the main advance and the
+  reaction resume) drop it. Thieves' Cant exists only as a language (fine;
+  it's narrative). Found on the way: the round counter isn't reset between
+  combats, and the reaction-resume wrap doesn't bump it (or tick zones and
+  concentration) — the extra slot records its own round rather than relying
+  on `round` starting at 1.
 - **Sorcerer:** Dragon Companion (Draconic L18).
 - **Warlock:** Eldritch Invocations beyond 2 of 28 (§3), Contact Patron (L9).
 

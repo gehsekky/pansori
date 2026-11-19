@@ -1872,7 +1872,15 @@ export interface GameState {
   // FE shows a "Continue" gate instead of auto-switching back to the
   // out-of-combat view. Cleared by the `continue` action.
   combat_over_pending?: boolean;
-  initiative_order: Array<{ id: string; roll: number; is_enemy: boolean }>;
+  // `extra_turn_round` marks a bonus slot that exists only in that combat round
+  // (SRD Thief's Reflexes: a second turn at Initiative − 10 in round one); it's
+  // skipped and dropped once the round wraps.
+  initiative_order: Array<{
+    id: string;
+    roll: number;
+    is_enemy: boolean;
+    extra_turn_round?: number;
+  }>;
   initiative_idx: number;
   // RE-1 Phase 4 — persistent ally combatants (e.g. an Animate Dead
   // skeleton) raised out of combat; seeded into `entities` +
