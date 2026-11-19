@@ -142,6 +142,8 @@ describe("Hunter's Lore (Hunter L3)", () => {
   });
 
   it("is revealed when Hunter's Mark lands", async () => {
+    // High rolls: the Wight's counterattack can't break concentration on the mark.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const char = ranger(3, {
       spells_known: ['hunters_mark'],
       spell_slots_max: { 1: 3 },

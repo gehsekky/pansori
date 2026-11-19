@@ -18,7 +18,7 @@ play. "Partial" means the feature exists but the RAW behaviour differs.
 | Class features (base + subclass, excl. ASI/Epic Boon) | 196 | ~150 | **~35 missing, ~10 partial** (below) |
 | Eldritch Invocations | 28 | all 28 (done 2026-11-18; see §3) | simplifications in §3 |
 | Monsters | 330 | 328 | 169 `// Simplification:` notes; systemic gaps below |
-| Monster spellcasting | 59 stat blocks | 2 (Mage, Archmage) | **57**; enemy casting supports only damage / single-target condition spells |
+| Monster spellcasting | 59 stat blocks | 33 with combat spells (done 2026-11-18; §4) | the rest list only utility / narrative spells |
 | Legendary Resistance | 32 stat blocks | all 32 (done 2026-11-12) | lair "+1/Day" not applied |
 | Magic Resistance | 34 stat blocks | all 34 (done 2026-11-12) | Rakshasa's *Greater* Magic Resistance deferred |
 | Magic items | ~260 | ~15 (+N weapons/armor/shields, healing potions, 4 wondrous) | **~245 missing** |
@@ -238,7 +238,7 @@ Systemic gaps, each affecting many stat blocks:
 
 | System | SRD stat blocks | State |
 |---|---|---|
-| Spellcasting | 59 | 2 casters; enemy casting supports only damage and single-target condition spells |
+| Spellcasting | 59 | **done 2026-11-18** for the combat spells — see below |
 | Magic Resistance (Adv. on saves vs spells) | 34 | **done** (`services/monsterSaves.ts`) |
 | Legendary Resistance (auto-succeed a failed save, N/day) | 32 | **done**; spent on effect saves, not damage-only ones (AI policy) |
 | Legendary Actions | 32 | supported (26 data references); spot-check coverage |
@@ -246,6 +246,30 @@ Systemic gaps, each affecting many stat blocks:
 | Grapple riders | many | supported; 18 notes defer specifics |
 | Swallow / Engulf | ~11 notes | partial (4 engine references) |
 | Shape-shift | 14 | deferred |
+
+Monster Spellcasting landed 2026-11-18. Every SRD caster with a combat spell
+the enemy resolver can express now lists it (`spells`), with its "level N
+version" (`spellLevels`, upcast damage), its "N/Day" limit (`spellsPerDay`,
+tracked in `GameState.enemy_spell_uses`; a countered spell still spends its
+use), its save DC and spell attack bonus (DC − 8 when the block lists none):
+the ten adult/ancient chromatic and metallic dragons that cast, Cultist
+Fanatic, Druid, Dryad, Efreeti, Green Hag, Guardian Naga, Incubus, Lich, Mage,
+Archmage (now Lightning Bolt, per 5.2.1, not Fireball), Mummy Lord, Night Hag,
+Oni, Spirit Naga, Unicorn. The resolver gained spell attack rolls (vs AC with
+Half Cover, crits, one roll per Scorching Ray ray), damage-spell riders on a
+failed save or a hit (Phantasmal Killer, Ray of Sickness), no-damage control
+areas (Fear, Hypnotic Pattern, Entangle), and a spell that gets past
+Counterspell now resolves in full (save, area, rider) instead of as raw damage.
+Guiding Bolt and Ice Storm gained their missing upcast bonus (PCs too).
+Simplifications: utility / narrative spells (Detect Magic, Scrying, Plane
+Shift, Invisibility, Fly, Darkness, Dispel Magic, …) aren't cast; Command,
+Confusion and Sleep are left out (their PC-side condition has no effect or no
+end); healing spells (Guardian Naga's Cure Wounds) and the Priest's Spirit
+Guardians aura aren't cast; lingering areas (Moonbeam, Wall of Fire, Insect
+Plague) resolve once; Ice Knife's explosion, Acid Arrow's delayed damage,
+Guiding Bolt's Advantage rider and extra targets from upcast Hold Person /
+Charm Person aren't modeled; the cast decision is a per-turn `castChance`, and
+spell range isn't checked.
 
 Magic Resistance and Legendary Resistance landed 2026-11-12: every enemy save
 path (spell saves, AoE, re-saves, zones, smites, Turn/Sear Undead, Counterspell,
@@ -320,7 +344,7 @@ concentration.
    and Druid base features (done 2026-11-12); ~~spell attacks honoring
    conditions~~ (done 2026-11-13).
 4. Remaining class features, class by class, each with a spec per CLAUDE.md.
-5. Monster spellcasting (needs enemy support for buff/control/AoE spells first).
+5. ~~Monster spellcasting~~ (done 2026-11-18, §4).
 6. Magic items, passive-number ones first; then mechanizable narrative spells.
 
 ## Reproducing

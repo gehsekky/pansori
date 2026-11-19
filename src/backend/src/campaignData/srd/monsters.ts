@@ -337,8 +337,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   // SRD 5.2.1 redesigned monster casters around a concrete attack action plus a
   // short per-day spell list. We model the damage-dealing attack faithfully with
-  // native fields; the per-day spells (here Spirit Guardians — an AoE aura) are
-  // deferred until enemy AoE spellcasting lands. The Priest fights with Radiant
+  // native fields; the Priest's 1/Day Spirit Guardians (a caster-centered aura
+  // the enemy resolver can't hold) is deferred. The Priest fights with Radiant
   // Flame (a ranged radiant bolt), so it reads as a caster, not a basher.
   priest: {
     name: 'Priest',
@@ -379,7 +379,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'slashing',
     bonusDamage: '2d6',
     bonusDamageType: 'necrotic',
-    // Simplification: utility Spellcasting deferred (the Priest convention).
+    // Simplification: utility Spellcasting (Light / Thaumaturgy) and Command (no PC-side effect) omitted.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['hold_person'],
+    spellsPerDay: { hold_person: 1 },
+    castChance: 0.4,
+    spellSaveDC: 12,
+    spellAttackBonus: 4,
   },
   ogre: {
     name: 'Ogre',
@@ -1404,8 +1411,8 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     darkvision_ft: 60,
   },
   // Arcane Burst is the Mage's whole offense in SRD 5.2.1 — a ranged Force
-  // attack, thrice per turn. Its 2/Day Fireball + 1/Day Cone of Cold are AoE
-  // (deferred until enemy AoE spellcasting lands). A long reach models the
+  // attack, thrice per turn, and it can open with its 2/Day Fireball or 1/Day
+  // Cone of Cold (below). A long reach models the
   // 120-ft range so it pelts the party without closing.
   mage: {
     name: 'Mage',
@@ -1426,12 +1433,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     multiattack: 3,
     attackReachFt: 120, // Arcane Burst — ranged
     damageType: 'force',
-    // SRD Spellcasting: 2/Day Fireball, 1/Day Cone of Cold. Modeled via the
-    // enemy AoE-cast path — each turn the mage may open with an area spell
-    // (resolveEnemyAoeSpell) instead of Arcane Burst. (Per-day counts aren't
-    // tracked; `castChance` is the per-turn abstraction. Fireball resolves at
-    // its base 8d6 — the stat block's level-4 bump isn't modeled.)
+    // SRD Spellcasting: 2/Day Fireball (level 4 version), 1/Day Cone of Cold.
+    // Each turn the mage may open with an area spell (resolveEnemyAoeSpell)
+    // instead of Arcane Burst; `castChance` is the per-turn abstraction.
     spells: ['fireball', 'cone_of_cold'],
+    spellLevels: { fireball: 4 },
+    spellsPerDay: { fireball: 2, cone_of_cold: 1 },
     castChance: 0.3,
     spellSaveDC: 14,
   },
@@ -1689,7 +1696,7 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
   },
   // The Archmage scales the Mage's pattern up: four Arcane Bursts (4d10+5 Force)
   // at 150 ft, with Psychic immunity and Charmed immunity (its Mind Blank). Its
-  // Fireball / Cone of Cold / Wall of Force arsenal is AoE/utility — deferred.
+  // utility spells (Scrying, Teleport, Mind Blank, …) aren't modeled.
   archmage: {
     name: 'Archmage',
     size: 'medium',
@@ -1712,9 +1719,11 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'force',
     immunities: ['psychic'],
     condition_immunities: ['charmed'],
-    // SRD Spellcasting (offensive subset): Fireball + Cone of Cold via the enemy
-    // AoE-cast path, at the archmage's spell save DC 17.
-    spells: ['fireball', 'cone_of_cold'],
+    // SRD Spellcasting (offensive subset): 2/Day Lightning Bolt (level 7
+    // version), 1/Day Cone of Cold (level 9 version), at spell save DC 17.
+    spells: ['lightning_bolt', 'cone_of_cold'],
+    spellLevels: { lightning_bolt: 7, cone_of_cold: 9 },
+    spellsPerDay: { lightning_bolt: 2, cone_of_cold: 1 },
     castChance: 0.35,
     spellSaveDC: 17,
   },
@@ -4084,6 +4093,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'poison',
     // Simplification: utility Spellcasting (Druidcraft / Speak with Animals)
     // deferred, matching the Priest convention.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['entangle', 'thunderwave', 'moonbeam'],
+    spellsPerDay: { entangle: 2, thunderwave: 2, moonbeam: 1 },
+    castChance: 0.5,
+    spellSaveDC: 13,
   },
 
   bugbear_stalker: {
@@ -4702,6 +4717,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'slashing',
     attackReachFt: 10,
     // Simplification: Fey Charm + utility Spellcasting + Tree Stride deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['charm_monster', 'entangle'],
+    spellsPerDay: { entangle: 1 },
+    castChance: 0.4,
+    spellSaveDC: 14,
   },
 
   harpy: {
@@ -5052,6 +5073,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     damageType: 'slashing',
     multiattack: 2,
     // Simplification: Mimicry + Invisible Passage + Coven Magic deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['ray_of_sickness'],
+    spellLevels: { ray_of_sickness: 3 },
+    castChance: 0.4,
+    spellSaveDC: 12,
+    spellAttackBonus: 4,
   },
 
   nightmare: {
@@ -5438,7 +5466,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     darkvision_ft: 120,
     resistances: ['cold', 'fire'],
     condition_immunities: ['charmed'],
-    // Simplification: Nightmare Haunting + spellcasting + Etherealness deferred.
+    // Simplification: Nightmare Haunting + utility spellcasting + Etherealness deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['magic_missile', 'phantasmal_killer'],
+    spellLevels: { magic_missile: 4 },
+    spellsPerDay: { phantasmal_killer: 2 },
+    castChance: 0.4,
+    spellSaveDC: 14,
   },
 
   otyugh: {
@@ -5787,7 +5822,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'poison',
     immunities: ['poison'],
     condition_immunities: ['charmed', 'poisoned'],
-    // Simplification: spellcasting + Fiendish Restoration deferred.
+    // Simplification: utility spellcasting + Fiendish Restoration deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['hold_person', 'lightning_bolt'],
+    spellLevels: { hold_person: 3, lightning_bolt: 4 },
+    spellsPerDay: { hold_person: 2, lightning_bolt: 2 },
+    castChance: 0.4,
+    spellSaveDC: 14,
   },
 
   treant: {
@@ -5838,7 +5880,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamageType: 'poison',
     immunities: ['poison'],
     condition_immunities: ['charmed', 'paralyzed', 'poisoned', 'restrained'],
-    // Simplification: Poisonous Spittle + spellcasting + Celestial Restoration deferred.
+    // Simplification: Poisonous Spittle + Cure Wounds / utility spellcasting + Celestial Restoration deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['flame_strike'],
+    spellLevels: { flame_strike: 6 },
+    spellsPerDay: { flame_strike: 1 },
+    castChance: 0.3,
+    spellSaveDC: 16,
   },
 
   // ─── Dragon families (SRD 5.2.1) — batch 2026-06-07 ────────────────────────
@@ -6416,7 +6465,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Sleep Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Sleep Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['scorching_ray'],
+    castChance: 0.25,
+    spellSaveDC: 16,
   },
 
   adult_white_dragon: {
@@ -6456,7 +6510,6 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
   },
 
   young_white_dragon: {
@@ -6530,7 +6583,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['acid_arrow', 'fear', 'vitriolic_sphere'],
+    spellLevels: { acid_arrow: 3 },
+    spellsPerDay: { vitriolic_sphere: 1 },
+    castChance: 0.25,
+    spellSaveDC: 17,
+    spellAttackBonus: 9,
   },
 
   adult_copper_dragon: {
@@ -6570,7 +6631,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Slowing Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Slowing Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['mind_spike'],
+    spellLevels: { mind_spike: 4 },
+    castChance: 0.25,
+    spellSaveDC: 17,
   },
 
   adult_bronze_dragon: {
@@ -6610,7 +6677,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Repulsion Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Repulsion Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['guiding_bolt'],
+    spellLevels: { guiding_bolt: 2 },
+    castChance: 0.25,
+    spellSaveDC: 17,
+    spellAttackBonus: 10,
   },
 
   adult_green_dragon: {
@@ -6651,7 +6725,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['mind_spike'],
+    spellLevels: { mind_spike: 3 },
+    castChance: 0.25,
+    spellSaveDC: 17,
   },
 
   adult_blue_dragon: {
@@ -6691,7 +6771,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['shatter'],
+    castChance: 0.25,
+    spellSaveDC: 18,
   },
 
   adult_silver_dragon: {
@@ -6731,7 +6816,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Paralyzing Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Paralyzing Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['hold_monster', 'ice_knife', 'ice_storm'],
+    spellLevels: { ice_storm: 5 },
+    spellsPerDay: { ice_storm: 1 },
+    castChance: 0.25,
+    spellSaveDC: 19,
+    spellAttackBonus: 11,
   },
 
   adult_gold_dragon: {
@@ -6771,7 +6864,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Weakening Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Weakening Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['guiding_bolt', 'flame_strike'],
+    spellLevels: { guiding_bolt: 2 },
+    spellsPerDay: { flame_strike: 1 },
+    castChance: 0.25,
+    spellSaveDC: 21,
+    spellAttackBonus: 13,
   },
 
   adult_red_dragon: {
@@ -6811,7 +6912,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['scorching_ray', 'fireball'],
+    spellsPerDay: { fireball: 1 },
+    castChance: 0.25,
+    spellSaveDC: 20,
+    spellAttackBonus: 12,
   },
 
   ancient_brass_dragon: {
@@ -6851,7 +6959,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Sleep Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Sleep Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['scorching_ray'],
+    spellLevels: { scorching_ray: 3 },
+    castChance: 0.25,
+    spellSaveDC: 20,
   },
 
   ancient_white_dragon: {
@@ -6891,7 +7005,6 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
   },
 
   ancient_black_dragon: {
@@ -6931,7 +7044,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['acid_arrow', 'fear', 'vitriolic_sphere'],
+    spellLevels: { acid_arrow: 4, vitriolic_sphere: 5 },
+    spellsPerDay: { vitriolic_sphere: 1 },
+    castChance: 0.25,
+    spellSaveDC: 21,
+    spellAttackBonus: 13,
   },
 
   ancient_copper_dragon: {
@@ -6971,7 +7092,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Slowing Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Slowing Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['mind_spike'],
+    spellLevels: { mind_spike: 5 },
+    castChance: 0.25,
+    spellSaveDC: 21,
   },
 
   ancient_bronze_dragon: {
@@ -7011,7 +7138,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Repulsion Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Repulsion Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['guiding_bolt'],
+    spellLevels: { guiding_bolt: 2 },
+    castChance: 0.25,
+    spellSaveDC: 22,
+    spellAttackBonus: 14,
   },
 
   ancient_green_dragon: {
@@ -7052,7 +7186,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['mind_spike'],
+    spellLevels: { mind_spike: 5 },
+    castChance: 0.25,
+    spellSaveDC: 21,
   },
 
   ancient_blue_dragon: {
@@ -7092,7 +7232,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['shatter'],
+    spellLevels: { shatter: 3 },
+    castChance: 0.25,
+    spellSaveDC: 22,
   },
 
   ancient_silver_dragon: {
@@ -7132,7 +7278,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Paralyzing Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Paralyzing Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['hold_monster', 'ice_knife', 'ice_storm'],
+    spellLevels: { ice_knife: 2, ice_storm: 7 },
+    spellsPerDay: { ice_storm: 1 },
+    castChance: 0.25,
+    spellSaveDC: 23,
+    spellAttackBonus: 15,
   },
 
   ancient_gold_dragon: {
@@ -7172,7 +7326,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred; the Weakening Breath (utility, no damage) deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted); the Weakening Breath (utility, no damage) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['guiding_bolt', 'flame_strike'],
+    spellLevels: { guiding_bolt: 4, flame_strike: 6 },
+    spellsPerDay: { flame_strike: 1 },
+    castChance: 0.25,
+    spellSaveDC: 24,
+    spellAttackBonus: 16,
   },
 
   ancient_red_dragon: {
@@ -7212,7 +7374,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     // legendary options are spell-based and deferred).
     legendary_actions: [{ id: 'pounce', name: 'Pounce', cost: 1, kind: 'extra_attack' }],
     legendary_pool: 3,
-    // Simplification: adult/ancient Spellcasting deferred.
+    // Simplification: Spellcasting limited to its combat spells (utility spells omitted).
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['scorching_ray', 'fireball'],
+    spellLevels: { scorching_ray: 3, fireball: 6 },
+    spellsPerDay: { fireball: 1 },
+    castChance: 0.25,
+    spellSaveDC: 23,
+    spellAttackBonus: 15,
   },
 
   // ─── Planar + top-end (SRD 5.2.1) — batch 2026-06-07, the final batch ──────
@@ -7534,6 +7704,12 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     speedFt: 60, // fly
     resistances: ['cold', 'fire', 'poison', 'psychic'],
     // Simplification: the rest-denying curse + Nightmare Visit deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['hypnotic_pattern'],
+    spellsPerDay: { hypnotic_pattern: 1 },
+    castChance: 0.3,
+    spellSaveDC: 15,
   },
 
   succubus: {
@@ -7647,7 +7823,13 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
       { id: 'charging_horn', name: 'Charging Horn', cost: 1, kind: 'extra_attack' },
     ],
     legendary_pool: 3,
-    // Simplification: RAW one Hooves + one Radiant Horn — the horn averaged into a per-hit radiant rider; spellcasting + Shimmering Shield deferred.
+    // Simplification: RAW one Hooves + one Radiant Horn — the horn averaged into a per-hit radiant rider; utility spellcasting + Shimmering Shield deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['entangle'],
+    spellsPerDay: { entangle: 1 },
+    castChance: 0.2,
+    spellSaveDC: 14,
   },
 
   drider: {
@@ -7728,7 +7910,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamage: '2d8',
     bonusDamageType: 'necrotic',
     resistances: ['cold'],
-    // Simplification: RAW Regeneration 10 has no damage-type off-switch; Nightmare Ray + spellcasting + shape-shift deferred.
+    // Simplification: RAW Regeneration 10 has no damage-type off-switch; Nightmare Ray + Darkness / Gaseous Form / Sleep + shape-shift deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['charm_person'],
+    spellLevels: { charm_person: 2 },
+    spellsPerDay: { charm_person: 1 },
+    castChance: 0.2,
+    spellSaveDC: 13,
   },
 
   shield_guardian: {
@@ -8082,7 +8271,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     bonusDamage: '2d12',
     bonusDamageType: 'fire',
     immunities: ['fire'],
-    // Simplification: Hurl Flame + spellcasting (incl. the wish-granting) deferred.
+    // Simplification: Hurl Flame + utility spellcasting (incl. the wish-granting) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['wall_of_fire'],
+    spellLevels: { wall_of_fire: 7 },
+    spellsPerDay: { wall_of_fire: 1 },
+    castChance: 0.25,
+    spellSaveDC: 16,
   },
 
   horned_devil: {
@@ -8401,7 +8597,15 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['necrotic', 'poison'],
     vulnerabilities: ['fire'],
     condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
-    // Simplification: the no-heal curse, Dreadful Glare, Channel Negative Energy, spellcasting + its legendary actions deferred.
+    // Simplification: the no-heal curse, Dreadful Glare, Channel Negative Energy, utility spellcasting (Dispel Magic, Animate Dead) + its legendary actions deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['harm', 'insect_plague'],
+    spellLevels: { insect_plague: 7 },
+    spellsPerDay: { harm: 1, insect_plague: 1 },
+    castChance: 0.3,
+    spellSaveDC: 17,
+    spellAttackBonus: 9,
   },
 
   purple_worm: {
@@ -8682,7 +8886,14 @@ export const SRD_MONSTERS: Record<string, SrdMonster> = {
     immunities: ['necrotic', 'poison'],
     resistances: ['cold', 'lightning'],
     condition_immunities: ['charmed', 'exhaustion', 'frightened', 'paralyzed', 'poisoned'],
-    // Simplification: Paralyzed until its next turn modeled as the plain condition; spellcasting, the Spirit Jar and its legendary actions (Deathly Teleport / Disrupt Life) deferred.
+    // Simplification: Paralyzed until its next turn modeled as the plain condition; utility spellcasting (Dispel Magic, Animate Dead, …), the Spirit Jar and its legendary actions (Deathly Teleport / Disrupt Life) deferred.
+    // SRD Spellcasting — the combat spells the enemy resolver can cast
+    // (utility spells are omitted).
+    spells: ['fireball', 'lightning_bolt', 'chain_lightning', 'finger_of_death', 'power_word_kill'],
+    spellLevels: { fireball: 5, lightning_bolt: 5 },
+    spellsPerDay: { chain_lightning: 1, finger_of_death: 1, power_word_kill: 1 },
+    castChance: 0.5,
+    spellSaveDC: 20,
   },
 
   solar: {

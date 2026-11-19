@@ -925,6 +925,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     castTime: 'action',
     damageType: 'radiant',
     damage: '4d6',
+    upcastBonus: '1d6', // SRD: +1d6 per slot level above 1
     attackRoll: true,
     desc: 'A flash of light streaks toward a target. Spell attack roll, 4d6 radiant on hit.',
     rangeKind: 'ranged',
@@ -3211,6 +3212,7 @@ export const SRD_SPELLS: Record<string, Spell> = {
     level: 4,
     castTime: 'action',
     damage: '2d10',
+    upcastBonus: '1d10', // SRD: +1d10 per slot level above 4
     damageType: 'bludgeoning',
     damage2: '4d6',
     damageType2: 'cold',

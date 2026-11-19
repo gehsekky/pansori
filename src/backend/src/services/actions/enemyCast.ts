@@ -1,5 +1,5 @@
+import { enemyCastSpell, resolveEnemySpell } from '../gameEngine.js';
 import type { ActionHandler } from './types.js';
-import { resolveEnemySpell } from '../gameEngine.js';
 
 /**
  * `enemy_cast` (EE-3): an enemy damage spell resolving against a PC,
@@ -16,10 +16,12 @@ export const handleEnemyCast: ActionHandler<{
 }> = (ctx, action) => {
   if (ctx.actor.kind !== 'enemy') return { rejected: 'enemy_cast requires an enemy actor.' };
   const { enemy } = ctx.actor;
-  const spell = ctx.context.spellTable?.[action.spellId];
-  // Damage spells + single-target condition spells (Hold Person, Cause Fear).
-  if (!spell?.damage && !spell?.condition)
+  const base = ctx.context.spellTable?.[action.spellId];
+  // Damage spells + condition spells (Hold Person, Fear, Hypnotic Pattern).
+  if (!base?.damage && !base?.condition)
     return { rejected: 'enemy_cast: spell has no damage or condition.' };
+  // SRD "(level N version)" — cast at the stat block's level.
+  const spell = enemyCastSpell(enemy, base);
   const target = ctx.st.characters.find((c) => c.id === action.targetCharId);
   if (!target) return { rejected: 'enemy_cast: target not found.' };
 

@@ -100,6 +100,8 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     castChance: template.castChance,
     spellSaveDC: template.spellSaveDC,
     spellAttackBonus: template.spellAttackBonus,
+    spellLevels: template.spellLevels,
+    spellsPerDay: template.spellsPerDay,
     attackReachFt: template.attackReachFt,
     speedFt: template.speedFt,
     darkvision_ft: template.darkvision_ft,

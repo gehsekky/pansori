@@ -901,6 +901,8 @@ const EnemyTemplateSchema = z
     castChance: z.number().min(0).max(1).optional(),
     spellSaveDC: z.number().int().min(1).max(30).optional(),
     spellAttackBonus: z.number().int().min(0).max(20).optional(),
+    spellLevels: z.record(z.string().min(1).max(60), z.number().int().min(1).max(9)).optional(),
+    spellsPerDay: z.record(z.string().min(1).max(60), z.number().int().min(1).max(10)).optional(),
     attackReachFt: z.number().positive().optional(),
     speedFt: z.number().nonnegative().optional(),
     darkvision_ft: z.number().nonnegative().optional(),

@@ -378,15 +378,20 @@ export const handleResolveReaction: ActionHandler<{
         if (success) {
           ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} is unraveled — no effect.`;
         } else {
-          const damage = applyEnemySpellDamage(ctx.st, rx, ctx.context);
+          const damage = applyEnemySpellDamage(ctx.st, rx, ctx.context, ctx.seed);
           if (damage) {
             ctx.st = damage.st;
-            // If the reactor IS the spell target, sync char so the final
-            // commitChar doesn't overwrite the damage.
-            if (rx.intendedTargetPcId === pc.char.id) {
-              updatePcActor(ctx, { ...pc.char, hp: damage.targetHp });
-            }
-            ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+            // If the reactor was caught, sync char so the final commitChar
+            // doesn't overwrite the damage / conditions.
+            const meAfter = ctx.st.characters.find((c) => c.id === pc.char.id);
+            if (meAfter)
+              updatePcActor(ctx, {
+                ...pc.char,
+                hp: meAfter.hp,
+                conditions: meAfter.conditions,
+                condition_durations: meAfter.condition_durations,
+              });
+            ctx.narrative = `⚡ ${pc.char.name} casts COUNTERSPELL (lvl ${slotLvl} slot)!${checkDetail} ${rx.enemySpellName} bursts through — ${damage.narrative}`;
           } else {
             ctx.narrative = `${pc.char.name} fails to counter ${rx.enemySpellName}. The spell resolves.`;
           }
@@ -398,13 +403,18 @@ export const handleResolveReaction: ActionHandler<{
         };
       }
     } else {
-      const damage = applyEnemySpellDamage(ctx.st, rx, ctx.context);
+      const damage = applyEnemySpellDamage(ctx.st, rx, ctx.context, ctx.seed);
       if (damage) {
         ctx.st = damage.st;
-        if (rx.intendedTargetPcId === pc.char.id) {
-          updatePcActor(ctx, { ...pc.char, hp: damage.targetHp });
-        }
-        ctx.narrative = `${pc.char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.targetName} takes ${damage.dmgRoll} ${damage.damageType}.`;
+        const meAfter = ctx.st.characters.find((c) => c.id === pc.char.id);
+        if (meAfter)
+          updatePcActor(ctx, {
+            ...pc.char,
+            hp: meAfter.hp,
+            conditions: meAfter.conditions,
+            condition_durations: meAfter.condition_durations,
+          });
+        ctx.narrative = `${pc.char.name} declines to counter. ${rx.enemySpellName} resolves — ${damage.narrative}`;
       } else {
         ctx.narrative = `${pc.char.name} declines to counter. ${rx.enemySpellName} resolves.`;
       }

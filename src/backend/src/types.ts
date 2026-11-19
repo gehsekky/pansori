@@ -422,6 +422,8 @@ export interface EnemyTemplate {
   castChance?: number;
   spellSaveDC?: number;
   spellAttackBonus?: number;
+  spellLevels?: Record<string, number>;
+  spellsPerDay?: Record<string, number>;
   // Tactical movement (SRD 5.2.1). Engine-level defaults: 5 ft melee
   // reach, 30 ft walking speed. Override for reach weapons (10 ft) or
   // larger/faster monsters.
@@ -550,6 +552,11 @@ export interface Enemy {
   castChance?: number; // 0..1 probability per turn; 0 or undefined = never cast
   spellSaveDC?: number; // DC for save-based spells; defaults to 8 + prof(CR-derived) + caster mod
   spellAttackBonus?: number; // +mod for spell-attack-roll spells; defaults to toHit
+  // SRD "(level N version)" — the level a spell is cast at (upcast damage).
+  spellLevels?: Record<string, number>;
+  // SRD "N/Day" — casts per day; spells not listed are At Will. Uses spent are
+  // tracked per enemy in GameState.enemy_spell_uses.
+  spellsPerDay?: Record<string, number>;
   // Tactical movement (SRD 5.2.1). Mirrors EnemyTemplate fields and is
   // carried through procgen. attackReachFt defaults to 5 ft (the default
   // melee reach); speedFt defaults to 30 ft (the default humanoid walk).
@@ -1858,6 +1865,8 @@ export interface GameState {
   // SRD Legendary Resistance uses spent, by enemy id. Cleared on a Long Rest
   // (the "per Day" reset).
   legendary_resistance_used?: Record<string, number>;
+  // SRD monster Spellcasting "N/Day" — casts spent, by enemy id then spell id.
+  enemy_spell_uses?: Record<string, Record<string, number>>;
   // Schema version. `normalizeState` stamps this with
   // `CURRENT_SCHEMA_VERSION` on every load; older saves (or saves
   // missing the field — pre-versioning) are routed through the

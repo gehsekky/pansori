@@ -636,9 +636,11 @@ describe('SRD bestiary additions — effect fields', () => {
     expect(SRD_MONSTERS.archmage.condition_immunities).toContain('charmed');
   });
 
-  it('Mage and Archmage carry AoE spells (Fireball / Cone of Cold) for enemy casting', () => {
+  it('Mage and Archmage carry AoE spells for enemy casting', () => {
+    // SRD 5.2.1: Mage — Fireball / Cone of Cold; Archmage — Lightning Bolt / Cone of Cold.
+    expect(SRD_MONSTERS.mage.spells).toEqual(['fireball', 'cone_of_cold']);
+    expect(SRD_MONSTERS.archmage.spells).toEqual(['lightning_bolt', 'cone_of_cold']);
     for (const k of ['mage', 'archmage'] as const) {
-      expect(SRD_MONSTERS[k].spells).toEqual(['fireball', 'cone_of_cold']);
       expect(SRD_MONSTERS[k].castChance).toBeGreaterThan(0);
       expect(SRD_MONSTERS[k].spellSaveDC).toBeGreaterThan(0);
     }

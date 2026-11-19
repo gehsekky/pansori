@@ -22,9 +22,12 @@ import {
   resolveEnemyAttack,
   resolvePlayerAttack,
   rollConditionSave,
+  rollCritical,
   rollDeathSave,
   rollDice,
   seesInDarkness,
+  upcastDamage,
+  upcastDamage2,
 } from './rulesEngine.js';
 import type {
   AbilityKey,
@@ -8639,30 +8642,42 @@ function isHellishRebukeEligible(
   return true;
 }
 
-// Resolve a pending enemy spell's damage on its intended target. Used by
-// the Counterspell decline path (and by counterspell-failed-check). Returns
-// undefined if there's nothing to apply (spell has no damage, target dead).
+// Resolve a pending enemy spell on its intended target once Counterspell is
+// declined or fails. With the caster's stat block (via `seed`) it runs the full
+// enemy resolver — saves, spell attacks, areas, riders, at the stat block's
+// spell level; without it, it falls back to the raw damage roll. Returns
+// undefined if there's nothing to apply.
 export function applyEnemySpellDamage(
   st: GameState,
-  rx: { enemySpellId: string; intendedTargetPcId: string },
-  context: Context
-):
-  | { st: GameState; targetHp: number; targetName: string; dmgRoll: number; damageType: string }
-  | undefined {
+  rx: { enemySpellId: string; intendedTargetPcId: string; attackerEnemyId?: string },
+  context: Context,
+  seed?: Seed
+): { st: GameState; targetHp: number; targetName: string; narrative: string } | undefined {
   const tgtIdx = st.characters.findIndex((c) => c.id === rx.intendedTargetPcId);
   if (tgtIdx < 0) return undefined;
-  const spell = context.spellTable?.[rx.enemySpellId];
-  if (!spell?.damage) return undefined;
-  const dmgRoll = rollDice(spell.damage);
+  const base = context.spellTable?.[rx.enemySpellId];
+  if (!base?.damage && !base?.condition) return undefined;
   const tgt = st.characters[tgtIdx];
+  const enemy = seed && rx.attackerEnemyId ? getEnemyById(seed, rx.attackerEnemyId) : undefined;
+  if (enemy) {
+    const r = resolveEnemySpell({
+      enemy: { ...enemy, id: rx.attackerEnemyId! },
+      spell: enemyCastSpell(enemy, base),
+      target: tgt,
+      st,
+      narrative: '',
+      context,
+    });
+    return { st: r.st, targetHp: r.target.hp, targetName: tgt.name, narrative: r.narrative.trim() };
+  }
+  if (!base.damage) return undefined;
+  const dmgRoll = rollDice(base.damage);
   const newHp = Math.max(0, tgt.hp - dmgRoll);
-  const newSt = commitCharacter(st, { ...tgt, hp: newHp });
   return {
-    st: newSt,
+    st: commitCharacter(st, { ...tgt, hp: newHp }),
     targetHp: newHp,
     targetName: tgt.name,
-    dmgRoll,
-    damageType: spell.damageType ?? 'damage',
+    narrative: `${tgt.name} takes ${dmgRoll} ${base.damageType ?? 'damage'}.`,
   };
 }
 
@@ -9631,6 +9646,60 @@ export function attemptEnemyApproach(args: {
  * open the interactive Indomitable reroll window (saves resolve immediately);
  * Counterspell still gates the whole spell upstream in `attemptEnemySpellCast`.
  */
+/**
+ * SRD monster Spellcasting — the spell as this enemy casts it: at the level its
+ * stat block gives ("level N version", `spellLevels`), with the damage scaled
+ * by the spell's upcast bonus. Unchanged when cast at its own level.
+ */
+export function enemyCastSpell(enemy: Pick<Enemy, 'spellLevels'>, spell: Spell): Spell {
+  const lvl = enemy.spellLevels?.[spell.id] ?? spell.level;
+  if (lvl <= spell.level) return spell;
+  return {
+    ...spell,
+    level: lvl,
+    ...(spell.damage ? { damage: upcastDamage(spell, lvl) } : {}),
+    ...(spell.damage2 ? { damage2: upcastDamage2(spell, lvl) } : {}),
+  };
+}
+
+/**
+ * The spells an enemy can cast right now: ones the enemy resolver can express
+ * (damage and / or a condition) with an "N/Day" use left (At Will spells are
+ * always available).
+ */
+export function castableEnemySpells(
+  enemy: Pick<Enemy, 'id' | 'spells' | 'spellsPerDay'>,
+  st: Pick<GameState, 'enemy_spell_uses'>,
+  context: Context
+): string[] {
+  return (enemy.spells ?? []).filter((id) => {
+    const sp = context.spellTable?.[id];
+    if (!sp?.damage && !sp?.condition) return false;
+    const perDay = enemy.spellsPerDay?.[id];
+    return perDay === undefined || (st.enemy_spell_uses?.[enemy.id]?.[id] ?? 0) < perDay;
+  });
+}
+
+/** Record one cast of an "N/Day" enemy spell. */
+function spendEnemySpell(st: GameState, enemyId: string, spellId: string): GameState {
+  const mine = st.enemy_spell_uses?.[enemyId] ?? {};
+  return {
+    ...st,
+    enemy_spell_uses: {
+      ...(st.enemy_spell_uses ?? {}),
+      [enemyId]: { ...mine, [spellId]: (mine[spellId] ?? 0) + 1 },
+    },
+  };
+}
+
+/**
+ * SRD Scorching Ray — several rays, each its own spell attack (3 at level 2,
+ * one more per level above). The enemy resolver rolls each ray separately.
+ */
+const ENEMY_RAY_SPELLS: Record<string, { baseLevel: number; rays: number; dice: string }> = {
+  scorching_ray: { baseLevel: 2, rays: 3, dice: '2d6' },
+};
+
 // Apply an enemy AoE spell's rider condition to a PC who failed its save
 // (an enemy casting a Sunburst/Weird-style spell → Blinded / Frightened). The
 // mirror of the PC-side AoE rider: respects condition immunity, stamps the
@@ -9688,9 +9757,11 @@ function resolveEnemyAoeSpell(args: {
   // Party-side creatures only (no friendly fire), resolved against live PCs.
   const victimIds = new Set(inArea.filter((e) => !e.isEnemy).map((e) => e.id));
 
-  // SRD — one damage roll for the whole spell, shared by every target.
-  const dmgRoll = rollDice(spell.damage ?? '0');
-  const dmgRoll2 = spell.damage2 ? rollDice(spell.damage2) : 0;
+  // SRD — one damage roll for the whole spell, shared by every target. A pure
+  // control area (Fear, Hypnotic Pattern, Entangle) deals none.
+  const dealsDamage = !!spell.damage && spell.damage !== '0' && spell.damageType !== 'none';
+  const dmgRoll = dealsDamage ? rollDice(spell.damage ?? '0') : 0;
+  const dmgRoll2 = dealsDamage && spell.damage2 ? rollDice(spell.damage2) : 0;
   const half = (n: number): number => Math.floor(n / 2);
 
   let narrative = args.narrative + ` ${enemy.name} unleashes ${spell.name}!`;
@@ -9713,7 +9784,9 @@ function resolveEnemyAoeSpell(args: {
     const evasionNote = evasion ? ' ✦ Evasion' : '';
     const newHp = Math.max(0, c.hp - dmg);
     st = commitCharacter(st, { ...c, hp: newHp });
-    narrative += ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`;
+    narrative += dealsDamage
+      ? ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`
+      : ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}.`;
     // SRD AoE rider condition (Sunburst → Blinded, Weird → Frightened): a PC who
     // failed and is still standing gains the spell's condition.
     if (!saved && spell.condition && newHp > 0) {
@@ -9881,9 +9954,18 @@ export function resolveEnemySpell(args: {
       return { st: r.st, target: r.target, narrative: r.narrative };
     }
   }
+  // Spell attack roll (Acid Arrow, Guiding Bolt, Scorching Ray, Ray of
+  // Sickness, …): roll to hit the PC's AC instead of a save.
+  if (spell.attackRoll) {
+    const r = resolveEnemySpellAttack({ ...args, narrative });
+    return { st: r.st, target: r.target, narrative: r.narrative };
+  }
   const dmgRoll = rollDice(spell.damage ?? '0');
   let newTarget: Character;
   let pendingSaveReroll: PendingSaveRerollInfo | undefined;
+  // A failed save against a damage spell with a rider (Phantasmal Killer →
+  // Frightened) also applies the condition.
+  let riderOnFailedSave = false;
   if (spell.savingThrow) {
     const saveScore = (target[spell.savingThrow] ?? 10) as number;
     const dc = enemy.spellSaveDC ?? 8 + Math.floor((enemy.toHit + 5) / 2);
@@ -9953,17 +10035,74 @@ export function resolveEnemySpell(args: {
     const evasionNote = evasion ? ' ✦ Evasion' : '';
     const dmg = dmgFor(saved);
     newTarget = { ...workingTarget, hp: Math.max(0, workingTarget.hp - dmg) };
+    riderOnFailedSave = !saved && !!spell.condition;
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} ${fmt.save(spell.savingThrow.toUpperCase(), save)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${rescueNote}${evasionNote}`;
   } else {
     newTarget = { ...target, hp: Math.max(0, target.hp - dmgRoll) };
     narrative += ` ${enemy.name} casts ${spell.name}! ${target.name} takes ${fmt.dmg(dmgRoll)} ${spell.damageType ?? 'damage'}.`;
   }
-  return {
-    st: commitCharacter(args.st, newTarget),
-    target: newTarget,
-    narrative,
-    pendingSaveReroll,
-  };
+  let st = commitCharacter(args.st, newTarget);
+  if (riderOnFailedSave && newTarget.hp > 0) {
+    const cr = applyEnemySpellConditionToPc(st, spell, newTarget.id, enemy.id);
+    st = cr.st;
+    narrative += cr.note;
+    newTarget = st.characters.find((c) => c.id === newTarget.id) ?? newTarget;
+  }
+  return { st, target: newTarget, narrative, pendingSaveReroll };
+}
+
+/**
+ * An enemy's spell attack against a PC: d20 + its spell attack bonus (else its
+ * attack bonus) vs the PC's AC with any Half Cover. A natural 20 is a Critical
+ * Hit (dice doubled), a natural 1 misses. Ray spells roll each ray. A hit with
+ * a rider (Ray of Sickness → Poisoned) applies the condition.
+ */
+function resolveEnemySpellAttack(args: {
+  enemy: Enemy;
+  spell: Spell;
+  target: Character;
+  st: GameState;
+  narrative: string;
+}): { st: GameState; target: Character; narrative: string } {
+  const { enemy, spell, target } = args;
+  // Stat blocks that list only a save DC: spell attack bonus = DC − 8.
+  const bonus =
+    enemy.spellAttackBonus ??
+    (enemy.spellSaveDC !== undefined ? enemy.spellSaveDC - 8 : enemy.toHit);
+  const ac =
+    target.ac +
+    Math.max(sanctuaryCoverAc(args.st, target.id), smiteOfProtectionAc(args.st, target.id));
+  const ray = ENEMY_RAY_SPELLS[spell.id];
+  const count = ray ? ray.rays + Math.max(0, spell.level - ray.baseLevel) : 1;
+  const dice = ray ? ray.dice : (spell.damage ?? '0');
+  const parts: string[] = [];
+  let hp = target.hp;
+  let hits = 0;
+  for (let i = 0; i < count; i++) {
+    const d20 = rollDice('1d20');
+    const total = d20 + bonus;
+    const hit = d20 !== 1 && (d20 === 20 || total >= ac);
+    if (!hit) {
+      parts.push(`${fmt.roll(total)} vs ${fmt.ac(ac)} — miss`);
+      continue;
+    }
+    const dmg = d20 === 20 ? rollCritical(dice) : rollDice(dice);
+    hp = Math.max(0, hp - dmg);
+    hits++;
+    parts.push(
+      `${fmt.roll(total)} vs ${fmt.ac(ac)} — ${d20 === 20 ? 'critical hit' : 'hit'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}`
+    );
+  }
+  let narrative = `${args.narrative} ${enemy.name} casts ${spell.name} at ${target.name}!`;
+  narrative +=
+    count > 1 ? ` ${parts.map((p, i) => `Ray ${i + 1}: ${p}`).join('; ')}.` : ` ${parts[0]}.`;
+  let st = commitCharacter(args.st, { ...target, hp });
+  if (hits > 0 && spell.condition && hp > 0) {
+    const cr = applyEnemySpellConditionToPc(st, spell, target.id, enemy.id);
+    st = cr.st;
+    narrative += cr.note;
+  }
+  return { st, target: st.characters.find((c) => c.id === target.id) ?? target, narrative };
 }
 
 async function attemptEnemySpellCast(args: {
@@ -9991,43 +10130,39 @@ async function attemptEnemySpellCast(args: {
       pendingSaveReroll?: PendingSaveRerollInfo;
     }
 > {
-  const {
-    enemy,
-    enemyId,
-    enemyEnt,
-    target,
-    targetCharIdx,
-    st,
-    context,
-    resumeMi,
-    advIdx,
-    orderLen,
-  } = args;
+  const { enemy, enemyId, enemyEnt, target, targetCharIdx, context, resumeMi, advIdx, orderLen } =
+    args;
   let narrative = args.narrative;
   // `resumeMi > 0` means we're already mid-multiattack from a prior
   // pause/resume cycle — don't re-decide cast intent.
+  // SRD monster Spellcasting — only spells the resolver can express (damage
+  // and / or a condition) with an "N/Day" use left are candidates.
+  const castable = castableEnemySpells({ ...enemy, id: enemyId }, args.st, context);
   if (
     resumeMi !== 0 ||
-    !enemy.spells ||
-    enemy.spells.length === 0 ||
+    castable.length === 0 ||
     (enemy.castChance ?? 0) === 0 ||
     Math.random() >= (enemy.castChance ?? 0)
   ) {
     return { kind: 'no-cast' };
   }
-  const spellId = pick(enemy.spells);
-  const spell = context.spellTable?.[spellId];
-  // The enemy resolver handles damage spells and single-target condition spells
-  // (Hold Person, Cause Fear). Anything else (pure narrative) isn't castable.
-  if (!spell?.damage && !spell?.condition) return { kind: 'no-cast' };
+  const spellId = pick(castable);
+  const baseSpell = context.spellTable?.[spellId];
+  if (!baseSpell) return { kind: 'no-cast' };
+  const spell = enemyCastSpell(enemy, baseSpell);
 
   // SRD anti-magic suppression — an enemy spell crossing an Antimagic Field /
   // Globe of Invulnerability (or cast within an act-scoped dead-magic field)
   // fizzles before it's cast.
-  const supTargetPos = st.entities?.find((e) => e.id === target.id && !e.isEnemy)?.pos;
-  if (isSpellSuppressed(st, enemyId, supTargetPos, spell.level, context).blocked) {
+  const supTargetPos = args.st.entities?.find((e) => e.id === target.id && !e.isEnemy)?.pos;
+  if (isSpellSuppressed(args.st, enemyId, supTargetPos, spell.level, context).blocked) {
     return { kind: 'no-cast' };
   }
+  // The cast is committed: an "N/Day" spell spends its use even if countered.
+  const st =
+    enemy.spellsPerDay?.[spellId] !== undefined
+      ? spendEnemySpell(args.st, enemyId, spellId)
+      : args.st;
 
   // Counterspell eligibility — check all party PCs.
   const reactor = st.characters.find((c) =>
