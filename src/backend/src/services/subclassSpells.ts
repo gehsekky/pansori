@@ -1,5 +1,6 @@
 import type { Character } from '../types.js';
 import { getClassLevel } from './multiclass.js';
+import { magicalDiscoveriesMax } from './bardFeatures.js';
 
 // SRD 5.2.1 subclass spell lists: "when you reach a <Class> level specified in
 // the table, you thereafter always have the listed spells prepared." Such
@@ -120,6 +121,10 @@ export function alwaysPreparedSpells(char: Character): string[] {
   if (list) unlocked(list.tiers, getClassLevel(char, list.cls)).forEach((s) => out.add(s));
   if (choosesCircleLand(char) && char.circle_land) {
     circleLandSpells(char.circle_land, getClassLevel(char, 'druid')).forEach((s) => out.add(s));
+  }
+  // SRD College of Lore Magical Discoveries — always prepared.
+  if (magicalDiscoveriesMax(char) > 0) {
+    for (const s of char.magical_discoveries ?? []) out.add(s);
   }
   // SRD Pact of the Tome — the Book of Shadows' spells are prepared.
   for (const s of [

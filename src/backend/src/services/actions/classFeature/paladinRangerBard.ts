@@ -1,4 +1,5 @@
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
+import { bardicInspirationLeft, bardicInspirationMax, lowestOpenSlot } from '../../bardFeatures.js';
 import { channelDivinityUsesMax, getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
 import { endCombatState, enemyHpAfterDamage, isRoomCleared } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
@@ -10,6 +11,7 @@ import { fmt } from '../../narrativeFmt.js';
  *
  *  Bard (Lore subclass only — base Bard bonus action is here too):
  *   - `bardic_inspiration`: grant a die to an ally (d6→d12 by level).
+ *   - `font_of_inspiration` (L5): spend a spell slot to regain a BI use.
  *   - `cutting_words` (Lore): reaction. Spend a BI use; the next
  *     enemy attack/check takes a die-roll subtraction. Stages
  *     state.cutting_words_penalty for the attack handler.
@@ -64,6 +66,35 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       ),
     };
     ctx.narrative = `${char.name} grants Bardic Inspiration (${inspDie}) to ${ally.name}! (${biUses - 1} use${biUses - 1 === 1 ? '' : 's'} remaining)`;
+    return true;
+  }
+
+  // SRD Font of Inspiration (Bard L5) — no action: expend a spell slot (the
+  // lowest open one) to regain one expended Bardic Inspiration use.
+  if (fid === 'font_of_inspiration') {
+    if (getClassLevel(char, 'bard') < 5) {
+      ctx.narrative = 'Font of Inspiration requires Bard level 5.';
+      return true;
+    }
+    const left = bardicInspirationLeft(char);
+    if (left >= bardicInspirationMax(char)) {
+      ctx.narrative = 'Your Bardic Inspiration is already full.';
+      return true;
+    }
+    const slot = lowestOpenSlot(char);
+    if (slot === 0) {
+      ctx.narrative = 'No spell slot left to spend.';
+      return true;
+    }
+    char.spell_slots_used = {
+      ...(char.spell_slots_used ?? {}),
+      [slot]: (char.spell_slots_used?.[slot] ?? 0) + 1,
+    };
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
+      bardic_inspiration: left + 1,
+    };
+    ctx.narrative = `${char.name} spends a level ${slot} spell slot — Font of Inspiration restores a Bardic Inspiration use (${left + 1} left).`;
     return true;
   }
 

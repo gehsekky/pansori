@@ -172,7 +172,12 @@ describe('jump action — clears obstacles and validates landing', () => {
   it('landing in difficult terrain forces an Acrobatics check or Prone', async () => {
     mockRandom(0.0); // d20 = 1 → fails the DC 10 Acrobatics check
     const seed = jumpSeed([], [{ x: 1, y: 3 }]);
-    const r = await jump(jumpState({ str: 16, movementUsed: 10 }), { x: 1, y: 3 }, seed);
+    // A Wizard: a Fighter's Tactical Mind could rescue the failed check.
+    const r = await jump(
+      jumpState({ str: 16, movementUsed: 10, characterClass: 'Wizard' }),
+      { x: 1, y: 3 },
+      seed
+    );
     expect(r.narrative).toMatch(/Prone/);
     expect(r.newState.characters[0].conditions).toContain('prone');
   });

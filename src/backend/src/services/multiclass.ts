@@ -1131,9 +1131,12 @@ export function casterSpellOptions(
 export function casterSpellOptionsByLevel(
   cls: string,
   spellTable: Record<string, Spell>,
-  maxLevel: number
+  maxLevel: number,
+  extraLists: ReadonlyArray<'arcane' | 'divine' | 'primal'> = []
 ): Record<number, string[]> {
-  const lists = CLASS_SPELL_LISTS[cls.toLowerCase()] ?? [];
+  const classLists = CLASS_SPELL_LISTS[cls.toLowerCase()] ?? [];
+  // Extra lists (Bard Magical Secrets) only widen a class that casts already.
+  const lists = classLists.length > 0 ? [...classLists, ...extraLists] : [];
   const byLevel: Record<number, string[]> = {};
   if (lists.length === 0) return byLevel;
   const onList = (s: Spell) => (s.spellList ?? []).some((l) => lists.includes(l));

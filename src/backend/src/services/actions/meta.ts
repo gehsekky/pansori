@@ -31,11 +31,17 @@ import {
   skillKey,
   skillLabel,
 } from '../multiclass.js';
+import {
+  isMagicalDiscoveryEligible,
+  magicalSecretsLists,
+  pendingMagicalDiscoveries,
+} from '../bardFeatures.js';
 import type { ActionHandler } from './types.js';
 import { characterAc } from '../armorClass.js';
 import { masterableWeapons } from '../../campaignData/srd/index.js';
-import { pendingBonusSkills } from '../barbarianFeatures.js';
+import { pendingBonusSkills } from '../bonusSkills.js';
 import { syncSetAbilities } from '../wornEffects.js';
+import { syncSubclassSpells } from '../subclassSpells.js';
 import { updatePcActor } from './actor.js';
 
 /**
@@ -704,6 +710,36 @@ export const handleChooseBonusSkill: ActionHandler<{
 };
 
 /**
+ * `choose_magical_discovery`: SRD College of Lore Magical Discoveries (Bard L6)
+ * — learn a spell from the Cleric, Druid or Wizard list (a cantrip or a level
+ * the Bard has slots for). Two picks; the spells are always prepared, so they
+ * join `spells_known` through the subclass-spell sync. Out-of-combat, no
+ * action cost.
+ */
+export const handleChooseMagicalDiscovery: ActionHandler<{
+  type: 'choose_magical_discovery';
+  spellId: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can choose Magical Discoveries.' };
+  const { char } = ctx.actor;
+  if (ctx.st.combat_active) return { rejected: 'You cannot learn spells during combat.' };
+  if (pendingMagicalDiscoveries(char) <= 0) {
+    return { rejected: 'You have no Magical Discoveries spell to choose.' };
+  }
+  const spell = ctx.context.spellTable?.[action.spellId];
+  if (!isMagicalDiscoveryEligible(char, spell)) {
+    return { rejected: `${action.spellId} isn't a spell Magical Discoveries can teach you.` };
+  }
+  const next: Character = {
+    ...char,
+    magical_discoveries: [...(char.magical_discoveries ?? []), action.spellId],
+  };
+  syncSubclassSpells(next);
+  updatePcActor(ctx, next);
+  ctx.narrative = `${char.name} learns ${spell!.name} (Magical Discoveries) — always prepared.`;
+};
+
+/**
  * `choose_weapon_mastery`: spend one pending Weapon Mastery slot (granted on a
  * Fighter/Barbarian level-up) on a weapon the class may master and isn't
  * already mastering. Out-of-combat, no action cost.
@@ -777,7 +813,8 @@ export const handleLearnSpell: ActionHandler<{
   const byLevel = casterSpellOptionsByLevel(
     char.character_class,
     ctx.context.spellTable ?? {},
-    maxSpellLevelForLevel(char.level ?? 1)
+    maxSpellLevelForLevel(char.level ?? 1),
+    magicalSecretsLists(char)
   );
   const eligible = new Set<string>();
   for (let lvl = 1; lvl <= maxSpellLevelForLevel(char.level ?? 1); lvl++) {

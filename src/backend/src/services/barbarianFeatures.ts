@@ -1,5 +1,5 @@
 import type { BrutalStrikeEffect, Character } from '../types.js';
-import { getClassLevel, hasSkillProficiency, skillKey } from './multiclass.js';
+import { getClassLevel, skillKey } from './multiclass.js';
 
 // ── Primal Knowledge (L3) ────────────────────────────────────────────────────
 
@@ -36,48 +36,6 @@ export function primalKnowledgeScore(char: Character, skill: string, score: numb
   if (!(char.conditions ?? []).includes('raging')) return score;
   if (!PRIMAL_KNOWLEDGE_SKILLS.includes(skillKey(skill))) return score;
   return Math.max(score, char.str);
-}
-
-/** A feature that grants proficiency in skills of the player's choice. */
-export interface BonusSkillGrant {
-  /** Key into `Character.bonus_skill_picks`. */
-  source: string;
-  /** Feature name for menus and narration. */
-  label: string;
-  count: number;
-  options: string[];
-}
-
-/**
- * Every "gain proficiency in a skill of your choice" grant the character has.
- * SRD Barbarian Primal Knowledge (L3): one skill from the Barbarian list.
- */
-export function bonusSkillGrants(char: Character): BonusSkillGrant[] {
-  const grants: BonusSkillGrant[] = [];
-  if (getClassLevel(char, 'barbarian') >= 3) {
-    grants.push({
-      source: 'primal_knowledge',
-      label: 'Primal Knowledge',
-      count: 1,
-      options: BARBARIAN_SKILL_OPTIONS,
-    });
-  }
-  return grants;
-}
-
-/**
- * Grants with picks still open, each with the options the character isn't
- * already proficient in. A grant whose options are all taken is dropped (there
- * is nothing left to choose).
- */
-export function pendingBonusSkills(char: Character): BonusSkillGrant[] {
-  return bonusSkillGrants(char)
-    .map((g) => ({
-      ...g,
-      count: g.count - (char.bonus_skill_picks?.[g.source]?.length ?? 0),
-      options: g.options.filter((s) => !hasSkillProficiency(char, s)),
-    }))
-    .filter((g) => g.count > 0 && g.options.length > 0);
 }
 
 // ── Instinctive Pounce (L7) ──────────────────────────────────────────────────

@@ -1572,6 +1572,10 @@ export interface Character {
   // 'primal_knowledge'). The picks are also added to `skill_proficiencies`;
   // this map only tracks which grants have been used (see `pendingBonusSkills`).
   bonus_skill_picks?: Record<string, string[]>;
+  // SRD College of Lore Magical Discoveries (Bard L6) — the two spells chosen
+  // from the Cleric / Druid / Wizard lists; always prepared (see
+  // `alwaysPreparedSpells`).
+  magical_discoveries?: string[];
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   // Ids that subclass "always prepared" lists added to `spells_known` (see
   // services/subclassSpells.ts), so a grant that stops applying can be removed

@@ -997,6 +997,9 @@ export type StructuredAction =
   // Primal Knowledge, L3). `source` names the grant; `skill` must be one of its
   // options. Out-of-combat, no action cost.
   | { type: 'choose_bonus_skill'; source: string; skill: string }
+  // SRD College of Lore Magical Discoveries (Bard L6): learn a Cleric / Druid /
+  // Wizard spell that is always prepared (two picks).
+  | { type: 'choose_magical_discovery'; spellId: string }
   // 2024 Weapon Mastery slot growth — on level-up the player picks a new weapon
   // to master (Fighter L4/10/16, Barbarian L4/10). `weaponId` is the chosen
   // weapon. Out-of-combat, no action cost.

@@ -68,7 +68,6 @@ import {
   brutalStrikeOptions,
   brutalStrikeRiders,
   mindlessRageActive,
-  pendingBonusSkills,
 } from './barbarianFeatures.js';
 import {
   CIRCLE_LANDS,
@@ -150,6 +149,13 @@ import {
   planLabel,
   planTotal,
 } from './slotRecovery.js';
+import {
+  canFontOfInspiration,
+  lowestOpenSlot,
+  magicalDiscoveryOptions,
+  magicalSecretsLists,
+  pendingMagicalDiscoveries,
+} from './bardFeatures.js';
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import {
   conjurablePactWeapons,
@@ -187,6 +193,7 @@ import { canTakeFeat } from './feats.js';
 import { characterAc } from './armorClass.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
+import { pendingBonusSkills } from './bonusSkills.js';
 import { randomUUID } from 'crypto';
 import { unarmoredMovementBonus } from './monkFeatures.js';
 import { wornSaveBonus } from './wornEffects.js';
@@ -4785,10 +4792,12 @@ function masteryChoicesFor(char: Character, context: Context): GameChoice[] {
 // can't get stuck.
 function spellChoicesFor(char: Character, context: Context): GameChoice[] {
   const spellTable = context.spellTable ?? {};
+  // SRD Bard Magical Secrets (L10) — Cleric / Druid / Wizard spells too.
   const byLevel = casterSpellOptionsByLevel(
     char.character_class,
     spellTable,
-    maxSpellLevelForLevel(char.level ?? 1)
+    maxSpellLevelForLevel(char.level ?? 1),
+    magicalSecretsLists(char)
   );
   const already = new Set(char.spells_known ?? []);
   // Only leveled spells (skip cantrips at level 0 — they aren't "learned" via
@@ -5591,6 +5600,20 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── College of Lore Magical Discoveries (Bard L6) ────────────────────────
+  // Two spells from the Cleric / Druid / Wizard lists, surfaced out of combat
+  // while a pick is open.
+  if (!state.combat_active && pendingMagicalDiscoveries(char) > 0 && context.spellTable) {
+    for (const id of magicalDiscoveryOptions(char, context.spellTable)) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const sp = context.spellTable[id];
+      choices.push({
+        label: `Magical Discoveries: learn ${sp.name} (${sp.level === 0 ? 'cantrip' : `level ${sp.level}`})`,
+        action: { type: 'choose_magical_discovery', spellId: id },
+      });
+    }
+  }
+
   // ── Cleric Divine Order (L1) — Protector / Thaumaturge ─────────────────────
   // One-time choice surfaced out of combat. Thaumaturge grants a concrete
   // extra Cleric cantrip (the first learnable one) plus the Arcana/Religion
@@ -6229,6 +6252,16 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
+  }
+
+  // SRD Bard Font of Inspiration (L5) — no action required: a spell slot buys
+  // back one Bardic Inspiration use.
+  if (state.combat_active && canFontOfInspiration(char)) {
+    choices.push({
+      label: `Font of Inspiration — expend a level ${lowestOpenSlot(char)} spell slot to regain a Bardic Inspiration use`,
+      action: { type: 'use_class_feature', featureId: 'font_of_inspiration' },
+      kind: 'class_feature',
+    });
   }
 
   // Fighter: Action Surge — shown in combat when not yet used

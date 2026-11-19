@@ -16,7 +16,6 @@ import {
   brutalStrikeDice,
   brutalStrikeOptions,
   instinctivePounceFeet,
-  pendingBonusSkills,
   primalKnowledgeScore,
 } from '../../services/barbarianFeatures.js';
 import {
@@ -33,6 +32,7 @@ import { context as ctx } from '../fixtures/testContext.js';
 import { disadvantageOnSave } from '../../services/conditions/registry.js';
 import { opportunityAttackTriggers } from '../../services/gridEngine.js';
 import { pcActor } from '../../services/actions/actor.js';
+import { pendingBonusSkills } from '../../services/bonusSkills.js';
 
 afterEach(() => vi.restoreAllMocks());
 

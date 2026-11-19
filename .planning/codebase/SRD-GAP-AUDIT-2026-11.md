@@ -88,9 +88,17 @@ Missing (no code path):
   didn't count for Hide, the surprise roll, jump landings, or trap detection,
   and Sneak read the class's default list instead of the character. All sites
   now go through `hasSkillProficiency` (spelling-insensitive).
-- **Bard:** Font of Inspiration (L5: regain on Short Rest, spend a slot to
+- ~~**Bard:** Font of Inspiration (L5: regain on Short Rest, spend a slot to
   regain a use), Magical Secrets (L10), College of Lore Bonus Proficiencies (L3)
-  and Magical Discoveries (L6).
+  and Magical Discoveries (L6).~~ Done 2026-11-18 (`services/bardFeatures.ts`).
+  The Short Rest refill already existed; Font of Inspiration's slot spend is a
+  no-action combat choice that uses the lowest open slot. Magical Secrets
+  widens the level-up `learn_spell` pick to the divine and primal lists (the
+  arcane tag stands in for the Wizard list). Bonus Proficiencies reuses the
+  `choose_bonus_skill` grant (moved to `services/bonusSkills.ts`). Magical
+  Discoveries picks are always prepared via `alwaysPreparedSpells`.
+  Simplifications: neither Magical Secrets' nor Magical Discoveries' "replace a
+  spell on level-up" is modeled (pansori has no known-spell swap for Bards).
 - **Druid:** Nature's Sanctuary (L14). (Done 2026-11-12: Primal Order,
   Wild Companion, Wild Resurgence, Elemental Fury + Improved, Archdruid's
   Evergreen Wild Shape and Nature Magician, Nature's Ward, Beast Spells —
