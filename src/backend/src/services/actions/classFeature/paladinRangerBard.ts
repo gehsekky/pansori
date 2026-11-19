@@ -1,4 +1,5 @@
 import { ABJURED_TAG, ABJURE_FOES_RANGE_FT, abjureFoesTargetCount } from '../../paladinFeatures.js';
+import { NATURES_VEIL_SOURCE, naturesVeilLeft } from '../../rangerFeatures.js';
 import { abilityMod, profBonus, rollDice } from '../../rulesEngine.js';
 import { bardicInspirationLeft, bardicInspirationMax, lowestOpenSlot } from '../../bardFeatures.js';
 import { channelDivinityUsesMax, getClassLevel, hasClass, huntersPrey } from '../../multiclass.js';
@@ -105,6 +106,41 @@ export function handlePaladinRangerBardFeature(ctx: ActionContext, fid: string):
       bardic_inspiration: left + 1,
     };
     ctx.narrative = `${char.name} spends a level ${slot} spell slot — Font of Inspiration restores a Bardic Inspiration use (${left + 1} left).`;
+    return true;
+  }
+
+  // SRD Ranger Nature's Veil (L14) — Bonus Action: the Invisible condition
+  // until the end of your next turn. WIS-mod uses (min 1) per Long Rest.
+  if (fid === 'natures_veil') {
+    if (getClassLevel(char, 'ranger') < 14) {
+      ctx.narrative = "Nature's Veil requires Ranger level 14.";
+      return true;
+    }
+    const left = naturesVeilLeft(char);
+    if (left <= 0) {
+      ctx.narrative = "No Nature's Veil uses left (they return after a Long Rest).";
+      return true;
+    }
+    if (ctx.st.combat_active && char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    char.class_resource_uses = {
+      ...(char.class_resource_uses ?? {}),
+      natures_veil_used: (char.class_resource_uses?.natures_veil_used ?? 0) + 1,
+    };
+    if (ctx.st.combat_active) {
+      char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    }
+    // Duration 2: conditions tick at the start of the Ranger's turn, so the
+    // veil survives the next turn and lifts as the one after begins.
+    char.conditions = [...char.conditions.filter((c) => c !== 'invisible'), 'invisible'];
+    char.condition_durations = { ...(char.condition_durations ?? {}), invisible: 2 };
+    char.condition_sources = {
+      ...(char.condition_sources ?? {}),
+      invisible: NATURES_VEIL_SOURCE,
+    };
+    ctx.narrative = `Spirits of nature draw a veil around ${char.name} — Invisible until the end of their next turn. (${left - 1} Nature's Veil use${left - 1 === 1 ? '' : 's'} left)`;
     return true;
   }
 

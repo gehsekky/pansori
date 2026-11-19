@@ -16,6 +16,7 @@ import { applySingleTargetDamage } from './applyDamage.js';
 import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from '../attack/toHit.js';
 import { hasSmiteOfProtection } from '../../paladinFeatures.js';
+import { huntersLoreNote } from '../../rangerFeatures.js';
 import { pickCastPrefix } from './utils.js';
 import { runAoeConditionSpell } from './aoeCondition.js';
 import { runAoeSpell } from './aoe.js';
@@ -438,7 +439,8 @@ export const handleCastSpell: ActionHandler<{
         slotNote,
         target: spellTarget.name,
       }) +
-      '.';
+      '.' +
+      huntersLoreNote(pc.char, spellTarget);
     ctx.usedInitiative = true;
     return;
   }

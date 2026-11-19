@@ -507,7 +507,8 @@ export function hasWordsOfCreation(char: Character): boolean {
 }
 
 /**
- * SRD 5.2.1 Expertise (Rogue L1 + L6, Bard L2 + L9): the number of skills the
+ * SRD 5.2.1 Expertise (Rogue L1 + L6, Bard L2 + L9, Wizard Scholar L2, Ranger
+ * Deft Explorer L2 + Expertise L9): the number of skills the
  * character may hold Expertise in (double proficiency bonus). Each class grants
  * 2 then 2 more; multiclass grants are independent, so they sum. (RE-2.)
  */
@@ -519,7 +520,10 @@ export function expertiseSlots(char: Character): number {
   const rogueSlots = rogue >= 6 ? 4 : rogue >= 1 ? 2 : 0;
   // SRD Wizard Scholar (L2) — a single Expertise pick in a knowledge skill.
   const wizardSlots = wizard >= 2 ? 1 : 0;
-  return bardSlots + rogueSlots + wizardSlots;
+  // SRD Ranger Deft Explorer (L2) — one skill; Ranger Expertise (L9) — two more.
+  const ranger = getClassLevel(char, 'ranger');
+  const rangerSlots = ranger >= 9 ? 3 : ranger >= 2 ? 1 : 0;
+  return bardSlots + rogueSlots + wizardSlots + rangerSlots;
 }
 
 /**
@@ -536,6 +540,8 @@ export function expertiseSlotsForClassLevel(className: string, level: number): n
       return level >= 9 ? 4 : level >= 2 ? 2 : 0;
     case 'wizard':
       return level >= 2 ? 1 : 0;
+    case 'ranger':
+      return level >= 9 ? 3 : level >= 2 ? 1 : 0;
     default:
       return 0;
   }
@@ -574,7 +580,10 @@ const SCHOLAR_SKILLS = ['Arcana', 'History', 'Investigation', 'Medicine', 'Natur
  *  (it dominates the Scholar restriction for the uncommon multiclass case). */
 export function expertiseEligibleSkills(char: Character): string[] {
   const profs = char.skill_proficiencies ?? [];
-  const broad = getClassLevel(char, 'rogue') >= 1 || getClassLevel(char, 'bard') >= 2;
+  const broad =
+    getClassLevel(char, 'rogue') >= 1 ||
+    getClassLevel(char, 'bard') >= 2 ||
+    getClassLevel(char, 'ranger') >= 2;
   if (broad) return profs;
   return profs.filter((s) => SCHOLAR_SKILLS.some((k) => skillKey(k) === skillKey(s)));
 }

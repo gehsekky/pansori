@@ -120,6 +120,7 @@ import {
   sanctuaryStands,
   wildShapeBlocksCasting,
 } from './druidFeatures.js';
+import { NATURES_VEIL_SOURCE, naturesVeilLeft } from './rangerFeatures.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -5612,7 +5613,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // ── Expertise picks (Rogue L1/L6, Bard L2/L9, Wizard Scholar L2) ───────────
+  // ── Expertise picks (Rogue L1/L6, Bard L2/L9, Wizard Scholar L2, Ranger L2/L9)
   // Double proficiency in a chosen skill. RAW level-up choice, surfaced out of
   // combat like Fighting Style; offered per still-unchosen eligible skill while
   // a slot is open. Wizard's Scholar restricts the pool to knowledge skills via
@@ -6311,6 +6312,22 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
+  }
+
+  // SRD Ranger Nature's Veil (L14) — Bonus Action: Invisible until the end of
+  // the next turn.
+  if (
+    state.combat_active &&
+    !char.turn_actions.bonus_action_used &&
+    !char.conditions.includes('invisible') &&
+    naturesVeilLeft(char) > 0
+  ) {
+    choices.push({
+      label: `Nature's Veil — bonus action: turn Invisible until the end of your next turn (${naturesVeilLeft(char)} left)`,
+      action: { type: 'use_class_feature', featureId: 'natures_veil' },
+      kind: 'class_feature',
+      requiresBonusAction: true,
+    });
   }
 
   // SRD Bard Font of Inspiration (L5) — no action required: a spell slot buys
@@ -12172,7 +12189,11 @@ export async function takeAction({
     const grantsInvisible = castSpellId
       ? context.spellTable?.[castSpellId]?.condition === 'invisible'
       : false;
+    // SRD Ranger Nature's Veil — the Invisible condition itself, which an
+    // attack doesn't end; it lasts until the end of the Ranger's next turn.
+    const veiled = char.condition_sources?.invisible === NATURES_VEIL_SOURCE;
     const keepsInvisible =
+      veiled ||
       grantsInvisible ||
       (castSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(castSpellId)) ||
       (concSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(concSpellId));

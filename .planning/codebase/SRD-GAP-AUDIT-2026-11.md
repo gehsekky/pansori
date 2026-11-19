@@ -138,7 +138,15 @@ Missing (no code path):
   Action" limit isn't enforced on enemy turns; Smite of Protection's cover
   lasts until the round wraps (where `turn_actions` reset), not exactly the
   Paladin's next turn, and doesn't add +2 to DEX saves.
-- **Ranger:** Deft Explorer (L2), Nature's Veil (L14), Hunter's Lore (L3).
+- ~~**Ranger:** Deft Explorer (L2), Nature's Veil (L14), Hunter's Lore (L3).~~
+  Done 2026-11-18 (`services/rangerFeatures.ts`). Deft Explorer's Expertise
+  (1 skill) and the L9 Expertise (2 more, also missing before) use the shared
+  Expertise pick. Hunter's Lore reveals the marked creature's immunities,
+  resistances and vulnerabilities when Hunter's Mark lands. Nature's Veil is a
+  Bonus Action Invisible (duration 2, so it lifts as the turn after next
+  begins) that attacking doesn't end; WIS-mod uses per Long Rest.
+  Simplification: Deft Explorer's two languages aren't modeled (pansori has no
+  languages).
 - **Rogue:** Thief's Reflexes (Thief L17). Thieves' Cant exists only as a
   language (fine; it's narrative).
 - **Sorcerer:** Dragon Companion (Draconic L18).
