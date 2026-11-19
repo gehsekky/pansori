@@ -4,6 +4,7 @@ import { hasEscapeTheHorde, hasSecondStoryWork } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
 import { hasAcrobaticMovement } from '../monkFeatures.js';
+import { hasInvocation } from '../invocations.js';
 import { resolveEnemyAttack } from '../rulesEngine.js';
 import { updatePcActor } from './actor.js';
 
@@ -134,7 +135,9 @@ export const handleGridMove: ActionHandler<{
   // falling. Simplification: climb / swim cells cost no extra movement for it.
   const acrobatic = hasAcrobaticMovement(char, ctx.context.lootTable);
   const hasClimbSpeed = (char.climb_speed_ft ?? 0) > 0 || hasSecondStoryWork(char) || acrobatic;
-  const hasSwimSpeed = (char.swim_speed_ft ?? 0) > 0 || acrobatic;
+  // SRD Gift of the Depths (Warlock invocation) — a Swim Speed equal to Speed.
+  const hasSwimSpeed =
+    (char.swim_speed_ft ?? 0) > 0 || acrobatic || hasInvocation(char, 'gift_of_the_depths');
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
     const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));

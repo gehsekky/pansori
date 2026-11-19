@@ -1579,6 +1579,15 @@ export interface Character {
   // from the Cleric / Druid / Wizard lists; always prepared (see
   // `alwaysPreparedSpells`).
   magical_discoveries?: string[];
+  // SRD Lessons of the First Ones (Warlock invocation) — the Origin feat taken
+  // for each time it was learned.
+  lessons_feats?: string[];
+  // SRD Gift of the Protectors (Warlock invocation) — party member ids written
+  // on the Book of Shadows' page.
+  protectors_page?: string[];
+  // SRD Gaze of Two Minds (Warlock invocation) — the linked ally; the link
+  // lasts while the Warlock has the `gaze_linked` condition.
+  gaze_ally_id?: string;
   prepared_spells?: string[]; // spell ids currently prepared (Cleric/Paladin/Druid)
   // Ids that subclass "always prepared" lists added to `spells_known` (see
   // services/subclassSpells.ts), so a grant that stops applying can be removed

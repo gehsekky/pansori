@@ -242,6 +242,11 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.dark_ones_luck; // Fiend Warlock Dark One's Own Luck — uses reset after a long rest
     delete restoredUses.magical_cunning_used; // Warlock Magical Cunning — available again after a long rest
     delete restoredUses.natures_veil_used; // Ranger Nature's Veil — all uses back after a long rest
+    delete restoredUses.gift_of_protectors_used; // Warlock Gift of the Protectors — page works again
+    // Warlock once-per-Long-Rest invocation spells (Gift of the Depths).
+    for (const k of Object.keys(restoredUses)) {
+      if (k.startsWith('invocation_used_')) delete restoredUses[k];
+    }
     // Warlock Mystic Arcanum — each tier's free cast returns after a long rest.
     for (const k of Object.keys(restoredUses)) {
       if (k.startsWith('mystic_arcanum_')) delete restoredUses[k];

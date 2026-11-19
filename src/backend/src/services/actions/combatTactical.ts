@@ -1,4 +1,5 @@
 import type { ActionContext, ActionHandler } from './types.js';
+import type { CombatEntity, Enemy } from '../../types.js';
 import {
   abilityMod,
   d,
@@ -334,14 +335,21 @@ export const handleFamiliarAttack: ActionHandler<{
     return { rejected: `Your familiar must be within 5 ft of the ${target.name}.` };
   }
 
+  updatePcActor(ctx, {
+    turn_actions: { ...char.turn_actions, familiar_attack_used: true },
+  });
+  familiarStrike(ctx, familiar, target);
+  spendOneAttack(ctx, target.id);
+  return undefined;
+};
+
+/** The familiar's one attack against `target` (shared by both commands). */
+function familiarStrike(ctx: ActionContext, familiar: CombatEntity, target: Enemy): void {
   const famName = familiar.companionName ?? 'Your familiar';
   const res = resolveEnemyAttack(
     { toHit: familiar.toHit ?? 0, damage: familiar.damage ?? '1d4' },
     target.ac
   );
-  updatePcActor(ctx, {
-    turn_actions: { ...char.turn_actions, familiar_attack_used: true },
-  });
   if (!res.hit) {
     ctx.narrative = `${famName} lunges at the ${target.name} — ${res.total} vs AC ${target.ac}, miss.`;
   } else {
@@ -357,6 +365,35 @@ export const handleFamiliarAttack: ActionHandler<{
       if (!anyEnemyLeft) ctx.st = endCombatState(ctx.st);
     }
   }
-  spendOneAttack(ctx, target.id);
+}
+
+/**
+ * `familiar_quick_attack`: SRD Investment of the Chain Master (Warlock L5,
+ * Pact of the Chain) — as a Bonus Action, command the familiar to take the
+ * Attack action. Unlike the Pact's forgo-an-attack strike, this costs none of
+ * your attacks. The familiar must be within 5 ft of the target.
+ */
+export const handleFamiliarQuickAttack: ActionHandler<{
+  type: 'familiar_quick_attack';
+  targetEnemyId?: string;
+}> = (ctx, action) => {
+  if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs command a familiar.' };
+  const { char } = ctx.actor;
+  if (!hasInvocation(char, 'investment_of_the_chain_master')) {
+    return { rejected: 'Quick Attack needs the Investment of the Chain Master invocation.' };
+  }
+  if (!ctx.st.combat_active) return { rejected: 'Your familiar attacks only in combat.' };
+  const familiar = ctx.st.entities?.find(
+    (e) => e.summoned_by === char.id && e.noAttack && e.hp > 0
+  );
+  if (!familiar) return { rejected: 'You have no familiar in this fight.' };
+  const target = ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId) ?? ctx.enemy;
+  const tgtEnt = target ? ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy) : undefined;
+  if (!target || !tgtEnt || tgtEnt.hp <= 0) return { rejected: 'No enemy for your familiar.' };
+  if (distanceFeet(familiar.pos, tgtEnt.pos) > 5) {
+    return { rejected: `Your familiar must be within 5 ft of the ${target.name}.` };
+  }
+  familiarStrike(ctx, familiar, target);
+  ctx.narrative = `Quick Attack! ${ctx.narrative}`;
   return undefined;
 };

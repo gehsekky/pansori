@@ -17,6 +17,7 @@ export interface BonusSkillGrant {
  * Every "gain proficiency in a skill of your choice" grant the character has.
  *  - SRD Barbarian Primal Knowledge (L3): one skill from the Barbarian list.
  *  - SRD College of Lore Bonus Proficiencies (Bard L3): three skills, any.
+ *  - SRD Skilled, when taken through Lessons of the First Ones: three skills.
  */
 export function bonusSkillGrants(char: Character): BonusSkillGrant[] {
   const grants: BonusSkillGrant[] = [];
@@ -32,6 +33,15 @@ export function bonusSkillGrants(char: Character): BonusSkillGrant[] {
     grants.push({
       source: 'lore_bonus_proficiencies',
       label: 'Bonus Proficiencies',
+      count: 3,
+      options: [...ALL_SKILLS],
+    });
+  }
+  // SRD Skilled taken through Lessons of the First Ones — its three skills.
+  if ((char.lessons_feats ?? []).includes('skilled')) {
+    grants.push({
+      source: 'lessons_skilled',
+      label: 'Skilled',
       count: 3,
       options: [...ALL_SKILLS],
     });

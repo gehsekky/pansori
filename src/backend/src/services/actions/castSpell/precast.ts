@@ -8,8 +8,8 @@ import {
 import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
 import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { druidCantripRangeBonus, wildShapeBlocksCasting } from '../../druidFeatures.js';
+import { gazeAllyId, hasInvocation, invocationDef, invocationUsedKey } from '../../invocations.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
-import { hasInvocation, invocationDef } from '../../invocations.js';
 import type { ActionContext } from '../types.js';
 import { alwaysPreparedSpells } from '../../subclassSpells.js';
 import { equippedArmorId } from '../../equipment.js';
@@ -264,6 +264,15 @@ export function runPrecast(
         ctx.narrative = `${inv.name} works only in Dim Light or Darkness.`;
         return { done: true };
       }
+    }
+    // SRD Gift of the Depths — Water Breathing once, then not until a Long Rest.
+    if (inv.freeSpell.oncePerLongRest) {
+      const key = invocationUsedKey(inv.id);
+      if (pc.char.class_resource_uses?.[key]) {
+        ctx.narrative = `${inv.name}'s free ${spell.name} returns after a Long Rest.`;
+        return { done: true };
+      }
+      pc.char.class_resource_uses = { ...(pc.char.class_resource_uses ?? {}), [key]: 1 };
     }
     usedInvocation = true;
     ctx.invocation = inv.id;
@@ -603,6 +612,17 @@ export function isSpellOutOfRange(
     distFt > SQUARE_SIZE &&
     !hasLineOfSight(casterEnt.pos, targetEnt.pos, ctx.roomObstacleCells ?? []);
   if (distFt <= maxFt && !blockedLoS) return false;
+  // SRD Gaze of Two Minds — while linked and within 60 ft of each other, the
+  // Warlock can cast as if from the ally's space.
+  const gazeId = gazeAllyId(pc.char);
+  const gazeEnt = gazeId ? ctx.st.entities.find((e) => e.id === gazeId && !e.isEnemy) : undefined;
+  if (gazeEnt && distanceFeet(casterEnt.pos, gazeEnt.pos) <= 60) {
+    const fromAlly = distanceFeet(gazeEnt.pos, targetEnt.pos);
+    const allyLoS =
+      fromAlly <= SQUARE_SIZE ||
+      hasLineOfSight(gazeEnt.pos, targetEnt.pos, ctx.roomObstacleCells ?? []);
+    if (fromAlly <= maxFt && allyLoS) return false;
+  }
 
   ctx.narrative = blockedLoS
     ? `${spell.name} has no line of sight to the ${spellTargetName} — something solid blocks the way.`

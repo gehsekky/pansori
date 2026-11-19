@@ -2,7 +2,12 @@ import { CONDITIONS, DISADV_CONDITIONS, PLAYER_ADV_CONDITIONS } from './conditio
 import type { Character, Enemy } from '../types.js';
 import { canSeeTarget, coverBonus, distanceFeet, magicalDarknessCells } from './gridEngine.js';
 import { d20TestPenalty, seesInDarkness } from './rulesEngine.js';
-import { getClassLevel, hasFeralSenses, piercesMagicalDarkness } from './multiclass.js';
+import {
+  getClassLevel,
+  hasFeralSenses,
+  piercesMagicalDarkness,
+  truesightFt,
+} from './multiclass.js';
 import type { ActionContext } from './actions/types.js';
 import { grappledAttackDisadvantage } from './unarmedStrike.js';
 import { isHeavilyEncumbered } from './gameEngine.js';
@@ -116,11 +121,16 @@ export function computeAttackEdges(
   const proneAdv = targetProne && within5;
   const proneDisadv = targetProne && !within5;
   const targetAdvConditions = tgtConds.filter(TARGET_ADV);
-  // SRD Invisible — negated by See Invisibility (`sees_invisible`).
+  // SRD Invisible — negated by See Invisibility (`sees_invisible`), or by
+  // Truesight (Boon of Truesight / Witch Sight) within its range.
+  const tsFt = truesightFt(char);
+  const seesInvisible =
+    !!char.sees_invisible ||
+    (tsFt > 0 && !!pcEnt && !!tgtEnt && distanceFeet(pcEnt.pos, tgtEnt.pos) <= tsFt);
   const targetDisadvConditions = tgtConds.filter(
     (c) =>
       CONDITIONS[c]?.imposesDisadvantageOnAttackers === true &&
-      !(c === 'invisible' && char.sees_invisible)
+      !(c === 'invisible' && seesInvisible)
   );
   // SRD Paralyzed / Unconscious — any hit from within 5 ft is a Critical Hit.
   const autoCritOnHit =

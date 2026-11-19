@@ -925,6 +925,9 @@ export type StructuredAction =
   | { type: 'try_escape_grapple' }
   // SRD Pact of the Chain — forgo one attack so the familiar attacks.
   | { type: 'familiar_attack'; targetEnemyId?: string }
+  // SRD Investment of the Chain Master (Warlock invocation): a Bonus Action
+  // familiar attack that costs none of your own attacks.
+  | { type: 'familiar_quick_attack'; targetEnemyId?: string }
   | { type: 'stand_up' }
   | { type: 'spend_inspiration' }
   // Manual level-up into a specific class (SRD multiclassing).
@@ -1005,6 +1008,13 @@ export type StructuredAction =
   // SRD College of Lore Magical Discoveries (Bard L6): learn a Cleric / Druid /
   // Wizard spell that is always prepared (two picks).
   | { type: 'choose_magical_discovery'; spellId: string }
+  // SRD Lessons of the First Ones (Warlock invocation): take the Origin feat for
+  // one learning of the invocation. Magic Initiate's spells and Skilled's skills
+  // follow as separate picks (`choose_feat_spell` / `choose_bonus_skill`).
+  | { type: 'choose_lessons_feat'; featId: string }
+  // A Magic Initiate feat taken without its spell choices (Lessons of the First
+  // Ones): pick its cantrips, then its level 1 spell, one at a time.
+  | { type: 'choose_feat_spell'; featId: string; spellId: string }
   // 2024 Weapon Mastery slot growth — on level-up the player picks a new weapon
   // to master (Fighter L4/10/16, Barbarian L4/10). `weaponId` is the chosen
   // weapon. Out-of-combat, no action cost.

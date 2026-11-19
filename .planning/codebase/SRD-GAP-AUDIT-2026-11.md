@@ -16,7 +16,7 @@ play. "Partial" means the feature exists but the RAW behaviour differs.
 |---|---|---|---|
 | Spells | 339 | 339 (+ Bardic Inspiration modeled as a spell) | **112 narrative-only** (no mechanical effect) |
 | Class features (base + subclass, excl. ASI/Epic Boon) | 196 | ~150 | **~35 missing, ~10 partial** (below) |
-| Eldritch Invocations | 28 | 2 (Agonizing Blast, Devil's Sight) | **26 missing** |
+| Eldritch Invocations | 28 | all 28 (done 2026-11-18; see §3) | simplifications in §3 |
 | Monsters | 330 | 328 | 169 `// Simplification:` notes; systemic gaps below |
 | Monster spellcasting | 59 stat blocks | 2 (Mage, Archmage) | **57**; enemy casting supports only damage / single-target condition spells |
 | Legendary Resistance | 32 stat blocks | all 32 (done 2026-11-12) | lair "+1/Day" not applied |
@@ -157,7 +157,7 @@ Missing (no code path):
   concentration) — the extra slot records its own round rather than relying
   on `round` starting at 1.
 - **Sorcerer:** Dragon Companion (Draconic L18).
-- **Warlock:** Eldritch Invocations beyond 2 of 28 (§3), Contact Patron (L9).
+- **Warlock:** Contact Patron (L9). (Invocations done 2026-11-18, §3.)
 
 Partial or unverified (check behaviour against the text):
 
@@ -197,8 +197,33 @@ Chain's free Find Familiar is out of combat only (summons join at the next
 combat start); the Book of Shadows can be rewritten any time out of combat
 (RAW: when it appears at the end of a rest).
 
-Still missing: Investment of the Chain Master, Gift of the Protectors, Gift of
-the Depths, Gaze of Two Minds, Lessons of the First Ones, Witch Sight.
+The last six done 2026-11-18:
+- Lessons of the First Ones (repeatable): each learning takes an Origin feat
+  (`choose_lessons_feat`); Magic Initiate's spells follow one at a time
+  (`choose_feat_spell`, `services/actions/lessons.ts`) and Skilled's skills via
+  the shared bonus-skill grant.
+- Gift of the Depths: Swim Speed (water costs no extra movement) and a free
+  Water Breathing once per Long Rest (`freeSpell.oncePerLongRest`).
+- Gift of the Protectors: party members are written on the page out of combat
+  (CHA-mod names); a named creature knocked to 0 HP by an enemy attack (and not
+  killed outright) stays at 1 HP, once per Long Rest of that Warlock.
+- Gaze of Two Minds: a Bonus Action link (touch to start, any distance to
+  maintain; `gaze_linked`, duration 2); while within 60 ft, a spell's range and
+  line of sight can be measured from the ally's space.
+- Investment of the Chain Master: Quick Attack (`familiar_quick_attack`, a
+  Bonus Action familiar attack).
+- Witch Sight: Truesight 30 ft (`truesightFt`) — pierces magical darkness and
+  negates an invisible target's defence within range.
+
+Simplifications for these: Gift of the Protectors triggers only on the
+enemy-attack knockout path (like Relentless Endurance); Gaze of Two Minds
+doesn't lend the ally's special senses, and attack-roll edges (cover, light)
+are still measured from the Warlock; the Chain Master's flying / swimming
+familiar, damage-type swap, save DC and Resistance reaction aren't modeled
+(familiars don't move independently, their damage ignores type, they have no
+save effects, and enemies never target summons); Witch Sight doesn't stop an
+invisible enemy's Advantage against the Warlock or see through shapechanges;
+breathing underwater has no system to apply to.
 Simplifications: Agonizing Blast, Repelling Blast and Eldritch Spear apply to
 Eldritch Blast only (RAW: a chosen damaging Warlock cantrip, repeatable);
 replacing an invocation on level-up isn't offered.

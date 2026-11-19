@@ -9,10 +9,12 @@ import {
 import { clearInstance, equippedWeaponId, setSlot } from '../../equipment.js';
 import {
   conjurablePactWeapons,
+  gazeAllyId,
   hasInvocation,
   highestOpenSlot,
   invocationDef,
   learnableInvocations,
+  protectorsPageMax,
   tomeCantripOptions,
   tomeRitualOptions,
 } from '../../invocations.js';
@@ -20,6 +22,7 @@ import { enemySaveD20, legendaryResist } from '../../monsterSaves.js';
 import { getClassLevel, hasClass, knowsMetamagic } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { composeNow } from '../../narrative/compose.js';
+import { distanceFeet } from '../../gridEngine.js';
 import { randomUUID } from 'crypto';
 
 // SRD Sorcery Incarnate (L7) — while Innate Sorcery is active, up to TWO
@@ -306,7 +309,7 @@ export function handleCasterFeature(ctx: ActionContext, fid: string, option?: st
       ctx.narrative = `Only Warlocks can learn ${invDef.name}.`;
       return true;
     }
-    if (hasInvocation(char, fid)) {
+    if (hasInvocation(char, fid) && !invDef.repeatable) {
       ctx.narrative = `You already have the ${invDef.name} invocation.`;
       return true;
     }
@@ -321,6 +324,81 @@ export function handleCasterFeature(ctx: ActionContext, fid: string, option?: st
         : fid === 'devils_sight'
           ? `${char.name} gains Devil's Sight — you can see normally in magical darkness.`
           : `${char.name} learns the ${invDef.name} invocation — ${invDef.blurb}.`;
+    return true;
+  }
+
+  // SRD Gift of the Protectors — write a party member's name on the Book of
+  // Shadows' page (up to CHA-mod names), or erase one. Out of combat (RAW:
+  // writing takes the creature's action; erasing is a Magic action).
+  if (fid === 'protectors_inscribe' || fid === 'protectors_erase') {
+    if (!hasInvocation(char, 'gift_of_the_protectors')) {
+      ctx.narrative = 'You need the Gift of the Protectors invocation.';
+      return true;
+    }
+    if (ctx.st.combat_active) {
+      ctx.narrative = 'Tend the Book of Shadows outside combat.';
+      return true;
+    }
+    const who = ctx.st.characters.find((c) => c.id === option && !c.dead);
+    if (!who) {
+      ctx.narrative = 'Choose a party member.';
+      return true;
+    }
+    const page = char.protectors_page ?? [];
+    if (fid === 'protectors_erase') {
+      char.protectors_page = page.filter((id) => id !== who.id);
+      ctx.narrative = `${char.name} touches the page — ${who.name}'s name fades.`;
+      return true;
+    }
+    if (page.includes(who.id)) {
+      ctx.narrative = `${who.name}'s name is already on the page.`;
+      return true;
+    }
+    if (page.length >= protectorsPageMax(char)) {
+      ctx.narrative = `The page is full (${protectorsPageMax(char)} names).`;
+      return true;
+    }
+    char.protectors_page = [...page, who.id];
+    ctx.narrative = `${who.name} writes their name in ${char.name}'s Book of Shadows — Gift of the Protectors.`;
+    return true;
+  }
+
+  // SRD Gaze of Two Minds — Bonus Action: touch a willing ally and perceive
+  // through its senses until the end of your next turn (the `gaze_linked`
+  // condition, duration 2: conditions tick as your turn starts). Repeating it
+  // on the linked ally maintains the link at any distance.
+  if (fid === 'gaze_link') {
+    if (!hasInvocation(char, 'gaze_of_two_minds')) {
+      ctx.narrative = 'You need the Gaze of Two Minds invocation.';
+      return true;
+    }
+    if (ctx.st.combat_active && char.turn_actions.bonus_action_used) {
+      ctx.narrative = 'Bonus action already used this turn.';
+      return true;
+    }
+    const ally = ctx.st.characters.find((c) => c.id === option && c.id !== char.id && !c.dead);
+    if (!ally) {
+      ctx.narrative = 'Choose a willing ally to link with.';
+      return true;
+    }
+    const maintaining = gazeAllyId(char) === ally.id;
+    if (!maintaining && ctx.st.combat_active) {
+      const a = ctx.st.entities?.find((e) => e.id === char.id)?.pos;
+      const b = ctx.st.entities?.find((e) => e.id === ally.id && !e.isEnemy)?.pos;
+      if (a && b && distanceFeet(a, b) > 5) {
+        ctx.narrative = `You must touch ${ally.name} to link with them.`;
+        return true;
+      }
+    }
+    if (ctx.st.combat_active) {
+      char.turn_actions = { ...char.turn_actions, bonus_action_used: true };
+    }
+    char.gaze_ally_id = ally.id;
+    char.conditions = [...char.conditions.filter((c) => c !== 'gaze_linked'), 'gaze_linked'];
+    char.condition_durations = { ...(char.condition_durations ?? {}), gaze_linked: 2 };
+    ctx.narrative = maintaining
+      ? `${char.name} holds the link with ${ally.name}'s senses.`
+      : `${char.name} touches ${ally.name} and looks out through their eyes — spells can now be cast from ${ally.name}'s space while you're within 60 ft.`;
     return true;
   }
 

@@ -742,7 +742,8 @@ export function hasFeralSenses(char: Character): boolean {
 /**
  * SRD Vision & Light — whether a creature's senses let it see WITHOUT light and
  * THROUGH magical Darkness: Blindsight (Ranger Feral Senses), the Warlock's
- * Devil's Sight, or Truesight (the epic Boon of Truesight, `truesight_ft`).
+ * Devil's Sight, or Truesight (the epic Boon of Truesight, `truesight_ft`, or
+ * Witch Sight).
  * Darkvision is deliberately excluded — it brightens nonmagical Darkness but
  * cannot pierce the magical Darkness of the Darkness spell. Feeds both
  * `seesInDarkness` (sees in the dark) and `canSeeTarget`'s
@@ -752,10 +753,16 @@ export function hasFeralSenses(char: Character): boolean {
  */
 export function piercesMagicalDarkness(char: Character): boolean {
   return (
-    hasFeralSenses(char) ||
-    (char.feats?.includes('devils_sight') ?? false) ||
-    (char.truesight_ft ?? 0) > 0
+    hasFeralSenses(char) || (char.feats?.includes('devils_sight') ?? false) || truesightFt(char) > 0
   );
+}
+
+/**
+ * Truesight range in feet: the epic Boon of Truesight (`truesight_ft`) or the
+ * Warlock's Witch Sight invocation (30 ft). 0 without Truesight.
+ */
+export function truesightFt(char: Character): number {
+  return Math.max(char.truesight_ft ?? 0, (char.feats ?? []).includes('witch_sight') ? 30 : 0);
 }
 
 /**

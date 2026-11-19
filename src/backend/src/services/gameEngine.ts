@@ -178,12 +178,18 @@ import {
 import { composeFragments, enemyAttackFragmentEvent } from './narrative/compose.js';
 import {
   conjurablePactWeapons,
+  gazeAllyId,
   hasInvocation,
   highestOpenSlot,
+  invocationUsedKey,
   isPactWeapon,
   knownInvocations,
   learnableInvocations,
+  lessonsFeatOptions,
   pactChainForms,
+  pendingLessonsFeats,
+  protectorFor,
+  protectorsPageMax,
   tomeCantripOptions,
   tomeRitualOptions,
 } from './invocations.js';
@@ -212,6 +218,7 @@ import { characterAc } from './armorClass.js';
 import { factionShopPrice } from './campaignEngine.js';
 import { llmProvider } from './llmProvider.js';
 import { pendingBonusSkills } from './bonusSkills.js';
+import { pendingFeatSpellPicks } from './actions/lessons.js';
 import { randomUUID } from 'crypto';
 import { unarmoredMovementBonus } from './monkFeatures.js';
 import { wornSaveBonus } from './wornEffects.js';
@@ -5689,6 +5696,30 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── Lessons of the First Ones (Warlock invocation) — Origin feat picks, then
+  // a Magic Initiate's spells one at a time. Out of combat.
+  if (!state.combat_active) {
+    if (pendingLessonsFeats(char) > 0) {
+      for (const featId of lessonsFeatOptions(char)) {
+        const feat = context.featTable?.[featId];
+        if (!feat) continue;
+        choices.push({
+          label: `Lessons of the First Ones: gain the ${feat.name} feat`,
+          action: { type: 'choose_lessons_feat', featId },
+        });
+      }
+    }
+    for (const pick of pendingFeatSpellPicks(char, context)) {
+      for (const spellId of pick.options) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `${pick.featName}: learn ${context.spellTable?.[spellId]?.name ?? spellId} (${pick.level === 0 ? 'cantrip' : 'level 1'})`,
+          action: { type: 'choose_feat_spell', featId: pick.featId, spellId },
+        });
+      }
+    }
+  }
+
   // ── Cleric Divine Order (L1) — Protector / Thaumaturge ─────────────────────
   // One-time choice surfaced out of combat. Thaumaturge grants a concrete
   // extra Cleric cantrip (the first learnable one) plus the Arcana/Religion
@@ -6820,6 +6851,53 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         });
       }
     }
+    // SRD Gift of the Protectors — write party members' names on the Book of
+    // Shadows' page (CHA-mod names), or erase one. Out of combat.
+    if (!state.combat_active && hasInvocation(char, 'gift_of_the_protectors')) {
+      const page = char.protectors_page ?? [];
+      for (const m of state.characters) {
+        if (m.dead) continue;
+        if (page.includes(m.id)) {
+          choices.push({
+            label: `Gift of the Protectors — erase ${m.name}'s name from the page`,
+            action: { type: 'use_class_feature', featureId: 'protectors_erase', option: m.id },
+            kind: 'class_feature',
+          });
+        } else if (page.length < protectorsPageMax(char)) {
+          choices.push({
+            label: `Gift of the Protectors — write ${m.name}'s name on the page`,
+            action: { type: 'use_class_feature', featureId: 'protectors_inscribe', option: m.id },
+            kind: 'class_feature',
+          });
+        }
+      }
+    }
+    // SRD Gaze of Two Minds — Bonus Action: touch a willing ally and perceive
+    // through its senses (cast spells from its space) until the end of your
+    // next turn; the same Bonus Action maintains the link.
+    if (
+      hasInvocation(char, 'gaze_of_two_minds') &&
+      (!state.combat_active || !char.turn_actions.bonus_action_used)
+    ) {
+      const selfPos = state.entities?.find((e) => e.id === char.id)?.pos;
+      const linked = gazeAllyId(char);
+      for (const m of state.characters) {
+        if (m.dead || m.id === char.id) continue;
+        const pos = state.entities?.find((e) => e.id === m.id && !e.isEnemy)?.pos;
+        const touchable =
+          !state.combat_active || !selfPos || !pos || distanceFeet(selfPos, pos) <= 5;
+        if (m.id !== linked && !touchable) continue;
+        choices.push({
+          label:
+            m.id === linked
+              ? `Gaze of Two Minds — maintain the link with ${m.name} (bonus action)`
+              : `Gaze of Two Minds — link senses with ${m.name} (bonus action)`,
+          action: { type: 'use_class_feature', featureId: 'gaze_link', option: m.id },
+          kind: 'class_feature',
+          requiresBonusAction: state.combat_active || undefined,
+        });
+      }
+    }
     // SRD Pact of the Blade — Bonus Action: bond the held melee weapon, or
     // conjure one (a picker of the mundane Simple / Martial melee weapons).
     const bonusFree = !state.combat_active || !char.turn_actions.bonus_action_used;
@@ -6915,6 +6993,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const free = inv.freeSpell;
       const sp = free ? context.spellTable?.[free.spellId] : undefined;
       if (!free || !sp) continue;
+      if (free.oncePerLongRest && char.class_resource_uses?.[invocationUsedKey(inv.id)]) continue;
       if (sp.outOfCombatOnly && state.combat_active) continue;
       if (free.needsDimOrDark) {
         const pos = state.entities?.find((e) => e.id === char.id)?.pos;
@@ -7775,6 +7854,28 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `Your ${famName} attacks the ${en.name} — forgo one of your attacks (Pact of the Chain)`,
         action: { type: 'familiar_attack', targetEnemyId: en.id },
+      });
+    }
+  }
+
+  // SRD Investment of the Chain Master — Quick Attack: a Bonus Action command
+  // for the familiar to attack, costing none of your own attacks.
+  if (
+    state.combat_active &&
+    !char.turn_actions.bonus_action_used &&
+    hasInvocation(char, 'investment_of_the_chain_master')
+  ) {
+    const familiar = state.entities?.find(
+      (e) => e.summoned_by === char.id && e.noAttack && e.hp > 0
+    );
+    const famName = familiar?.companionName ?? 'familiar';
+    for (const en of familiar ? livingEnemies : []) {
+      const enEnt = state.entities?.find((e) => e.id === en.id && e.isEnemy);
+      if (!enEnt || distanceFeet(familiar!.pos, enEnt.pos) > 5) continue;
+      choices.push({
+        label: `Quick Attack — your ${famName} attacks the ${en.name} (bonus action)`,
+        action: { type: 'familiar_quick_attack', targetEnemyId: en.id },
+        requiresBonusAction: true,
       });
     }
   }
@@ -9093,7 +9194,51 @@ export function resolveEnemySubAttack(args: {
       };
     }
   }
+  // SRD Gift of the Protectors — a creature named on a Warlock's Book of
+  // Shadows page drops to 1 HP instead of 0 (not if killed outright); then no
+  // one benefits until that Warlock finishes a Long Rest.
+  let protectorName = '';
+  let protectorId = '';
+  if (
+    !orcSaveFired &&
+    !relentlessRageFired &&
+    prevHp > 0 &&
+    target.hp === 0 &&
+    !isMassiveDamageDeath(prevHp, computed.hpLost, target.max_hp)
+  ) {
+    const w = protectorFor(computed.proposedSt.characters, target.id);
+    if (w) {
+      protectorName = w.name;
+      protectorId = w.id;
+      target = { ...target, hp: 1 };
+      if (w.id === target.id) {
+        target = {
+          ...target,
+          class_resource_uses: {
+            ...(target.class_resource_uses ?? {}),
+            gift_of_protectors_used: 1,
+          },
+        };
+      }
+    }
+  }
   st = computed.proposedSt;
+  if (protectorId && protectorId !== target.id) {
+    st = {
+      ...st,
+      characters: st.characters.map((c) =>
+        c.id === protectorId
+          ? {
+              ...c,
+              class_resource_uses: { ...(c.class_resource_uses ?? {}), gift_of_protectors_used: 1 },
+            }
+          : c
+      ),
+    };
+  }
+  if (protectorName) {
+    narrative += ` 📖 Gift of the Protectors! ${target.name}'s name on ${protectorName}'s page holds them at ${fmt.hp(1)} HP.`;
+  }
   if (orcSaveFired) {
     narrative += ` 🪓 Relentless Endurance! ${target.name} stays standing at ${fmt.hp(1)} HP.`;
   }

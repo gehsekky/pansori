@@ -45,6 +45,7 @@ import {
 } from './social.js';
 import { handleAttune, handleDeAttune, handleUse } from './inventory.js';
 import { handleCancelTeleport, handleTeleportTo } from './teleportTo.js';
+import { handleChooseFeatSpell, handleChooseLessonsFeat } from './lessons.js';
 import { handleContinue, handleEndTurn, handlePass } from './utility.js';
 import {
   handleDash,
@@ -58,6 +59,7 @@ import {
 import { handleDismount, handleMount } from './mount.js';
 import {
   handleFamiliarAttack,
+  handleFamiliarQuickAttack,
   handleGrapple,
   handleShove,
   handleTryEscapeGrapple,
@@ -124,6 +126,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   choose_expertise: handleChooseExpertise as ActionHandler,
   choose_bonus_skill: handleChooseBonusSkill as ActionHandler,
   choose_magical_discovery: handleChooseMagicalDiscovery as ActionHandler,
+  choose_lessons_feat: handleChooseLessonsFeat as ActionHandler,
+  choose_feat_spell: handleChooseFeatSpell as ActionHandler,
   choose_weapon_mastery: handleChooseWeaponMastery as ActionHandler,
   learn_spell: handleLearnSpell as ActionHandler,
   choose_hunter_option: handleChooseHunterOption as ActionHandler,
@@ -167,6 +171,7 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   try_escape_grapple: handleTryEscapeGrapple as ActionHandler,
   shove: handleShove as ActionHandler,
   familiar_attack: handleFamiliarAttack as ActionHandler,
+  familiar_quick_attack: handleFamiliarQuickAttack as ActionHandler,
   move_zone: handleMoveZone as ActionHandler,
   loot: handleLoot as ActionHandler,
   sneak: handleSneak as ActionHandler,

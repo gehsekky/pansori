@@ -54,6 +54,7 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   shove: 'action',
   try_escape_grapple: 'action',
   familiar_attack: 'action',
+  familiar_quick_attack: 'bonusAction',
 
   // Reaction-cost handlers.
   use_reaction: 'reaction',
@@ -73,6 +74,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   choose_expertise: 'managed',
   choose_bonus_skill: 'managed',
   choose_magical_discovery: 'managed',
+  choose_lessons_feat: 'managed',
+  choose_feat_spell: 'managed',
   choose_weapon_mastery: 'managed',
   learn_spell: 'managed',
   choose_hunter_option: 'managed',

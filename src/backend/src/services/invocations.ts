@@ -16,6 +16,8 @@ export interface InvocationFreeSpell {
   selfOnly?: boolean;
   /** One with Shadows: only while in Dim Light or Darkness. */
   needsDimOrDark?: boolean;
+  /** Gift of the Depths: once, then not again until a Long Rest. */
+  oncePerLongRest?: boolean;
 }
 
 export interface InvocationDef {
@@ -29,6 +31,8 @@ export interface InvocationDef {
   requiresSpell?: string;
   /** A spell the invocation lets you cast without a slot, at will. */
   freeSpell?: InvocationFreeSpell;
+  /** Lessons of the First Ones: can be learned more than once. */
+  repeatable?: boolean;
   /** Short menu blurb (our own words). */
   blurb: string;
 }
@@ -178,6 +182,46 @@ export const INVOCATIONS: InvocationDef[] = [
     blurb: 'Arcane Eye, no slot',
   },
   {
+    id: 'gaze_of_two_minds',
+    name: 'Gaze of Two Minds',
+    minLevel: 5,
+    blurb: 'link senses with an ally (Bonus Action) and cast spells from their space',
+  },
+  {
+    id: 'gift_of_the_depths',
+    name: 'Gift of the Depths',
+    minLevel: 5,
+    freeSpell: { spellId: 'water_breathing', oncePerLongRest: true },
+    blurb: 'Swim Speed, breathe underwater, and Water Breathing once per Long Rest without a slot',
+  },
+  {
+    id: 'gift_of_the_protectors',
+    name: 'Gift of the Protectors',
+    minLevel: 9,
+    requires: 'pact_of_the_tome',
+    blurb: 'allies named in your Book of Shadows drop to 1 HP instead of 0 (once per Long Rest)',
+  },
+  {
+    id: 'investment_of_the_chain_master',
+    name: 'Investment of the Chain Master',
+    minLevel: 5,
+    requires: 'pact_of_the_chain',
+    blurb: 'command your familiar to attack as a Bonus Action',
+  },
+  {
+    id: 'lessons_of_the_first_ones',
+    name: 'Lessons of the First Ones',
+    minLevel: 2,
+    repeatable: true,
+    blurb: 'gain an Origin feat (repeatable)',
+  },
+  {
+    id: 'witch_sight',
+    name: 'Witch Sight',
+    minLevel: 15,
+    blurb: 'Truesight out to 30 ft',
+  },
+  {
     id: 'whispers_of_the_grave',
     name: 'Whispers of the Grave',
     minLevel: 7,
@@ -212,6 +256,11 @@ export function hasInvocation(char: Pick<Character, 'feats'>, id: string): boole
   return (char.feats ?? []).includes(id);
 }
 
+/** How many times the character has learned invocation `id` (repeatables). */
+export function invocationCount(char: Pick<Character, 'feats'>, id: string): number {
+  return (char.feats ?? []).filter((f) => f === id).length;
+}
+
 /** The invocations this character knows. */
 export function knownInvocations(char: Pick<Character, 'feats'>): InvocationDef[] {
   return (char.feats ?? []).map((f) => BY_ID.get(f)).filter((d): d is InvocationDef => !!d);
@@ -223,7 +272,9 @@ export function learnableInvocations(char: Character): InvocationDef[] {
   if (knownInvocations(char).length >= invocationsKnownMax(wl)) return [];
   return INVOCATIONS.filter(
     (d) =>
-      !hasInvocation(char, d.id) &&
+      (d.repeatable
+        ? lessonsFeatOptions(char).length > pendingLessonsFeats(char)
+        : !hasInvocation(char, d.id)) &&
       wl >= d.minLevel &&
       (!d.requires || hasInvocation(char, d.requires)) &&
       (!d.requiresSpell || (char.spells_known ?? []).includes(d.requiresSpell))
@@ -333,4 +384,64 @@ export function tomeRitualOptions(
   return Object.values(spellTable).filter(
     (sp) => sp.level === 1 && !!sp.ritualCasting && !known.has(sp.id)
   );
+}
+
+// ── Lessons of the First Ones ───────────────────────────────────────────────
+
+/** SRD Origin feats (Lessons of the First Ones grants one per learning). */
+export const ORIGIN_FEATS = [
+  'alert',
+  'magic_initiate_arcane',
+  'magic_initiate_divine',
+  'magic_initiate_primal',
+  'savage_attacker',
+  'skilled',
+];
+
+/** Origin feats the character doesn't have yet (each Lessons pick must differ). */
+export function lessonsFeatOptions(char: Pick<Character, 'feats'>): string[] {
+  return ORIGIN_FEATS.filter((f) => !(char.feats ?? []).includes(f));
+}
+
+/** Lessons of the First Ones learned but whose Origin feat isn't chosen yet. */
+export function pendingLessonsFeats(char: Pick<Character, 'feats' | 'lessons_feats'>): number {
+  return Math.max(
+    0,
+    invocationCount(char, 'lessons_of_the_first_ones') - (char.lessons_feats ?? []).length
+  );
+}
+
+// ── Gift of the Protectors ──────────────────────────────────────────────────
+
+/** How many names the Book of Shadows' page holds: CHA modifier, minimum 1. */
+export function protectorsPageMax(char: Pick<Character, 'cha'>): number {
+  return Math.max(1, Math.floor((char.cha - 10) / 2));
+}
+
+/**
+ * SRD Gift of the Protectors — the Warlock whose page names `targetId` and
+ * whose once-per-Long-Rest protection is unspent, if any.
+ */
+export function protectorFor(chars: Character[], targetId: string): Character | undefined {
+  return chars.find(
+    (w) =>
+      !w.dead &&
+      hasInvocation(w, 'gift_of_the_protectors') &&
+      (w.protectors_page ?? []).includes(targetId) &&
+      !(w.class_resource_uses?.gift_of_protectors_used ?? 0)
+  );
+}
+
+// ── Gaze of Two Minds ───────────────────────────────────────────────────────
+
+/** SRD Gaze of Two Minds — the linked ally's id while the link holds. */
+export function gazeAllyId(
+  char: Pick<Character, 'conditions' | 'gaze_ally_id'>
+): string | undefined {
+  return (char.conditions ?? []).includes('gaze_linked') ? char.gaze_ally_id : undefined;
+}
+
+/** The free-cast use key for a once-per-Long-Rest invocation spell. */
+export function invocationUsedKey(invocationId: string): string {
+  return `invocation_used_${invocationId}`;
 }
