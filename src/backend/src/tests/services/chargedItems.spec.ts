@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { attuneBlocker, itemCastOptions, regainItemCharges } from '../../services/chargedItems.js';
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
+import { ITEM_POWERS } from '../../campaignData/srd/itemPowers.js';
 import { SRD_ITEMS } from '../../campaignData/srd/items.js';
 import { SRD_SPELLS } from '../../campaignData/srd/spells.js';
 import { context as baseCtx } from '../fixtures/testContext.js';
@@ -146,7 +147,10 @@ describe('catalog', () => {
     }
     for (const it of Object.values(SRD_ITEMS)) {
       for (const s of it.itemSpells ?? [])
-        expect(SRD_SPELLS[s.spellId], `${it.id}: ${s.spellId}`).toBeDefined();
+        expect(
+          SRD_SPELLS[s.spellId] ?? ITEM_POWERS[s.spellId],
+          `${it.id}: ${s.spellId}`
+        ).toBeDefined();
       if (it.spellScroll) expect(SRD_SPELLS[it.spellScroll]).toBeDefined();
     }
     expect(SRD_ITEMS.spell_scroll_fireball.value).toBe(300);

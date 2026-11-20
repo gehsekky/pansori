@@ -729,6 +729,7 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal('displacement') }).strict(),
   z.object({ kind: z.literal('truesight'), feet: z.number().int().min(5).max(300) }).strict(),
+  z.object({ kind: z.literal('missile_snaring') }).strict(),
   z
     .object({
       kind: z.literal('spell_attack_bonus'),
@@ -872,9 +873,11 @@ const LootItemSchema = z
         effect: PotionEffectSchema,
         charges: z.number().int().min(1).max(20).optional(),
         daily: z.boolean().optional(),
+        bonusAction: z.boolean().optional(),
       })
       .strict()
       .optional(),
+    evasionRing: z.boolean().optional(),
     studyIncrease: SAVE_ABILITY.optional(),
     conjuresAmmo: z.boolean().optional(),
     charges: z
@@ -901,6 +904,14 @@ const LootItemSchema = z
             daily: z.boolean().optional(),
             attack: z.number().int().min(-5).max(20).optional(),
             selfOnly: z.boolean().optional(),
+            backfire: z
+              .object({
+                chancePct: z.number().int().min(1).max(100),
+                damage: DICE,
+                damageType: z.string().min(1).max(20),
+              })
+              .strict()
+              .optional(),
           })
           .strict()
       )

@@ -1874,6 +1874,8 @@ export type WornEffect =
   | { kind: 'regeneration'; dice: string; everyMinutes: number }
   // SRD Robe of Eyes — Truesight out to `feet`.
   | { kind: 'truesight'; feet: number }
+  // SRD Gloves of Missile Snaring — a Reaction cuts a ranged weapon hit by 1d10 + DEX.
+  | { kind: 'missile_snaring' }
   // SRD Cloak of Displacement — attacks against you have Disadvantage until you
   // take damage (back at the start of your next turn); not while Speed is 0.
   | { kind: 'displacement' };
@@ -2010,6 +2012,7 @@ export interface WornTraits {
   regeneration?: Array<{ dice: string; everyMinutes: number }>;
   displacement?: boolean;
   truesightFt?: number;
+  missileSnaring?: boolean;
 }
 
 /**
@@ -2035,6 +2038,9 @@ export interface ItemSpell {
   attack?: number;
   // The item casts it on its wearer only (Ring of Jumping, Boots of Levitation).
   selfOnly?: boolean;
+  // Each use risks the item blowing up in the user's hands (Horn of Blasting:
+  // 20 percent, 10d6 Force) — it's then destroyed.
+  backfire?: { chancePct: number; damage: string; damageType: string };
 }
 
 /** SRD item charges — `regain` is the dice regained at dawn (on a Long Rest). */
@@ -2262,7 +2268,17 @@ export interface LootItem {
   carried?: boolean;
   // SRD activated wondrous items (Winged Boots, Wings of Flying, Periapt of
   // Health) — a Magic action, worn and attuned, spending charges or a daily use.
-  activate?: { label: string; effect: PotionEffect; charges?: number; daily?: boolean };
+  activate?: {
+    label: string;
+    effect: PotionEffect;
+    charges?: number;
+    daily?: boolean;
+    // A Bonus Action instead of a Magic action (Boots of Speed).
+    bonusAction?: boolean;
+  };
+  // SRD Ring of Evasion — a failed Dexterity save becomes a success for a
+  // charge (and the wearer's Reaction).
+  evasionRing?: boolean;
   // SRD Manuals and Tomes — studying one raises a score by 2 (max 30), then
   // the book loses its magic.
   studyIncrease?: AbilityKey;

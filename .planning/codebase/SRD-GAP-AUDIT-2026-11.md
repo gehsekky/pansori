@@ -511,6 +511,30 @@ the Wind Fan gets one safe use per dawn instead of its tearing chance. The
 Rod of Resurrection's Resurrection is castable through the API but isn't
 offered in the choice list (revive spells never are for item casts yet).
 
+**Batch 9 done 2026-11-20 — activated items, round 2 (effects that aren't
+spells).** New machinery: item powers (`campaignData/srd/itemPowers.ts`) —
+spell-shaped `itemPower` effects resolved by the spell engine (attack roll,
+save, cone / sphere / cube, save-ends conditions) but on no class list and
+outside the spell table, reachable only through their item; Emanations
+centered on the user for AoE conditions; `ItemSpell.backfire` (a chance to
+explode in the user's hands); `activate.bonusAction`; `evasionRing` (a failed
+Dex save against an enemy spell becomes a success for a charge and the
+Reaction); a `missile_snaring` worn effect (a ranged weapon hit loses 1d10 +
+DEX for the Reaction); and item invisibility that attacking doesn't end.
+Items: Wand of Paralysis, Ring of the Ram, Horn of Blasting, Bead of Force,
+Pipes of Haunting, Rod of Rulership, Boots of Speed, Gloves of Missile
+Snaring, Ring of Evasion, Ring and Cloak of Invisibility, and the Ring of
+Shooting Stars' Shooting Stars. Simplifications: the Ram's push and
+object-breaking, the Bead's trapping sphere (and a fixed pouch of 6), the
+Pipes' 24-hour immunity and the Rod's early end when harmed aren't modeled;
+every Shooting Stars mote lands on one point; Boots of Speed are one
+10-minute use per Long Rest; Missile Snaring and the Ring of Evasion resolve
+automatically (the free hand isn't checked, and the ring covers enemy spell
+saves only, not monster on-hit saves); the Ring of Invisibility lasts an hour
+per use and neither item's invisibility ends early when it's removed.
+Deferred: Dust of Sneezing and Choking (it catches the user too), Robe of
+Scintillating Colors, the Ring of Shooting Stars' Lightning Spheres.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

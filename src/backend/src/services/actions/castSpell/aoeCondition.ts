@@ -33,11 +33,14 @@ export function runAoeConditionSpell(ctx: ActionContext, spell: Spell, dc: numbe
 
   // Epicenter: the targeted enemy's cell (Confusion's 10-ft sphere anchors on
   // the primary target; a Cone/Cube/Line extends from the caster toward it).
-  const epicenter =
-    ctx.st.entities.find((e) => e.id === ctx.enemy?.id && e.isEnemy)?.pos ??
-    ctx.st.entities.find((e) => e.isEnemy)?.pos;
-  if (!epicenter) return false;
   const casterPos = ctx.st.entities.find((e) => e.id === char.id)?.pos;
+  // A self-centered sphere is an Emanation around the user (Pipes of Haunting).
+  const emanation = spell.rangeKind === 'self' && (spell.aoeShape ?? 'sphere') === 'sphere';
+  const epicenter = emanation
+    ? casterPos
+    : (ctx.st.entities.find((e) => e.id === ctx.enemy?.id && e.isEnemy)?.pos ??
+      ctx.st.entities.find((e) => e.isEnemy)?.pos);
+  if (!epicenter) return false;
 
   // Same shape resolution as the AoE damage branch (Color Spray is a Cone from
   // the caster; Confusion a Sphere on the target).

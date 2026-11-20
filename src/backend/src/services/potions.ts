@@ -228,6 +228,9 @@ const CONDITION_NOTES: Record<string, string> = {
   [POTION_CONDITIONS.invulnerable]: 'has Resistance to all damage',
   [POTION_CONDITIONS.slippery]: "can't be Paralyzed, Restrained, or Grappled (Freedom of Movement)",
   [POTION_CONDITIONS.waterBreathing]: 'can breathe underwater',
+  // SRD Ring / Cloak of Invisibility — granted with `invisible`; attacking doesn't end it.
+  item_invisibility: "turns Invisible (attacking doesn't end it)",
+  boots_of_speed: 'doubles their Speed (Opportunity Attacks against them have Disadvantage)',
 };
 
 /**
@@ -247,7 +250,9 @@ export function resolvePotion(
     case 'condition': {
       const rounds = potionRounds(potion.rounds);
       t = grantTimed(t, potion.conditions, rounds);
-      const parts = potion.conditions.map((c) => CONDITION_NOTES[c] ?? c);
+      const parts = potion.conditions
+        .filter((c) => !(c === 'invisible' && potion.conditions.includes('item_invisibility')))
+        .map((c) => CONDITION_NOTES[c] ?? c);
       if (potion.tempHp) {
         // SRD: Temporary Hit Points don't stack — keep the larger pool.
         const had = t.temp_hp ?? 0;

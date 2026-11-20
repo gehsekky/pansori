@@ -201,7 +201,13 @@ export const handleGridMove: ActionHandler<{
     ) {
       // SRD Ranger Escape the Horde (Defensive Tactics L7) — opportunity
       // attacks against you have Disadvantage.
-      const oaResult = resolveEnemyAttack(oaEnemy, nextChar.ac, false, hasEscapeTheHorde(nextChar));
+      // SRD Boots of Speed — likewise while the boots are clicked on.
+      const oaResult = resolveEnemyAttack(
+        oaEnemy,
+        nextChar.ac,
+        false,
+        hasEscapeTheHorde(nextChar) || nextChar.conditions.includes('boots_of_speed')
+      );
       if (oaResult.hit) {
         const rawDmg = oaResult.damage;
         // Route through applyDamage so the OA respects every PC-side

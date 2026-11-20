@@ -13,14 +13,15 @@ import {
   inDimLightOrDarkness,
 } from '../../gridEngine.js';
 import { abilityMod, d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
-import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
+import { breakConcentration, isSpellSuppressed, pcDamageTaken } from '../../gameEngine.js';
+import { clearInstance, equippedArmorId } from '../../equipment.js';
 import { druidCantripRangeBonus, wildShapeBlocksCasting } from '../../druidFeatures.js';
 import { gazeAllyId, hasInvocation, invocationDef, invocationUsedKey } from '../../invocations.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { alwaysPreparedSpells } from '../../subclassSpells.js';
+import { applyDamage } from '../../damage.js';
 import { characterAc } from '../../armorClass.js';
-import { equippedArmorId } from '../../equipment.js';
 import { spellRecallKeepsSlot } from '../../feats.js';
 import { syncSetAbilities } from '../../wornEffects.js';
 import { updatePcActor } from '../actor.js';
@@ -500,6 +501,19 @@ export function runPrecast(
     if (!itemPlan.scroll && now?.id !== itemPlan.loot.id) {
       syncSetAbilities(pc.char, ctx.context.lootTable);
       pc.char.ac = characterAc(pc.char, ctx.context.lootTable);
+    }
+    // SRD Horn of Blasting — each use may blow the item up in the user's hands.
+    const bf = itemPlan.is?.backfire;
+    if (bf && d(100) <= bf.chancePct) {
+      const gone = itemPlan.inv.instance_id;
+      pc.char.inventory = pc.char.inventory.filter((i) => i.instance_id !== gone);
+      pc.char.equipment = clearInstance(pc.char.equipment ?? {}, gone);
+      pc.char.attuned_items = (pc.char.attuned_items ?? []).filter((id) => id !== gone);
+      const dmg = pcDamageTaken(pc.char, ctx.st, rollDice(bf.damage), bf.damageType);
+      const hit = applyDamage(pc.char, ctx.st, dmg, { damageType: bf.damageType });
+      Object.assign(pc.char, hit.char);
+      ctx.st = hit.st;
+      itemNote += ` The ${itemPlan.loot.name} explodes in ${pc.char.name}'s hands — ${hit.amountDealt} ${bf.damageType} damage!`;
     }
     ctx.itemCast = {
       attackBonus: itemPlan.attackBonus,

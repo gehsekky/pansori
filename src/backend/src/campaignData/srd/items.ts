@@ -3941,19 +3941,25 @@ const WONDROUS_3: Array<[string, LootItem]> = [
       itemSpells: [sp('animal_friendship', 1), sp('fear', 1), sp('speak_with_animals', 1)],
     }
   ),
-  // SRD Ring of Shooting Stars. Simplification: the Lightning Spheres and
-  // Shooting Stars properties aren't modeled yet, and the ring works in any light.
+  // SRD Ring of Shooting Stars. Simplification: the Lightning Spheres aren't
+  // modeled, every Shooting Stars mote lands on one point, and the ring works
+  // in any light.
   wondrous(
     'ring_of_shooting_stars',
     'Ring of Shooting Stars',
     'Very Rare',
-    '6 charges (regains 1d6 at dawn). While wearing it, cast Dancing Lights or Light at will, or spend 1 charge to cast Faerie Fire.',
+    '6 charges (regains 1d6 at dawn). While wearing it, cast Dancing Lights or Light at will, spend 1 charge to cast Faerie Fire, or 1 to 3 charges for Shooting Stars: a 15-foot cube within 60 feet, DC 15 Dexterity save, 5d4 Radiant per charge (half on a success).',
     'ring',
     {
       requiresAttunement: true,
       weight: 0,
       charges: { max: 6, regain: '1d6' },
-      itemSpells: [sp('dancing_lights', 0), sp('light', 0), sp('faerie_fire', 1)],
+      itemSpells: [
+        sp('dancing_lights', 0),
+        sp('light', 0),
+        sp('faerie_fire', 1),
+        sp('shooting_stars', 1, { maxLevel: 3, dc: 15 }),
+      ],
     }
   ),
   wondrous(
@@ -4205,6 +4211,171 @@ const WONDROUS_3: Array<[string, LootItem]> = [
         { kind: 'darkvision', feet: 120, atLeast: true },
         { kind: 'truesight', feet: 120 },
       ],
+    }
+  ),
+];
+
+// ── SRD activated items, round 2 — effects that aren't spells ──────────────
+// Item powers (campaignData/srd/itemPowers.ts) resolve through the spell
+// engine; the rest are reactions, a Bonus Action toggle and invisibility.
+const WONDROUS_4: Array<[string, LootItem]> = [
+  wand(
+    'wand_of_paralysis',
+    'Wand of Paralysis',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn). Spend 1 charge to fire a ray at a creature within 60 feet: DC 15 Constitution save or Paralyzed for 1 minute (it saves again at the end of each turn).',
+    {
+      requiresAttunement: true,
+      attuneBy: ['spellcaster'],
+      charges: WAND_CHARGES,
+      itemSpellDc: 15,
+      itemSpells: [sp('paralysis_ray', 1)],
+    }
+  ),
+  // Simplification: the push and the object-breaking use aren't modeled.
+  wondrous(
+    'ring_of_the_ram',
+    'Ring of the Ram',
+    'Rare',
+    '3 charges (regains 1d3 at dawn). While wearing it, spend 1 to 3 charges: a spectral ram makes a ranged attack (+7) against a creature within 60 feet, dealing 2d10 Force per charge.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('ram_strike', 1, { maxLevel: 3, attack: 7 })],
+    }
+  ),
+  wondrous(
+    'horn_of_blasting',
+    'Horn of Blasting',
+    'Rare',
+    'Blow it for a 30-foot cone of sound: DC 15 Constitution save, 5d8 Thunder and Deafened for 1 minute (half damage only on a success). Each use has a 20 percent chance to explode, dealing 10d6 Force to you and destroying the horn. Hold it in your off hand.',
+    'off_hand',
+    {
+      weight: 2,
+      itemSpellDc: 15,
+      itemSpells: [
+        sp('horn_blast', 0, { backfire: { chancePct: 20, damage: '10d6', damageType: 'force' } }),
+      ],
+    }
+  ),
+  // SRD Bead of Force — 1d4 + 4 are found together. Simplification: a pouch of
+  // 6, and the trapping sphere of force isn't modeled.
+  wondrous(
+    'bead_of_force',
+    'Bead of Force',
+    'Rare',
+    'A pouch of 6 beads. Throw one up to 60 feet: it bursts in a 10-foot-radius sphere, and each creature there makes a DC 15 Dexterity save or takes 5d4 Force damage.',
+    null,
+    {
+      weight: 0,
+      castWhileCarried: true,
+      charges: { max: 6, regain: '0', consumable: true },
+      itemSpellDc: 15,
+      itemSpells: [sp('force_bead', 1)],
+    }
+  ),
+  // Simplification: the 24-hour immunity after a successful save isn't tracked.
+  wondrous(
+    'pipes_of_haunting',
+    'Pipes of Haunting',
+    'Uncommon',
+    '3 charges (regains 1d3 at dawn). Spend 1 to play an eerie tune: each enemy within 30 feet makes a DC 15 Wisdom save or is Frightened for 1 minute (saving again at the end of each turn). Hold them in your off hand.',
+    'off_hand',
+    {
+      weight: 2,
+      charges: { max: 3, regain: '1d3' },
+      itemSpellDc: 15,
+      itemSpells: [sp('haunting_tune', 1)],
+    }
+  ),
+  // Simplification: the charm doesn't break early when the party harms a target.
+  wondrous(
+    'rod_of_rulership',
+    'Rod of Rulership',
+    'Rare',
+    'Once per dawn, present the rod: each enemy within 120 feet makes a DC 15 Wisdom save or is Charmed by you for 8 hours. Hold it in your off hand.',
+    'off_hand',
+    {
+      requiresAttunement: true,
+      weight: 2,
+      itemSpellDc: 15,
+      itemSpells: [sp('rulership', 0, { daily: true })],
+    }
+  ),
+  // SRD Boots of Speed. Simplification: one 10-minute use per Long Rest (the
+  // boots can't be switched off early to save the rest of the time).
+  wondrous(
+    'boots_of_speed',
+    'Boots of Speed',
+    'Rare',
+    'While wearing them, click your heels as a Bonus Action: your Speed doubles and Opportunity Attacks against you have Disadvantage for 10 minutes. Then not again until you finish a Long Rest.',
+    'feet',
+    {
+      requiresAttunement: true,
+      activate: {
+        label: 'Click the heels (10 minutes)',
+        daily: true,
+        bonusAction: true,
+        effect: { kind: 'condition', conditions: ['boots_of_speed'], rounds: 100 },
+      },
+    }
+  ),
+  // SRD Gloves of Missile Snaring. Simplification: resolved automatically,
+  // and the free hand isn't checked.
+  wondrous(
+    'gloves_of_missile_snaring',
+    'Gloves of Missile Snaring',
+    'Uncommon',
+    'While wearing them, when a Ranged or thrown weapon hits you, your Reaction cuts the damage by 1d10 + your Dexterity modifier — down to 0, you catch it.',
+    'hands',
+    { requiresAttunement: true, wornEffects: [{ kind: 'missile_snaring' }] }
+  ),
+  wondrous(
+    'ring_of_evasion',
+    'Ring of Evasion',
+    'Rare',
+    '3 charges (regains 1d3 at dawn). While wearing it, when you fail a Dexterity save, your Reaction and 1 charge turn it into a success.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      charges: { max: 3, regain: '1d3' },
+      evasionRing: true,
+    }
+  ),
+  // SRD Ring of Invisibility. Simplification: each use lasts 1 hour (use it
+  // again to stay unseen), and ending it early isn't modeled.
+  wondrous(
+    'ring_of_invisibility',
+    'Ring of Invisibility',
+    'Legendary',
+    'While wearing it, a Magic action makes you Invisible; attacking or casting does not end it.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      activate: {
+        label: 'Turn Invisible (1 hour)',
+        effect: { kind: 'condition', conditions: ['invisible', 'item_invisibility'], rounds: HOUR },
+      },
+    }
+  ),
+  wondrous(
+    'cloak_of_invisibility',
+    'Cloak of Invisibility',
+    'Legendary',
+    '3 charges (regains 1d3 at dawn). While wearing it, pull up the hood as a Magic action and spend 1 charge to be Invisible for 1 hour; attacking or casting does not end it.',
+    'cloak',
+    {
+      requiresAttunement: true,
+      charges: { max: 3, regain: '1d3' },
+      activate: {
+        label: 'Pull up the hood (Invisible, 1 hour)',
+        charges: 1,
+        effect: { kind: 'condition', conditions: ['invisible', 'item_invisibility'], rounds: HOUR },
+      },
     }
   ),
 ];
@@ -4569,6 +4740,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...CURSED_ITEMS,
   ...WONDROUS_2,
   ...WONDROUS_3,
+  ...WONDROUS_4,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

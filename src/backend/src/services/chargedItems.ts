@@ -1,6 +1,7 @@
 import type { Character, InventoryItem, ItemSpell, LootItem, Spell } from '../types.js';
 import { classSpellListTag, getAllClasses } from './multiclass.js';
 import { d, rollDice } from './rulesEngine.js';
+import { ITEM_POWERS } from '../campaignData/srd/itemPowers.js';
 import { clearInstance } from './equipment.js';
 
 // SRD 5.2.1 activated magic items — wands and staffs that cast spells from
@@ -24,6 +25,17 @@ export const SCROLL_STATS: Record<number, { dc: number; attack: number }> = {
 };
 
 const HAND_SLOTS = ['main_hand', 'off_hand'] as const;
+
+/**
+ * The spell an item casts — from the spell table, or one of the item powers
+ * (spell-shaped effects that aren't spells: the Wand of Paralysis' ray).
+ */
+export function itemSpellFor(
+  spellTable: Record<string, Spell> | undefined,
+  spellId: string
+): Spell | undefined {
+  return spellTable?.[spellId] ?? ITEM_POWERS[spellId];
+}
 
 /** Charges left on an item instance (0 for an item without charges). */
 export function chargesLeft(inv: InventoryItem, loot: LootItem): number {
@@ -303,7 +315,7 @@ export function itemCastOptions(
     if (!loot.itemSpells?.length || !canUseItem(char, inv, loot)) continue;
     const left = chargesLeft(inv, loot);
     for (const is of loot.itemSpells) {
-      const spell = spellTable[is.spellId];
+      const spell = itemSpellFor(spellTable, is.spellId);
       if (!spell || (is.daily && dailyUsed(inv, dailyKey(is.spellId)))) continue;
       const base = is.level ?? spell.level;
       for (let lvl = base; lvl <= (is.maxLevel ?? base); lvl++) {
@@ -336,4 +348,33 @@ export function itemSpellVersion(
     ...(is.damage ? { damage: is.damage, upcastBonus: undefined } : {}),
     ...(is.noConcentration ? { concentration: false } : {}),
   };
+}
+
+/**
+ * SRD Ring of Evasion — after a failed Dexterity save, the wearer (with their
+ * Reaction free) spends a charge to succeed instead. Auto-resolved
+ * (player-favorable). Returns the updated character and a note, or null when
+ * no worn, attuned ring has a charge left.
+ */
+export function useEvasionRing(
+  char: Character,
+  lootTable: LootItem[]
+): { char: Character; note: string } | null {
+  if (char.turn_actions?.reaction_used) return null;
+  const worn = new Set(Object.values(char.equipment ?? {}));
+  const attuned = new Set(char.attuned_items ?? []);
+  for (const inv of char.inventory ?? []) {
+    const loot = lootTable.find((l) => l.id === inv.id);
+    if (!loot?.evasionRing || !worn.has(inv.instance_id) || !attuned.has(inv.instance_id)) {
+      continue;
+    }
+    if (chargesLeft(inv, loot) < 1) continue;
+    const next: Character = {
+      ...char,
+      turn_actions: { ...char.turn_actions, reaction_used: true },
+    };
+    const left = spendCharges(next, inv.instance_id, 1, lootTable);
+    return { char: next, note: `${loot.name} turns the failure into a success${left}` };
+  }
+  return null;
 }

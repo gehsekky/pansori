@@ -171,7 +171,7 @@ import {
   spellSlotsForChar,
   wildShapeUsesMax,
 } from './multiclass.js';
-import { attuneBlocker, itemCastOptions } from './chargedItems.js';
+import { attuneBlocker, itemCastOptions, useEvasionRing } from './chargedItems.js';
 import {
   availableRecoveries,
   enumerateRecoveryPlans,
@@ -2064,7 +2064,21 @@ function computeEnemyAttack(
     // Uncanny Dodge), so the proposed snapshot here carries the FULL B/P/S
     // damage and the resolver applies the 1d10 + DEX + Monk-level reduction on
     // accept. (The optional Focus-Point redirect is deferred — see docs/TODO.md.)
-    const postDeflectDmg = postWardDmg;
+    // SRD Gloves of Missile Snaring — a Reaction cuts a Ranged weapon hit by
+    // 1d10 + DEX. Auto-resolved (player-favorable); a Monk keeps the
+    // interactive Deflect Attacks window instead.
+    let postDeflectDmg = postWardDmg;
+    let snareNote = '';
+    const snared =
+      !!char.worn_traits?.missileSnaring &&
+      (enemy.attackReachFt ?? 5) >= 20 &&
+      postWardDmg > 0 &&
+      !char.turn_actions?.reaction_used &&
+      !isDeflectAttacksEligible(char, enemy.damageType);
+    if (snared) {
+      postDeflectDmg = Math.max(0, postWardDmg - (rollDice('1d10') + abilityMod(char.dex)));
+      snareNote = ` 🧤 Gloves of Missile Snaring: ${fmt.dmg(postWardDmg)} → ${fmt.dmg(postDeflectDmg)}${postDeflectDmg === 0 ? ' — caught!' : ''}`;
+    }
     // SRD Ranger Superior Hunter's Defense (L15): a Reaction grants Resistance
     // to the damage type until end of turn. Auto-resolved (player-favorable,
     // like Deflect Attacks): spend the reaction the first time a type lands this
@@ -2076,7 +2090,8 @@ function computeEnemyAttack(
         ? char.superior_hunters_def?.type
         : undefined;
     const shdAlready = shdActiveType === shdDmgType;
-    const shdTrigger = hasSuperiorHuntersDefense(char) && !char.turn_actions?.reaction_used;
+    const shdTrigger =
+      hasSuperiorHuntersDefense(char) && !char.turn_actions?.reaction_used && !snared;
     let shdNote = '';
     let shdStamp = char.superior_hunters_def;
     let shdReactionUsed = false;
@@ -2144,7 +2159,7 @@ function computeEnemyAttack(
       damageType: enemy.damageType,
     });
     let updatedChar = dmgResult.char;
-    if (shdReactionUsed) {
+    if (shdReactionUsed || snared) {
       updatedChar = {
         ...updatedChar,
         turn_actions: { ...updatedChar.turn_actions, reaction_used: true },
@@ -2234,6 +2249,7 @@ function computeEnemyAttack(
       affinityNote +
       wardNote +
       tempHpNote;
+    narrative += snareNote;
     narrative += shdNote;
     narrative += dmgResult.resistanceNote;
     narrative += lifeDrainNote;
@@ -2940,7 +2956,10 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // post-Goliath / post-Mobile base; encumbrance still reduces after.
   // Applies to both walking and any future modes that derive from this
   // value (gridMove uses effectiveSpeed as the walking budget).
-  if (char.conditions?.includes('hasted')) base *= 2;
+  // SRD Boots of Speed — also double the Speed (not stacking with Haste).
+  if (char.conditions?.includes('hasted') || char.conditions?.includes('boots_of_speed')) {
+    base *= 2;
+  }
   // SRD Slow — "the target's Speed is halved." Floor-divide so
   // odd speeds (a rare 25 ft speed) don't fractional. If both hasted
   // and slowed are somehow stacked (RAW: cancel adv/disadv style), they
@@ -5674,7 +5693,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (data.requiresAttunement && !(char.attuned_items ?? []).includes(inv.instance_id)) {
         continue;
       }
-      if (state.combat_active && char.turn_actions.action_used) continue;
+      const econ = act.bonusAction ? 'bonus_action_used' : 'action_used';
+      if (state.combat_active && char.turn_actions[econ]) continue;
       if (act.daily && (inv.powers_used ?? []).includes('activate')) continue;
       const left = data.charges ? data.charges.max - (inv.charges_used ?? 0) : 0;
       if (act.charges && left < act.charges) continue;
@@ -5682,6 +5702,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       choices.push({
         label: `${data.name} — ${act.label}${act.charges ? ` (${left} charge${left === 1 ? '' : 's'})` : ''}`,
         action: { type: 'use', itemId: inv.id },
+        requiresBonusAction: (state.combat_active && act.bonusAction) || undefined,
       });
     }
   }
@@ -7881,7 +7902,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (spell.heal && state.characters.every((c) => c.dead || c.hp >= c.max_hp)) continue;
       const how = loot.spellScroll
         ? `Read the ${loot.name}`
-        : `${loot.name} — cast ${spell.name}${level > spell.level ? ` (level ${level})` : ''}`;
+        : spell.itemPower
+          ? `${loot.name} — ${spell.name}`
+          : `${loot.name} — cast ${spell.name}${level > spell.level ? ` (level ${level})` : ''}`;
       const costNote = cost > 0 ? ` (${cost} charge${cost === 1 ? '' : 's'})` : '';
       const base = {
         type: 'cast_spell' as const,
@@ -10153,7 +10176,18 @@ function resolveEnemyAoeSpell(args: {
     const d20 = saveAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
     const wornBonus = args.context ? wornSaveBonus(c, save, args.context.lootTable) : 0;
     const total = d20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(c, st) + wornBonus;
-    const saved = total >= dc;
+    let saved = total >= dc;
+    // SRD Ring of Evasion — spend a charge (and the Reaction) to succeed.
+    let saver = c;
+    let ringNote = '';
+    if (!saved && save === 'dex' && args.context) {
+      const ring = useEvasionRing(c, args.context.lootTable);
+      if (ring) {
+        saved = true;
+        saver = ring.char;
+        ringNote = ` ✦ ${ring.note}`;
+      }
+    }
     const evasion = save === 'dex' && spell.saveEffect === 'half' && hasEvasion(c);
     const effOf = (rolled: number): number => {
       if (evasion) return saved ? 0 : half(rolled);
@@ -10164,9 +10198,9 @@ function resolveEnemyAoeSpell(args: {
     const dmg =
       pcDamageTaken(c, st, effOf(dmgRoll), spell.damageType, spell.id) +
       pcDamageTaken(c, st, effOf(dmgRoll2), spell.damageType2 ?? spell.damageType, spell.id);
-    const evasionNote = evasion ? ' ✦ Evasion' : '';
+    const evasionNote = (evasion ? ' ✦ Evasion' : '') + ringNote;
     const newHp = Math.max(0, c.hp - dmg);
-    st = commitCharacter(st, { ...c, hp: newHp });
+    st = commitCharacter(st, { ...saver, hp: newHp });
     narrative += dealsDamage
       ? ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}.${evasionNote}`
       : ` ${c.name} ${fmt.save(save.toUpperCase(), total)} vs ${fmt.dc(dc)} — ${saved ? 'saves' : 'fails'}.`;
@@ -10432,6 +10466,15 @@ export function resolveEnemySpell(args: {
         saved = true;
         workingTarget = consumeStrokeOfLuck(target);
         rescueNote = ' ✦ Stroke of Luck';
+        pendingSaveReroll = undefined;
+      }
+    }
+    if (!saved && spell.savingThrow === 'dex' && args.context) {
+      const ring = useEvasionRing(workingTarget, args.context.lootTable);
+      if (ring) {
+        saved = true;
+        workingTarget = ring.char;
+        rescueNote = ` ✦ ${ring.note}`;
         pendingSaveReroll = undefined;
       }
     }
@@ -12947,8 +12990,11 @@ export async function takeAction({
     // SRD Ranger Nature's Veil — the Invisible condition itself, which an
     // attack doesn't end; it lasts until the end of the Ranger's next turn.
     const veiled = char.condition_sources?.invisible === NATURES_VEIL_SOURCE;
+    // SRD Ring / Cloak of Invisibility — the item's Invisible survives attacking.
+    const itemInvisible = char.conditions.includes('item_invisibility');
     const keepsInvisible =
       veiled ||
+      itemInvisible ||
       grantsInvisible ||
       (castSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(castSpellId)) ||
       (concSpellId && SPELLS_THAT_KEEP_INVISIBILITY.has(concSpellId));

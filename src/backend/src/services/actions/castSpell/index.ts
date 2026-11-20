@@ -10,6 +10,7 @@ import {
 import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
+import { itemSpellFor, itemSpellVersion } from '../../chargedItems.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 import { applySingleTargetDamage } from './applyDamage.js';
@@ -17,7 +18,6 @@ import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from '../attack/toHit.js';
 import { hasSmiteOfProtection } from '../../paladinFeatures.js';
 import { huntersLoreNote } from '../../rangerFeatures.js';
-import { itemSpellVersion } from '../../chargedItems.js';
 import { pickCastPrefix } from './utils.js';
 import { runAoeConditionSpell } from './aoeCondition.js';
 import { runAoeSpell } from './aoe.js';
@@ -115,7 +115,11 @@ export const handleCastSpell: ActionHandler<{
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can cast spells.' };
   const pc = ctx.actor;
   const { spellId, slotLevel } = action;
-  const baseSpell = ctx.context.spellTable?.[spellId];
+  const fromItem = (action as { itemInstanceId?: string }).itemInstanceId;
+  // An item power (not a spell) is only reachable through its item.
+  const baseSpell = fromItem
+    ? itemSpellFor(ctx.context.spellTable, spellId)
+    : ctx.context.spellTable?.[spellId];
   if (!baseSpell) {
     ctx.narrative = `Unknown spell: ${spellId}.`;
     return;

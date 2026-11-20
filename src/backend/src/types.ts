@@ -1003,6 +1003,10 @@ export interface Spell {
   // list. Absent on context-local utility spells that aren't tied
   // to a class list.
   spellList?: Array<'arcane' | 'divine' | 'primal'>;
+  // A magic item's own effect (Wand of Paralysis' ray, Horn of Blasting's
+  // blast), resolved through the spell engine but not a spell: on no class
+  // list, never learnable, cast only from its item (ITEM_POWERS).
+  itemPower?: boolean;
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.

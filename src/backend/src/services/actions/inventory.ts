@@ -175,8 +175,9 @@ export const handleUse: ActionHandler<{
       ctx.narrative = `You have no expended spell slot of level ${act.effect.maxLevel} or lower to restore.`;
       return;
     }
-    if (nextSt.combat_active && nextChar.turn_actions.action_used) {
-      ctx.narrative = 'You have already used your action this turn.';
+    const econ = act.bonusAction ? 'bonus_action_used' : 'action_used';
+    if (nextSt.combat_active && nextChar.turn_actions[econ]) {
+      ctx.narrative = `You have already used your ${act.bonusAction ? 'Bonus Action' : 'action'} this turn.`;
       return;
     }
     if (act.daily && dailyUsed(held, 'activate')) {
@@ -357,11 +358,12 @@ export const handleUse: ActionHandler<{
 
   if (nextSt.combat_active) {
     const isPotionLike =
-      itemData.type === 'consumable' &&
-      (itemData.heal != null ||
-        itemData.potion != null ||
-        itemData.effect === 'con_advantage' ||
-        itemData.effect === 'mystery');
+      (itemData.type === 'consumable' &&
+        (itemData.heal != null ||
+          itemData.potion != null ||
+          itemData.effect === 'con_advantage' ||
+          itemData.effect === 'mystery')) ||
+      !!itemData.activate?.bonusAction;
     nextChar = {
       ...nextChar,
       turn_actions: {

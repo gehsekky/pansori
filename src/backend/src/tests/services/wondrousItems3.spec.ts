@@ -10,6 +10,7 @@ import { attuneBlocker, itemCastOptions, spendCharges } from '../../services/cha
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
 import { syncSetAbilities, wornSaveBonus } from '../../services/wornEffects.js';
 import { CAMPAIGN_SECTION_SCHEMAS } from '../../routes/schemas.js';
+import { ITEM_POWERS } from '../../campaignData/srd/itemPowers.js';
 import { SRD_ITEMS } from '../../campaignData/srd/items.js';
 import { SRD_SPELLS } from '../../campaignData/srd/spells.js';
 import { context as baseCtx } from '../fixtures/testContext.js';
@@ -131,7 +132,7 @@ describe('catalog', () => {
   it('every item spell names a spell in the catalog', () => {
     for (const item of Object.values(SRD_ITEMS)) {
       for (const is of item.itemSpells ?? [])
-        expect(SRD_SPELLS[is.spellId], is.spellId).toBeDefined();
+        expect(SRD_SPELLS[is.spellId] ?? ITEM_POWERS[is.spellId], is.spellId).toBeDefined();
     }
   });
 });
