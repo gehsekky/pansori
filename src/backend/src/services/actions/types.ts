@@ -66,6 +66,13 @@ export interface ActionContext {
    */
   invocation?: string;
   /**
+   * SRD Spells Cast from Items — set by `runPrecast` when the cast comes from a
+   * wand / staff / Spell Scroll. `attackBonus` is a fixed spell attack bonus (a
+   * scroll's), replacing the caster's; `undo` restores the spent charges / the
+   * scroll when an out-of-range cast is refunded.
+   */
+  itemCast?: { attackBonus?: number; undo: () => void };
+  /**
    * Structured emission queue (see services/narrative/fragments.ts).
    * Migrated handlers push fragments here instead of doing
    * `ctx.narrative += ...` + `pushEvent(...)` in parallel; the composer

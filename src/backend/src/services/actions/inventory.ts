@@ -9,6 +9,7 @@ import {
 } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
+import { attuneBlocker } from '../chargedItems.js';
 import { characterAc } from '../armorClass.js';
 import { clearInstance } from '../equipment.js';
 import { fmt } from '../narrativeFmt.js';
@@ -45,6 +46,12 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
   const attunedList = char.attuned_items ?? [];
   if (attunedList.includes(instanceId)) {
     ctx.narrative = `You are already attuned to the ${invItem.name}.`;
+    return;
+  }
+  // SRD "Requires Attunement by a Spellcaster" / by a named class.
+  const blocker = attuneBlocker(char, lootItem);
+  if (blocker) {
+    ctx.narrative = blocker;
     return;
   }
   // SRD Thief Use Magic Device (L13) raises the cap to 4; otherwise 3.

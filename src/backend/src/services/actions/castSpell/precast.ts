@@ -1,19 +1,28 @@
 import type { AbilityKey, Spell } from '../../../types.js';
 import {
+  type ItemCastPlan,
+  isSpellcaster,
+  maxCastableLevel,
+  planItemCast,
+  spendItemCast,
+} from '../../chargedItems.js';
+import {
   SQUARE_SIZE,
   distanceFeet,
   hasLineOfSight,
   inDimLightOrDarkness,
 } from '../../gridEngine.js';
+import { abilityMod, d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { breakConcentration, isSpellSuppressed } from '../../gameEngine.js';
-import { d, hasArmorProficiency, rollDice, spellSaveDC } from '../../rulesEngine.js';
 import { druidCantripRangeBonus, wildShapeBlocksCasting } from '../../druidFeatures.js';
 import { gazeAllyId, hasInvocation, invocationDef, invocationUsedKey } from '../../invocations.js';
 import { getClassLevel, hasClass, resolveCastingAbility } from '../../multiclass.js';
 import type { ActionContext } from '../types.js';
 import { alwaysPreparedSpells } from '../../subclassSpells.js';
+import { characterAc } from '../../armorClass.js';
 import { equippedArmorId } from '../../equipment.js';
 import { spellRecallKeepsSlot } from '../../feats.js';
+import { syncSetAbilities } from '../../wornEffects.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -55,6 +64,7 @@ export function runPrecast(
     mysticArcanum?: boolean;
     wishDuplicate?: boolean;
     invocation?: string;
+    itemInstanceId?: string;
   },
   spell: Spell
 ): PrecastResult {
@@ -103,10 +113,32 @@ export function runPrecast(
     return { done: true };
   }
 
+  // SRD Spells Cast from Items — a wand / staff (charges) or a Spell Scroll.
+  // Validated up front: an item cast skips the slot, preparation and Material
+  // gates, and a wand or staff needs no components at all (a scroll still
+  // needs Verbal and Somatic).
+  let itemPlan: ItemCastPlan | undefined;
+  if (action.itemInstanceId) {
+    const plan = planItemCast(
+      pc.char,
+      action.itemInstanceId,
+      spell,
+      slotLevel,
+      ctx.context.lootTable
+    );
+    if ('error' in plan) {
+      ctx.narrative = plan.error;
+      return { done: true };
+    }
+    itemPlan = plan;
+  }
+  const noComponents = !!itemPlan && !itemPlan.scroll;
+
   // Deafened: cannot cast spells with verbal components (Subtle Spell removes
   // the verbal component, so it bypasses this gate).
   if (
     !isSubtle &&
+    !noComponents &&
     pc.char.conditions.includes('deafened') &&
     (spell as { verbal?: boolean }).verbal
   ) {
@@ -117,7 +149,7 @@ export function runPrecast(
   // SRD Silence: a caster standing inside a Silence zone can't cast a spell with
   // a Verbal component (Subtle Spell bypasses it). Reads the caster's grid cell
   // against any `blocksVerbal` SpellZone in the room.
-  if (!isSubtle && (spell as { verbal?: boolean }).verbal) {
+  if (!isSubtle && !noComponents && (spell as { verbal?: boolean }).verbal) {
     const casterPos = ctx.st.entities?.find((e) => e.id === pc.char.id)?.pos;
     const silenced =
       !!casterPos &&
@@ -336,7 +368,8 @@ export function runPrecast(
     !isRitualCast &&
     !usedDivineIntervention &&
     !usedWish &&
-    !usedInvocation
+    !usedInvocation &&
+    !itemPlan
   ) {
     const prepared = pc.char.prepared_spells ?? [];
     if (
@@ -367,7 +400,7 @@ export function runPrecast(
   // other spell. Recognized by walking `feat_choices` for any feat
   // entry whose `magicInitiateL1` matches the spell being cast.
   let usedMagicInitiateFree = false;
-  if (spell.level > 0 && !isRitualCast && !usedDivineIntervention) {
+  if (spell.level > 0 && !isRitualCast && !usedDivineIntervention && !itemPlan) {
     const choices = pc.char.feat_choices ?? {};
     const matched = Object.values(choices).some((c) => c?.magicInitiateL1 === spellId);
     if (matched && (pc.char.class_resource_uses?.magic_initiate_l1_used ?? 0) === 0) {
@@ -388,7 +421,13 @@ export function runPrecast(
   // the cast if the caster can't afford it; deduct from gold otherwise.
   // Checked BEFORE slot deduction so a missing diamond doesn't waste a
   // slot — RAW treats slot + material as a single cast-initiation event.
-  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention && !usedWish) {
+  if (
+    spell.materialCost &&
+    spell.materialCost > 0 &&
+    !usedDivineIntervention &&
+    !usedWish &&
+    !itemPlan
+  ) {
     if ((pc.char.gold ?? 0) < spell.materialCost) {
       ctx.narrative = `${spell.name} requires a ${spell.materialCost} gp material component you don't have.`;
       return { done: true };
@@ -406,7 +445,8 @@ export function runPrecast(
     !usedSignature &&
     !usedMysticArcanum &&
     !usedWish &&
-    !usedInvocation
+    !usedInvocation &&
+    !itemPlan
   ) {
     if (slotLevel < spell.level) {
       ctx.narrative = `${spell.name} requires at least a level-${spell.level} slot.`;
@@ -434,12 +474,40 @@ export function runPrecast(
     }
   }
 
+  // Spend the item's charges (or the scroll). Snapshot first so an
+  // out-of-range refund can put them back.
+  let itemNote = '';
+  if (itemPlan) {
+    const before = {
+      inventory: pc.char.inventory,
+      equipment: pc.char.equipment,
+      attuned_items: pc.char.attuned_items,
+    };
+    itemNote = spendItemCast(pc.char, itemPlan, ctx.context.lootTable);
+    // A staff that lost its magic (or a destroyed item) drops its held effects.
+    const now = pc.char.inventory.find((i) => i.instance_id === itemPlan.inv.instance_id);
+    if (!itemPlan.scroll && now?.id !== itemPlan.loot.id) {
+      syncSetAbilities(pc.char, ctx.context.lootTable);
+      pc.char.ac = characterAc(pc.char, ctx.context.lootTable);
+    }
+    ctx.itemCast = {
+      attackBonus: itemPlan.attackBonus,
+      undo: () => Object.assign(pc.char, before),
+    };
+  }
+
   // Deduct the material cost now that slot + affordability are both
   // confirmed. Material is consumed on a successful cast initiation
   // even if a downstream gate (e.g. Revivify's death-window check)
   // later fails — RAW: the diamond is gone the moment you start
   // casting, not when the spell resolves.
-  if (spell.materialCost && spell.materialCost > 0 && !usedDivineIntervention && !usedWish) {
+  if (
+    spell.materialCost &&
+    spell.materialCost > 0 &&
+    !usedDivineIntervention &&
+    !usedWish &&
+    !itemPlan
+  ) {
     pc.char.gold = (pc.char.gold ?? 0) - spell.materialCost;
     ctx.narrative = `${pc.char.name} expends a ${spell.materialCost} gp component. `;
   }
@@ -477,7 +545,8 @@ export function runPrecast(
   // is gone whether or not the spell fizzles). `somatic` defaults to
   // true if unspecified — virtually every SRD spell has S.
   // Subtle Spell removes the somatic component, so Slow can't disrupt it.
-  const hasSomatic = !isSubtle && ((spell as { somatic?: boolean }).somatic ?? true);
+  const hasSomatic =
+    !isSubtle && !noComponents && ((spell as { somatic?: boolean }).somatic ?? true);
   if (pc.char.conditions.includes('slowed') && hasSomatic) {
     const fizzleRoll = d(20);
     if (fizzleRoll < 11) {
@@ -527,31 +596,49 @@ export function runPrecast(
     ctx.context.spellcastingAbility ?? {},
     primaryCastingAbility
   ) as AbilityKey;
-  const castingScore = (pc.char[castingAbility] ?? 10) as number;
+  // SRD: a user with no spellcasting ability casts from an item with a +0
+  // modifier (its Proficiency Bonus still applies).
+  const castingScore = (
+    itemPlan && !isSpellcaster(pc.char) ? 10 : (pc.char[castingAbility] ?? 10)
+  ) as number;
+  // SRD Spell Scroll — a spell of a higher level than you can normally cast
+  // needs a spellcasting ability check (DC 10 + its level); on a failure the
+  // spell vanishes from the scroll.
+  if (itemPlan?.scroll && spell.level > maxCastableLevel(pc.char)) {
+    const roll = d(20);
+    const total = roll + abilityMod(castingScore);
+    if (total < 10 + spell.level) {
+      ctx.narrative = `${pc.char.name} tries to read the ${itemPlan.loot.name}, but the magic slips away (check ${roll}+${abilityMod(castingScore)} = ${total} vs DC ${10 + spell.level}) — the words fade from the scroll.`;
+      return { done: true };
+    }
+    itemNote += ` (check ${total} vs DC ${10 + spell.level} — success)`;
+  }
   // Slot-free casts must not claim a slot — a playtest log showed Magic
   // Initiate's freebie narrated as "(level-1 slot)".
-  const slotNote = usedDivineIntervention
-    ? ' (Divine Intervention)'
-    : usedMysticArcanum
-      ? ' (Mystic Arcanum)'
-      : usedSpellMastery
-        ? ' (Spell Mastery)'
-        : usedSignature
-          ? ' (Signature Spell)'
-          : usedMagicInitiateFree
-            ? ' (Magic Initiate — free cast)'
-            : usedInvocation
-              ? ` (${invocationDef(action.invocation!)?.name} — no slot)`
-              : usedWish
-                ? ' (granted by Wish)'
-                : isRitualCast
-                  ? ' (ritual)'
-                  : spell.level > 0
-                    ? ` (level-${slotLevel} slot)`
-                    : ' (cantrip)';
+  const slotNote = itemPlan
+    ? ` (from the ${itemPlan.loot.name}${itemPlan.cost > 0 ? `, ${itemPlan.cost} charge${itemPlan.cost === 1 ? '' : 's'}` : ''})${itemNote}`
+    : usedDivineIntervention
+      ? ' (Divine Intervention)'
+      : usedMysticArcanum
+        ? ' (Mystic Arcanum)'
+        : usedSpellMastery
+          ? ' (Spell Mastery)'
+          : usedSignature
+            ? ' (Signature Spell)'
+            : usedMagicInitiateFree
+              ? ' (Magic Initiate — free cast)'
+              : usedInvocation
+                ? ` (${invocationDef(action.invocation!)?.name} — no slot)`
+                : usedWish
+                  ? ' (granted by Wish)'
+                  : isRitualCast
+                    ? ' (ritual)'
+                    : spell.level > 0
+                      ? ` (level-${slotLevel} slot)`
+                      : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
-  const dc = spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
+  const dc = itemPlan?.dc ?? spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
 
   return {
     done: false,
@@ -567,7 +654,8 @@ export function runPrecast(
       usedSignature ||
       usedMysticArcanum ||
       usedWish ||
-      usedInvocation,
+      usedInvocation ||
+      !!itemPlan,
   };
 }
 
@@ -633,6 +721,8 @@ export function isSpellOutOfRange(
     : spell.rangeKind === 'touch'
       ? `${spell.name} requires a touch — the ${spellTargetName} is ${distFt} ft away.`
       : `${spell.name} is out of range (${distFt} ft to target, max ${maxFt} ft).`;
+  // An item cast puts its charges (or the scroll) back.
+  ctx.itemCast?.undo();
   // Refund the slot we just spent (free casts — Divine Intervention,
   // Magic Initiate — never spent one, so there's nothing to credit back)
   if (spell.level > 0 && !isRitualCast && !freeCast) {

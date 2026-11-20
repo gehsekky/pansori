@@ -902,6 +902,9 @@ export type StructuredAction =
       // Warlock Eldritch Invocation (e.g. 'armor_of_shadows') that lets this
       // spell be cast without a slot. Validated in precast.
       invocation?: string;
+      // SRD Spells Cast from Items — the wand / staff / Spell Scroll instance
+      // the spell is cast from (charges, no slot). Validated in precast.
+      itemInstanceId?: string;
     }
   | { type: 'disarm_trap' }
   | { type: 'interact_object'; objectId: string }
@@ -1818,7 +1821,10 @@ export type WornEffect =
   | { kind: 'speed_mode'; mode: 'swim' | 'climb'; feet: number | 'walk' }
   | { kind: 'speed_floor'; feet: number }
   | { kind: 'darkvision'; feet: number }
-  | { kind: 'spell_save_advantage' };
+  | { kind: 'spell_save_advantage' }
+  // SRD Wand of the War Mage / Staff of Power / Staff of the Magi — a flat bonus
+  // to spell attack rolls while held; `ignoreHalfCover` (War Mage) skips Half Cover.
+  | { kind: 'spell_attack_bonus'; bonus: number; ignoreHalfCover?: boolean };
 
 /**
  * SRD Potions — what drinking (or applying) a potion does. Timed effects ride
@@ -1870,6 +1876,31 @@ export interface WornTraits {
   climbFt?: number | 'walk';
   speedFloor?: number;
   spellSaveAdvantage?: boolean;
+  spellAttackBonus?: number;
+  spellIgnoreHalfCover?: boolean;
+}
+
+/**
+ * A spell a magic item lets its holder cast (SRD "Spells Cast from Items"):
+ * no slot, no components. `charges` is the cost at `level` (default the
+ * spell's own level); with `maxLevel`, each level above costs one more charge
+ * (Wand of Fireballs: 1 charge for level 3, up to 3 charges for level 5).
+ */
+export interface ItemSpell {
+  spellId: string;
+  charges: number;
+  level?: number;
+  maxLevel?: number;
+}
+
+/** SRD item charges — `regain` is the dice regained at dawn (on a Long Rest). */
+export interface ItemCharges {
+  max: number;
+  regain: string;
+  // Expending the last charge rolls a d20: on a 1 the item is destroyed — or,
+  // with `becomes`, turns into that item (Staff of Power → a +2 Quarterstaff).
+  destroyOnLast?: boolean;
+  becomes?: string;
 }
 
 // The 12 SRD classes (ids as used by Character.character_class + the keys
@@ -2100,6 +2131,16 @@ export interface LootItem {
   magicRiders?: MagicRider[];
   // SRD Potions — the effect of drinking / applying it (see PotionEffect).
   potion?: PotionEffect;
+  // SRD wands / staffs — charges, and the spells cast from the item while held.
+  charges?: ItemCharges;
+  itemSpells?: ItemSpell[];
+  // Fixed save DC for the item's spells (Wand of Fireballs: 15). Absent = the
+  // holder's own spell save DC.
+  itemSpellDc?: number;
+  // SRD Spell Scroll — the scroll's spell (its level sets the DC / attack bonus).
+  spellScroll?: string;
+  // SRD "Requires Attunement by a …" — class ids (lowercase) or 'spellcaster'.
+  attuneBy?: string[];
   // SRD Energy Bow — conjures its own arrows: no ammunition needed.
   conjuresAmmo?: boolean;
   // SRD Elven Chain — wearable without armor training.

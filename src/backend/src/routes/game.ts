@@ -1056,6 +1056,10 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
       if ('cost' in check && check.cost === 'free_interaction') {
         char.turn_actions = { ...turnActions, free_interaction_used: true };
       }
+      // A wielded magic weapon can carry held effects (Staff of Power's +2 AC
+      // and saves, Staff of Fire's Resistance) — re-derive them now.
+      syncSetAbilities(char, ctx.lootTable);
+      char.ac = fullAc(char);
     } else if (loot.slot) {
       // Worn wondrous items (head/neck/cloak/hands/arms/waist/feet + rings).
       // No armor-style don/doff combat gate — the attunement requirement (above)

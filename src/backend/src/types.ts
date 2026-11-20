@@ -1203,6 +1203,8 @@ export interface InventoryItem {
   // Stack size for stackable items (ammunition). Undefined ⇒ a single item.
   // Ranged attacks decrement this; at 0 the item (and any quiver equip) is removed.
   count?: number;
+  // SRD item charges spent (wands / staffs). Undefined ⇒ none spent (full).
+  charges_used?: number;
   [key: string]: unknown;
 }
 

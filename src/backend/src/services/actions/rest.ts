@@ -16,6 +16,7 @@ import {
 import { rageUsesMax, spellSlotsForClassLevel } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
 import { characterAc } from '../armorClass.js';
+import { regainItemCharges } from '../chargedItems.js';
 import { resetFeatLongRestResources } from '../feats.js';
 import { syncSubclassSpells } from '../subclassSpells.js';
 import { updatePcActor } from './actor.js';
@@ -319,6 +320,9 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     // Subclass always-prepared spells (also catches saves from before the
     // grant existed, and tiers unlocked since).
     syncSubclassSpells(refreshed);
+    // SRD wands / staffs regain charges "daily at dawn" — at the Long Rest.
+    const regained = regainItemCharges(refreshed, ctx.context.lootTable);
+    if (regained.length) restLines.push(`${c.name}'s ${regained.join(', ')}`);
     // Recompute AC after clearing the magical buffs so the stored
     // `ac` field reflects the post-rest state.
     refreshed.ac = characterAc(refreshed, ctx.context.lootTable);

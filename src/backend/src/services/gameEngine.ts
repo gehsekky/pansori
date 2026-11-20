@@ -165,6 +165,7 @@ import {
   spellSlotsForChar,
   wildShapeUsesMax,
 } from './multiclass.js';
+import { attuneBlocker, itemCastOptions } from './chargedItems.js';
 import {
   availableRecoveries,
   enumerateRecoveryPlans,
@@ -4961,6 +4962,100 @@ function spellChoicesFor(char: Character, context: Context): GameChoice[] {
   }));
 }
 
+/**
+ * The option picker a cast choice carries (single-select): Polymorph's beast
+ * form, Greater Restoration's effect, Protection from Energy's damage type, ….
+ * The FE opens an option dialog; the cast path honors the chosen id.
+ */
+function spellPickOption(spellId: string, context: Context): GameChoice['pickOption'] {
+  return spellId === 'polymorph' ||
+    spellId === 'true_polymorph' ||
+    spellId === 'shapechange' ||
+    spellId === 'animal_shapes'
+    ? {
+        param: 'beastForm',
+        title: 'Choose a beast form',
+        options: Object.values(BEAST_FORMS).map((f) => ({
+          id: f.id,
+          label: f.name,
+          sub: `CR ${f.cr} · ${f.hp ?? 11} HP`,
+        })),
+      }
+    : spellId === 'greater_restoration'
+      ? {
+          param: 'restorationEffect',
+          title: 'Greater Restoration — choose an effect to remove',
+          options: [
+            { id: 'exhaustion', label: 'Reduce Exhaustion by 1' },
+            { id: 'charmed', label: 'End the Charmed condition' },
+            { id: 'petrified', label: 'End the Petrified condition' },
+            { id: 'hp_max', label: 'Restore drained Hit Point maximum' },
+          ],
+        }
+      : spellId === 'protection_from_energy'
+        ? {
+            param: 'resistType',
+            title: 'Protection from Energy — choose a damage type to resist',
+            options: [
+              { id: 'acid', label: 'Acid' },
+              { id: 'cold', label: 'Cold' },
+              { id: 'fire', label: 'Fire' },
+              { id: 'lightning', label: 'Lightning' },
+              { id: 'thunder', label: 'Thunder' },
+            ],
+          }
+        : spellId === 'dragons_breath'
+          ? {
+              param: 'breathType',
+              title: "Dragon's Breath — choose the breath's damage type",
+              options: [
+                { id: 'acid', label: 'Acid' },
+                { id: 'cold', label: 'Cold' },
+                { id: 'fire', label: 'Fire' },
+                { id: 'lightning', label: 'Lightning' },
+                { id: 'poison', label: 'Poison' },
+              ],
+            }
+          : spellId === 'blindness_deafness'
+            ? {
+                param: 'conditionChoice',
+                title: 'Blindness/Deafness — choose the affliction',
+                options: [
+                  { id: 'blinded', label: 'Blinded' },
+                  { id: 'deafened', label: 'Deafened' },
+                ],
+              }
+            : spellId === 'wish'
+              ? {
+                  // SRD Wish (basic use) — duplicate any spell of level 1-8.
+                  param: 'wishSpellId',
+                  title: 'Wish — duplicate a spell (level 8 or lower)',
+                  options: Object.values(context.spellTable ?? {})
+                    .filter((s) => s.level >= 1 && s.level <= 8)
+                    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+                    .map((s) => ({ id: s.id, label: s.name, sub: `Lvl ${s.level}` })),
+                }
+              : spellId === 'resistance'
+                ? {
+                    param: 'resistType',
+                    title: 'Resistance — choose a damage type to reduce',
+                    options: [
+                      { id: 'acid', label: 'Acid' },
+                      { id: 'bludgeoning', label: 'Bludgeoning' },
+                      { id: 'cold', label: 'Cold' },
+                      { id: 'fire', label: 'Fire' },
+                      { id: 'lightning', label: 'Lightning' },
+                      { id: 'necrotic', label: 'Necrotic' },
+                      { id: 'piercing', label: 'Piercing' },
+                      { id: 'poison', label: 'Poison' },
+                      { id: 'radiant', label: 'Radiant' },
+                      { id: 'slashing', label: 'Slashing' },
+                      { id: 'thunder', label: 'Thunder' },
+                    ],
+                  }
+                : undefined;
+}
+
 export function generateChoices(state: GameState, seed: Seed, context: Context): GameChoice[] {
   const char =
     state.characters.find((c) => c.id === state.active_character_id) ?? state.characters[0];
@@ -7359,93 +7454,7 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // Option pickers (single-select): Polymorph's beast form, Greater
       // Restoration's effect. Tagged on the cast choice so the FE opens an
       // option dialog; the cast path honors the chosen id (else its default).
-      const pickOption: GameChoice['pickOption'] =
-        spellId === 'polymorph' ||
-        spellId === 'true_polymorph' ||
-        spellId === 'shapechange' ||
-        spellId === 'animal_shapes'
-          ? {
-              param: 'beastForm',
-              title: 'Choose a beast form',
-              options: Object.values(BEAST_FORMS).map((f) => ({
-                id: f.id,
-                label: f.name,
-                sub: `CR ${f.cr} · ${f.hp ?? 11} HP`,
-              })),
-            }
-          : spellId === 'greater_restoration'
-            ? {
-                param: 'restorationEffect',
-                title: 'Greater Restoration — choose an effect to remove',
-                options: [
-                  { id: 'exhaustion', label: 'Reduce Exhaustion by 1' },
-                  { id: 'charmed', label: 'End the Charmed condition' },
-                  { id: 'petrified', label: 'End the Petrified condition' },
-                  { id: 'hp_max', label: 'Restore drained Hit Point maximum' },
-                ],
-              }
-            : spellId === 'protection_from_energy'
-              ? {
-                  param: 'resistType',
-                  title: 'Protection from Energy — choose a damage type to resist',
-                  options: [
-                    { id: 'acid', label: 'Acid' },
-                    { id: 'cold', label: 'Cold' },
-                    { id: 'fire', label: 'Fire' },
-                    { id: 'lightning', label: 'Lightning' },
-                    { id: 'thunder', label: 'Thunder' },
-                  ],
-                }
-              : spellId === 'dragons_breath'
-                ? {
-                    param: 'breathType',
-                    title: "Dragon's Breath — choose the breath's damage type",
-                    options: [
-                      { id: 'acid', label: 'Acid' },
-                      { id: 'cold', label: 'Cold' },
-                      { id: 'fire', label: 'Fire' },
-                      { id: 'lightning', label: 'Lightning' },
-                      { id: 'poison', label: 'Poison' },
-                    ],
-                  }
-                : spellId === 'blindness_deafness'
-                  ? {
-                      param: 'conditionChoice',
-                      title: 'Blindness/Deafness — choose the affliction',
-                      options: [
-                        { id: 'blinded', label: 'Blinded' },
-                        { id: 'deafened', label: 'Deafened' },
-                      ],
-                    }
-                  : spellId === 'wish'
-                    ? {
-                        // SRD Wish (basic use) — duplicate any spell of level 1-8.
-                        param: 'wishSpellId',
-                        title: 'Wish — duplicate a spell (level 8 or lower)',
-                        options: Object.values(context.spellTable ?? {})
-                          .filter((s) => s.level >= 1 && s.level <= 8)
-                          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
-                          .map((s) => ({ id: s.id, label: s.name, sub: `Lvl ${s.level}` })),
-                      }
-                    : spellId === 'resistance'
-                      ? {
-                          param: 'resistType',
-                          title: 'Resistance — choose a damage type to reduce',
-                          options: [
-                            { id: 'acid', label: 'Acid' },
-                            { id: 'bludgeoning', label: 'Bludgeoning' },
-                            { id: 'cold', label: 'Cold' },
-                            { id: 'fire', label: 'Fire' },
-                            { id: 'lightning', label: 'Lightning' },
-                            { id: 'necrotic', label: 'Necrotic' },
-                            { id: 'piercing', label: 'Piercing' },
-                            { id: 'poison', label: 'Poison' },
-                            { id: 'radiant', label: 'Radiant' },
-                            { id: 'slashing', label: 'Slashing' },
-                            { id: 'thunder', label: 'Thunder' },
-                          ],
-                        }
-                      : undefined;
+      const pickOption = spellPickOption(spellId, context);
 
       if (spell.level === 0) {
         // Cantrip: no slot needed
@@ -7702,6 +7711,44 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         },
         kind: 'cast_spell',
       });
+    }
+  }
+
+  // ── SRD Spells Cast from Items — held wands / staffs, Spell Scrolls ───────
+  // One choice per castable (item, spell, level); offensive single-target
+  // spells get one choice per living enemy. Not tagged `kind: 'cast_spell'`
+  // so they stay in the text list rather than merging into the SpellBar.
+  if (context.spellTable) {
+    for (const opt of itemCastOptions(char, context.lootTable, context.spellTable)) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      const { spell, inv, loot, level, cost } = opt;
+      if (spell.castTime === 'reaction' || spell.revive) continue;
+      if (spell.outOfCombatOnly && state.combat_active) continue;
+      const econ = spell.castTime === 'bonus_action' ? 'bonus_action_used' : 'action_used';
+      if (state.combat_active && char.turn_actions[econ]) continue;
+      const isOffensive = !!(spell.damage || spell.condition) || spell.id === 'true_strike';
+      if (isOffensive && !enemyAlive) continue;
+      if (spell.heal && state.characters.every((c) => c.dead || c.hp >= c.max_hp)) continue;
+      const how = loot.spellScroll
+        ? `Read the ${loot.name}`
+        : `${loot.name} — cast ${spell.name}${level > spell.level ? ` (level ${level})` : ''}`;
+      const costNote = cost > 0 ? ` (${cost} charge${cost === 1 ? '' : 's'})` : '';
+      const base = {
+        type: 'cast_spell' as const,
+        spellId: spell.id,
+        slotLevel: level,
+        itemInstanceId: inv.instance_id,
+      };
+      const perEnemy = isOffensive && !spell.blastRadius && livingEnemies.length >= 2;
+      const targets = perEnemy ? livingEnemies : [isOffensive ? livingEnemies[0] : undefined];
+      for (const en of targets) {
+        choices.push({
+          label: `${how}${costNote}${perEnemy && en ? ` → ${en.name}` : ''}`,
+          action: { ...base, targetEnemyId: en?.id },
+          requiresBonusAction: spell.castTime === 'bonus_action' || undefined,
+          pickOption: spellPickOption(spell.id, context),
+        });
+      }
     }
   }
 
@@ -8068,7 +8115,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       for (const invItem of char.inventory) {
         if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
         const lootItem = context.lootTable.find((l) => l.id === invItem.id);
-        if (lootItem?.requiresAttunement && !attuned.includes(invItem.instance_id)) {
+        if (
+          lootItem?.requiresAttunement &&
+          !attuned.includes(invItem.instance_id) &&
+          !attuneBlocker(char, lootItem)
+        ) {
           choices.push({
             label: `Attune to ${invItem.name}`,
             action: { type: 'attune', instanceId: invItem.instance_id },

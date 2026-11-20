@@ -84,6 +84,10 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'speed_mode' && e.mode === 'climb') t.climbFt = better(t.climbFt, e.feet);
     else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
     else if (e.kind === 'spell_save_advantage') t.spellSaveAdvantage = true;
+    else if (e.kind === 'spell_attack_bonus') {
+      t.spellAttackBonus = (t.spellAttackBonus ?? 0) + e.bonus;
+      if (e.ignoreHalfCover) t.spellIgnoreHalfCover = true;
+    }
   }
   return Object.keys(t).length > 0 ? t : undefined;
 }

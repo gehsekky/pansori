@@ -370,6 +370,36 @@ Miscibility table aren't modeled; Heroism's Bless, like the spell's, adds to
 attack rolls only (Bless on saves is an existing gap); the healing ladder keeps
 its existing prices.
 
+**Batch 4 done 2026-11-19 — wands, staffs and Spell Scrolls** (`LootItem.charges` /
+`itemSpells` / `spellScroll`, resolved in `services/chargedItems.ts`; a
+`cast_spell` with `itemInstanceId` skips the slot, preparation and Material
+gates in `runPrecast`). Charges are tracked per inventory instance
+(`charges_used`); a wand or staff works only while held (a wand in the off
+hand, a staff wielded as a Quarterstaff); expending the last charge rolls the
+d20 (a Staff of Power / of the Woodlands becomes a +2 / plain Quarterstaff
+instead of vanishing); charges come back on a Long Rest. New: "Requires
+Attunement by a …" (`attuneBy`: classes or any spellcaster) is enforced; a
+`spell_attack_bonus` held effect (Wand of the War Mage also ignores Half
+Cover); casting from an item with no spellcasting ability uses a +0 modifier;
+wands and staffs need no components (Deafened, Silence, Slow don't stop them).
+Wands: Binding, Fear, Fireballs, Lightning Bolts, Magic Detection, Magic
+Missiles, Polymorph, Web, War Mage +1 / +2 / +3. Staffs: Charming, Fire,
+Frost, Healing, Power, Swarming Insects, the Magi, the Woodlands. A Spell
+Scroll for every SRD spell (only readable when the spell is on your list —
+pansori's arcane / divine / primal lists; a spell above your highest slot
+needs the DC 10 + level check; the scroll's own DC and attack bonus apply;
+worth twice the scribing cost). Simplifications: "dawn" is the Long Rest;
+Wand of Fear's Command isn't limited to flee / grovel and its Fear keeps the
+spell's cone; Staff of Charming's Reflect / Resist Enchantment, Staff of
+Power's and the Magi's Retributive Strike, the Magi's Spell Absorption and
+regain-on-20, Swarming Insects' Insect Cloud and Woodlands' Tree Form aren't
+modeled; a held staff's Resistance / AC needs it equipped; scrolls aren't
+copyable into a spellbook. Deferred: Wand of Paralysis, Enemy Detection,
+Secrets and Wonder (non-spell activations), Staff of Striking, Withering,
+Thunder and Lightning and the Python (with the activated weapons), rods,
+Necklace of Fireballs, Ring of Shooting Stars / Spell Storing and the other
+charged wondrous items.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

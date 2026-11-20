@@ -1,4 +1,5 @@
-import type { LootItem } from '../../types.js';
+import type { ItemCharges, ItemSpell, LootItem, WornEffect } from '../../types.js';
+import { SRD_SPELLS } from './spells.js';
 
 // Shared SRD 5.2.1 equipment definitions.
 //
@@ -2564,6 +2565,406 @@ const POTIONS: [string, LootItem][] = [
   ),
 ];
 
+// ─── Wands, staffs and Spell Scrolls (SRD 5.2.1) ─────────────────────────────
+// Spells cast from these items spend charges (or the scroll) instead of a slot
+// — see services/chargedItems.ts. A wand or staff works only while held (a
+// wand in the off hand, a staff wielded as a Quarterstaff). SRD Magic Item
+// Rarities and Values set the prices; a Spell Scroll is worth twice its
+// scribing cost. Simplification: charges come back at the Long Rest ("dawn").
+const RARITY_VALUE = {
+  Uncommon: 400,
+  Rare: 4000,
+  'Very Rare': 40000,
+  Legendary: 200000,
+} as const;
+type Rarity = keyof typeof RARITY_VALUE;
+const WAND_CHARGES: ItemCharges = { max: 7, regain: '1d6+1', destroyOnLast: true };
+const sp = (spellId: string, charges: number, more: Partial<ItemSpell> = {}): ItemSpell => ({
+  spellId,
+  charges,
+  ...more,
+});
+
+function wand(
+  id: string,
+  name: string,
+  rarity: Rarity,
+  desc: string,
+  extra: Partial<LootItem>
+): [string, LootItem] {
+  const attune = extra.requiresAttunement
+    ? extra.attuneBy?.includes('spellcaster')
+      ? '; requires attunement by a spellcaster'
+      : '; requires attunement'
+    : '';
+  return [
+    id,
+    {
+      id,
+      name,
+      value: RARITY_VALUE[rarity],
+      desc: `${desc} Hold it in your off hand to use it. (${rarity}${attune}.)`,
+      weight: 1,
+      type: 'misc',
+      slot: 'off_hand',
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      aliases: [name.toLowerCase()],
+      ...extra,
+    },
+  ];
+}
+
+const WANDS: Array<[string, LootItem]> = [
+  wand(
+    'wand_of_binding',
+    'Wand of Binding',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn). Cast Hold Person (2 charges) or Hold Monster (5) at save DC 17.',
+    {
+      requiresAttunement: true,
+      charges: WAND_CHARGES,
+      itemSpellDc: 17,
+      itemSpells: [sp('hold_person', 2), sp('hold_monster', 5)],
+    }
+  ),
+  // Simplification: Command isn't limited to "flee" / "grovel", and Fear keeps
+  // its usual cone rather than the wand's 60-foot one.
+  wand(
+    'wand_of_fear',
+    'Wand of Fear',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn). Cast Command (1 charge) or Fear (3) at save DC 15.',
+    {
+      requiresAttunement: true,
+      charges: WAND_CHARGES,
+      itemSpellDc: 15,
+      itemSpells: [sp('command', 1), sp('fear', 3)],
+    }
+  ),
+  wand(
+    'wand_of_fireballs',
+    'Wand of Fireballs',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn). Cast Fireball at save DC 15: 1 charge for level 3, +1 charge per level up to 5.',
+    {
+      requiresAttunement: true,
+      attuneBy: ['spellcaster'],
+      charges: WAND_CHARGES,
+      itemSpellDc: 15,
+      itemSpells: [sp('fireball', 1, { maxLevel: 5 })],
+    }
+  ),
+  wand(
+    'wand_of_lightning_bolts',
+    'Wand of Lightning Bolts',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn). Cast Lightning Bolt at save DC 15: 1 charge for level 3, +1 charge per level up to 5.',
+    {
+      requiresAttunement: true,
+      attuneBy: ['spellcaster'],
+      charges: WAND_CHARGES,
+      itemSpellDc: 15,
+      itemSpells: [sp('lightning_bolt', 1, { maxLevel: 5 })],
+    }
+  ),
+  wand(
+    'wand_of_magic_detection',
+    'Wand of Magic Detection',
+    'Uncommon',
+    '3 charges (regains 1d3 at dawn). Cast Detect Magic for 1 charge.',
+    {
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('detect_magic', 1)],
+    }
+  ),
+  wand(
+    'wand_of_magic_missiles',
+    'Wand of Magic Missiles',
+    'Uncommon',
+    '7 charges (regains 1d6+1 at dawn). Cast Magic Missile: 1 charge for level 1, +1 charge per level up to 3.',
+    {
+      charges: WAND_CHARGES,
+      itemSpells: [sp('magic_missile', 1, { maxLevel: 3 })],
+    }
+  ),
+  wand(
+    'wand_of_polymorph',
+    'Wand of Polymorph',
+    'Very Rare',
+    '7 charges (regains 1d6+1 at dawn). Cast Polymorph for 1 charge at save DC 15.',
+    {
+      requiresAttunement: true,
+      attuneBy: ['spellcaster'],
+      charges: WAND_CHARGES,
+      itemSpellDc: 15,
+      itemSpells: [sp('polymorph', 1)],
+    }
+  ),
+  wand(
+    'wand_of_web',
+    'Wand of Web',
+    'Uncommon',
+    '7 charges (regains 1d6+1 at dawn). Cast Web for 1 charge at save DC 13.',
+    {
+      requiresAttunement: true,
+      attuneBy: ['spellcaster'],
+      charges: WAND_CHARGES,
+      itemSpellDc: 13,
+      itemSpells: [sp('web', 1)],
+    }
+  ),
+  ...(
+    [
+      [1, 'Uncommon'],
+      [2, 'Rare'],
+      [3, 'Very Rare'],
+    ] as Array<[number, Rarity]>
+  ).map(([n, r]) =>
+    wand(
+      `wand_of_the_war_mage_plus_${n}`,
+      `Wand of the War Mage +${n}`,
+      r,
+      `While held, +${n} to spell attack rolls, and your spell attacks ignore Half Cover.`,
+      {
+        requiresAttunement: true,
+        attuneBy: ['spellcaster'],
+        wornEffects: [{ kind: 'spell_attack_bonus', bonus: n, ignoreHalfCover: true }],
+        aliases: [`wand of the war mage +${n}`, `war mage wand +${n}`],
+      }
+    )
+  ),
+];
+
+// A staff is also a Quarterstaff, wielded in the main hand.
+function staff(
+  id: string,
+  name: string,
+  rarity: Rarity,
+  by: string[],
+  desc: string,
+  extra: Partial<LootItem> & { held?: WornEffect[] }
+): [string, LootItem] {
+  const { held, ...rest } = extra;
+  const who = by.map((b) => b.charAt(0).toUpperCase() + b.slice(1));
+  const attune = by.length
+    ? `requires attunement by a ${who.slice(0, -1).join(', ')}${who.length > 1 ? ' or ' : ''}${who[who.length - 1]}`
+    : 'requires attunement';
+  return namedMagic(
+    'quarterstaff',
+    id,
+    name,
+    RARITY_VALUE[rarity],
+    `${desc} (${rarity}; ${attune}.)`,
+    {
+      requiresAttunement: true,
+      ...(by.length ? { attuneBy: by } : {}),
+      ...(held ? { wornEffects: held } : {}),
+      ...rest,
+    }
+  );
+}
+const STAFF_CHARGES: ItemCharges = { max: 10, regain: '1d6+4', destroyOnLast: true };
+const ARCANE = ['sorcerer', 'warlock', 'wizard'];
+const ELEMENTAL = ['druid', 'sorcerer', 'warlock', 'wizard'];
+const ALL_CASTERS = ['bard', 'cleric', 'druid', 'sorcerer', 'warlock', 'wizard'];
+
+const STAFFS: Array<[string, LootItem]> = [
+  // Simplification: Reflect / Resist Enchantment aren't modeled.
+  staff(
+    'staff_of_charming',
+    'Staff of Charming',
+    'Rare',
+    ALL_CASTERS,
+    'A Quarterstaff with 10 charges (regains 1d8+2 at dawn). Cast Charm Person, Command or Comprehend Languages for 1 charge, with your spell save DC.',
+    {
+      charges: { max: 10, regain: '1d8+2', destroyOnLast: true },
+      itemSpells: [sp('charm_person', 1), sp('command', 1), sp('comprehend_languages', 1)],
+    }
+  ),
+  staff(
+    'staff_of_fire',
+    'Staff of Fire',
+    'Very Rare',
+    ELEMENTAL,
+    'A Quarterstaff with 10 charges (regains 1d6+4 at dawn). While held you resist Fire damage. Cast Burning Hands (1 charge), Fireball (3) or Wall of Fire (4) with your spell save DC.',
+    {
+      held: [{ kind: 'resistance', damageType: 'fire' }],
+      charges: STAFF_CHARGES,
+      itemSpells: [sp('burning_hands', 1), sp('fireball', 3), sp('wall_of_fire', 4)],
+    }
+  ),
+  staff(
+    'staff_of_frost',
+    'Staff of Frost',
+    'Very Rare',
+    ELEMENTAL,
+    'A Quarterstaff with 10 charges (regains 1d6+4 at dawn). While held you resist Cold damage. Cast Fog Cloud (1 charge), Ice Storm (4), Wall of Ice (4) or Cone of Cold (5) with your spell save DC.',
+    {
+      held: [{ kind: 'resistance', damageType: 'cold' }],
+      charges: STAFF_CHARGES,
+      itemSpells: [
+        sp('fog_cloud', 1),
+        sp('ice_storm', 4),
+        sp('wall_of_ice', 4),
+        sp('cone_of_cold', 5),
+      ],
+    }
+  ),
+  staff(
+    'staff_of_healing',
+    'Staff of Healing',
+    'Rare',
+    ['bard', 'cleric', 'druid'],
+    'A Quarterstaff with 10 charges (regains 1d6+4 at dawn). Cast Cure Wounds (1 charge per spell level, up to level 4), Lesser Restoration (2) or Mass Cure Wounds (5) with your spellcasting modifier.',
+    {
+      charges: STAFF_CHARGES,
+      itemSpells: [
+        sp('cure_wounds', 1, { maxLevel: 4 }),
+        sp('lesser_restoration', 2),
+        sp('mass_cure_wounds', 5),
+      ],
+    }
+  ),
+  // Simplification: Retributive Strike isn't modeled.
+  staff(
+    'staff_of_power',
+    'Staff of Power',
+    'Very Rare',
+    ARCANE,
+    'A +2 Quarterstaff with 20 charges (regains 2d8+4 at dawn). While held: +2 to AC, saving throws and spell attack rolls. Cast Magic Missile (1 charge), Ray of Enfeeblement (1), Levitate (2), Cone of Cold, Hold Monster, Wall of Force, level-5 Fireball or Lightning Bolt (5 each) or Globe of Invulnerability (6) with your spell save DC. Spending the last charge risks leaving only a +2 Quarterstaff.',
+    {
+      magicBonus: 2,
+      held: [
+        { kind: 'ac_bonus', bonus: 2 },
+        { kind: 'save_bonus', ability: 'all', bonus: 2 },
+        { kind: 'spell_attack_bonus', bonus: 2 },
+      ],
+      charges: { max: 20, regain: '2d8+4', destroyOnLast: true, becomes: 'quarterstaff_plus_2' },
+      itemSpells: [
+        sp('magic_missile', 1),
+        sp('ray_of_enfeeblement', 1),
+        sp('levitate', 2),
+        sp('cone_of_cold', 5),
+        sp('fireball', 5, { level: 5 }),
+        sp('hold_monster', 5),
+        sp('lightning_bolt', 5, { level: 5 }),
+        sp('wall_of_force', 5),
+        sp('globe_of_invulnerability', 6),
+      ],
+    }
+  ),
+  // Simplification: the Insect Cloud property isn't modeled.
+  staff(
+    'staff_of_swarming_insects',
+    'Staff of Swarming Insects',
+    'Rare',
+    ALL_CASTERS,
+    'A Quarterstaff with 10 charges (regains 1d6+4 at dawn). Cast Giant Insect (4 charges) or Insect Plague (5) with your spell save DC.',
+    {
+      charges: STAFF_CHARGES,
+      itemSpells: [sp('giant_insect', 4), sp('insect_plague', 5)],
+    }
+  ),
+  // Simplification: Spell Absorption's Reaction and Retributive Strike aren't modeled.
+  staff(
+    'staff_of_the_magi',
+    'Staff of the Magi',
+    'Legendary',
+    ARCANE,
+    'A +2 Quarterstaff with 50 charges (regains 4d6+2 at dawn). While held: +2 to spell attack rolls and Advantage on saves against spells. Casts a long list of spells, some at no cost (Light, Mage Hand, Detect Magic, Arcane Lock, Enlarge/Reduce, Protection from Evil and Good), with your spell save DC.',
+    {
+      magicBonus: 2,
+      held: [{ kind: 'spell_attack_bonus', bonus: 2 }, { kind: 'spell_save_advantage' }],
+      charges: { max: 50, regain: '4d6+2' },
+      itemSpells: [
+        sp('arcane_lock', 0),
+        sp('detect_magic', 0),
+        sp('enlarge_reduce', 0),
+        sp('light', 0),
+        sp('mage_hand', 0),
+        sp('protection_from_evil_and_good', 0),
+        sp('flaming_sphere', 2),
+        sp('invisibility', 2),
+        sp('knock', 2),
+        sp('web', 2),
+        sp('dispel_magic', 3),
+        sp('ice_storm', 4),
+        sp('wall_of_fire', 4),
+        sp('passwall', 5),
+        sp('telekinesis', 5),
+        sp('conjure_elemental', 7),
+        sp('fireball', 7, { level: 7 }),
+        sp('lightning_bolt', 7, { level: 7 }),
+        sp('plane_shift', 7),
+      ],
+    }
+  ),
+  // Simplification: Tree Form isn't modeled.
+  staff(
+    'staff_of_the_woodlands',
+    'Staff of the Woodlands',
+    'Rare',
+    ['druid'],
+    'A +2 Quarterstaff with 6 charges (regains 1d6 at dawn). While held: +2 to spell attack rolls. Cast Animal Friendship or Speak with Animals (1 charge), Barkskin, Locate Animals or Plants or Pass without Trace (2), Speak with Plants (3), Awaken (5) or Wall of Thorns (6) with your spell save DC. Spending the last charge risks leaving a plain Quarterstaff.',
+    {
+      magicBonus: 2,
+      held: [{ kind: 'spell_attack_bonus', bonus: 2 }],
+      charges: { max: 6, regain: '1d6', destroyOnLast: true, becomes: 'quarterstaff' },
+      itemSpells: [
+        sp('animal_friendship', 1),
+        sp('speak_with_animals', 1),
+        sp('barkskin', 2),
+        sp('locate_animals_or_plants', 2),
+        sp('pass_without_trace', 2),
+        sp('speak_with_plants', 3),
+        sp('awaken', 5),
+        sp('wall_of_thorns', 6),
+      ],
+    }
+  ),
+];
+
+// SRD Spell Scroll — one per SRD spell. Value: twice the scribing cost.
+const SCROLL_VALUE = [30, 50, 200, 300, 2000, 3000, 20000, 25000, 30000, 100000];
+const SCROLL_RARITY = [
+  'Common',
+  'Common',
+  'Uncommon',
+  'Uncommon',
+  'Rare',
+  'Rare',
+  'Very Rare',
+  'Very Rare',
+  'Very Rare',
+  'Legendary',
+];
+const SPELL_SCROLLS: Array<[string, LootItem]> = Object.values(SRD_SPELLS).map((spell) => {
+  const id = `spell_scroll_${spell.id}`;
+  const name = `Spell Scroll (${spell.name})`;
+  const lvl = spell.level === 0 ? 'cantrip' : `level ${spell.level}`;
+  return [
+    id,
+    {
+      id,
+      name,
+      value: SCROLL_VALUE[spell.level],
+      desc: `A scroll holding ${spell.name} (${lvl}). If the spell is on your spell list you can cast it from the scroll, without Material components; a spell above the level you can cast needs a spellcasting check (DC 10 + its level). The scroll crumbles once used. (${SCROLL_RARITY[spell.level]}.)`,
+      weight: 0,
+      type: 'consumable',
+      slot: null,
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      spellScroll: spell.id,
+      aliases: [name.toLowerCase(), `scroll of ${spell.name.toLowerCase()}`],
+    },
+  ];
+});
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -2915,6 +3316,9 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
     { requiresAttunement: true, magicBonus: 2 }
   ),
   ...POTIONS,
+  ...WANDS,
+  ...STAFFS,
+  ...SPELL_SCROLLS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

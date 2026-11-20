@@ -648,6 +648,13 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('speed_floor'), feet: z.number().int().positive().max(120) }).strict(),
   z.object({ kind: z.literal('darkvision'), feet: z.number().int().positive().max(300) }).strict(),
   z.object({ kind: z.literal('spell_save_advantage') }).strict(),
+  z
+    .object({
+      kind: z.literal('spell_attack_bonus'),
+      bonus: z.number().int().min(1).max(5),
+      ignoreHalfCover: z.boolean().optional(),
+    })
+    .strict(),
 ]);
 
 const LootItemSchema = z
@@ -747,6 +754,31 @@ const LootItemSchema = z
       ])
       .optional(),
     conjuresAmmo: z.boolean().optional(),
+    charges: z
+      .object({
+        max: z.number().int().min(1).max(100),
+        regain: z.string().max(20),
+        destroyOnLast: z.boolean().optional(),
+        becomes: z.string().min(1).max(60).optional(),
+      })
+      .strict()
+      .optional(),
+    itemSpells: z
+      .array(
+        z
+          .object({
+            spellId: z.string().min(1).max(60),
+            charges: z.number().int().min(0).max(50),
+            level: z.number().int().min(0).max(9).optional(),
+            maxLevel: z.number().int().min(0).max(9).optional(),
+          })
+          .strict()
+      )
+      .max(30)
+      .optional(),
+    itemSpellDc: z.number().int().min(5).max(30).optional(),
+    spellScroll: z.string().min(1).max(60).optional(),
+    attuneBy: z.array(z.string().min(1).max(20)).max(12).optional(),
     noArmorTrainingNeeded: z.boolean().optional(),
     versatileDamage: DICE.optional(),
     damageType: z.string().min(1).max(20).optional(),
