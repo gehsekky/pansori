@@ -282,7 +282,9 @@ export const handleCastSpell: ActionHandler<{
       slotNote,
       slotLevel,
       (action as { summonVariant?: string }).summonVariant,
-      castingScore
+      castingScore,
+      // An item's own creature (not a scroll's Animate Dead) is tied to the item.
+      fromItem && spell.itemPower ? { instanceId: fromItem } : undefined
     )
   ) {
     return;

@@ -1236,6 +1236,10 @@ export interface InventoryItem {
   powers_used?: string[];
   // An armed on-hit weapon power (Dagger of Venom, Staff of Striking, …).
   primed?: { power: string; charges: number };
+  // Long Rests left before a spent `powers_used` key recharges, for properties
+  // that take days to come back (Figurines of Wondrous Power: "until 5 days
+  // have passed" — a pansori day is a Long Rest). Absent ⇒ back at the next one.
+  recharge_rests?: Record<string, number>;
   [key: string]: unknown;
 }
 
@@ -1838,6 +1842,10 @@ export interface SummonedAlly {
   // mount's Speed (ft), carried onto the entity's `speed_ft`.
   isMount?: boolean;
   speed?: number;
+  // A creature from a magic item (Figurine of Wondrous Power, Horn of
+  // Valhalla): the item's instance id. Using the item again replaces it, and
+  // it reverts (leaves) at the next Long Rest.
+  fromItem?: string;
 }
 
 // SRD wall/terrain spells (Wall of Fire, Wall of Force) — a transient set of

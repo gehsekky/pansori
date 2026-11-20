@@ -4380,6 +4380,150 @@ const WONDROUS_4: Array<[string, LootItem]> = [
   ),
 ];
 
+// ── SRD summoning items ─────────────────────────────────────────────────────
+// Each calls a creature (an item power with a `summon` block) out of combat;
+// it fights beside the party from the next battle, reverts at the next Long
+// Rest, and is replaced if the item is used again. Simplification: the
+// creature lasts until that Long Rest rather than its listed hours.
+const FIGURINES: Array<[string, string, Rarity, number, string]> = [
+  ['bronze_griffon', 'Bronze Griffon', 'Rare', 5, 'a Griffon'],
+  ['ebony_fly', 'Ebony Fly', 'Rare', 2, 'a Giant Fly you can ride (it has no attacks)'],
+  ['golden_lions', 'Golden Lions', 'Rare', 7, 'a pair of Lions'],
+  ['marble_elephant', 'Marble Elephant', 'Rare', 7, 'an Elephant'],
+  [
+    'obsidian_steed',
+    'Obsidian Steed',
+    'Very Rare',
+    5,
+    'a Nightmare you can ride (it fights only to defend itself)',
+  ],
+  ['onyx_dog', 'Onyx Dog', 'Rare', 7, 'a Mastiff'],
+  ['serpentine_owl', 'Serpentine Owl', 'Rare', 2, 'a Giant Owl'],
+  ['silver_raven', 'Silver Raven', 'Uncommon', 2, 'a Raven'],
+];
+const VALHALLA: Array<[string, Rarity, number]> = [
+  ['silver', 'Rare', 2],
+  ['brass', 'Rare', 3],
+  ['bronze', 'Very Rare', 4],
+  ['iron', 'Legendary', 5],
+];
+const ELEMENT_VESSELS: Array<[string, string, string, string]> = [
+  [
+    'bowl_of_commanding_water_elementals',
+    'Bowl of Commanding Water Elementals',
+    'water',
+    'Fill it with water and',
+  ],
+  [
+    'brazier_of_commanding_fire_elementals',
+    'Brazier of Commanding Fire Elementals',
+    'fire',
+    'Kindle it and',
+  ],
+  [
+    'censer_of_controlling_air_elementals',
+    'Censer of Controlling Air Elementals',
+    'air',
+    'Swing it and',
+  ],
+  [
+    'stone_of_controlling_earth_elementals',
+    'Stone of Controlling Earth Elementals',
+    'earth',
+    'Touch it to the ground and',
+  ],
+];
+const ELEMENTAL_GEMS: Array<[string, string, string]> = [
+  ['blue_sapphire', 'Blue Sapphire', 'air'],
+  ['emerald', 'Emerald', 'water'],
+  ['red_corundum', 'Red Corundum', 'fire'],
+  ['yellow_diamond', 'Yellow Diamond', 'earth'],
+];
+const anEl = (el: string) => `${el === 'air' || el === 'earth' ? 'an' : 'a'} ${cap(el)} Elemental`;
+
+const SUMMONING_ITEMS: Array<[string, LootItem]> = [
+  ...FIGURINES.map(([key, name, rarity, days, what]) =>
+    wondrous(
+      `figurine_of_wondrous_power_${key}`,
+      `Figurine of Wondrous Power (${name})`,
+      rarity,
+      `Out of combat, throw the statuette to turn it into ${what} that joins the party until the next Long Rest. Then it can't be used again for ${days} days (Long Rests).`,
+      null,
+      {
+        weight: 0,
+        castWhileCarried: true,
+        itemSpells: [sp(`figurine_${key}`, 0, { rechargeDays: days })],
+      }
+    )
+  ),
+  // Simplification: the horn's requirement (proficiency with Simple weapons,
+  // Medium armor or Martial weapons) isn't checked, and the spirits'
+  // Charmed / Frightened immunity isn't modeled.
+  ...VALHALLA.map(([metal, rarity, n]) =>
+    wondrous(
+      `horn_of_valhalla_${metal}`,
+      `Horn of Valhalla (${cap(metal)})`,
+      rarity,
+      `Out of combat, blow it to call ${n} Berserker spirits from Ysgard to fight beside you until the next Long Rest. Then it can't be used again for 7 days (Long Rests).`,
+      null,
+      {
+        weight: 2,
+        castWhileCarried: true,
+        itemSpells: [sp(`valhalla_${metal}`, 0, { rechargeDays: 7 })],
+      }
+    )
+  ),
+  ...ELEMENT_VESSELS.map(([id, name, el, how]) =>
+    wondrous(
+      id,
+      name,
+      'Rare',
+      `${how} summon ${anEl(el)} (out of combat) that fights beside you until the next Long Rest. Once per dawn.`,
+      null,
+      {
+        weight: id.startsWith('stone') ? 5 : 3,
+        castWhileCarried: true,
+        itemSpells: [sp(`summon_${el}_elemental`, 0, { daily: true })],
+      }
+    )
+  ),
+  ...ELEMENTAL_GEMS.map(([key, name, el]) =>
+    wondrous(
+      `elemental_gem_${key}`,
+      `Elemental Gem (${name})`,
+      'Uncommon',
+      `Break the gem (out of combat) to summon ${anEl(el)} that fights beside you until the next Long Rest. The gem is then spent.`,
+      null,
+      {
+        weight: 0,
+        castWhileCarried: true,
+        charges: { max: 1, regain: '0', consumable: true },
+        itemSpells: [sp(`summon_${el}_elemental`, 1)],
+      }
+    )
+  ),
+  wondrous(
+    'ring_of_djinni_summoning',
+    'Ring of Djinni Summoning',
+    'Legendary',
+    'While wearing it, once per dawn (out of combat) summon a Djinni that serves you until the next Long Rest.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      itemSpells: [sp('djinni_summoning', 0, { daily: true })],
+    }
+  ),
+  staff(
+    'staff_of_the_python',
+    'Staff of the Python',
+    'Uncommon',
+    [],
+    'Out of combat, throw the staff to turn it into a Giant Constrictor Snake that fights beside you until the next Long Rest.',
+    { itemSpells: [sp('python_staff', 0)] }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -4741,6 +4885,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...WONDROUS_2,
   ...WONDROUS_3,
   ...WONDROUS_4,
+  ...SUMMONING_ITEMS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

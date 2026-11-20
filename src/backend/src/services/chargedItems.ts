@@ -68,6 +68,11 @@ export function dailyUsed(inv: InventoryItem, key: string): boolean {
   return (inv.powers_used ?? []).includes(key);
 }
 
+/** Long Rests until the spent property `key` recharges (1 = the next one). */
+export function restsLeft(inv: InventoryItem, key: string): number {
+  return inv.recharge_rests?.[key] ?? 1;
+}
+
 /** True when any of the character's classes casts spells. */
 export function isSpellcaster(char: Character): boolean {
   return getAllClasses(char).some((c) => !!classSpellListTag(c));
@@ -158,8 +163,12 @@ export function planItemCast(
     const how = loot.slot === 'weapon' || loot.slot === 'off_hand' ? 'holding' : 'wearing';
     return { error: `You must be ${how} the ${loot.name}.` };
   }
-  if (is.daily && dailyUsed(inv, dailyKey(is.spellId))) {
-    return { error: `The ${loot.name}'s ${spell.name} can't be used again until dawn.` };
+  if ((is.daily || is.rechargeDays) && dailyUsed(inv, dailyKey(is.spellId))) {
+    return {
+      error: is.rechargeDays
+        ? `The ${loot.name} is still recovering — ${restsLeft(inv, dailyKey(is.spellId))} more Long Rest${restsLeft(inv, dailyKey(is.spellId)) === 1 ? '' : 's'} before it can be used again.`
+        : `The ${loot.name}'s ${spell.name} can't be used again until dawn.`,
+    };
   }
   const cost = itemSpellCost(is, spell, level);
   if (cost === null)
@@ -196,15 +205,47 @@ export function spendItemCast(char: Character, plan: ItemCastPlan, lootTable: Lo
     drop();
     return ' The scroll crumbles to dust.';
   }
-  if (plan.is?.daily) markDaily(char, plan.inv.instance_id, dailyKey(plan.is.spellId));
+  if (plan.is?.daily || plan.is?.rechargeDays) {
+    markDaily(char, plan.inv.instance_id, dailyKey(plan.is.spellId), plan.is.rechargeDays);
+  }
   return spendCharges(char, plan.inv.instance_id, plan.cost, lootTable);
 }
 
 /** Mark the instance's once-per-dawn property `key` as spent. Mutates `char`. */
-export function markDaily(char: Character, instanceId: string, key: string): void {
+export function markDaily(
+  char: Character,
+  instanceId: string,
+  key: string,
+  rechargeDays = 1
+): void {
   char.inventory = char.inventory.map((i) =>
-    i.instance_id === instanceId ? { ...i, powers_used: [...(i.powers_used ?? []), key] } : i
+    i.instance_id === instanceId
+      ? {
+          ...i,
+          powers_used: [...(i.powers_used ?? []), key],
+          ...(rechargeDays > 1
+            ? { recharge_rests: { ...(i.recharge_rests ?? {}), [key]: rechargeDays } }
+            : {}),
+        }
+      : i
   );
+}
+
+/**
+ * One Long Rest (a day) passes for the instance's spent properties: each
+ * comes back unless its `recharge_rests` countdown still has days to run.
+ */
+function restPowers(inv: InventoryItem): InventoryItem {
+  if (!inv.powers_used && !inv.primed) return inv;
+  const waits: Record<string, number> = {};
+  for (const [k, n] of Object.entries(inv.recharge_rests ?? {})) if (n > 1) waits[k] = n - 1;
+  const still = (inv.powers_used ?? []).filter((k) => waits[k] !== undefined);
+  return {
+    ...inv,
+    powers_used: still.length ? still : undefined,
+    recharge_rests: Object.keys(waits).length ? waits : undefined,
+    primed: undefined,
+  };
 }
 
 /**
@@ -269,8 +310,7 @@ export function spendCharges(
 export function regainItemCharges(char: Character, lootTable: LootItem[]): string[] {
   const notes: string[] = [];
   char.inventory = (char.inventory ?? []).map((raw) => {
-    const inv =
-      raw.powers_used || raw.primed ? { ...raw, powers_used: undefined, primed: undefined } : raw;
+    const inv = restPowers(raw);
     const used = inv.charges_used ?? 0;
     const loot = used > 0 ? lootTable.find((l) => l.id === inv.id) : undefined;
     if (!loot?.charges) return inv;
@@ -316,7 +356,8 @@ export function itemCastOptions(
     const left = chargesLeft(inv, loot);
     for (const is of loot.itemSpells) {
       const spell = itemSpellFor(spellTable, is.spellId);
-      if (!spell || (is.daily && dailyUsed(inv, dailyKey(is.spellId)))) continue;
+      if (!spell || ((is.daily || is.rechargeDays) && dailyUsed(inv, dailyKey(is.spellId))))
+        continue;
       const base = is.level ?? spell.level;
       for (let lvl = base; lvl <= (is.maxLevel ?? base); lvl++) {
         const cost = itemSpellCost(is, spell, lvl)!;

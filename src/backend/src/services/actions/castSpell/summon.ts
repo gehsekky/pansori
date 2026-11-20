@@ -26,7 +26,10 @@ export function runSummonSpell(
   // Caster's spellcasting ability SCORE — only consulted for
   // `countFromSpellMod` spells (Animate Objects). Defaults to 10 (mod +0) so
   // direct unit callers needn't supply it for fixed-count summons.
-  castingScore = 10
+  castingScore = 10,
+  // The magic item the creature comes from (Figurine of Wondrous Power): using
+  // it again replaces its earlier creature, which also leaves at a Long Rest.
+  fromItem?: { instanceId: string }
 ): boolean {
   if (ctx.actor.kind !== 'pc') return false;
   const { char } = ctx.actor;
@@ -45,6 +48,14 @@ export function runSummonSpell(
   // SRD Find Familiar — one familiar only: a recast gives the existing
   // familiar the new form (the old one is replaced).
   const isFamiliar = spell.id === 'find_familiar';
+  if (fromItem) {
+    ctx.st = {
+      ...ctx.st,
+      summoned_allies: (ctx.st.summoned_allies ?? []).filter(
+        (a) => a.fromItem !== fromItem.instanceId
+      ),
+    };
+  }
   if (isFamiliar) {
     ctx.st = {
       ...ctx.st,
@@ -78,6 +89,7 @@ export function runSummonSpell(
     // flag + Speed so combat start auto-mounts the caster.
     isMount: base.isMount,
     speed: base.speed,
+    ...(fromItem ? { fromItem: fromItem.instanceId } : {}),
   }));
   ctx.st = {
     ...ctx.st,
@@ -85,6 +97,13 @@ export function runSummonSpell(
   };
   // Mounts read differently from a war-band of summons: you conjure one steed
   // and ride it into the next fight.
+  if (fromItem) {
+    const who = count === 1 ? `a ${chosen.name}` : `${count} ${chosen.name}s`;
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      `${char.name} unleashes the magic${slotNote} — ${who} ${count === 1 ? 'stands' : 'stand'} ready to fight at the party's side until the next Long Rest.`;
+    return true;
+  }
   if (base.isMount) {
     ctx.narrative =
       (ctx.narrative ?? '') +

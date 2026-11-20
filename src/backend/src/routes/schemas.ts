@@ -904,6 +904,7 @@ const LootItemSchema = z
             daily: z.boolean().optional(),
             attack: z.number().int().min(-5).max(20).optional(),
             selfOnly: z.boolean().optional(),
+            rechargeDays: z.number().int().min(1).max(30).optional(),
             backfire: z
               .object({
                 chancePct: z.number().int().min(1).max(100),

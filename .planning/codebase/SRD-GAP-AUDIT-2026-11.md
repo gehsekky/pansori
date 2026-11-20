@@ -535,6 +535,26 @@ per use and neither item's invisibility ends early when it's removed.
 Deferred: Dust of Sneezing and Choking (it catches the user too), Robe of
 Scintillating Colors, the Ring of Shooting Stars' Lightning Spheres.
 
+**Batch 10 done 2026-11-20 — summoning items.** Item powers can now carry a
+`summon` block (stat blocks read from the SRD bestiary). Used out of combat,
+the item calls its creature into `summoned_allies` (it joins the next battle,
+like Animate Dead); item creatures are tagged `fromItem`, revert at the next
+Long Rest, and using the item again replaces its earlier creature. New
+`ItemSpell.rechargeDays` + `InventoryItem.recharge_rests`: a property that
+takes days to return counts down one per Long Rest (a pansori day). Items:
+Figurines of Wondrous Power (Bronze Griffon, Ebony Fly — the Giant Fly as a
+non-combatant mount — Golden Lions, Marble Elephant, Obsidian Steed, Onyx
+Dog, Serpentine Owl, Silver Raven); Horns of Valhalla (Silver, Brass, Bronze,
+Iron); Bowl / Brazier / Censer / Stone of commanding elementals; the four
+Elemental Gems; Ring of Djinni Summoning; Staff of the Python.
+Simplifications: creatures last until the Long Rest rather than their listed
+hours (and use the existing one-attack ally model); the Horn of Valhalla's
+requirement and its spirits' Charmed / Frightened immunity, the Obsidian
+Steed's disobedience, the djinni's Concentration and chance of leaving, and
+the Python staff shattering when the snake dies aren't modeled. Deferred:
+Ivory Goats, Bag of Tricks (random tables), Pipes of the Sewers (uncontrolled
+swarms), Efreeti Bottle.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

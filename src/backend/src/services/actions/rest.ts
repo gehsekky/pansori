@@ -346,7 +346,8 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     // SRD Legendary Resistance is N/Day; a day has passed.
     legendary_resistance_used: undefined,
     // SRD Druid Wild Companion — that familiar disappears on a Long Rest.
-    summoned_allies: (ctx.st.summoned_allies ?? []).filter((a) => !a.wild_companion),
+    // Item creatures (Figurines, Horn of Valhalla) revert at the Long Rest too.
+    summoned_allies: (ctx.st.summoned_allies ?? []).filter((a) => !a.wild_companion && !a.fromItem),
   };
   updatePcActor(ctx, { ...restedChars[safeIdx] });
   const longRestFlavor = ctx.context.narratives.longRest

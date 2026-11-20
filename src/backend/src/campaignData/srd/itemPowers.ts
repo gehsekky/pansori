@@ -1,3 +1,4 @@
+import { SRD_MONSTERS } from './monsters.js';
 import type { Spell } from '../../types.js';
 
 // SRD 5.2.1 magic items whose activated effect isn't a spell — the Wand of
@@ -13,7 +14,135 @@ const power = (p: Omit<Spell, 'castTime' | 'itemPower'>): Spell => ({
   ...p,
 });
 
+type Summon = NonNullable<Spell['summon']>;
+
+/** A summon block from an SRD bestiary entry (one attack line; Multiattack aside). */
+function creature(key: string, more: Partial<Summon> = {}): Summon {
+  const m = SRD_MONSTERS[key];
+  if (!m) throw new Error(`itemPowers: unknown monster ${key}`);
+  return { name: m.name, ac: m.ac, maxHp: m.hp, toHit: m.toHit, damage: m.damage, ...more };
+}
+
+/**
+ * An item that calls a creature to fight beside the party (out of combat; it
+ * joins the next battle). Item creatures revert at the next Long Rest, and
+ * using the item again replaces the earlier one.
+ */
+const summonPower = (id: string, name: string, summon: Summon, desc: string): Spell =>
+  power({ id, name, level: 1, outOfCombatOnly: true, summon, desc });
+
 export const ITEM_POWERS: Record<string, Spell> = {
+  // ── Summoning items ───────────────────────────────────────────────────────
+  // SRD Figurines of Wondrous Power.
+  figurine_bronze_griffon: summonPower(
+    'figurine_bronze_griffon',
+    'Bronze Griffon',
+    creature('griffon'),
+    'The statuette becomes a Griffon that fights beside you.'
+  ),
+  // The Ebony Fly's Giant Fly has no attacks: a non-combatant mount.
+  figurine_ebony_fly: summonPower(
+    'figurine_ebony_fly',
+    'Ebony Fly',
+    {
+      name: 'Giant Fly',
+      ac: 11,
+      maxHp: 19,
+      toHit: 0,
+      damage: '0',
+      noAttack: true,
+      isMount: true,
+      speed: 30,
+    },
+    'The statuette becomes a Giant Fly you can ride.'
+  ),
+  figurine_golden_lions: summonPower(
+    'figurine_golden_lions',
+    'Golden Lions',
+    creature('lion', { baseCount: 2 }),
+    'The pair of statuettes become two Lions that fight beside you.'
+  ),
+  figurine_marble_elephant: summonPower(
+    'figurine_marble_elephant',
+    'Marble Elephant',
+    creature('elephant'),
+    'The statuette becomes an Elephant that fights beside you.'
+  ),
+  // Simplification: the Obsidian Steed's 10 percent chance to ignore orders
+  // (and the ride to Hades) isn't modeled. It fights only to defend itself.
+  figurine_obsidian_steed: summonPower(
+    'figurine_obsidian_steed',
+    'Obsidian Steed',
+    creature('nightmare', { noAttack: true, isMount: true, speed: 60 }),
+    'The statuette becomes a Nightmare you can ride; it fights only to defend itself.'
+  ),
+  figurine_onyx_dog: summonPower(
+    'figurine_onyx_dog',
+    'Onyx Dog',
+    creature('mastiff'),
+    'The statuette becomes a Mastiff that fights beside you.'
+  ),
+  figurine_serpentine_owl: summonPower(
+    'figurine_serpentine_owl',
+    'Serpentine Owl',
+    creature('giant_owl'),
+    'The statuette becomes a Giant Owl that fights beside you.'
+  ),
+  figurine_silver_raven: summonPower(
+    'figurine_silver_raven',
+    'Silver Raven',
+    creature('raven'),
+    'The statuette becomes a Raven that fights beside you.'
+  ),
+  // SRD Horn of Valhalla — Berserker spirits (2 / 3 / 4 / 5 by metal).
+  ...Object.fromEntries(
+    (
+      [
+        ['silver', 2],
+        ['brass', 3],
+        ['bronze', 4],
+        ['iron', 5],
+      ] as const
+    ).map(([metal, n]) => [
+      `valhalla_${metal}`,
+      summonPower(
+        `valhalla_${metal}`,
+        'Warrior Spirits',
+        creature('berserker', { baseCount: n }),
+        `${n} Berserker spirits from Ysgard fight beside you.`
+      ),
+    ])
+  ),
+  // SRD Bowl / Brazier / Censer / Stone of commanding elementals, and the
+  // Elemental Gems.
+  ...Object.fromEntries(
+    ['air', 'earth', 'fire', 'water'].map((el) => [
+      `summon_${el}_elemental`,
+      summonPower(
+        `summon_${el}_elemental`,
+        `${el.charAt(0).toUpperCase()}${el.slice(1)} Elemental`,
+        creature(`${el}_elemental`),
+        `${el === 'air' || el === 'earth' ? 'An' : 'A'} ${el} elemental answers the call and fights beside you.`
+      ),
+    ])
+  ),
+  // Simplification: the djinni needs no Concentration, and the 5 percent chance
+  // it leaves for good isn't modeled.
+  djinni_summoning: summonPower(
+    'djinni_summoning',
+    'Djinni',
+    creature('djinni'),
+    'A Djinni from the Elemental Plane of Air arrives to serve you.'
+  ),
+  // Simplification: the staff isn't destroyed when the snake drops to 0 HP.
+  python_staff: summonPower(
+    'python_staff',
+    'Giant Constrictor Snake',
+    creature('giant_constrictor_snake'),
+    'The staff becomes a Giant Constrictor Snake that fights beside you.'
+  ),
+
+  // ── Attack and control powers ─────────────────────────────────────────────
   // SRD Wand of Paralysis — a ray: Con save or Paralyzed for 1 minute, saving
   // again at the end of each of its turns.
   paralysis_ray: power({

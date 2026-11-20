@@ -2039,6 +2039,9 @@ export interface ItemSpell {
   noConcentration?: boolean;
   // Usable once, then not again until dawn (the Long Rest).
   daily?: boolean;
+  // Usable once, then not again until this many Long Rests (days) have passed
+  // (Figurine of Wondrous Power: 5). Implies `daily`.
+  rechargeDays?: number;
   // Fixed spell attack bonus (Circlet of Blasting: +5), instead of the holder's.
   attack?: number;
   // The item casts it on its wearer only (Ring of Jumping, Boots of Levitation).
