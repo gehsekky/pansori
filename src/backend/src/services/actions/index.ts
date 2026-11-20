@@ -44,6 +44,7 @@ import {
   handleTalkResponse,
 } from './social.js';
 import { handleAttune, handleDeAttune, handleUse } from './inventory.js';
+import { handleBonusWeaponAttack, handleItemPower } from './itemPower.js';
 import { handleCancelTeleport, handleTeleportTo } from './teleportTo.js';
 import { handleChooseFeatSpell, handleChooseLessonsFeat } from './lessons.js';
 import { handleContinue, handleEndTurn, handlePass } from './utility.js';
@@ -185,6 +186,8 @@ const handlers: Partial<Record<StructuredAction['type'], ActionHandler>> = {
   study: handleStudy as ActionHandler,
   use_reaction: handleUseReaction as ActionHandler,
   two_weapon_attack: handleTwoWeaponAttack as ActionHandler,
+  item_power: handleItemPower as ActionHandler,
+  bonus_weapon_attack: handleBonusWeaponAttack as ActionHandler,
   use_lands_aid: handleLandsAid as ActionHandler,
   grid_move: handleGridMove as ActionHandler,
   mount: handleMount as ActionHandler,

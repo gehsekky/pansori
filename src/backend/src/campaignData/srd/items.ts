@@ -2965,6 +2965,477 @@ const SPELL_SCROLLS: Array<[string, LootItem]> = Object.values(SRD_SPELLS).map((
   ];
 });
 
+// ─── Activated magic weapons and armor (SRD 5.2.1) ───────────────────────────
+// Powers resolved in services/actions/attack/weaponPowers.ts: armed on-hit
+// powers (`weaponPowers`), rider saves, natural-20 death effects (`critSlay`),
+// the Oathbow's sworn enemy and the Hammer of Thunderbolts' charged throw.
+// "Any weapon" items are generated on a few representative bases.
+const SLAYING_TYPES = [
+  'aberration',
+  'beast',
+  'celestial',
+  'construct',
+  'dragon',
+  'elemental',
+  'fey',
+  'fiend',
+  'giant',
+  'humanoid',
+  'monstrosity',
+  'ooze',
+  'plant',
+  'undead',
+];
+const GIANT_GEAR = ['belt_of_', 'gauntlets_of_ogre_power'];
+const ARMOR_FOR_METAL = [
+  'chain_shirt',
+  'scale_mail',
+  'breastplate',
+  'half_plate',
+  'ring_mail',
+  'chain_mail',
+  'splint_armor',
+  'plate_armor',
+];
+
+const ACTIVATED_WEAPONS: Array<[string, LootItem]> = [
+  namedMagic(
+    'javelin',
+    'javelin_of_lightning',
+    'Javelin of Lightning',
+    RARITY_VALUE.Uncommon,
+    'A magic javelin whose hits can deal Lightning instead of Piercing damage (the better of the two is used). Once per dawn, hurl it as a bolt of lightning: a Line to the target, 4d6 Lightning (DC 13 Dexterity save for half). (Uncommon.)',
+    {
+      altDamageType: 'lightning',
+      itemSpells: [sp('lightning_bolt', 0, { dc: 13, damage: '4d6', daily: true })],
+    }
+  ),
+  // SRD Dagger of Venom (Rare) — +1; a Bonus Action coats the blade once per dawn.
+  namedMagic(
+    'dagger',
+    'dagger_of_venom',
+    'Dagger of Venom',
+    RARITY_VALUE.Rare,
+    'A +1 dagger. Once per dawn, coat it with poison as a Bonus Action: the next creature it hits makes a DC 15 Constitution save or takes 2d10 Poison damage and is Poisoned for 1 minute. (Rare.)',
+    {
+      magicBonus: 1,
+      weaponPowers: [
+        {
+          id: 'venom',
+          label: 'Coat the blade with poison',
+          cost: 'bonus_action',
+          daily: true,
+          rider: {
+            label: 'Venom',
+            dice: '2d10',
+            damageType: 'poison',
+            save: { ability: 'con', dc: 15, condition: 'poisoned', rounds: 10, onSave: 'none' },
+          },
+        },
+      ],
+    }
+  ),
+  // SRD Mace of Terror (Rare, attunement). Simplification: the wave uses the
+  // Fear spell (its cone, without Concentration) rather than a 30-ft area of
+  // creatures you choose.
+  namedMagic(
+    'mace',
+    'mace_of_terror',
+    'Mace of Terror',
+    RARITY_VALUE.Rare,
+    'A magic mace with 3 charges (regains 1d3 at dawn). Spend 1 to release a wave of terror: creatures in it make a DC 15 Wisdom save or are Frightened for 1 minute. (Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('fear', 1, { dc: 15, noConcentration: true })],
+    }
+  ),
+  // SRD Nine Lives Stealer (Very Rare, attunement). Simplification: it starts
+  // with 5 charges (the average of 1d8 + 1).
+  ...named(['longsword', 'greatsword', 'rapier'], (b) =>
+    namedMagic(
+      b.id,
+      `nine_lives_stealer_${b.id}`,
+      `Nine Lives Stealer ${b.name}`,
+      RARITY_VALUE['Very Rare'],
+      `${b.desc} A +2 magic weapon with 5 charges. On a natural 20 against a creature with fewer than 100 Hit Points, it makes a DC 15 Constitution save or is slain (Constructs and Undead always succeed); each slaying spends a charge. (Very Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 2,
+        charges: { max: 5, regain: '0' },
+        critSlay: {
+          label: 'Life Stealing',
+          dc: 15,
+          maxHp: 100,
+          immuneTypes: ['construct', 'undead'],
+          spendsCharge: true,
+        },
+      }
+    )
+  ),
+  // SRD Oathbow (Very Rare, attunement).
+  ...named(['longbow', 'shortbow'], (b) =>
+    namedMagic(
+      b.id,
+      `oathbow_${b.id}`,
+      `Oathbow (${b.name})`,
+      RARITY_VALUE['Very Rare'],
+      `${b.desc} Your first ranged attack with it swears the target as your sworn enemy (one at a time; once one dies, a new oath waits for dawn). Against it you have Advantage, it gets no benefit from Half or Three-Quarters Cover, and a hit deals +3d6 Piercing. While it lives, you have Disadvantage with other weapons. (Very Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        swornEnemy: true,
+        magicRiders: [
+          { label: 'Oathbow', dice: '3d6', damageType: 'piercing', vsSwornEnemy: true },
+        ],
+      }
+    )
+  ),
+  // SRD Hammer of Thunderbolts (Legendary, attunement). Simplification: the
+  // thunderclap stuns only enemies, not the wielder's allies in the area.
+  ...named(['maul', 'warhammer'], (b) =>
+    namedMagic(
+      b.id,
+      `hammer_of_thunderbolts_${b.id}`,
+      `Hammer of Thunderbolts (${b.name})`,
+      RARITY_VALUE.Legendary,
+      `${b.desc} A +1 magic weapon with 5 charges (regains 1d4+1 at dawn). Spend a charge to throw it (20/60 ft; it flies back): a hit forces the target and every enemy within 30 ft of it to make a DC 17 Constitution save or be Stunned until the end of your next turn. While you also wear an attuned Belt of Giant Strength or Gauntlets of Ogre Power, their Strength is 4 higher (max 30), and a natural 20 against a Giant forces a DC 17 Constitution save or it dies. (Legendary; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 1,
+        charges: { max: 5, regain: '1d4+1' },
+        thrown: { normalRange: 20, longRange: 60 },
+        throwCharge: { dc: 17, radiusFt: 30 },
+        mightOfGiants: GIANT_GEAR,
+        critSlay: { label: "Giants' Bane", dc: 17, vsTypes: ['giant'], needsWorn: GIANT_GEAR },
+      }
+    )
+  ),
+  // SRD Trident of Fish Command (Uncommon, attunement). Simplification: the
+  // Beast needn't have a Swim Speed.
+  namedMagic(
+    'trident',
+    'trident_of_fish_command',
+    'Trident of Fish Command',
+    RARITY_VALUE.Uncommon,
+    'A magic trident with 3 charges (regains 1d3 at dawn). While you carry it, spend 1 to cast Dominate Beast (save DC 15). (Uncommon; requires attunement.)',
+    {
+      requiresAttunement: true,
+      castWhileCarried: true,
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('dominate_beast', 1, { dc: 15 })],
+    }
+  ),
+  // SRD Quarterstaff of the Acrobat (Very Rare, attunement). Simplification:
+  // the light and the rod / 10-foot-pole forms aren't modeled.
+  namedMagic(
+    'quarterstaff',
+    'quarterstaff_of_the_acrobat',
+    'Quarterstaff of the Acrobat',
+    RARITY_VALUE['Very Rare'],
+    'A +2 quarterstaff that can be thrown (30/120 ft) and flies back to your hand. While held you have Advantage on Dexterity (Acrobatics) checks, and once per Short or Long Rest you can take a Reaction to twirl it, gaining +5 AC against an attack that hits you. (Very Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      magicBonus: 2,
+      thrown: { normalRange: 30, longRange: 120 },
+      deflect: true,
+      wornEffects: [{ kind: 'skill_advantage', skill: 'acrobatics' }],
+    }
+  ),
+  // SRD Scimitar of Speed (Very Rare, attunement).
+  namedMagic(
+    'scimitar',
+    'scimitar_of_speed',
+    'Scimitar of Speed',
+    RARITY_VALUE['Very Rare'],
+    'A +2 scimitar. On each of your turns you can make one attack with it as a Bonus Action. (Very Rare; requires attunement.)',
+    { requiresAttunement: true, magicBonus: 2, bonusAttack: true }
+  ),
+  // SRD Frost Brand (Very Rare, attunement). Simplification: the light in
+  // freezing temperatures and the flame-quenching draw aren't modeled.
+  ...named(['longsword', 'greatsword', 'rapier', 'scimitar'], (b) =>
+    namedMagic(
+      b.id,
+      `frost_brand_${b.id}`,
+      `Frost Brand ${b.name}`,
+      RARITY_VALUE['Very Rare'],
+      `${b.desc} A magic weapon: +1d6 Cold damage on a hit, and while you hold it you have Resistance to Fire damage. (Very Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicRiders: [{ label: 'Frost Brand', dice: '1d6', damageType: 'cold' }],
+        wornEffects: [{ kind: 'resistance', damageType: 'fire' }],
+      }
+    )
+  ),
+  // SRD Vorpal Sword (Legendary, attunement). Simplification: Oozes,
+  // Elementals and Plants count as having no head to lose; size never saves it.
+  ...named(['longsword', 'greatsword', 'scimitar'], (b) =>
+    namedMagic(
+      b.id,
+      `vorpal_sword_${b.id}`,
+      `Vorpal ${b.name}`,
+      RARITY_VALUE.Legendary,
+      `${b.desc} A +3 magic weapon that ignores Resistance to Slashing damage. On a natural 20 it cuts off the target's head, killing it — a creature without a head to lose (or that spends a Legendary Resistance) takes an extra 30 Slashing damage instead. (Legendary; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 3,
+        ignoresResistance: 'slashing',
+        critSlay: { label: 'Vorpal', immuneTypes: ['ooze', 'elemental', 'plant'], elseDamage: 30 },
+      }
+    )
+  ),
+  // SRD Sword of Sharpness (Very Rare, attunement). Simplification: the
+  // Exhaustion level and maximized damage against objects aren't modeled.
+  ...named(['longsword', 'greatsword', 'scimitar'], (b) =>
+    namedMagic(
+      b.id,
+      `sword_of_sharpness_${b.id}`,
+      `Sword of Sharpness (${b.name})`,
+      RARITY_VALUE['Very Rare'],
+      `${b.desc} A magic weapon: on a natural 20 the target takes an extra 14 Slashing damage. (Very Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicRiders: [{ label: 'Sharpness', dice: '14', damageType: 'slashing', onCrit: true }],
+      }
+    )
+  ),
+  // SRD Sword of Wounding (Rare, attunement). The wound blocks Regeneration.
+  ...named(['longsword', 'rapier', 'scimitar'], (b) =>
+    namedMagic(
+      b.id,
+      `sword_of_wounding_${b.id}`,
+      `Sword of Wounding (${b.name})`,
+      RARITY_VALUE.Rare,
+      `${b.desc} A magic weapon: a hit deals +2d6 Necrotic damage, and the target makes a DC 15 Constitution save or can't regain Hit Points (it repeats the save at the end of each of its turns). (Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicRiders: [
+          {
+            label: 'Wounding',
+            dice: '2d6',
+            damageType: 'necrotic',
+            save: {
+              ability: 'con',
+              dc: 15,
+              condition: 'festering_wound',
+              rounds: 600,
+              saveEnds: true,
+            },
+          },
+        ],
+      }
+    )
+  ),
+  // SRD Sword of Life Stealing (Rare, attunement).
+  ...named(['longsword', 'rapier', 'scimitar'], (b) =>
+    namedMagic(
+      b.id,
+      `sword_of_life_stealing_${b.id}`,
+      `Sword of Life Stealing (${b.name})`,
+      RARITY_VALUE.Rare,
+      `${b.desc} A magic weapon: on a natural 20 a creature that isn't a Construct or Undead takes an extra 15 Necrotic damage, and you gain that many Temporary Hit Points. (Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicRiders: [
+          {
+            label: 'Life Stealing',
+            dice: '15',
+            damageType: 'necrotic',
+            onCrit: true,
+            notVsCreatureTypes: ['construct', 'undead'],
+            tempHpFromDamage: true,
+          },
+        ],
+      }
+    )
+  ),
+  // SRD Luck Blade (Legendary, attunement). Simplifications: the save bonus
+  // needs it wielded (not just carried); the Luck reroll isn't modeled; it holds
+  // 2 Wish charges (the average of 1d3).
+  ...named(['longsword', 'rapier', 'shortsword'], (b) =>
+    namedMagic(
+      b.id,
+      `luck_blade_${b.id}`,
+      `Luck Blade (${b.name})`,
+      RARITY_VALUE.Legendary,
+      `${b.desc} A +1 magic weapon that gives +1 to saving throws while wielded. It holds 2 charges of Wish: spend one to cast Wish from it, no more than once per dawn. (Legendary; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 1,
+        wornEffects: [{ kind: 'save_bonus', ability: 'all', bonus: 1 }],
+        charges: { max: 2, regain: '0' },
+        itemSpells: [sp('wish', 1, { daily: true })],
+      }
+    )
+  ),
+  // SRD Staff of Striking (Very Rare, attunement).
+  staff(
+    'staff_of_striking',
+    'Staff of Striking',
+    'Very Rare',
+    [],
+    'A +3 Quarterstaff with 10 charges (regains 1d6+4 at dawn). When you hit with a melee attack you can spend up to 3 charges: +1d6 Force damage each. Spending the last charge risks leaving a plain Quarterstaff.',
+    {
+      magicBonus: 3,
+      charges: { max: 10, regain: '1d6+4', destroyOnLast: true, becomes: 'quarterstaff' },
+      weaponPowers: [
+        {
+          id: 'strike',
+          label: 'Striking',
+          cost: 'free',
+          maxCharges: 3,
+          rider: { label: 'Striking', dice: '1d6', damageType: 'force', meleeOnly: true },
+        },
+      ],
+    }
+  ),
+  // SRD Staff of Withering (Rare, attunement). Simplification: the
+  // Disadvantage covers Strength / Constitution saves (checks are narrated).
+  staff(
+    'staff_of_withering',
+    'Staff of Withering',
+    'Rare',
+    [],
+    'A Quarterstaff with 3 charges (regains 1d3 at dawn). On a hit you can spend 1: +2d10 Necrotic damage, and the target makes a DC 15 Constitution save or has Disadvantage on Strength and Constitution checks and saves for 1 hour.',
+    {
+      charges: { max: 3, regain: '1d3' },
+      weaponPowers: [
+        {
+          id: 'wither',
+          label: 'Withering',
+          cost: 'free',
+          charges: 1,
+          rider: {
+            label: 'Withering',
+            dice: '2d10',
+            damageType: 'necrotic',
+            save: { ability: 'con', dc: 15, condition: 'withered', rounds: 600 },
+          },
+        },
+      ],
+    }
+  ),
+  // SRD Staff of Thunder and Lightning (Very Rare, attunement).
+  // Simplifications: only one property can be armed at a time (no combined
+  // Bonus Action use), and Thunderclap isn't modeled.
+  staff(
+    'staff_of_thunder_and_lightning',
+    'Staff of Thunder and Lightning',
+    'Very Rare',
+    [],
+    'A +2 Quarterstaff. Each once per dawn: Lightning (a melee hit deals +2d6 Lightning), Thunder (a melee hit forces a DC 17 Constitution save or Stunned until the end of your next turn), and Lightning Strike (a 120-ft Line, 9d6 Lightning, DC 17 Dexterity save for half).',
+    {
+      magicBonus: 2,
+      weaponPowers: [
+        {
+          id: 'lightning',
+          label: 'Lightning',
+          cost: 'free',
+          daily: true,
+          rider: { label: 'Lightning', dice: '2d6', damageType: 'lightning', meleeOnly: true },
+        },
+        {
+          id: 'thunder',
+          label: 'Thunder',
+          cost: 'free',
+          daily: true,
+          rider: {
+            label: 'Thunder',
+            dice: '0',
+            meleeOnly: true,
+            save: { ability: 'con', dc: 17, condition: 'stunned', rounds: 1 },
+          },
+        },
+      ],
+      itemSpells: [sp('lightning_bolt', 0, { dc: 17, damage: '9d6', daily: true })],
+    }
+  ),
+];
+
+const ACTIVATED_ARMOR: Array<[string, LootItem]> = [
+  // SRD Adamantine Armor (Uncommon). Enemy weapon attacks don't score Critical
+  // Hits in pansori, so this matters against enemy spell attacks.
+  ...ARMOR_FOR_METAL.map((id) =>
+    namedMagic(
+      id,
+      `adamantine_${id}`,
+      `Adamantine ${BASE_ITEMS[id].name}`,
+      RARITY_VALUE.Uncommon + (BASE_ITEMS[id].value ?? 0),
+      `${BASE_ITEMS[id].desc}. Reinforced with adamantine: a Critical Hit against you becomes a normal hit. (Uncommon.)`,
+      { wornEffects: [{ kind: 'no_crits' }] }
+    )
+  ),
+  // SRD Mithral Armor (Uncommon). pansori doesn't enforce Stealth
+  // Disadvantage or Strength requirements, so this is the same armor, lighter.
+  ...ARMOR_FOR_METAL.map((id) =>
+    namedMagic(
+      id,
+      `mithral_${id}`,
+      `Mithral ${BASE_ITEMS[id].name}`,
+      RARITY_VALUE.Uncommon + (BASE_ITEMS[id].value ?? 0),
+      `${BASE_ITEMS[id].desc}. Made of mithral: no Stealth Disadvantage and no Strength requirement. (Uncommon.)`,
+      {}
+    )
+  ),
+  // SRD Animated Shield (Very Rare, attunement). Simplification: hands aren't
+  // tracked, so it works as a normal Shield.
+  namedMagic(
+    'shield',
+    'animated_shield',
+    'Animated Shield',
+    RARITY_VALUE['Very Rare'],
+    'A magic shield that can hover in your space as a Bonus Action, protecting you with your hands free. (Very Rare; requires attunement.)',
+    { requiresAttunement: true }
+  ),
+  // SRD Plate Armor of Etherealness (Legendary, attunement).
+  ...['half_plate', 'plate_armor'].map((id) =>
+    namedMagic(
+      id,
+      `${id}_of_etherealness`,
+      `${BASE_ITEMS[id].name} of Etherealness`,
+      RARITY_VALUE.Legendary,
+      `${BASE_ITEMS[id].desc}. While you wear it, once per dawn you can gain the effect of the Etherealness spell. (Legendary; requires attunement.)`,
+      { requiresAttunement: true, itemSpells: [sp('etherealness', 0, { daily: true })] }
+    )
+  ),
+];
+
+// SRD Ammunition of Slaying (Very Rare) — one piece per creature type and
+// ammunition kind. Worth a tenth of a Very Rare potion each, like +N ammunition.
+const SLAYING_AMMO: Array<[string, LootItem]> = [
+  'arrows',
+  'crossbow_bolts',
+  'sling_bullets',
+  'blowgun_needles',
+  'firearm_bullets',
+].flatMap((ammo) =>
+  SLAYING_TYPES.map((t) => {
+    const base = BASE_ITEMS[ammo];
+    const id = `${ammo}_of_${t}_slaying`;
+    const name = `${base.name} of ${cap(t)} Slaying`;
+    return [
+      id,
+      {
+        ...base,
+        id,
+        name,
+        value: 2000,
+        count: 1,
+        desc: `Magic ammunition meant for ${t}s: a ${cap(t)} it damages makes a DC 17 Constitution save, taking an extra 6d10 Force damage on a failure or half as much on a success. (Very Rare.)`,
+        magicRiders: [
+          {
+            label: `${cap(t)} Slaying`,
+            dice: '6d10',
+            damageType: 'force',
+            vsCreatureTypes: [t],
+            save: { ability: 'con', dc: 17, onSave: 'half' },
+          },
+        ],
+        aliases: [name.toLowerCase()],
+      } as LootItem,
+    ] as [string, LootItem];
+  })
+);
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -3319,6 +3790,9 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...WANDS,
   ...STAFFS,
   ...SPELL_SCROLLS,
+  ...ACTIVATED_WEAPONS,
+  ...ACTIVATED_ARMOR,
+  ...SLAYING_AMMO,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

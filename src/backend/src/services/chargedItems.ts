@@ -36,6 +36,26 @@ export function isHeld(char: Pick<Character, 'equipment'>, instanceId: string): 
   return HAND_SLOTS.some((s) => char.equipment?.[s] === instanceId);
 }
 
+/**
+ * Whether the character is in a position to use `loot`'s item spells: held (a
+ * wand or staff), worn (Plate Armor of Etherealness), or merely carried
+ * (`castWhileCarried`, Trident of Fish Command).
+ */
+export function canUseItem(char: Character, inv: InventoryItem, loot: LootItem): boolean {
+  if (loot.castWhileCarried) return true;
+  if (loot.slot === 'weapon' || loot.slot === 'off_hand' || !loot.slot) {
+    return isHeld(char, inv.instance_id);
+  }
+  return Object.values(char.equipment ?? {}).includes(inv.instance_id);
+}
+
+const dailyKey = (spellId: string) => `spell:${spellId}`;
+
+/** True when the instance's once-per-dawn property `key` is spent. */
+export function dailyUsed(inv: InventoryItem, key: string): boolean {
+  return (inv.powers_used ?? []).includes(key);
+}
+
 /** True when any of the character's classes casts spells. */
 export function isSpellcaster(char: Character): boolean {
   return getAllClasses(char).some((c) => !!classSpellListTag(c));
@@ -85,6 +105,7 @@ export function itemSpellCost(is: ItemSpell, spell: Spell, level: number): numbe
 export interface ItemCastPlan {
   inv: InventoryItem;
   loot: LootItem;
+  is?: ItemSpell;
   scroll: boolean;
   cost: number;
   dc?: number;
@@ -121,7 +142,13 @@ export function planItemCast(
   }
   const is = loot.itemSpells?.find((x) => x.spellId === spell.id);
   if (!is) return { error: `The ${loot.name} can't cast ${spell.name}.` };
-  if (!isHeld(char, instanceId)) return { error: `You must be holding the ${loot.name}.` };
+  if (!canUseItem(char, inv, loot)) {
+    const how = loot.slot === 'weapon' || loot.slot === 'off_hand' ? 'holding' : 'wearing';
+    return { error: `You must be ${how} the ${loot.name}.` };
+  }
+  if (is.daily && dailyUsed(inv, dailyKey(is.spellId))) {
+    return { error: `The ${loot.name}'s ${spell.name} can't be used again until dawn.` };
+  }
   const cost = itemSpellCost(is, spell, level);
   if (cost === null)
     return { error: `The ${loot.name} can't cast ${spell.name} at level ${level}.` };
@@ -131,7 +158,7 @@ export function planItemCast(
       error: `The ${loot.name} has ${left} charge${left === 1 ? '' : 's'} — ${spell.name} needs ${cost}.`,
     };
   }
-  return { inv, loot, scroll: false, cost, dc: loot.itemSpellDc };
+  return { inv, loot, is, scroll: false, cost, dc: is.dc ?? loot.itemSpellDc };
 }
 
 /**
@@ -149,45 +176,75 @@ export function spendItemCast(char: Character, plan: ItemCastPlan, lootTable: Lo
     drop();
     return ' The scroll crumbles to dust.';
   }
-  if (plan.cost <= 0) return '';
-  const used = (plan.inv.charges_used ?? 0) + plan.cost;
+  if (plan.is?.daily) markDaily(char, plan.inv.instance_id, dailyKey(plan.is.spellId));
+  return spendCharges(char, plan.inv.instance_id, plan.cost, lootTable);
+}
+
+/** Mark the instance's once-per-dawn property `key` as spent. Mutates `char`. */
+export function markDaily(char: Character, instanceId: string, key: string): void {
   char.inventory = char.inventory.map((i) =>
-    i.instance_id === plan.inv.instance_id ? { ...i, charges_used: used } : i
+    i.instance_id === instanceId ? { ...i, powers_used: [...(i.powers_used ?? []), key] } : i
   );
-  const left = chargesLeft({ ...plan.inv, charges_used: used }, plan.loot);
-  if (left === 0 && plan.loot.charges?.destroyOnLast) {
+}
+
+/**
+ * Spend `cost` charges from the instance. Mutates `char`. Expending a
+ * destroy-on-last item's final charge rolls a d20 — on a 1 it's destroyed, or
+ * becomes its `charges.becomes` item (Staff of Power → a +2 Quarterstaff).
+ * Returns a narration suffix.
+ */
+export function spendCharges(
+  char: Character,
+  instanceId: string,
+  cost: number,
+  lootTable: LootItem[]
+): string {
+  const inv = char.inventory.find((i) => i.instance_id === instanceId);
+  const loot = inv ? lootTable.find((l) => l.id === inv.id) : undefined;
+  if (!inv || !loot?.charges || cost <= 0) return '';
+  const used = Math.min(loot.charges.max, (inv.charges_used ?? 0) + cost);
+  char.inventory = char.inventory.map((i) =>
+    i.instance_id === instanceId ? { ...i, charges_used: used } : i
+  );
+  const left = loot.charges.max - used;
+  if (left === 0 && loot.charges.destroyOnLast) {
     const roll = d(20);
     if (roll === 1) {
-      const into = plan.loot.charges.becomes
-        ? lootTable.find((l) => l.id === plan.loot.charges!.becomes)
+      const into = loot.charges.becomes
+        ? lootTable.find((l) => l.id === loot.charges!.becomes)
         : undefined;
       if (!into) {
-        drop();
-        return ` The ${plan.loot.name}'s last charge is spent — it rolls a 1 and is destroyed!`;
+        char.inventory = char.inventory.filter((i) => i.instance_id !== instanceId);
+        char.equipment = clearInstance(char.equipment ?? {}, instanceId);
+        char.attuned_items = (char.attuned_items ?? []).filter((id) => id !== instanceId);
+        return ` The ${loot.name}'s last charge is spent — it rolls a 1 and is destroyed!`;
       }
       // The same instance (still wielded) loses its magic and becomes `into`.
       char.inventory = char.inventory.map((i) =>
-        i.instance_id === plan.inv.instance_id
+        i.instance_id === instanceId
           ? { instance_id: i.instance_id, id: into.id, name: into.name }
           : i
       );
       if (!into.requiresAttunement) {
-        char.attuned_items = (char.attuned_items ?? []).filter((id) => id !== plan.inv.instance_id);
+        char.attuned_items = (char.attuned_items ?? []).filter((id) => id !== instanceId);
       }
-      return ` The ${plan.loot.name}'s last charge is spent — it rolls a 1 and is now just a ${into.name}.`;
+      return ` The ${loot.name}'s last charge is spent — it rolls a 1 and is now just a ${into.name}.`;
     }
-    return ` The ${plan.loot.name} is out of charges (d20: ${roll} — it survives).`;
+    return ` The ${loot.name} is out of charges (d20: ${roll} — it survives).`;
   }
   return ` (${left} charge${left === 1 ? '' : 's'} left)`;
 }
 
 /**
  * SRD "regains … expended charges daily at dawn" — pansori's dawn is the Long
- * Rest. Mutates `char`; returns one note per item that regained charges.
+ * Rest. Also restores once-per-dawn properties and drops any armed weapon
+ * power. Mutates `char`; returns one note per item that regained charges.
  */
 export function regainItemCharges(char: Character, lootTable: LootItem[]): string[] {
   const notes: string[] = [];
-  char.inventory = (char.inventory ?? []).map((inv) => {
+  char.inventory = (char.inventory ?? []).map((raw) => {
+    const inv =
+      raw.powers_used || raw.primed ? { ...raw, powers_used: undefined, primed: undefined } : raw;
     const used = inv.charges_used ?? 0;
     const loot = used > 0 ? lootTable.find((l) => l.id === inv.id) : undefined;
     if (!loot?.charges) return inv;
@@ -229,11 +286,11 @@ export function itemCastOptions(
       out.push({ inv, loot, spell, level: spell.level, cost: 0 });
       continue;
     }
-    if (!loot.itemSpells?.length || !isHeld(char, inv.instance_id)) continue;
+    if (!loot.itemSpells?.length || !canUseItem(char, inv, loot)) continue;
     const left = chargesLeft(inv, loot);
     for (const is of loot.itemSpells) {
       const spell = spellTable[is.spellId];
-      if (!spell) continue;
+      if (!spell || (is.daily && dailyUsed(inv, dailyKey(is.spellId)))) continue;
       const base = is.level ?? spell.level;
       for (let lvl = base; lvl <= (is.maxLevel ?? base); lvl++) {
         const cost = itemSpellCost(is, spell, lvl)!;
@@ -242,4 +299,27 @@ export function itemCastOptions(
     }
   }
   return out;
+}
+
+/**
+ * The spell as cast from the item `instanceId`: an `ItemSpell` with its own
+ * `damage` dice or `noConcentration` reshapes the spell (no upcast dice).
+ * Any other cast returns `spell` unchanged.
+ */
+export function itemSpellVersion(
+  char: Character,
+  instanceId: string | undefined,
+  spell: Spell,
+  lootTable: LootItem[]
+): Spell {
+  if (!instanceId) return spell;
+  const inv = char.inventory?.find((i) => i.instance_id === instanceId);
+  const loot = inv ? lootTable.find((l) => l.id === inv.id) : undefined;
+  const is = loot?.itemSpells?.find((x) => x.spellId === spell.id);
+  if (!is?.damage && !is?.noConcentration) return spell;
+  return {
+    ...spell,
+    ...(is.damage ? { damage: is.damage, upcastBonus: undefined } : {}),
+    ...(is.noConcentration ? { concentration: false } : {}),
+  };
 }

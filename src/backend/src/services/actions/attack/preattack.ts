@@ -1,10 +1,11 @@
 import type { Enemy, InventoryItem, LootItem } from '../../../types.js';
 import { SHILLELAGH_WEAPON_IDS, shillelaghDie } from '../../rulesEngine.js';
-import { chebyshev, hasLineOfSight, inRange } from '../../gridEngine.js';
+import { chebyshev, distanceFeet, hasLineOfSight, inRange } from '../../gridEngine.js';
 import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
 import type { ActionContext } from '../types.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
+import { chargesLeft } from '../../chargedItems.js';
 import { updatePcActor } from '../actor.js';
 
 /**
@@ -159,9 +160,22 @@ export function runPreattack(
   }
   const weaponLabel = weaponItem ? `Your ${weaponItem.name}` : 'Your fists';
 
+  // SRD Hammer of Thunderbolts — a throw needs a charge; refuse before the
+  // action is spent.
+  if (weaponItem?.throwCharge && ctx.st.entities) {
+    const me = ctx.st.entities.find((e) => e.id === pc.char.id)?.pos;
+    const them = ctx.st.entities.find((e) => e.id === targetId && e.isEnemy)?.pos;
+    if (me && them && distanceFeet(me, them) > 5 && chargesLeft(weaponItem, weaponItem) <= 0) {
+      ctx.narrative = `The ${weaponItem.name} has no charges left to hurl it — close to melee range.`;
+      return { done: true };
+    }
+  }
+
   // ── Ammunition check (SRD) ──────────────────────────────────────
   // SRD Ammunition +N — the shot fired gets its bonus to attack + damage.
   let ammoMagicBonus = 0;
+  // SRD Ammunition of Slaying — the fired piece's riders join the shot's.
+  let ammoRiders: LootItem['magicRiders'] = undefined;
   // SRD Energy Bow — conjures its own arrows.
   if (weaponItem?.range === 'ranged' && !weaponItem.thrown && !weaponItem.conjuresAmmo) {
     // NOTE: order matters. 'hand_crossbow' includes both 'bow' and 'crossbow',
@@ -193,7 +207,9 @@ export function runPreattack(
       return { done: true };
     }
     const ammoItem = pc.char.inventory[ammoIdx];
-    ammoMagicBonus = ctx.context.lootTable.find((l) => l.id === ammoItem.id)?.magicBonus ?? 0;
+    const ammoLoot = ctx.context.lootTable.find((l) => l.id === ammoItem.id);
+    ammoMagicBonus = ammoLoot?.magicBonus ?? 0;
+    ammoRiders = ammoLoot?.magicRiders;
     const ammoCount = ammoItem.count ?? 1;
     if (ammoCount <= 1) {
       // Stack spent — drop the bundle, and clear the quiver slot if this was
@@ -216,8 +232,14 @@ export function runPreattack(
 
   // The shot's effective weapon: magic ammunition stacks its +N on the bow's.
   const shotWeapon =
-    weaponItem && ammoMagicBonus > 0
-      ? { ...weaponItem, magicBonus: (weaponItem.magicBonus ?? 0) + ammoMagicBonus }
+    weaponItem && (ammoMagicBonus > 0 || ammoRiders?.length)
+      ? {
+          ...weaponItem,
+          magicBonus: (weaponItem.magicBonus ?? 0) + ammoMagicBonus,
+          ...(ammoRiders?.length
+            ? { magicRiders: [...(weaponItem.magicRiders ?? []), ...ammoRiders] }
+            : {}),
+        }
       : weaponItem;
   return {
     done: false,

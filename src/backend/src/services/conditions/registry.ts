@@ -131,6 +131,12 @@ const defs: ConditionDef[] = [
     duration: 1,
     disadvantageSaves: ['str', 'dex', 'con', 'int', 'wis', 'cha'],
   },
+  // SRD Staff of Withering — Disadvantage on Strength and Constitution saves
+  // (and checks, narrated) for 1 hour.
+  { id: 'withered', duration: 600, disadvantageSaves: ['str', 'con'] },
+  // SRD Sword of Wounding — can't regain Hit Points (blocks Regeneration);
+  // repeats the CON save at the end of each of its turns.
+  { id: 'festering_wound', duration: 600 },
   // SRD Deafened — the creature can't hear and auto-fails any ability check that
   // requires hearing. No attack/save modifiers (deafened ≠ silenced; it doesn't
   // block Verbal spell components RAW, though pansori's precast currently gates

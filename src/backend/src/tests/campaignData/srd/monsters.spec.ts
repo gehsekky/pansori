@@ -721,10 +721,11 @@ describe('SRD bestiary additions — effect fields', () => {
 
 describe('Animals appendix batch — effect fields', () => {
   it('every appendix animal carries the beast creature type (Celestials/Monstrosities excepted)', () => {
-    // The four appendix entries that are NOT Beasts in SRD 5.2.1 (the
-    // creatureType union has no celestial/monstrosity — left unspecified).
-    const notBeasts = ['giant_owl', 'giant_elk', 'flying_snake', 'giant_vulture'];
-    for (const id of notBeasts) expect(SRD_MONSTERS[id].creatureType, id).toBeUndefined();
+    // The four appendix entries that are NOT Beasts in SRD 5.2.1.
+    expect(SRD_MONSTERS.giant_owl.creatureType).toBe('celestial');
+    expect(SRD_MONSTERS.giant_elk.creatureType).toBe('celestial');
+    expect(SRD_MONSTERS.flying_snake.creatureType).toBe('monstrosity');
+    expect(SRD_MONSTERS.giant_vulture.creatureType).toBe('monstrosity');
     for (const id of ['rat', 'panther', 'elephant', 'tyrannosaurus_rex', 'swarm_of_rats'])
       expect(SRD_MONSTERS[id].creatureType, id).toBe('beast');
   });
@@ -817,9 +818,9 @@ describe('Animals appendix batch — effect fields', () => {
 });
 
 describe('Humanoid foes batch — effect fields', () => {
-  it('the goblinoid tier leaves creatureType unspecified (5.2.1 Fey, no union entry)', () => {
+  it('the goblinoid tier is Fey (5.2.1)', () => {
     for (const id of ['goblin_minion', 'goblin_boss', 'hobgoblin_warrior', 'hobgoblin_captain'])
-      expect(SRD_MONSTERS[id].creatureType, id).toBeUndefined();
+      expect(SRD_MONSTERS[id].creatureType, id).toBe('fey');
     expect(SRD_MONSTERS.sahuagin_warrior.creatureType).toBe('fiend'); // 5.2.1 reclassification
   });
 

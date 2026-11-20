@@ -173,6 +173,7 @@ import {
   planLabel,
   planTotal,
 } from './slotRecovery.js';
+import { canDeflect, weaponPowerOptions } from './actions/attack/weaponPowers.js';
 import {
   canFontOfInspiration,
   lowestOpenSlot,
@@ -3975,6 +3976,10 @@ export function endCombatState(st: GameState): GameState {
         // Divine Favor / Searing Smite — have no other teardown).
         weapon_rider: undefined,
         pending_smite: undefined,
+        // SRD Oathbow — the sworn enemy lasts the encounter here; armed weapon
+        // powers (Dagger of Venom's 1-minute poison, …) lapse with the fight.
+        oath_sworn_id: undefined,
+        inventory: c.inventory.map((i) => (i.primed ? { ...i, primed: undefined } : i)),
         // Fire Shield (retaliate) + resistance buffs (Fire Shield / Stoneskin /
         // Protection from Energy) are ~1-minute / encounter effects; clear them at
         // combat end so a non-concentration buff (Fire Shield) can't leak, and a
@@ -5115,11 +5120,21 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       // introspect it); narrow via a local shape just for the label.
       const proposedFragment = pending.pendingFragment as { damage?: number } | undefined;
       const proposedDmg = proposedFragment?.damage ?? 0;
-      return [
-        {
+      const shieldChoices: GameChoice[] = [];
+      if (knowsSpellWithSlot(char, 'shield', context)) {
+        shieldChoices.push({
           label: `Cast Shield (reaction, 1st-level slot) — +5 AC, ${enemyForLabel}'s attack (total ${pending.atkTotal} vs AC ${pending.targetAcAtAttack}) misses!`,
           action: { type: 'resolve_reaction', accept: true },
-        },
+        });
+      }
+      if (canDeflect(char, context.lootTable)) {
+        shieldChoices.push({
+          label: `Deflect with the Quarterstaff of the Acrobat (reaction, once per rest) — +5 AC, ${enemyForLabel}'s attack (total ${pending.atkTotal} vs AC ${pending.targetAcAtAttack}) misses!`,
+          action: { type: 'resolve_reaction', accept: true, source: 'acrobat_deflect' },
+        });
+      }
+      return [
+        ...shieldChoices,
         {
           label: `Decline — take the hit (${proposedDmg} damage)`,
           action: { type: 'resolve_reaction', accept: false },
@@ -7820,6 +7835,40 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // SRD activated weapons — Scimitar of Speed's Bonus Action attack, and arming
+  // the wielded weapon's on-hit powers (Dagger of Venom, Staff of Striking, …).
+  if (state.combat_active && enemyAlive) {
+    const mainInv = char.inventory.find((i) => i.instance_id === equippedWeaponId(char));
+    const mainLoot = mainInv ? context.lootTable.find((l) => l.id === mainInv.id) : undefined;
+    if (
+      mainLoot?.bonusAttack &&
+      !char.turn_actions.bonus_action_used &&
+      (!mainLoot.requiresAttunement || (char.attuned_items ?? []).includes(mainInv!.instance_id))
+    ) {
+      for (const en of livingEnemies) {
+        if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+        choices.push({
+          label: `${mainLoot.name} — quick strike at the ${en.name} (bonus action)`,
+          action: { type: 'bonus_weapon_attack', targetEnemyId: en.id },
+          requiresBonusAction: true,
+        });
+      }
+    }
+    for (const opt of weaponPowerOptions(char, context.lootTable)) {
+      if (MAX_CHOICES && choices.length >= MAX_CHOICES) break;
+      choices.push({
+        label: opt.label,
+        action: {
+          type: 'item_power',
+          instanceId: opt.instanceId,
+          power: opt.power,
+          ...(opt.charges ? { charges: opt.charges } : {}),
+        },
+        requiresBonusAction: opt.bonusAction || undefined,
+      });
+    }
+  }
+
   // Land Druid — Land's Aid (bonus action, 2 uses per long rest).
   // Surfaces 3 variants: heal + harm-necrotic + harm-radiant.
   if (
@@ -9192,7 +9241,16 @@ export function resolveEnemySubAttack(args: {
     args.roomObstacles ?? []
   );
   // Shield reaction window — pause before committing the proposed snapshot.
-  if (computed.hit && isShieldEligible(target, computed.atkTotal, target.ac, context)) {
+  // SRD Quarterstaff of the Acrobat's Attack Deflection (+5 AC against this
+  // attack) shares the Shield window.
+  const deflectOk =
+    canDeflect(target, context.lootTable) &&
+    computed.atkTotal >= target.ac &&
+    computed.atkTotal <= target.ac + 4;
+  if (
+    computed.hit &&
+    (isShieldEligible(target, computed.atkTotal, target.ac, context) || deflectOk)
+  ) {
     st = {
       ...st,
       pending_reaction: {
@@ -10290,12 +10348,14 @@ function resolveEnemySpellAttack(args: {
       parts.push(`${fmt.roll(total)} vs ${fmt.ac(ac)} — miss`);
       continue;
     }
-    const rolled = d20 === 20 ? rollCritical(dice) : rollDice(dice);
+    // SRD Adamantine Armor — a Critical Hit against the wearer becomes a normal hit.
+    const crit = d20 === 20 && !target.worn_traits?.critImmune;
+    const rolled = crit ? rollCritical(dice) : rollDice(dice);
     const dmg = pcDamageTaken(target, args.st, rolled, spell.damageType, spell.id);
     hp = Math.max(0, hp - dmg);
     hits++;
     parts.push(
-      `${fmt.roll(total)} vs ${fmt.ac(ac)} — ${d20 === 20 ? 'critical hit' : 'hit'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}`
+      `${fmt.roll(total)} vs ${fmt.ac(ac)} — ${crit ? 'critical hit' : 'hit'}, ${fmt.dmg(dmg)} ${spell.damageType ?? 'damage'}`
     );
   }
   let narrative = `${args.narrative} ${enemy.name} casts ${spell.name} at ${target.name}!`;
@@ -11610,7 +11670,10 @@ export async function runEnemyTurns(args: {
       if (rm.regeneration) {
         const regenEnt = st.entities?.find((e) => e.id === eEntry.id && e.isEnemy);
         if (regenEnt && regenEnt.hp > 0) {
-          if (rm.regen_blocked) {
+          if (regenEnt.conditions.includes('festering_wound')) {
+            // SRD Sword of Wounding — it can't regain Hit Points.
+            narrative += `\n\n${fmt.note(`[${rm.name}'s wound festers — no regeneration this turn.]`)}`;
+          } else if (rm.regen_blocked) {
             rm.regen_blocked = false;
             narrative += `\n\n${fmt.note(`[${rm.name}'s wounds smolder — no regeneration this turn.]`)}`;
           } else if (regenEnt.hp < regenEnt.maxHp) {

@@ -60,7 +60,12 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
     ctx.narrative = `You can only be attuned to ${attuneCap} items at a time. De-attune one first.`;
     return;
   }
-  updatePcActor(ctx, { attuned_items: [...attunedList, instanceId] });
+  // Attunement can switch on held effects (Hammer of Thunderbolts' Might of
+  // Giants raising a worn Belt's Strength) — re-derive them now.
+  const attunedChar = { ...char, attuned_items: [...attunedList, instanceId] };
+  syncSetAbilities(attunedChar, ctx.context.lootTable);
+  attunedChar.ac = characterAc(attunedChar, ctx.context.lootTable);
+  updatePcActor(ctx, attunedChar);
   let narrative = `You spend a moment focusing on the ${invItem.name}, attuning yourself to its magic. (${attunedList.length + 1}/${attuneCap} attuned items)`;
   // Cursed items reveal on attunement (SRD). The curse text is
   // appended so the player learns about the curse and knows they're

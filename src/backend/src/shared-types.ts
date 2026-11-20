@@ -1076,7 +1076,16 @@ export type StructuredAction =
   // Deafened, Frightened, Paralyzed and Stunned. (RE-2.)
   | { type: 'lay_on_hands'; targetCharId: string; cure?: boolean; condition?: string }
   | { type: 'prepare_spells'; spellIds: string[] }
-  | { type: 'resolve_reaction'; accept: boolean; source?: 'inspiration' | 'stroke_of_luck' }
+  | {
+      type: 'resolve_reaction';
+      accept: boolean;
+      source?: 'inspiration' | 'stroke_of_luck' | 'acrobat_deflect';
+    }
+  // SRD activated weapons — arm an on-hit power of the wielded weapon (Dagger of
+  // Venom's poison, Staff of Striking's charges, …).
+  | { type: 'item_power'; instanceId: string; power: string; charges?: number }
+  // SRD Scimitar of Speed — one attack with the wielded weapon as a Bonus Action.
+  | { type: 'bonus_weapon_attack'; targetEnemyId?: string }
   // RAW player-command for a summoned creature (Animate Dead, etc.). On the
   // owner's turn, spend a bonus action to direct one summon's target for its
   // upcoming turn. Records `commanded_target_id` on the summon entity; the
@@ -1829,7 +1838,9 @@ export type WornEffect =
   | { kind: 'spell_save_advantage' }
   // SRD Wand of the War Mage / Staff of Power / Staff of the Magi — a flat bonus
   // to spell attack rolls while held; `ignoreHalfCover` (War Mage) skips Half Cover.
-  | { kind: 'spell_attack_bonus'; bonus: number; ignoreHalfCover?: boolean };
+  | { kind: 'spell_attack_bonus'; bonus: number; ignoreHalfCover?: boolean }
+  // SRD Adamantine Armor — a Critical Hit against the wearer becomes a normal hit.
+  | { kind: 'no_crits' };
 
 /**
  * SRD Potions — what drinking (or applying) a potion does. Timed effects ride
@@ -1861,8 +1872,65 @@ export interface MagicRider {
   dice: string;
   damageType?: string;
   vsCreatureTypes?: string[];
+  // Never against these types (Sword of Life Stealing: Constructs, Undead).
+  notVsCreatureTypes?: string[];
   onCrit?: boolean;
   rangedOnly?: boolean;
+  meleeOnly?: boolean;
+  // SRD Oathbow — only against the wielder's sworn enemy.
+  vsSwornEnemy?: boolean;
+  // SRD Sword of Life Stealing — the wielder gains Temporary HP equal to it.
+  tempHpFromDamage?: boolean;
+  // A save the target makes (Dagger of Venom, Sword of Wounding, Ammunition of Slaying).
+  save?: RiderSave;
+}
+
+/**
+ * A saving throw an item's on-hit effect forces, at a fixed DC. On a failure
+ * the target gains `condition` for `rounds` (default 10; `saveEnds` repeats
+ * the save at the end of its turns). `onSave` sets the rider damage on a
+ * success: 'half', 'none', or (default) full — the save only resists the
+ * condition.
+ */
+export interface RiderSave {
+  ability: AbilityKey;
+  dc: number;
+  condition?: string;
+  rounds?: number;
+  saveEnds?: boolean;
+  onSave?: 'half' | 'none';
+}
+
+/**
+ * An on-hit power the wielder arms before attacking (Dagger of Venom's poison,
+ * Staff of Striking's charges, Staff of Thunder and Lightning's Thunder). The
+ * armed rider fires on the next hit with the weapon and is then spent.
+ * `maxCharges` lets the wielder spend 1..N charges, each adding `rider.dice`.
+ */
+export interface WeaponPower {
+  id: string;
+  label: string;
+  cost: 'bonus_action' | 'free';
+  charges?: number;
+  maxCharges?: number;
+  daily?: boolean;
+  rider: MagicRider;
+}
+
+/**
+ * SRD natural-20 death effects: Vorpal Sword (no save — immune creatures take
+ * `elseDamage`), Nine Lives Stealer, Hammer of Thunderbolts' Giant's Bane.
+ */
+export interface CritSlay {
+  label: string;
+  dc?: number;
+  maxHp?: number;
+  vsTypes?: string[];
+  immuneTypes?: string[];
+  // Item-id prefixes the wielder must be wearing and attuned to.
+  needsWorn?: string[];
+  spendsCharge?: boolean;
+  elseDamage?: number;
 }
 
 /** Worn-item traits derived from `wornEffects` (see `syncSetAbilities`). */
@@ -1883,6 +1951,7 @@ export interface WornTraits {
   spellSaveAdvantage?: boolean;
   spellAttackBonus?: number;
   spellIgnoreHalfCover?: boolean;
+  critImmune?: boolean;
 }
 
 /**
@@ -1896,6 +1965,14 @@ export interface ItemSpell {
   charges: number;
   level?: number;
   maxLevel?: number;
+  // Per-spell save DC (beats the item's `itemSpellDc`).
+  dc?: number;
+  // The item's own version: different damage dice (Javelin of Lightning's 4d6
+  // bolt), or no Concentration (Mace of Terror's wave isn't a spell).
+  damage?: string;
+  noConcentration?: boolean;
+  // Usable once, then not again until dawn (the Long Rest).
+  daily?: boolean;
 }
 
 /** SRD item charges — `regain` is the dice regained at dawn (on a Long Rest). */
@@ -2146,6 +2223,27 @@ export interface LootItem {
   spellScroll?: string;
   // SRD "Requires Attunement by a …" — class ids (lowercase) or 'spellcaster'.
   attuneBy?: string[];
+  // Item spells usable while merely carried (Trident of Fish Command), not held.
+  castWhileCarried?: boolean;
+  // SRD activated weapons — armed on-hit powers, natural-20 death effects.
+  weaponPowers?: WeaponPower[];
+  critSlay?: CritSlay;
+  // SRD Vorpal Sword — ignores Resistance to this damage type.
+  ignoresResistance?: string;
+  // SRD Javelin of Lightning — a hit may deal this type instead (the better one is used).
+  altDamageType?: string;
+  // SRD Scimitar of Speed — one attack with it as a Bonus Action each turn.
+  bonusAttack?: boolean;
+  // SRD Oathbow — swears the first target of its ranged attack as a sworn enemy.
+  swornEnemy?: boolean;
+  // SRD Hammer of Thunderbolts — each throw costs a charge; a hit forces a save
+  // on the target and every enemy within `radiusFt` of it, or Stunned.
+  throwCharge?: { dc: number; radiusFt: number };
+  // SRD Quarterstaff of the Acrobat — Attack Deflection (+5 AC Reaction, 1/rest).
+  deflect?: boolean;
+  // SRD Hammer of Thunderbolts' Might of Giants — while attuned, a worn item
+  // whose id starts with one of these sets Strength 4 higher (max 30).
+  mightOfGiants?: string[];
   // SRD Energy Bow — conjures its own arrows: no ammunition needed.
   conjuresAmmo?: boolean;
   // SRD Elven Chain — wearable without armor training.

@@ -8,6 +8,7 @@ import { computeAttackEdges } from '../../attackEdges.js';
 import { equippedArmorId } from '../../equipment.js';
 import { hasFightingStyle } from '../../fightingStyle.js';
 import { isPactWeapon } from '../../invocations.js';
+import { oathbowEdges } from './weaponPowers.js';
 /**
  * Everything resolveOneAttack needs once the target + weapon are
  * known. Computing it up front (a) ensures stable adv/disadv state
@@ -159,10 +160,20 @@ export function computeToHitContext(
     }
   }
 
-  const disadvantage =
-    edges.disadvantage || heavyWeaponSmallDisadv || !armorProficient || thrownLongRangeDisadv;
+  // SRD Oathbow — the sworn enemy (Advantage, no Half / Three-Quarters Cover;
+  // Disadvantage with every other weapon while it lives).
+  const oath = oathbowEdges(ctx, weaponItem, targetId);
+  if (oath.ignoreCover && edges.coverAcBonus > 0) edges.coverAcBonus = 0;
 
-  const advantage = edges.advantage || flankingAdv || recklessAdv || packTacticsAdv;
+  const disadvantage =
+    edges.disadvantage ||
+    heavyWeaponSmallDisadv ||
+    !armorProficient ||
+    thrownLongRangeDisadv ||
+    oath.disadvantage;
+
+  const advantage =
+    edges.advantage || flankingAdv || recklessAdv || packTacticsAdv || oath.advantage;
 
   const disadvReasons = [
     edges.rangedInMelee ? 'ranged in melee' : '',
@@ -179,6 +190,7 @@ export function computeToHitContext(
       .map((c) => `target ${c}`)
       .join(', '),
     edges.grappled ? 'grappled' : '',
+    oath.disadvantage ? oath.note : '',
   ]
     .filter(Boolean)
     .join(', ');

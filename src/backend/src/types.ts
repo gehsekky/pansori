@@ -326,7 +326,7 @@ export interface EnemyTemplate {
   // SRD creature type, when it matters mechanically (e.g. Holy Water damages
   // only Fiends/Undead; future Turn Undead, etc.). Omitted ⇒ unspecified.
   // Carried through place() + procgen onto the Enemy.
-  creatureType?: 'undead' | 'fiend' | 'beast' | 'humanoid' | 'construct' | 'dragon' | 'giant';
+  creatureType?: CreatureType;
   str?: number;
   dex?: number;
   con?: number;
@@ -459,6 +459,23 @@ export interface EnemyTemplate {
   goldDrop?: number;
 }
 
+// SRD 5.2.1 creature types (the stat block's type line).
+export type CreatureType =
+  | 'aberration'
+  | 'beast'
+  | 'celestial'
+  | 'construct'
+  | 'dragon'
+  | 'elemental'
+  | 'fey'
+  | 'fiend'
+  | 'giant'
+  | 'humanoid'
+  | 'monstrosity'
+  | 'ooze'
+  | 'plant'
+  | 'undead';
+
 export interface Enemy {
   id: string; // stable per-instance id (distinct from roomId; multiple enemies share a room)
   name: string;
@@ -469,7 +486,7 @@ export interface Enemy {
   proper_noun?: boolean;
   // SRD creature type (see EnemyTemplate.creatureType) — drives Fiend/Undead
   // interactions like Holy Water. Carried from the template via place()/procgen.
-  creatureType?: 'undead' | 'fiend' | 'beast' | 'humanoid' | 'construct' | 'dragon' | 'giant';
+  creatureType?: CreatureType;
   hp: number;
   ac: number;
   damage: string;
@@ -1205,6 +1222,10 @@ export interface InventoryItem {
   count?: number;
   // SRD item charges spent (wands / staffs). Undefined ⇒ none spent (full).
   charges_used?: number;
+  // Once-per-dawn properties already used (`spell:<id>` or a power id).
+  powers_used?: string[];
+  // An armed on-hit weapon power (Dagger of Venom, Staff of Striking, …).
+  primed?: { power: string; charges: number };
   [key: string]: unknown;
 }
 
@@ -1470,6 +1491,10 @@ export interface Character {
   // Set when the spell is cast, cleared on breakConcentration. The caster's
   // attack rolls vs this target deal +1d6 Force (d10 at Ranger L20, Foe Slayer).
   hunters_mark_target_id?: string;
+  // SRD Oathbow — the sworn enemy (lasts the encounter here), and whether the
+  // oath was fulfilled (a new one waits for dawn — the Long Rest).
+  oath_sworn_id?: string;
+  oath_fulfilled?: boolean;
   // SRD Hex (Warlock L1) — the id of the hexed enemy entity. Like Hunter's Mark:
   // the caster's hits vs this target deal +1d6 necrotic. Set on cast, cleared on
   // breakConcentration. (The curse-an-ability-for-disadvantage rider is narrative.)

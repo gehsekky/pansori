@@ -127,6 +127,8 @@ export const ACTION_COSTS: Record<StructuredAction['type'], ActionCost> = {
   influence: 'managed',
   study: 'managed',
   two_weapon_attack: 'managed',
+  item_power: 'managed', // free or a Bonus Action, per power
+  bonus_weapon_attack: 'managed', // Scimitar of Speed — spends the Bonus Action itself
   use_lands_aid: 'managed',
   grid_move: 'managed',
   // SRD Mounted Combat — mounting/dismounting costs half your Speed of

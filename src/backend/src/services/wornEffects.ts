@@ -84,6 +84,7 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'speed_mode' && e.mode === 'climb') t.climbFt = better(t.climbFt, e.feet);
     else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
     else if (e.kind === 'spell_save_advantage') t.spellSaveAdvantage = true;
+    else if (e.kind === 'no_crits') t.critImmune = true;
     else if (e.kind === 'spell_attack_bonus') {
       t.spellAttackBonus = (t.spellAttackBonus ?? 0) + e.bonus;
       if (e.ignoreHalfCover) t.spellIgnoreHalfCover = true;
@@ -130,6 +131,28 @@ export function syncSetAbilities(char: Character, lootTable: LootItem[]): void {
   for (const e of activeWornEffects(char, lootTable)) {
     if (e.kind !== 'set_ability') continue;
     want[e.ability] = Math.max(want[e.ability] ?? 0, e.value);
+  }
+  // SRD Hammer of Thunderbolts' Might of Giants — while attuned to it, a worn
+  // and attuned Belt of Giant Strength / Gauntlets of Ogre Power sets Strength
+  // 4 higher (max 30).
+  const attuned = char.attuned_items ?? [];
+  const mightPrefixes = (char.inventory ?? []).flatMap((i) =>
+    attuned.includes(i.instance_id)
+      ? (lootTable.find((l) => l.id === i.id)?.mightOfGiants ?? [])
+      : []
+  );
+  if (mightPrefixes.length) {
+    for (const iid of Object.values(char.equipment ?? {})) {
+      const inv = char.inventory?.find((i) => i.instance_id === iid);
+      const loot = inv ? lootTable.find((l) => l.id === inv.id) : undefined;
+      if (!inv || !loot || !mightPrefixes.some((p) => inv.id.startsWith(p))) continue;
+      if (loot.requiresAttunement && !attuned.includes(iid)) continue;
+      for (const e of loot.wornEffects ?? []) {
+        if (e.kind === 'set_ability' && e.ability === 'str') {
+          want.str = Math.max(want.str ?? 0, Math.min(30, e.value + 4));
+        }
+      }
+    }
   }
   // SRD Potion of Giant Strength — while it lasts, it competes with worn items.
   if (char.conditions?.includes('giant_strength') && char.potion_strength) {

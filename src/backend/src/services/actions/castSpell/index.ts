@@ -17,6 +17,7 @@ import { composeNow } from '../../narrative/compose.js';
 import { computeToHitContext } from '../attack/toHit.js';
 import { hasSmiteOfProtection } from '../../paladinFeatures.js';
 import { huntersLoreNote } from '../../rangerFeatures.js';
+import { itemSpellVersion } from '../../chargedItems.js';
 import { pickCastPrefix } from './utils.js';
 import { runAoeConditionSpell } from './aoeCondition.js';
 import { runAoeSpell } from './aoe.js';
@@ -114,11 +115,19 @@ export const handleCastSpell: ActionHandler<{
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs can cast spells.' };
   const pc = ctx.actor;
   const { spellId, slotLevel } = action;
-  const spell = ctx.context.spellTable?.[spellId];
-  if (!spell) {
+  const baseSpell = ctx.context.spellTable?.[spellId];
+  if (!baseSpell) {
     ctx.narrative = `Unknown spell: ${spellId}.`;
     return;
   }
+  // SRD activated items cast their own version of a spell — Javelin of
+  // Lightning's 4d6 bolt, Mace of Terror's wave (no Concentration).
+  const spell = itemSpellVersion(
+    pc.char,
+    (action as { itemInstanceId?: string }).itemInstanceId,
+    baseSpell,
+    ctx.context.lootTable
+  );
 
   const precast = runPrecast(
     ctx,

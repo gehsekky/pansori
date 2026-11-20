@@ -88,7 +88,7 @@ export const handleResolveReaction: ActionHandler<{
   type: 'resolve_reaction';
   accept: boolean;
   replacementIndex?: number;
-  source?: 'inspiration' | 'stroke_of_luck';
+  source?: 'inspiration' | 'stroke_of_luck' | 'acrobat_deflect';
 }> = async (ctx, action) => {
   if (ctx.actor.kind !== 'pc') return { rejected: 'Only PCs have reactions.' };
   const pc = ctx.actor;
@@ -208,7 +208,22 @@ export const handleResolveReaction: ActionHandler<{
       updatePcActor(ctx, pendingProposedChar);
       ctx.st = pushEvent(ctx.st, enemyAttackFragmentEvent(pendingFragment, ctx.st.round ?? 1));
     };
-    if (action.accept) {
+    if (action.accept && action.source === 'acrobat_deflect') {
+      // SRD Quarterstaff of the Acrobat — Attack Deflection: +5 AC against this
+      // one attack (it misses); usable again after a Short or Long Rest. The
+      // proposed (hit) snapshot is discarded.
+      updatePcActor(ctx, {
+        ...pc.char,
+        turn_actions: { ...pc.char.turn_actions, reaction_used: true },
+        class_resource_uses: { ...(pc.char.class_resource_uses ?? {}), acrobat_deflect_used: 1 },
+      });
+      ctx.narrative = `🌀 ${pc.char.name} twirls the Quarterstaff of the Acrobat — +5 AC, and the ${pendingFragment.attackerName}'s strike glances away.`;
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((c) => (c.id === pc.char.id ? pc.char : c)),
+        pending_reaction: undefined,
+      };
+    } else if (action.accept) {
       const slotsMax = pc.char.spell_slots_max ?? {};
       const slotsUsed = pc.char.spell_slots_used ?? {};
       const lvl = Object.keys(slotsMax)

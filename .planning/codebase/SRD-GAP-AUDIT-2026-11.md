@@ -400,6 +400,41 @@ Thunder and Lightning and the Python (with the activated weapons), rods,
 Necklace of Fireballs, Ring of Shooting Stars / Spell Storing and the other
 charged wondrous items.
 
+**Batch 5 done 2026-11-19 — activated weapons and armor** (on-hit layer in
+`services/actions/attack/weaponPowers.ts`). New machinery: armed one-shot
+powers (`weaponPowers`, the `item_power` action — Bonus Action or free, daily
+or per charge, spent on the next hit); rider saves with conditions (`RiderSave`),
+Temporary HP, sworn-enemy and melee-only gating, and creature-type exclusions;
+natural-20 death effects (`critSlay`); a Bonus Action weapon attack
+(`bonus_weapon_attack`); per-throw charges; item spells with their own DC /
+damage / no Concentration / once per dawn, usable while worn or carried; the
+Acrobat's deflection in the Shield reaction window. Items: Javelin of
+Lightning, Dagger of Venom, Mace of Terror, Nine Lives Stealer, Oathbow,
+Hammer of Thunderbolts (incl. Might of Giants and Giants' Bane), Trident of
+Fish Command, Quarterstaff of the Acrobat, Scimitar of Speed, Frost Brand,
+Vorpal Sword, Swords of Sharpness, Wounding and Life Stealing, Luck Blade,
+Staffs of Striking, Withering and Thunder and Lightning, Adamantine and
+Mithral Armor, Animated Shield, Plate Armor of Etherealness, Ammunition of
+Slaying (14 types × 5 ammunition kinds). Found on the way: only 198 of 328
+SRD monsters had a creature type (the union lacked half the SRD's types), so
+type-keyed riders (Holy Water, Mace of Disruption, the Slayers) missed most
+monsters — the union now has all 14 and every monster is tagged from the SRD
+type line (Axe Beak and Roc were wrongly Beasts; they're Monstrosities).
+Simplifications: Mace of Terror uses the Fear spell's cone (without
+Concentration); Nine Lives Stealer starts with 5 charges and Luck Blade with
+2 Wishes (the averages); Luck Blade's save bonus needs it wielded and its
+Luck reroll isn't modeled; the Hammer's thunderclap catches only enemies;
+the Oathbow's oath lasts the encounter; Vorpal treats Oozes, Elementals and
+Plants as headless and ignores size; Sword of Sharpness's Exhaustion,
+Withering's ability-check Disadvantage, Thunder and Lightning's combined use
+and Thunderclap, the Trident's swim-speed limit, the Acrobat's light and
+forms aren't modeled; Mithral and Animated Shield are mechanically the base
+item (pansori doesn't enforce Stealth Disadvantage, Strength requirements or
+hands); Adamantine only matters against enemy spell attacks (enemy weapon
+attacks don't crit). Deferred: Dancing Sword, Staff of the Python, and the
+cursed items (Berserker Axe, Demon Armor, Armor of Vulnerability, Shield of
+Missile Attraction).
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

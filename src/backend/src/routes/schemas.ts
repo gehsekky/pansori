@@ -587,6 +587,33 @@ const RegionsSchema = z
 // a LIVE engine field, so a section that parses here must be servable.
 const DICE = z.string().min(1).max(20); // '1d4', '2d6+1', or flat ('1' — SRD Blowgun)
 
+const SAVE_ABILITY = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
+const RiderSaveSchema = z
+  .object({
+    ability: SAVE_ABILITY,
+    dc: z.number().int().min(5).max(30),
+    condition: z.string().min(1).max(40).optional(),
+    rounds: z.number().int().min(1).max(14400).optional(),
+    saveEnds: z.boolean().optional(),
+    onSave: z.enum(['half', 'none']).optional(),
+  })
+  .strict();
+const MagicRiderSchema = z
+  .object({
+    label: z.string().min(1).max(60),
+    dice: DICE,
+    damageType: z.string().min(1).max(20).optional(),
+    vsCreatureTypes: z.array(z.string().min(1).max(20)).max(6).optional(),
+    notVsCreatureTypes: z.array(z.string().min(1).max(20)).max(6).optional(),
+    onCrit: z.boolean().optional(),
+    rangedOnly: z.boolean().optional(),
+    meleeOnly: z.boolean().optional(),
+    vsSwornEnemy: z.boolean().optional(),
+    tempHpFromDamage: z.boolean().optional(),
+    save: RiderSaveSchema.optional(),
+  })
+  .strict();
+
 const WornEffectSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -648,6 +675,7 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('speed_floor'), feet: z.number().int().positive().max(120) }).strict(),
   z.object({ kind: z.literal('darkvision'), feet: z.number().int().positive().max(300) }).strict(),
   z.object({ kind: z.literal('spell_save_advantage') }).strict(),
+  z.object({ kind: z.literal('no_crits') }).strict(),
   z
     .object({
       kind: z.literal('spell_attack_bonus'),
@@ -709,21 +737,50 @@ const LootItemSchema = z
     // SRD +1/+2/+3 magic bonus (weapon: attack + damage + counts as magical;
     // armor/shield: AC). Capped at the SRD's +3.
     magicBonus: z.number().int().min(1).max(3).optional(),
-    magicRiders: z
+    magicRiders: z.array(MagicRiderSchema).max(4).optional(),
+    weaponPowers: z
       .array(
         z
           .object({
+            id: z.string().min(1).max(40),
             label: z.string().min(1).max(60),
-            dice: DICE,
-            damageType: z.string().min(1).max(20).optional(),
-            vsCreatureTypes: z.array(z.string().min(1).max(20)).max(6).optional(),
-            onCrit: z.boolean().optional(),
-            rangedOnly: z.boolean().optional(),
+            cost: z.enum(['bonus_action', 'free']),
+            charges: z.number().int().min(0).max(20).optional(),
+            maxCharges: z.number().int().min(1).max(20).optional(),
+            daily: z.boolean().optional(),
+            rider: MagicRiderSchema,
           })
           .strict()
       )
-      .max(4)
+      .max(6)
       .optional(),
+    critSlay: z
+      .object({
+        label: z.string().min(1).max(60),
+        dc: z.number().int().min(5).max(30).optional(),
+        maxHp: z.number().int().min(1).optional(),
+        vsTypes: z.array(z.string().min(1).max(20)).max(14).optional(),
+        immuneTypes: z.array(z.string().min(1).max(20)).max(14).optional(),
+        needsWorn: z.array(z.string().min(1).max(60)).max(6).optional(),
+        spendsCharge: z.boolean().optional(),
+        elseDamage: z.number().int().min(0).max(200).optional(),
+      })
+      .strict()
+      .optional(),
+    ignoresResistance: z.string().min(1).max(20).optional(),
+    altDamageType: z.string().min(1).max(20).optional(),
+    bonusAttack: z.boolean().optional(),
+    swornEnemy: z.boolean().optional(),
+    throwCharge: z
+      .object({
+        dc: z.number().int().min(5).max(30),
+        radiusFt: z.number().int().min(0).max(120),
+      })
+      .strict()
+      .optional(),
+    deflect: z.boolean().optional(),
+    mightOfGiants: z.array(z.string().min(1).max(60)).max(6).optional(),
+    castWhileCarried: z.boolean().optional(),
     potion: z
       .discriminatedUnion('kind', [
         z
@@ -771,6 +828,10 @@ const LootItemSchema = z
             charges: z.number().int().min(0).max(50),
             level: z.number().int().min(0).max(9).optional(),
             maxLevel: z.number().int().min(0).max(9).optional(),
+            dc: z.number().int().min(5).max(30).optional(),
+            damage: DICE.optional(),
+            noConcentration: z.boolean().optional(),
+            daily: z.boolean().optional(),
           })
           .strict()
       )
@@ -970,7 +1031,22 @@ const EnemyTemplateSchema = z
     toHit: z.number().int().min(0).max(20),
     xp: z.number().int().nonnegative(),
     creatureType: z
-      .enum(['undead', 'fiend', 'beast', 'humanoid', 'construct', 'dragon', 'giant'])
+      .enum([
+        'aberration',
+        'beast',
+        'celestial',
+        'construct',
+        'dragon',
+        'elemental',
+        'fey',
+        'fiend',
+        'giant',
+        'humanoid',
+        'monstrosity',
+        'ooze',
+        'plant',
+        'undead',
+      ])
       .optional(),
     str: AbilityScore.optional(),
     dex: AbilityScore.optional(),

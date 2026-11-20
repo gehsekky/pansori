@@ -13,7 +13,6 @@ import {
   sneakAttackDice,
   unarmedDamage,
 } from '../../rulesEngine.js';
-import { SQUARE_SIZE, distanceFeet } from '../../gridEngine.js';
 import {
   applyPartyLevelUps,
   dominatedDamageReSave,
@@ -27,6 +26,7 @@ import {
   pushEntityAway,
   splitEncounterXp,
 } from '../../gameEngine.js';
+import { bestDamageType, rollItemHit, spendThrowCharge, thunderclap } from './weaponPowers.js';
 import { brutalStrikeDice, brutalStrikeRiders, sunderedTag } from '../../barbarianFeatures.js';
 import { consumeStrokeOfLuck, strokeOfLuckAvailable } from '../../strokeOfLuck.js';
 import {
@@ -46,6 +46,7 @@ import {
 } from '../../feats.js';
 import { primalStrikeDie, primalStrikeType } from '../../druidFeatures.js';
 import type { ActionContext } from '../types.js';
+import { SQUARE_SIZE } from '../../gridEngine.js';
 import type { ToHitContext } from './toHit.js';
 import { composeNow } from '../../narrative/compose.js';
 import { fmt } from '../../narrativeFmt.js';
@@ -99,6 +100,13 @@ export function resolveOneAttack(
   if (ctx.actor.kind !== 'pc') return false;
   const pc = ctx.actor;
   const { target, targetId, weaponItem, weaponDamage, isVersatile, weaponLabel, toHit } = atkCtx;
+  // SRD Hammer of Thunderbolts — every throw spends a charge (an Extra Attack
+  // throw with none left is lost).
+  const hammerThrow = spendThrowCharge(ctx, weaponItem, targetId);
+  if (hammerThrow.blocked) {
+    ctx.narrative += ` ${hammerThrow.blocked}`;
+    return false;
+  }
   const {
     weaponProficient,
     advantage,
@@ -685,27 +693,20 @@ export function resolveOneAttack(
   }
 
   // SRD magic weapon riders (Vicious Weapon, Flame Tongue, Dragon / Giant
-  // Slayer, Mace of Disruption, Sun Blade, Holy Avenger, …): extra damage on a
-  // hit, doubled on a Critical Hit (an `onCrit` rider fires only on a 20, flat).
-  let itemRiderDmg = 0;
-  const itemRiderLabels: string[] = [];
-  if (atk.hit && weaponItem?.magicRiders?.length) {
-    const pcPos = ctx.st.entities?.find((e) => e.id === pc.char.id)?.pos;
-    const tgtPos = ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.pos;
-    const rangedAttack =
-      weaponItem.range === 'ranged' ||
-      (!!weaponItem.thrown && !!pcPos && !!tgtPos && distanceFeet(pcPos, tgtPos) > 5);
-    for (const r of weaponItem.magicRiders) {
-      if (r.vsCreatureTypes && !r.vsCreatureTypes.includes(target.creatureType ?? '')) continue;
-      if (r.onCrit && !isCrit) continue;
-      if (r.rangedOnly && !rangedAttack) continue;
-      const type = r.damageType ?? weaponItem.damageType ?? 'bludgeoning';
-      const rolled = isCrit && !r.onCrit ? rollCritical(r.dice) : rollDice(r.dice);
-      const dmg = applyDamageMultiplier(rolled, type, target, { magical: true }).damage;
-      itemRiderDmg += dmg;
-      itemRiderLabels.push(`${r.label} ${r.dice}: +${dmg} ${type}`);
-    }
-  }
+  // Slayer, Mace of Disruption, Sun Blade, Holy Avenger, …) and the activated
+  // weapons' armed powers, rider saves and natural-20 death effects: extra
+  // damage on a hit, doubled on a Critical Hit (an `onCrit` rider fires only on
+  // a 20, flat). See weaponPowers.ts.
+  const itemHit = rollItemHit(ctx, {
+    weaponItem,
+    target,
+    targetId,
+    isCrit,
+    natural20: atk.roll === 20,
+    curHp: ctx.st.entities?.find((e) => e.id === targetId && e.isEnemy)?.hp ?? target.hp,
+  });
+  const itemRiderDmg = itemHit.dmg;
+  const itemRiderLabels = itemHit.labels;
 
   const rawDmg =
     baseHit +
@@ -719,10 +720,14 @@ export function resolveOneAttack(
   // pansori auto-picks Force (it bypasses most resistances); only when unarmed
   // (no weaponItem). Otherwise the weapon's own type stands.
   const empoweredStrikes = !weaponItem && getClassLevel(pc.char, 'monk') >= 6;
-  const effectiveDamageType = weaponItem?.damageType ?? (empoweredStrikes ? 'force' : undefined);
+  const effectiveDamageType =
+    bestDamageType(weaponItem, target) ?? (empoweredStrikes ? 'force' : undefined);
   // SRD Boon of Irresistible Offense — Overcome Defenses: B/P/S damage ignores
   // Resistance (Immunity / Vulnerability still apply).
-  const overcomeResist = overcomeDefensesApplies(pc.char, effectiveDamageType);
+  // SRD Vorpal Sword ignores Resistance to Slashing the same way.
+  const overcomeResist =
+    overcomeDefensesApplies(pc.char, effectiveDamageType) ||
+    (!!weaponItem?.ignoresResistance && weaponItem.ignoresResistance === effectiveDamageType);
   // The attack counts as magical — bypassing nonmagical-only resistance — when it
   // comes from a +N / Magic Weapon-buffed weapon or monk Empowered Strikes.
   // A named magic weapon (riders listed, even none — Weapon of Warning) is magical too.
@@ -851,6 +856,14 @@ export function resolveOneAttack(
     atkNote,
     bonuses: hitBonuses,
   });
+  // Item on-hit aftermath: rider saves, slays, the Hammer's thunderclap, and
+  // Sword of Life Stealing's Temporary Hit Points.
+  if (itemHit.after.length) ctx.narrative += ` ${fmt.note(`[${itemHit.after.join('; ')}]`)}`;
+  if (hammerThrow.thrown) ctx.narrative += thunderclap(ctx, weaponItem, targetId);
+  if (itemHit.tempHp > (pc.char.temp_hp ?? 0)) {
+    updatePcActor(ctx, { temp_hp: itemHit.tempHp });
+    ctx.narrative += ` ${fmt.note(`[${pc.char.name} gains ${itemHit.tempHp} Temporary Hit Points]`)}`;
+  }
 
   // ── Ranger Superior Hunter's Prey (L11) ──────────────────────────────
   // Once per turn, when you deal Hunter's Mark damage to the marked target,
