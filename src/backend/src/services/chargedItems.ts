@@ -158,7 +158,15 @@ export function planItemCast(
       error: `The ${loot.name} has ${left} charge${left === 1 ? '' : 's'} — ${spell.name} needs ${cost}.`,
     };
   }
-  return { inv, loot, is, scroll: false, cost, dc: is.dc ?? loot.itemSpellDc };
+  return {
+    inv,
+    loot,
+    is,
+    scroll: false,
+    cost,
+    dc: is.dc ?? loot.itemSpellDc,
+    attackBonus: is.attack,
+  };
 }
 
 /**
@@ -207,6 +215,12 @@ export function spendCharges(
     i.instance_id === instanceId ? { ...i, charges_used: used } : i
   );
   const left = loot.charges.max - used;
+  if (left === 0 && loot.charges.consumable) {
+    char.inventory = char.inventory.filter((i) => i.instance_id !== instanceId);
+    char.equipment = clearInstance(char.equipment ?? {}, instanceId);
+    char.attuned_items = (char.attuned_items ?? []).filter((id) => id !== instanceId);
+    return ` That was the last of the ${loot.name}.`;
+  }
   if (left === 0 && loot.charges.destroyOnLast) {
     const roll = d(20);
     if (roll === 1) {

@@ -3871,6 +3871,344 @@ const WONDROUS_2: Array<[string, LootItem]> = [
   ),
 ];
 
+// ── SRD wondrous items, round 3 — items that cast spells ────────────────────
+// Each casts through the Spells Cast from Items path (`itemSpells`): no slot,
+// no components, at the spell's lowest level unless stated.
+const CRYSTAL_BALL_DESC =
+  'While holding this orb, you can cast Scrying (save DC 17) from it. Hold it in your off hand.';
+const crystalBall = (
+  id: string,
+  name: string,
+  rarity: Rarity,
+  extraDesc: string,
+  more: ItemSpell[] = []
+) =>
+  wondrous(id, name, rarity, `${CRYSTAL_BALL_DESC}${extraDesc}`, 'off_hand', {
+    requiresAttunement: true,
+    weight: 3,
+    itemSpellDc: 17,
+    itemSpells: [sp('scrying', 0), ...more],
+  });
+
+const WONDROUS_3: Array<[string, LootItem]> = [
+  // SRD Necklace of Fireballs. Simplification: a fixed 6 beads (1d6 + 3 on
+  // average); throwing extra beads is upcasting (+1d6 each, to 12d6).
+  wondrous(
+    'necklace_of_fireballs',
+    'Necklace of Fireballs',
+    'Rare',
+    '6 beads. Detach and throw a bead to cast Fireball (level 3, save DC 15); throw more beads at once for +1d6 each (up to 12d6). Once the beads are gone, so is the necklace.',
+    null,
+    {
+      castWhileCarried: true,
+      charges: { max: 6, regain: '0', consumable: true },
+      itemSpellDc: 15,
+      itemSpells: [sp('fireball', 1, { maxLevel: 7 })],
+    }
+  ),
+  // SRD Necklace of Prayer Beads. Simplification: one bead of each of the six
+  // kinds, each cast at the spell's own casting time (not a Bonus Action).
+  wondrous(
+    'necklace_of_prayer_beads',
+    'Necklace of Prayer Beads',
+    'Rare',
+    'While wearing it, each of its six beads casts its spell once per dawn, using your own save DC: Bless, Cure Wounds (level 2), Greater Restoration, Shining Smite, Guardian of Faith and Wind Walk.',
+    'neck',
+    {
+      requiresAttunement: true,
+      attuneBy: ['cleric', 'druid', 'paladin'],
+      itemSpells: [
+        sp('bless', 0, { daily: true }),
+        sp('cure_wounds', 0, { level: 2, daily: true }),
+        sp('greater_restoration', 0, { daily: true }),
+        sp('shining_smite', 0, { daily: true }),
+        sp('guardian_of_faith', 0, { daily: true }),
+        sp('wind_walk', 0, { daily: true }),
+      ],
+    }
+  ),
+  // SRD Ring of Animal Influence. Simplification: its Fear isn't limited to Beasts.
+  wondrous(
+    'ring_of_animal_influence',
+    'Ring of Animal Influence',
+    'Rare',
+    '3 charges (regains 1d3 at dawn). While wearing it, spend 1 charge to cast Animal Friendship, Fear or Speak with Animals (save DC 13).',
+    'ring',
+    {
+      weight: 0,
+      charges: { max: 3, regain: '1d3' },
+      itemSpellDc: 13,
+      itemSpells: [sp('animal_friendship', 1), sp('fear', 1), sp('speak_with_animals', 1)],
+    }
+  ),
+  // SRD Ring of Shooting Stars. Simplification: the Lightning Spheres and
+  // Shooting Stars properties aren't modeled yet, and the ring works in any light.
+  wondrous(
+    'ring_of_shooting_stars',
+    'Ring of Shooting Stars',
+    'Very Rare',
+    '6 charges (regains 1d6 at dawn). While wearing it, cast Dancing Lights or Light at will, or spend 1 charge to cast Faerie Fire.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      charges: { max: 6, regain: '1d6' },
+      itemSpells: [sp('dancing_lights', 0), sp('light', 0), sp('faerie_fire', 1)],
+    }
+  ),
+  wondrous(
+    'ring_of_telekinesis',
+    'Ring of Telekinesis',
+    'Very Rare',
+    'While wearing it, you can cast Telekinesis from it at will.',
+    'ring',
+    { requiresAttunement: true, weight: 0, itemSpells: [sp('telekinesis', 0)] }
+  ),
+  wondrous(
+    'ring_of_jumping',
+    'Ring of Jumping',
+    'Uncommon',
+    'While wearing it, you can cast Jump from it at will, on yourself only.',
+    'ring',
+    { requiresAttunement: true, weight: 0, itemSpells: [sp('jump', 0, { selfOnly: true })] }
+  ),
+  wondrous(
+    'ring_of_water_walking',
+    'Ring of Water Walking',
+    'Uncommon',
+    'While wearing it, you can cast Water Walk from it at will, on yourself only.',
+    'ring',
+    { weight: 0, itemSpells: [sp('water_walk', 0, { selfOnly: true })] }
+  ),
+  wondrous(
+    'circlet_of_blasting',
+    'Circlet of Blasting',
+    'Uncommon',
+    'While wearing it, you can cast Scorching Ray from it (+5 to hit), once per dawn.',
+    'head',
+    { itemSpells: [sp('scorching_ray', 0, { attack: 5, daily: true })] }
+  ),
+  wondrous(
+    'helm_of_teleportation',
+    'Helm of Teleportation',
+    'Rare',
+    '3 charges (regains 1d3 at dawn). While wearing it, spend 1 charge to cast Teleport.',
+    'head',
+    {
+      requiresAttunement: true,
+      weight: 3,
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('teleport', 1)],
+    }
+  ),
+  // SRD Helm of Telepathy. Simplification: the 30-foot telepathy is flavor.
+  wondrous(
+    'helm_of_telepathy',
+    'Helm of Telepathy',
+    'Uncommon',
+    'While wearing it, you can cast Detect Thoughts and Suggestion (save DC 13) from it, each once per dawn.',
+    'head',
+    {
+      requiresAttunement: true,
+      weight: 3,
+      itemSpellDc: 13,
+      itemSpells: [sp('detect_thoughts', 0, { daily: true }), sp('suggestion', 0, { daily: true })],
+    }
+  ),
+  wondrous(
+    'helm_of_comprehending_languages',
+    'Helm of Comprehending Languages',
+    'Uncommon',
+    'While wearing it, you can cast Comprehend Languages from it at will.',
+    'head',
+    { weight: 3, itemSpells: [sp('comprehend_languages', 0)] }
+  ),
+  wondrous(
+    'medallion_of_thoughts',
+    'Medallion of Thoughts',
+    'Uncommon',
+    '5 charges (regains 1d4 at dawn). While wearing it, spend 1 charge to cast Detect Thoughts (save DC 13).',
+    'neck',
+    {
+      requiresAttunement: true,
+      charges: { max: 5, regain: '1d4' },
+      itemSpellDc: 13,
+      itemSpells: [sp('detect_thoughts', 1)],
+    }
+  ),
+  wondrous(
+    'eyes_of_charming',
+    'Eyes of Charming',
+    'Uncommon',
+    '3 charges (all regained at dawn). While wearing these lenses, cast Charm Person (save DC 13): 1 charge for level 1, +1 charge per level up to 3.',
+    'head',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      charges: { max: 3, regain: '3' },
+      itemSpellDc: 13,
+      itemSpells: [sp('charm_person', 1, { maxLevel: 3 })],
+    }
+  ),
+  // SRD Cape of the Mountebank. Simplification: the smoke left behind is flavor.
+  wondrous(
+    'cape_of_the_mountebank',
+    'Cape of the Mountebank',
+    'Rare',
+    'While wearing it, you can cast Dimension Door from it, once per dawn, leaving a puff of smoke behind.',
+    'cloak',
+    { itemSpells: [sp('dimension_door', 0, { daily: true })] }
+  ),
+  wondrous(
+    'boots_of_levitation',
+    'Boots of Levitation',
+    'Rare',
+    'While wearing them, you can cast Levitate from them at will, on yourself only.',
+    'feet',
+    { requiresAttunement: true, itemSpells: [sp('levitate', 0, { selfOnly: true })] }
+  ),
+  wondrous(
+    'hat_of_disguise',
+    'Hat of Disguise',
+    'Uncommon',
+    'While wearing it, you can cast Disguise Self from it at will.',
+    'head',
+    { requiresAttunement: true, itemSpells: [sp('disguise_self', 0)] }
+  ),
+  wondrous(
+    'rod_of_resurrection',
+    'Rod of Resurrection',
+    'Legendary',
+    '5 charges (regains 1 at dawn). While holding it, cast Heal (1 charge) or Resurrection (5 charges). Spending the last charge rolls a d20 — on a 1 the rod vanishes. Hold it in your off hand.',
+    'off_hand',
+    {
+      requiresAttunement: true,
+      weight: 2,
+      charges: { max: 5, regain: '1', destroyOnLast: true },
+      itemSpells: [sp('heal', 1), sp('resurrection', 5)],
+    }
+  ),
+  crystalBall('crystal_ball', 'Crystal Ball', 'Very Rare', ''),
+  // Simplification: the extra spell isn't tied to the Scrying sensor.
+  crystalBall(
+    'crystal_ball_of_mind_reading',
+    'Crystal Ball of Mind Reading',
+    'Legendary',
+    ' You can also cast Detect Thoughts (save DC 17) without Concentration.',
+    [sp('detect_thoughts', 0, { noConcentration: true })]
+  ),
+  crystalBall(
+    'crystal_ball_of_telepathy',
+    'Crystal Ball of Telepathy',
+    'Legendary',
+    ' You can also cast Suggestion (save DC 17) without Concentration, once per dawn.',
+    [sp('suggestion', 0, { noConcentration: true, daily: true })]
+  ),
+  // Simplification: the Truesight around the sensor is flavor.
+  crystalBall(
+    'crystal_ball_of_true_seeing',
+    'Crystal Ball of True Seeing',
+    'Legendary',
+    ' You also see through the sensor with Truesight out to 120 feet.'
+  ),
+  // SRD Robe of Stars. Simplification: the stars return at dawn (a Long Rest),
+  // not dusk, and the trip to the Astral Plane isn't modeled.
+  wondrous(
+    'robe_of_stars',
+    'Robe of Stars',
+    'Very Rare',
+    '+1 to saving throws while worn. 6 stars (1d6 return daily): spend one to cast Magic Missile at level 5.',
+    'cloak',
+    {
+      requiresAttunement: true,
+      charges: { max: 6, regain: '1d6' },
+      wornEffects: [{ kind: 'save_bonus', ability: 'all', bonus: 1 }],
+      itemSpells: [sp('magic_missile', 1, { level: 5 })],
+    }
+  ),
+  // SRD Cloak of Arachnida. Simplification: Spider Walk (webs) and the Web's
+  // doubled area aren't modeled.
+  wondrous(
+    'cloak_of_arachnida',
+    'Cloak of Arachnida',
+    'Very Rare',
+    'While worn: Resistance to Poison damage, a Climb Speed equal to your Speed, and once per dawn you can cast Web (save DC 13).',
+    'cloak',
+    {
+      requiresAttunement: true,
+      wornEffects: [
+        { kind: 'resistance', damageType: 'poison' },
+        { kind: 'speed_mode', mode: 'climb', feet: 'walk' },
+      ],
+      itemSpells: [sp('web', 0, { dc: 13, daily: true })],
+    }
+  ),
+  wondrous(
+    'chime_of_opening',
+    'Chime of Opening',
+    'Rare',
+    'Strike it to cast Knock. It rings 10 times, then cracks and is useless. Hold it in your off hand.',
+    'off_hand',
+    {
+      charges: { max: 10, regain: '0', consumable: true },
+      itemSpells: [sp('knock', 1)],
+    }
+  ),
+  // SRD Wind Fan. Simplification: one safe use per dawn instead of the
+  // cumulative 20 percent chance of tearing on repeat uses.
+  wondrous(
+    'wind_fan',
+    'Wind Fan',
+    'Uncommon',
+    'While holding it, you can cast Gust of Wind (save DC 13) from it, once per dawn. Hold it in your off hand.',
+    'off_hand',
+    { itemSpells: [sp('gust_of_wind', 0, { dc: 13, daily: true })] }
+  ),
+  wondrous(
+    'pearl_of_power',
+    'Pearl of Power',
+    'Uncommon',
+    'While it is on your person, a Magic action restores one expended spell slot of level 3 or lower, once per dawn.',
+    null,
+    {
+      requiresAttunement: true,
+      attuneBy: ['spellcaster'],
+      carried: true,
+      weight: 0,
+      activate: {
+        label: 'Regain a spell slot (level 3 or lower)',
+        daily: true,
+        effect: { kind: 'regain_slot', maxLevel: 3 },
+      },
+    }
+  ),
+  wondrous(
+    'necklace_of_adaptation',
+    'Necklace of Adaptation',
+    'Uncommon',
+    'While worn, you can breathe in any environment and have Advantage on saves to avoid or end the Poisoned condition.',
+    'neck',
+    { requiresAttunement: true, wornEffects: [{ kind: 'poison_save_advantage' }] }
+  ),
+  // SRD Robe of Eyes. Simplification: the Light / Daylight blinding drawback
+  // isn't modeled.
+  wondrous(
+    'robe_of_eyes',
+    'Robe of Eyes',
+    'Rare',
+    'While worn: Advantage on Wisdom (Perception) checks, and Darkvision and Truesight out to 120 feet.',
+    'cloak',
+    {
+      requiresAttunement: true,
+      wornEffects: [
+        { kind: 'skill_advantage', skill: 'perception' },
+        { kind: 'darkvision', feet: 120, atLeast: true },
+        { kind: 'truesight', feet: 120 },
+      ],
+    }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -4230,6 +4568,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...SLAYING_AMMO,
   ...CURSED_ITEMS,
   ...WONDROUS_2,
+  ...WONDROUS_3,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

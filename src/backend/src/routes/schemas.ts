@@ -728,6 +728,7 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ kind: z.literal('displacement') }).strict(),
+  z.object({ kind: z.literal('truesight'), feet: z.number().int().min(5).max(300) }).strict(),
   z
     .object({
       kind: z.literal('spell_attack_bonus'),
@@ -762,6 +763,7 @@ const PotionEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('sharpness') }).strict(),
   z.object({ kind: z.literal('narrative'), text: z.string().min(1).max(500) }).strict(),
   z.object({ kind: z.literal('heal'), dice: DICE }).strict(),
+  z.object({ kind: z.literal('regain_slot'), maxLevel: z.number().int().min(1).max(9) }).strict(),
 ]);
 
 const LootItemSchema = z
@@ -881,6 +883,7 @@ const LootItemSchema = z
         regain: z.string().max(20),
         destroyOnLast: z.boolean().optional(),
         becomes: z.string().min(1).max(60).optional(),
+        consumable: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -896,6 +899,8 @@ const LootItemSchema = z
             damage: DICE.optional(),
             noConcentration: z.boolean().optional(),
             daily: z.boolean().optional(),
+            attack: z.number().int().min(-5).max(20).optional(),
+            selfOnly: z.boolean().optional(),
           })
           .strict()
       )

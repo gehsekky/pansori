@@ -344,6 +344,17 @@ export function resolvePotion(
     case 'narrative':
       note = potion.text;
       break;
+    case 'regain_slot': {
+      const lvl = expendedSlotLevel(t, potion.maxLevel);
+      if (!lvl) {
+        note = 'has no expended spell slot to restore';
+        break;
+      }
+      const used = t.spell_slots_used ?? {};
+      t = { ...t, spell_slots_used: { ...used, [lvl]: Math.max(0, (used[lvl] ?? 0) - 1) } };
+      note = `regains a level ${lvl} spell slot`;
+      break;
+    }
     case 'heal': {
       const before = t.hp;
       t = { ...t, hp: Math.min(t.max_hp, t.hp + Math.max(0, rollDice(potion.dice))) };
@@ -352,6 +363,19 @@ export function resolvePotion(
     }
   }
   return { target: t, st: syncEntity(st, t), note, used: true };
+}
+
+/**
+ * SRD Pearl of Power — the highest expended spell slot of `maxLevel` or lower
+ * (the most valuable one to get back), or 0 when none is expended.
+ */
+export function expendedSlotLevel(
+  char: Pick<Character, 'spell_slots_used'>,
+  maxLevel: number
+): number {
+  const used = char.spell_slots_used ?? {};
+  for (let l = maxLevel; l >= 1; l--) if ((used[l] ?? 0) > 0) return l;
+  return 0;
 }
 
 /** SRD Oil of Sharpness — ammunition types that deal Piercing (sling bullets don't). */

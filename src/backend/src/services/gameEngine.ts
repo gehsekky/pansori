@@ -124,7 +124,13 @@ import {
   wildShapeBlocksCasting,
 } from './druidFeatures.js';
 import { NATURES_VEIL_SOURCE, naturesVeilLeft } from './rangerFeatures.js';
-import { POTION_CONDITIONS, POTION_SOURCE, SLIPPERY_IMMUNITIES, potionResists } from './potions.js';
+import {
+  POTION_CONDITIONS,
+  POTION_SOURCE,
+  SLIPPERY_IMMUNITIES,
+  expendedSlotLevel,
+  potionResists,
+} from './potions.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -5659,7 +5665,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
       const act = data?.activate;
       if (!data || !act) continue;
-      if (!Object.values(char.equipment ?? {}).includes(inv.instance_id)) continue;
+      if (!data.carried && !Object.values(char.equipment ?? {}).includes(inv.instance_id)) {
+        continue;
+      }
+      if (act.effect.kind === 'regain_slot' && !expendedSlotLevel(char, act.effect.maxLevel)) {
+        continue;
+      }
       if (data.requiresAttunement && !(char.attuned_items ?? []).includes(inv.instance_id)) {
         continue;
       }

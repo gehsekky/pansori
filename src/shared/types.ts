@@ -1872,6 +1872,8 @@ export type WornEffect =
   // SRD Ring of Regeneration (1d6 per 10 min) / Ioun Stone of Regeneration
   // (15 per hour) — HP regained with in-world time while at 1+ HP.
   | { kind: 'regeneration'; dice: string; everyMinutes: number }
+  // SRD Robe of Eyes — Truesight out to `feet`.
+  | { kind: 'truesight'; feet: number }
   // SRD Cloak of Displacement — attacks against you have Disadvantage until you
   // take damage (back at the start of your next turn); not while Speed is 0.
   | { kind: 'displacement' };
@@ -1901,7 +1903,9 @@ export type PotionEffect =
   | { kind: 'sharpness' }
   | { kind: 'narrative'; text: string }
   // SRD Periapt of Health — regain Hit Points.
-  | { kind: 'heal'; dice: string };
+  | { kind: 'heal'; dice: string }
+  // SRD Pearl of Power — regain one expended spell slot of `maxLevel` or lower.
+  | { kind: 'regain_slot'; maxLevel: number };
 
 export interface MagicRider {
   label: string;
@@ -2005,6 +2009,7 @@ export interface WornTraits {
   woundClosure?: boolean;
   regeneration?: Array<{ dice: string; everyMinutes: number }>;
   displacement?: boolean;
+  truesightFt?: number;
 }
 
 /**
@@ -2026,6 +2031,10 @@ export interface ItemSpell {
   noConcentration?: boolean;
   // Usable once, then not again until dawn (the Long Rest).
   daily?: boolean;
+  // Fixed spell attack bonus (Circlet of Blasting: +5), instead of the holder's.
+  attack?: number;
+  // The item casts it on its wearer only (Ring of Jumping, Boots of Levitation).
+  selfOnly?: boolean;
 }
 
 /** SRD item charges — `regain` is the dice regained at dawn (on a Long Rest). */
@@ -2036,6 +2045,9 @@ export interface ItemCharges {
   // with `becomes`, turns into that item (Staff of Power → a +2 Quarterstaff).
   destroyOnLast?: boolean;
   becomes?: string;
+  // The charges are the item itself (Necklace of Fireballs' beads, Chime of
+  // Opening's uses): spending the last one uses the item up.
+  consumable?: boolean;
 }
 
 // The 12 SRD classes (ids as used by Character.character_class + the keys

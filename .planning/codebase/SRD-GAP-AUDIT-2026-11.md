@@ -488,6 +488,29 @@ against non-spell magical effects aren't modeled; Displacement's break is
 checked per damage instance. Deferred Ioun Stones: Absorption, Greater
 Absorption, Mastery, Reserve.
 
+**Batch 8 done 2026-11-19 — wondrous items, round 3 (items that cast spells).**
+New machinery: `ItemSpell.attack` (a fixed spell attack bonus), `ItemSpell.selfOnly`
+(the item casts on its wearer only), `ItemCharges.consumable` (the charges are
+the item — spending the last one uses it up), a `regain_slot` activation
+(Pearl of Power, usable from the pack) and a worn `truesight` sense (feeds
+`truesightFt`, so it sees Invisible creatures in range). Items: Necklace of
+Fireballs; Necklace of Prayer Beads; Rings of Animal Influence, Shooting
+Stars, Telekinesis, Jumping and Water Walking; Circlet of Blasting; Helms of
+Teleportation, Telepathy and Comprehending Languages; Medallion of Thoughts;
+Eyes of Charming; Cape of the Mountebank; Boots of Levitation; Hat of
+Disguise; Rod of Resurrection; the four Crystal Balls; Robe of Stars; Cloak of
+Arachnida; Chime of Opening; Wind Fan; Pearl of Power; Necklace of
+Adaptation; Robe of Eyes. Simplifications: the Necklace of Fireballs has a
+fixed 6 beads and the Prayer Beads one bead of each kind, cast at the spell's
+own casting time; the Ring of Animal Influence's Fear isn't limited to
+Beasts; the Ring of Shooting Stars' Lightning Spheres and Shooting Stars, the
+Robe of Stars' Astral trip, Cloak of Arachnida's Spider Walk and doubled Web,
+the Crystal Balls' sensor-bound extras and the Robe of Eyes' Light / Daylight
+drawback aren't modeled; the Robe of Stars' stars return at dawn, not dusk;
+the Wind Fan gets one safe use per dawn instead of its tearing chance. The
+Rod of Resurrection's Resurrection is castable through the API but isn't
+offered in the choice list (revive spells never are for item casts yet).
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

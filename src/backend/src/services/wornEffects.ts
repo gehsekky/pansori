@@ -121,6 +121,7 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'regeneration') {
       (t.regeneration ??= []).push({ dice: e.dice, everyMinutes: e.everyMinutes });
     } else if (e.kind === 'displacement') t.displacement = true;
+    else if (e.kind === 'truesight') t.truesightFt = Math.max(t.truesightFt ?? 0, e.feet);
     else if (e.kind === 'ranged_weapon_resistance') t.rangedWeaponResistance = true;
     else if (e.kind === 'clawed_unarmed') {
       t.clawedUnarmed = { dice: e.dice, damageType: e.damageType, bonus: e.bonus };

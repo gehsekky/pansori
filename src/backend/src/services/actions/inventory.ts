@@ -5,7 +5,7 @@ import {
   resolveSaveWithAdvantage,
   rollDice,
 } from '../rulesEngine.js';
-import { applyOilOfSharpness, resolvePotion } from '../potions.js';
+import { applyOilOfSharpness, expendedSlotLevel, resolvePotion } from '../potions.js';
 import { attuneBlocker, chargesLeft, dailyUsed, markDaily, spendCharges } from '../chargedItems.js';
 import { commitCharacter, getItemData } from '../gameEngine.js';
 import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
@@ -164,10 +164,15 @@ export const handleUse: ActionHandler<{
     // spending a charge or the once-per-dawn use.
     const act = itemData.activate;
     const inst = held.instance_id;
-    const worn = Object.values(nextChar.equipment ?? {}).includes(inst);
+    // A `carried` item (Pearl of Power) works from the pack.
+    const worn = !!itemData.carried || Object.values(nextChar.equipment ?? {}).includes(inst);
     const attunedOk = !itemData.requiresAttunement || (nextChar.attuned_items ?? []).includes(inst);
     if (!worn || !attunedOk) {
       ctx.narrative = `You must be wearing${itemData.requiresAttunement ? ' and attuned to' : ''} the ${held.name} to use it.`;
+      return;
+    }
+    if (act.effect.kind === 'regain_slot' && !expendedSlotLevel(nextChar, act.effect.maxLevel)) {
+      ctx.narrative = `You have no expended spell slot of level ${act.effect.maxLevel} or lower to restore.`;
       return;
     }
     if (nextSt.combat_active && nextChar.turn_actions.action_used) {

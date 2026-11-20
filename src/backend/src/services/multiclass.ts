@@ -762,7 +762,11 @@ export function piercesMagicalDarkness(char: Character): boolean {
  * Warlock's Witch Sight invocation (30 ft). 0 without Truesight.
  */
 export function truesightFt(char: Character): number {
-  return Math.max(char.truesight_ft ?? 0, (char.feats ?? []).includes('witch_sight') ? 30 : 0);
+  return Math.max(
+    char.truesight_ft ?? 0,
+    (char.feats ?? []).includes('witch_sight') ? 30 : 0,
+    char.worn_traits?.truesightFt ?? 0 // SRD Robe of Eyes
+  );
 }
 
 /**

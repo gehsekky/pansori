@@ -65,6 +65,9 @@ export function runPrecast(
     wishDuplicate?: boolean;
     invocation?: string;
     itemInstanceId?: string;
+    targetCharId?: string;
+    targetCharIds?: string[];
+    targetEnemyId?: string;
   },
   spell: Spell
 ): PrecastResult {
@@ -131,6 +134,14 @@ export function runPrecast(
       return { done: true };
     }
     itemPlan = plan;
+    // An item that casts on its wearer only (Ring of Jumping, Boots of Levitation).
+    const others = [action.targetCharId, ...(action.targetCharIds ?? [])].filter(
+      (id) => id && id !== pc.char.id
+    );
+    if (plan.is?.selfOnly && (others.length > 0 || action.targetEnemyId)) {
+      ctx.narrative = `The ${plan.loot.name} casts ${spell.name} on its wearer only.`;
+      return { done: true };
+    }
   }
   const noComponents = !!itemPlan && !itemPlan.scroll;
 
