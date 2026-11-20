@@ -44,7 +44,12 @@ export function potionResists(
 
 /** SRD Potion of Flying — a Fly Speed equal to Speed (0 when not under it). */
 export function potionFlyFt(char: Pick<Character, 'conditions' | 'speed'>): number {
-  return char.conditions.includes(POTION_CONDITIONS.flying) ? (char.speed ?? 30) : 0;
+  return Math.max(
+    char.conditions.includes(POTION_CONDITIONS.flying) ? (char.speed ?? 30) : 0,
+    // SRD Winged Boots (30 ft) / Wings of Flying (60 ft) — timed like a potion.
+    char.conditions.includes('winged_boots') ? 30 : 0,
+    char.conditions.includes('wings_of_flying') ? 60 : 0
+  );
 }
 
 /** SRD Potion of Climbing — a Climb Speed equal to Speed. */
@@ -128,6 +133,7 @@ function dropPotionConditions(char: Character, conds: string[]): Character {
 /** One character's potion durations after `minutes` of in-world time. */
 export function elapseCharPotionTime(c: Character, minutes: number): Character {
   if (minutes <= 0) return c;
+  c = regenerateOverTime(c, minutes);
   const sources = c.condition_sources ?? {};
   const durations = { ...(c.condition_durations ?? {}) };
   const expired: string[] = [];
@@ -148,6 +154,21 @@ export function elapseCharPotionTime(c: Character, minutes: number): Character {
  * advances — a Short Rest, overland travel. Only potion-sourced entries move;
  * spell buffs keep their existing lifecycle.
  */
+/**
+ * SRD Ring of Regeneration (1d6 every 10 minutes) / Ioun Stone of Regeneration
+ * (15 every hour) — Hit Points regained as in-world time passes, while the
+ * wearer has at least 1 HP. Whole intervals only.
+ */
+export function regenerateOverTime(c: Character, minutes: number): Character {
+  const regen = c.worn_traits?.regeneration;
+  if (!regen?.length || c.dead || c.hp <= 0 || c.hp >= c.max_hp) return c;
+  let gained = 0;
+  for (const r of regen) {
+    for (let n = Math.floor(minutes / r.everyMinutes); n > 0; n--) gained += rollDice(r.dice);
+  }
+  return gained > 0 ? { ...c, hp: Math.min(c.max_hp, c.hp + gained) } : c;
+}
+
 export function elapsePotionTime(st: GameState, minutes: number): GameState {
   if (minutes <= 0 || !st.characters?.length) return st;
   const characters = st.characters.map((c) => elapseCharPotionTime(c, minutes));
@@ -323,6 +344,12 @@ export function resolvePotion(
     case 'narrative':
       note = potion.text;
       break;
+    case 'heal': {
+      const before = t.hp;
+      t = { ...t, hp: Math.min(t.max_hp, t.hp + Math.max(0, rollDice(potion.dice))) };
+      note = `regains ${t.hp - before} Hit Points (${t.hp}/${t.max_hp})`;
+      break;
+    }
   }
   return { target: t, st: syncEntity(st, t), note, used: true };
 }
@@ -386,7 +413,9 @@ export function applyOilOfSharpness(
 /** SRD Potion of Vitality — a spent Hit Point Die heals its maximum. */
 export function hitDieHealing(char: Character, st: GameState): number {
   const die = char.hit_die ?? 8;
-  return vitalityActive(char, st)
+  const healed = vitalityActive(char, st)
     ? die + abilityMod(char.con)
     : rollDice(`1d${die}`) + abilityMod(char.con);
+  // SRD Periapt of Wound Closure — a Hit Point Die restores double.
+  return char.worn_traits?.woundClosure ? healed * 2 : healed;
 }

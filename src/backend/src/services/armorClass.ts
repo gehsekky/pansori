@@ -46,6 +46,9 @@ export function unarmoredDefenseBonus(char: Character, lootTable: LootItem[]): n
   if (char.subclass === 'draconic' && getClassLevel(char, 'sorcerer') >= 3) {
     options.push(abilityMod(char.cha));
   }
+  // SRD Robe of the Archmagi — base AC 15 + DEX without armor.
+  const robeBase = char.worn_traits?.unarmoredBaseAc;
+  if (robeBase) options.push(robeBase - 10);
   if (options.length === 0) return 0;
   const best = Math.max(...options);
   return Math.max(0, best - (char.mage_armor_active ? 3 : 0));

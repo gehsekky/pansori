@@ -169,6 +169,11 @@ export function applyDamage(
     ...(deathWardSaves ? { death_ward_active: false } : {}),
     ...(resistanceNote ? { resistance_reduction: resistanceReduction } : {}),
   };
+  // SRD Cloak of Displacement — taking damage switches the illusion off until
+  // the start of your next turn (turn_actions reset then).
+  if (workingAmount > 0 && char.worn_traits?.displacement) {
+    newChar.turn_actions = { ...newChar.turn_actions, displacement_broken: true };
+  }
   let newSt = st;
 
   // Concentration check (uses amountDealt, not raw — temp HP absorption

@@ -1,4 +1,4 @@
-import type { ItemCharges, ItemSpell, LootItem, WornEffect } from '../../types.js';
+import type { AbilityKey, ItemCharges, ItemSpell, LootItem, WornEffect } from '../../types.js';
 import { SRD_SPELLS } from './spells.js';
 
 // Shared SRD 5.2.1 equipment definitions.
@@ -3525,6 +3525,352 @@ const CURSED_ITEMS: Array<[string, LootItem]> = [
   ),
 ];
 
+// ─── Wondrous items, round 2 (SRD 5.2.1) ─────────────────────────────────────
+// Passive boosts, carried stones, timed flight, and the Manuals / Tomes.
+// `carried` items work from the pack while attuned (an attuned Ioun Stone is
+// treated as orbiting your head — attunement already caps them at three).
+function wondrous(
+  id: string,
+  name: string,
+  rarity: Rarity,
+  desc: string,
+  slot: LootItem['slot'],
+  extra: Partial<LootItem>
+): [string, LootItem] {
+  const attune = extra.requiresAttunement
+    ? extra.attuneBy?.length
+      ? `; requires attunement by a ${extra.attuneBy.map(cap).join(' or ')}`
+      : '; requires attunement'
+    : '';
+  return [
+    id,
+    {
+      id,
+      name,
+      value: RARITY_VALUE[rarity],
+      desc: `${desc} (${rarity}${attune}.)`,
+      weight: 1,
+      type: 'misc',
+      slot,
+      damage: null,
+      ac_bonus: null,
+      heal: null,
+      effect: null,
+      aliases: [name.toLowerCase()],
+      ...extra,
+    },
+  ];
+}
+const IOUN_ABILITY: Array<[string, string, AbilityKey]> = [
+  ['agility', 'Agility', 'dex'],
+  ['fortitude', 'Fortitude', 'con'],
+  ['insight', 'Insight', 'wis'],
+  ['intellect', 'Intellect', 'int'],
+  ['leadership', 'Leadership', 'cha'],
+  ['strength', 'Strength', 'str'],
+];
+const STUDY_BOOKS: Array<[string, string, AbilityKey]> = [
+  ['manual_of_bodily_health', 'Manual of Bodily Health', 'con'],
+  ['manual_of_gainful_exercise', 'Manual of Gainful Exercise', 'str'],
+  ['manual_of_quickness_of_action', 'Manual of Quickness of Action', 'dex'],
+  ['tome_of_clear_thought', 'Tome of Clear Thought', 'int'],
+  ['tome_of_leadership_and_influence', 'Tome of Leadership and Influence', 'cha'],
+  ['tome_of_understanding', 'Tome of Understanding', 'wis'],
+];
+const ABILITY_NAME: Record<AbilityKey, string> = {
+  str: 'Strength',
+  dex: 'Dexterity',
+  con: 'Constitution',
+  int: 'Intelligence',
+  wis: 'Wisdom',
+  cha: 'Charisma',
+};
+
+const WONDROUS_2: Array<[string, LootItem]> = [
+  wondrous(
+    'stone_of_good_luck',
+    'Stone of Good Luck (Luckstone)',
+    'Uncommon',
+    'While this polished agate is on your person, you gain +1 to ability checks (Initiative included) and saving throws.',
+    null,
+    {
+      requiresAttunement: true,
+      carried: true,
+      weight: 0,
+      wornEffects: [
+        { kind: 'save_bonus', ability: 'all', bonus: 1 },
+        { kind: 'check_bonus', bonus: 1 },
+      ],
+    }
+  ),
+  // SRD Ioun Stones. Deferred: Absorption, Greater Absorption, Mastery, Reserve.
+  ...IOUN_ABILITY.map(([key, label, ab]) =>
+    wondrous(
+      `ioun_stone_of_${key}`,
+      `Ioun Stone of ${label}`,
+      'Very Rare',
+      `While it orbits your head, your ${ABILITY_NAME[ab]} increases by 2, to a maximum of 20.`,
+      null,
+      {
+        requiresAttunement: true,
+        carried: true,
+        weight: 0,
+        wornEffects: [{ kind: 'ability_increase', ability: ab, amount: 2, max: 20 }],
+      }
+    )
+  ),
+  wondrous(
+    'ioun_stone_of_awareness',
+    'Ioun Stone of Awareness',
+    'Rare',
+    'While it orbits your head, you have Advantage on Initiative rolls and Wisdom (Perception) checks.',
+    null,
+    {
+      requiresAttunement: true,
+      carried: true,
+      weight: 0,
+      wornEffects: [
+        { kind: 'initiative_advantage' },
+        { kind: 'skill_advantage', skill: 'perception' },
+      ],
+    }
+  ),
+  wondrous(
+    'ioun_stone_of_protection',
+    'Ioun Stone of Protection',
+    'Rare',
+    'While it orbits your head, you gain +1 to Armor Class.',
+    null,
+    {
+      requiresAttunement: true,
+      carried: true,
+      weight: 0,
+      wornEffects: [{ kind: 'ac_bonus', bonus: 1 }],
+    }
+  ),
+  wondrous(
+    'ioun_stone_of_regeneration',
+    'Ioun Stone of Regeneration',
+    'Legendary',
+    'While it orbits your head, you regain 15 Hit Points at the end of each hour if you have at least 1 Hit Point.',
+    null,
+    {
+      requiresAttunement: true,
+      carried: true,
+      weight: 0,
+      wornEffects: [{ kind: 'regeneration', dice: '15', everyMinutes: 60 }],
+    }
+  ),
+  wondrous(
+    'ioun_stone_of_sustenance',
+    'Ioun Stone of Sustenance',
+    'Rare',
+    "While it orbits your head, you don't need to eat or drink.",
+    null,
+    { requiresAttunement: true, carried: true, weight: 0 }
+  ),
+  // SRD Belt of Dwarvenkind. Simplification: the non-dwarf benefits apply to
+  // every wearer (a dwarf already has them), and Dwarvish / the Persuasion
+  // Advantage with dwarves aren't modeled.
+  wondrous(
+    'belt_of_dwarvenkind',
+    'Belt of Dwarvenkind',
+    'Rare',
+    'While worn: your Constitution increases by 2 (max 20), you have Darkvision 60 ft, Resistance to Poison damage, and Advantage on saves to avoid or end the Poisoned condition.',
+    'waist',
+    {
+      requiresAttunement: true,
+      wornEffects: [
+        { kind: 'ability_increase', ability: 'con', amount: 2, max: 20 },
+        { kind: 'darkvision', feet: 60, atLeast: true },
+        { kind: 'resistance', damageType: 'poison' },
+        { kind: 'poison_save_advantage' },
+      ],
+    }
+  ),
+  // SRD Manuals and Tomes (Very Rare).
+  ...STUDY_BOOKS.map(([id, name, ab]) =>
+    wondrous(
+      id,
+      name,
+      'Very Rare',
+      `Studying this book (out of combat) raises your ${ABILITY_NAME[ab]} by 2, to a maximum of 30. The book then loses its magic.`,
+      null,
+      { weight: 5, studyIncrease: ab }
+    )
+  ),
+  wondrous(
+    'winged_boots',
+    'Winged Boots',
+    'Uncommon',
+    '4 charges (regains 1d4 at dawn). While wearing them, spend a charge as a Magic action to gain a Fly Speed of 30 feet for 1 hour.',
+    'feet',
+    {
+      requiresAttunement: true,
+      charges: { max: 4, regain: '1d4' },
+      activate: {
+        label: 'Fly for 1 hour',
+        charges: 1,
+        effect: { kind: 'condition', conditions: ['winged_boots'], rounds: HOUR },
+      },
+    }
+  ),
+  // Simplification: the wings recover at dawn rather than after 1d12 hours.
+  wondrous(
+    'wings_of_flying',
+    'Wings of Flying',
+    'Rare',
+    'While wearing this cloak, as a Magic action it becomes wings: a Fly Speed of 60 feet for 1 hour, then not again until dawn.',
+    'cloak',
+    {
+      requiresAttunement: true,
+      activate: {
+        label: 'Spread the wings (1 hour)',
+        daily: true,
+        effect: { kind: 'condition', conditions: ['wings_of_flying'], rounds: HOUR },
+      },
+    }
+  ),
+  wondrous(
+    'cloak_of_the_manta_ray',
+    'Cloak of the Manta Ray',
+    'Uncommon',
+    'While wearing it, you can breathe underwater and have a Swim Speed of 60 feet.',
+    'cloak',
+    { requiresAttunement: true, wornEffects: [{ kind: 'speed_mode', mode: 'swim', feet: 60 }] }
+  ),
+  wondrous(
+    'bracers_of_archery',
+    'Bracers of Archery',
+    'Uncommon',
+    'While wearing them, you are proficient with the Longbow and Shortbow and deal +2 damage with them.',
+    'arms',
+    {
+      requiresAttunement: true,
+      wornEffects: [{ kind: 'weapon_bonus', weapons: ['longbow', 'shortbow'], damage: 2 }],
+    }
+  ),
+  wondrous(
+    'robe_of_the_archmagi',
+    'Robe of the Archmagi',
+    'Legendary',
+    'While worn: without armor your base AC is 15 + your Dexterity modifier; Advantage on saves against spells; +2 to your spell save DC and spell attack bonus.',
+    'cloak',
+    {
+      requiresAttunement: true,
+      attuneBy: ['sorcerer', 'warlock', 'wizard'],
+      wornEffects: [
+        { kind: 'unarmored_base_ac', base: 15 },
+        { kind: 'spell_save_advantage' },
+        { kind: 'spell_dc_bonus', bonus: 2 },
+        { kind: 'spell_attack_bonus', bonus: 2 },
+      ],
+    }
+  ),
+  // SRD Rod of Alertness. Simplification: the Protective Aura isn't modeled.
+  wondrous(
+    'rod_of_alertness',
+    'Rod of Alertness',
+    'Very Rare',
+    'While held: Advantage on Wisdom (Perception) checks and Initiative rolls, and you can cast Detect Evil and Good, Detect Magic, Detect Poison and Disease, or See Invisibility from it. Hold it in your off hand.',
+    'off_hand',
+    {
+      requiresAttunement: true,
+      weight: 2,
+      wornEffects: [
+        { kind: 'initiative_advantage' },
+        { kind: 'skill_advantage', skill: 'perception' },
+      ],
+      itemSpells: [
+        sp('detect_evil_and_good', 0),
+        sp('detect_magic', 0),
+        sp('detect_poison_and_disease', 0),
+        sp('see_invisibility', 0),
+      ],
+    }
+  ),
+  // SRD Talismans. Simplification: the touch damage and the charged fissure
+  // (Pure Rebuke / Ultimate End) aren't modeled.
+  wondrous(
+    'talisman_of_pure_good',
+    'Talisman of Pure Good',
+    'Legendary',
+    'A holy symbol: while you wear it, you gain +2 to spell attack rolls.',
+    'neck',
+    {
+      requiresAttunement: true,
+      attuneBy: ['cleric', 'paladin'],
+      wornEffects: [{ kind: 'spell_attack_bonus', bonus: 2 }],
+    }
+  ),
+  wondrous(
+    'talisman_of_ultimate_evil',
+    'Talisman of Ultimate Evil',
+    'Legendary',
+    'An unholy symbol: while you wear it, you gain +2 to spell attack rolls.',
+    'neck',
+    { requiresAttunement: true, wornEffects: [{ kind: 'spell_attack_bonus', bonus: 2 }] }
+  ),
+  // SRD Scarab of Protection. Simplification: Preservation's charges aren't modeled.
+  wondrous(
+    'scarab_of_protection',
+    'Scarab of Protection',
+    'Legendary',
+    'While it is on your person: +1 to Armor Class and Advantage on saving throws against spells.',
+    null,
+    {
+      requiresAttunement: true,
+      carried: true,
+      weight: 0,
+      wornEffects: [{ kind: 'ac_bonus', bonus: 1 }, { kind: 'spell_save_advantage' }],
+    }
+  ),
+  wondrous(
+    'periapt_of_health',
+    'Periapt of Health',
+    'Uncommon',
+    'While worn: Advantage on saves to avoid or end the Poisoned condition, and once per dawn a Magic action restores 2d4 + 2 Hit Points.',
+    'neck',
+    {
+      requiresAttunement: true,
+      wornEffects: [{ kind: 'poison_save_advantage' }],
+      activate: {
+        label: 'Regain 2d4 + 2 HP',
+        daily: true,
+        effect: { kind: 'heal', dice: '2d4+2' },
+      },
+    }
+  ),
+  wondrous(
+    'periapt_of_wound_closure',
+    'Periapt of Wound Closure',
+    'Uncommon',
+    'While worn: a Death Saving Throw of 9 or lower counts as a 10, and each Hit Point Die you spend restores double.',
+    'neck',
+    { requiresAttunement: true, wornEffects: [{ kind: 'wound_closure' }] }
+  ),
+  wondrous(
+    'ring_of_regeneration',
+    'Ring of Regeneration',
+    'Very Rare',
+    'While worn, you regain 1d6 Hit Points every 10 minutes if you have at least 1 Hit Point.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      wornEffects: [{ kind: 'regeneration', dice: '1d6', everyMinutes: 10 }],
+    }
+  ),
+  wondrous(
+    'cloak_of_displacement',
+    'Cloak of Displacement',
+    'Rare',
+    'While worn, attacks against you have Disadvantage — until you take damage, which suppresses it until the start of your next turn. It also fails while your Speed is 0.',
+    'cloak',
+    { requiresAttunement: true, wornEffects: [{ kind: 'displacement' }] }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -3883,6 +4229,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...ACTIVATED_ARMOR,
   ...SLAYING_AMMO,
   ...CURSED_ITEMS,
+  ...WONDROUS_2,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

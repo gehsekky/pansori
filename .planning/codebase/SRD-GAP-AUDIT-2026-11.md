@@ -460,6 +460,34 @@ save Disadvantage doesn't reach damage-only saves, and Abyssal isn't modeled;
 Missile Attraction only redirects enemy attacks. Still deferred: Dancing
 Sword, Staff of the Python.
 
+**Batch 7 done 2026-11-19 — wondrous items, round 2.** New machinery:
+`carried` items (effects from the pack while attuned — an attuned Ioun Stone
+counts as orbiting, attunement already caps them at three); an
+`ability_increase` worn effect (+N to a cap, beaten by a higher set score);
+an ability-check bonus (`checkPenalty`, used by every skill check, and
+Initiative); `activate` (a Magic action while worn and attuned, spending a
+charge or the daily use, resolving a `PotionEffect` — now with a `heal`
+kind); `studyIncrease` for the Manuals and Tomes; per-weapon proficiency and
+damage; an unarmored base AC; a spell save DC bonus; Advantage on saves
+against Poisoned; a death-save floor and doubled Hit Dice; HP regeneration
+with in-world time; and Disadvantage on attacks against the wearer until
+damaged (reset with the turn). Items: Stone of Good Luck; Ioun Stones of
+Agility, Awareness, Fortitude, Insight, Intellect, Leadership, Protection,
+Regeneration, Strength and Sustenance; Belt of Dwarvenkind (with a
+Darkvision floor, not stacking); the six Manuals and Tomes; Winged Boots;
+Wings of Flying; Cloak of the Manta Ray; Bracers of Archery; Robe of the
+Archmagi; Rod of Alertness (held; its four detection spells at will); the
+Talismans of Pure Good and Ultimate Evil; Scarab of Protection; Periapts of
+Health and Wound Closure; Ring of Regeneration; Cloak of Displacement.
+Simplifications: studying is instant (out of combat) and removes the spent
+book; Wings of Flying recover at dawn, not after 1d12 hours; the Belt's
+non-dwarf benefits apply to everyone, and Dwarvish / its Persuasion edge
+aren't modeled; the Rod's Protective Aura, the Talismans' touch damage and
+fissure charges, the Scarab's Preservation charges and the Robe's Advantage
+against non-spell magical effects aren't modeled; Displacement's break is
+checked per damage instance. Deferred Ioun Stones: Absorption, Greater
+Absorption, Mastery, Reserve.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

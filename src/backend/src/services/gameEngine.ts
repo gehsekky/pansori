@@ -1367,6 +1367,8 @@ function conditionSavingThrow(
     (effect.condition === 'charmed' && (speciesId === 'elf' || speciesId === 'drow')) ||
     (effect.condition === 'frightened' && speciesId === 'halfling') ||
     (effect.condition === 'poisoned' && speciesId === 'dwarf') ||
+    // SRD Periapt of Health / Belt of Dwarvenkind.
+    (effect.condition === 'poisoned' && !!char.worn_traits?.poisonSaveAdvantage) ||
     // SRD Protection from Evil and Good — Advantage on saves vs Charmed/Frightened.
     (!!char.protected_from_evil &&
       (effect.condition === 'charmed' || effect.condition === 'frightened')) ||
@@ -1841,7 +1843,16 @@ function computeEnemyAttack(
     attackerEnt?.grappled_by,
     char.id
   );
+  // SRD Cloak of Displacement — Disadvantage on attacks against the wearer
+  // until it takes damage; suppressed while its Speed is 0.
+  const displacementDisadv =
+    !!char.worn_traits?.displacement &&
+    !char.turn_actions?.displacement_broken &&
+    !char.conditions.some((c) =>
+      ['grappled', 'restrained', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
+    );
   const hasDisadvantage =
+    displacementDisadv ||
     baseDisadvantage ||
     forceDisadvantage ||
     grappledDisadv ||
@@ -2526,7 +2537,8 @@ export function processDeathSave(
   const save = rollDeathSave(
     char.death_saves,
     (char.conditions ?? []).includes('hopeful'),
-    d20TestPenalty(char)
+    d20TestPenalty(char),
+    !!char.worn_traits?.woundClosure
   );
   const newChar = { ...char, death_saves: save.saves };
   let narrative = '';
@@ -3861,7 +3873,8 @@ export function buildInitiativeOrder(
         const d20 = rollInit(feralAdv, surprised);
         return {
           id: c.id,
-          roll: d20 + abilityMod(c.dex) + alertBonus,
+          // SRD Stone of Good Luck — Initiative is a Dexterity check.
+          roll: d20 + abilityMod(c.dex) + alertBonus + (c.worn_traits?.checkBonus ?? 0),
           is_enemy: false,
         };
       }),
@@ -5626,6 +5639,38 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           : `Drink the ${data.name}${state.combat_active ? ' (bonus action)' : ''}`,
         action: { type: 'use', itemId: inv.id },
         requiresBonusAction: (state.combat_active && !isOil) || undefined,
+      });
+    }
+  }
+  // SRD activated wondrous items (worn + attuned; a Magic action) and the
+  // Manuals / Tomes (studied out of combat).
+  {
+    const seen = new Set<string>();
+    for (const inv of char.inventory ?? []) {
+      if (seen.has(inv.id) || (MAX_CHOICES && choices.length >= MAX_CHOICES)) continue;
+      const data = context.lootTable.find((l) => l.id === inv.id);
+      if (data?.studyIncrease && !state.combat_active) {
+        seen.add(inv.id);
+        choices.push({
+          label: `Study the ${data.name} (+2 ${data.studyIncrease.toUpperCase()})`,
+          action: { type: 'use', itemId: inv.id },
+        });
+        continue;
+      }
+      const act = data?.activate;
+      if (!data || !act) continue;
+      if (!Object.values(char.equipment ?? {}).includes(inv.instance_id)) continue;
+      if (data.requiresAttunement && !(char.attuned_items ?? []).includes(inv.instance_id)) {
+        continue;
+      }
+      if (state.combat_active && char.turn_actions.action_used) continue;
+      if (act.daily && (inv.powers_used ?? []).includes('activate')) continue;
+      const left = data.charges ? data.charges.max - (inv.charges_used ?? 0) : 0;
+      if (act.charges && left < act.charges) continue;
+      seen.add(inv.id);
+      choices.push({
+        label: `${data.name} — ${act.label}${act.charges ? ` (${left} charge${left === 1 ? '' : 's'})` : ''}`,
+        action: { type: 'use', itemId: inv.id },
       });
     }
   }

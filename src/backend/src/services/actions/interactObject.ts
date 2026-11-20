@@ -1,4 +1,4 @@
-import { abilityMod, d20TestPenalty, effectiveLightFor, skillCheck } from '../rulesEngine.js';
+import { abilityMod, checkPenalty, effectiveLightFor, skillCheck } from '../rulesEngine.js';
 import {
   applyConsequence,
   consumeBardicForCheck,
@@ -115,7 +115,7 @@ export const handleInteractObject: ActionHandler<{
     nextChar.species === 'halfling',
     hasReliableTalent(nextChar),
     strokeOfLuckAvailable(nextChar),
-    d20TestPenalty(nextChar),
+    checkPenalty(nextChar),
     peerlessSkillDie(nextChar)
   );
   if (rawCheck.strokeOfLuckUsed) nextChar = consumeStrokeOfLuck(nextChar);

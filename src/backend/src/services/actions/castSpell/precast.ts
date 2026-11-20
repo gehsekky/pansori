@@ -638,7 +638,9 @@ export function runPrecast(
                       : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
-  const dc = itemPlan?.dc ?? spellSaveDC(pc.char.level, castingScore) + innateDcBonus;
+  // SRD Robe of the Archmagi — +2 to the wearer's own spell save DC.
+  const robeDcBonus = pc.char.worn_traits?.spellDcBonus ?? 0;
+  const dc = itemPlan?.dc ?? spellSaveDC(pc.char.level, castingScore) + innateDcBonus + robeDcBonus;
 
   return {
     done: false,

@@ -398,6 +398,16 @@ export function resolveOneAttack(
     baseHit += weaponMagicBonus;
     magicWeaponNote = ` +${weaponMagicBonus} (magic)`;
   }
+  // SRD Bracers of Archery — +2 damage with a Longbow or Shortbow.
+  const wornWeaponDmg = weaponItem
+    ? (pc.char.worn_traits?.weaponBonuses ?? [])
+        .filter((b) => b.weapons.some((w) => weaponItem.id.includes(w)))
+        .reduce((sum, b) => sum + b.damage, 0)
+    : 0;
+  if (atk.hit && wornWeaponDmg > 0) {
+    baseHit += wornWeaponDmg;
+    magicWeaponNote += ` +${wornWeaponDmg} (bracers)`;
+  }
   // SRD Demon Armor — +1 to the damage of a clawed Unarmed Strike.
   const claws = !weaponItem ? pc.char.worn_traits?.clawedUnarmed : undefined;
   if (atk.hit && claws?.bonus && weaponDamage) {

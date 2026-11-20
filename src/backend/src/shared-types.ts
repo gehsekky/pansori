@@ -1834,7 +1834,8 @@ export type WornEffect =
   | { kind: 'spell_attack_disadvantage' }
   | { kind: 'speed_mode'; mode: 'swim' | 'climb'; feet: number | 'walk' }
   | { kind: 'speed_floor'; feet: number }
-  | { kind: 'darkvision'; feet: number }
+  // `atLeast` (Belt of Dwarvenkind): Darkvision of at least `feet`, not added on top.
+  | { kind: 'darkvision'; feet: number; atLeast?: boolean }
   | { kind: 'spell_save_advantage' }
   // SRD Wand of the War Mage / Staff of Power / Staff of the Magi — a flat bonus
   // to spell attack rolls while held; `ignoreHalfCover` (War Mage) skips Half Cover.
@@ -1856,7 +1857,29 @@ export type WornEffect =
   // SRD Demon Armor — Unarmed Strikes with its claws, and the curse's
   // Disadvantage against Demons.
   | { kind: 'clawed_unarmed'; dice: string; damageType: string; bonus: number }
-  | { kind: 'demon_bane' };
+  | { kind: 'demon_bane' }
+  // SRD Belt of Dwarvenkind / Ioun Stones — raise a score by `amount`, to `max`.
+  | { kind: 'ability_increase'; ability: AbilityKey; amount: number; max: number }
+  // SRD Stone of Good Luck — a flat bonus to ability checks.
+  | { kind: 'check_bonus'; bonus: number }
+  // SRD Bracers of Archery — proficiency with these weapons (id substrings) and
+  // a flat damage bonus with them.
+  | { kind: 'weapon_bonus'; weapons: string[]; damage: number }
+  // SRD Robe of the Archmagi — base AC (no armor) and spell save DC bonus.
+  | { kind: 'unarmored_base_ac'; base: number }
+  | { kind: 'spell_dc_bonus'; bonus: number }
+  // SRD Periapt of Health / Belt of Dwarvenkind — Advantage on saves to avoid
+  // or end the Poisoned condition.
+  | { kind: 'poison_save_advantage' }
+  // SRD Periapt of Wound Closure — a Death Saving Throw of 9 or lower counts as
+  // a 10; Hit Point Dice restore double.
+  | { kind: 'wound_closure' }
+  // SRD Ring of Regeneration (1d6 per 10 min) / Ioun Stone of Regeneration
+  // (15 per hour) — HP regained with in-world time while at 1+ HP.
+  | { kind: 'regeneration'; dice: string; everyMinutes: number }
+  // SRD Cloak of Displacement — attacks against you have Disadvantage until you
+  // take damage (back at the start of your next turn); not while Speed is 0.
+  | { kind: 'displacement' };
 
 /**
  * SRD Potions — what drinking (or applying) a potion does. Timed effects ride
@@ -1881,7 +1904,9 @@ export type PotionEffect =
   | { kind: 'cure'; conditions: string[]; exhaustion?: boolean; vitality?: boolean }
   | { kind: 'poison'; damage: string; dc: number }
   | { kind: 'sharpness' }
-  | { kind: 'narrative'; text: string };
+  | { kind: 'narrative'; text: string }
+  // SRD Periapt of Health — regain Hit Points.
+  | { kind: 'heal'; dice: string };
 
 export interface MagicRider {
   label: string;
@@ -1977,6 +2002,14 @@ export interface WornTraits {
   berserkerWeapon?: string;
   clawedUnarmed?: { dice: string; damageType: string; bonus: number };
   demonBane?: boolean;
+  checkBonus?: number;
+  weaponBonuses?: Array<{ weapons: string[]; damage: number }>;
+  unarmoredBaseAc?: number;
+  spellDcBonus?: number;
+  poisonSaveAdvantage?: boolean;
+  woundClosure?: boolean;
+  regeneration?: Array<{ dice: string; everyMinutes: number }>;
+  displacement?: boolean;
 }
 
 /**
@@ -2217,6 +2250,15 @@ export interface LootItem {
   curseEffects?: WornEffect[];
   // SRD Demon Armor — while attuned, it can't be taken off.
   curseLocksSlot?: boolean;
+  // SRD Stone of Good Luck / Ioun Stones / Scarab of Protection — the worn
+  // effects apply while the item is carried (and attuned), no body slot needed.
+  carried?: boolean;
+  // SRD activated wondrous items (Winged Boots, Wings of Flying, Periapt of
+  // Health) — a Magic action, worn and attuned, spending charges or a daily use.
+  activate?: { label: string; effect: PotionEffect; charges?: number; daily?: boolean };
+  // SRD Manuals and Tomes — studying one raises a score by 2 (max 30), then
+  // the book loses its magic.
+  studyIncrease?: AbilityKey;
   /**
    * Cursed item flag (SRD). The curse reveals on attunement and
    * voluntary de-attunement is blocked, and the bearer won't give it

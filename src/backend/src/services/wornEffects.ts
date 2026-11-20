@@ -9,11 +9,18 @@ const ABILITIES: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 // the Moonstone Amulet without putting it on, or wearing it without attuning,
 // gives nothing, matching 5e's "worn and attuned" requirement.
 
-/** All worn effects currently active on `char`, across every filled slot. */
+/**
+ * All worn effects currently active on `char`, across every filled slot — plus
+ * `carried` items (Stone of Good Luck, Ioun Stones), which need no slot.
+ */
 export function activeWornEffects(char: Character, lootTable: LootItem[]): WornEffect[] {
   const attuned = char.attuned_items ?? [];
   const out: WornEffect[] = [];
-  for (const instanceId of Object.values(char.equipment ?? {})) {
+  const slotted = new Set(Object.values(char.equipment ?? {}));
+  const carried = (char.inventory ?? [])
+    .filter((i) => !slotted.has(i.instance_id) && lootTable.find((l) => l.id === i.id)?.carried)
+    .map((i) => i.instance_id);
+  for (const instanceId of [...slotted, ...carried]) {
     const invItem = char.inventory?.find((i) => i.instance_id === instanceId);
     const loot = invItem ? lootTable.find((l) => l.id === invItem.id) : undefined;
     if (!loot?.wornEffects?.length) continue;
@@ -103,6 +110,17 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
     else if (e.kind === 'spell_save_advantage') t.spellSaveAdvantage = true;
     else if (e.kind === 'no_crits') t.critImmune = true;
+    else if (e.kind === 'check_bonus') t.checkBonus = (t.checkBonus ?? 0) + e.bonus;
+    else if (e.kind === 'weapon_bonus') {
+      (t.weaponBonuses ??= []).push({ weapons: e.weapons, damage: e.damage });
+    } else if (e.kind === 'unarmored_base_ac') {
+      t.unarmoredBaseAc = Math.max(t.unarmoredBaseAc ?? 0, e.base);
+    } else if (e.kind === 'spell_dc_bonus') t.spellDcBonus = (t.spellDcBonus ?? 0) + e.bonus;
+    else if (e.kind === 'poison_save_advantage') t.poisonSaveAdvantage = true;
+    else if (e.kind === 'wound_closure') t.woundClosure = true;
+    else if (e.kind === 'regeneration') {
+      (t.regeneration ??= []).push({ dice: e.dice, everyMinutes: e.everyMinutes });
+    } else if (e.kind === 'displacement') t.displacement = true;
     else if (e.kind === 'ranged_weapon_resistance') t.rangedWeaponResistance = true;
     else if (e.kind === 'clawed_unarmed') {
       t.clawedUnarmed = { dice: e.dice, damageType: e.damageType, bonus: e.bonus };
@@ -164,6 +182,19 @@ export function syncSetAbilities(char: Character, lootTable: LootItem[]): void {
     if (e.kind !== 'set_ability') continue;
     want[e.ability] = Math.max(want[e.ability] ?? 0, e.value);
   }
+  // SRD Belt of Dwarvenkind / Ioun Stones — raise the true base by the summed
+  // increases, to the highest cap; a higher set score (a Belt) still wins.
+  const incs: Partial<Record<AbilityKey, { amount: number; max: number }>> = {};
+  for (const e of activeWornEffects(char, lootTable)) {
+    if (e.kind !== 'ability_increase') continue;
+    const cur = incs[e.ability] ?? { amount: 0, max: 0 };
+    incs[e.ability] = { amount: cur.amount + e.amount, max: Math.max(cur.max, e.max) };
+  }
+  for (const ab of ABILITIES) {
+    const inc = incs[ab];
+    if (!inc || char[ab] >= inc.max) continue;
+    want[ab] = Math.max(want[ab] ?? 0, Math.min(inc.max, char[ab] + inc.amount));
+  }
   // SRD Hammer of Thunderbolts' Might of Giants — while attuned to it, a worn
   // and attuned Belt of Giant Strength / Gauntlets of Ogre Power sets Strength
   // 4 higher (max 30).
@@ -207,13 +238,13 @@ export function syncSetAbilities(char: Character, lootTable: LootItem[]): void {
   // top of existing Darkvision). `darkvision_base` holds the displaced value.
   char.worn_traits = deriveWornTraits(char, lootTable);
   const baseDv = char.darkvision_base ?? char.darkvision_ft ?? 0;
-  const dvGain = activeWornEffects(char, lootTable).reduce(
-    (m, e) => (e.kind === 'darkvision' ? Math.max(m, e.feet) : m),
-    0
-  );
-  if (dvGain > 0) {
+  const dvEffects = activeWornEffects(char, lootTable).filter((e) => e.kind === 'darkvision');
+  const dvGain = dvEffects.reduce((m, e) => (!e.atLeast ? Math.max(m, e.feet) : m), 0);
+  const dvFloor = dvEffects.reduce((m, e) => (e.atLeast ? Math.max(m, e.feet) : m), 0);
+  if (dvGain > 0 || dvFloor > baseDv) {
     char.darkvision_base = baseDv;
-    char.darkvision_ft = baseDv > 0 ? baseDv + dvGain : dvGain;
+    const added = dvGain > 0 ? (baseDv > 0 ? baseDv + dvGain : dvGain) : baseDv;
+    char.darkvision_ft = Math.max(added, dvFloor);
   } else if (char.darkvision_base !== undefined) {
     char.darkvision_ft = char.darkvision_base;
     char.darkvision_base = undefined;

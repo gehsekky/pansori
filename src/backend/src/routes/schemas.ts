@@ -673,7 +673,13 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ kind: z.literal('speed_floor'), feet: z.number().int().positive().max(120) }).strict(),
-  z.object({ kind: z.literal('darkvision'), feet: z.number().int().positive().max(300) }).strict(),
+  z
+    .object({
+      kind: z.literal('darkvision'),
+      feet: z.number().int().positive().max(300),
+      atLeast: z.boolean().optional(),
+    })
+    .strict(),
   z.object({ kind: z.literal('spell_save_advantage') }).strict(),
   z.object({ kind: z.literal('no_crits') }).strict(),
   z.object({ kind: z.literal('vulnerability'), damageType: z.string().min(1).max(20) }).strict(),
@@ -694,11 +700,68 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('demon_bane') }).strict(),
   z
     .object({
+      kind: z.literal('ability_increase'),
+      ability: SAVE_ABILITY,
+      amount: z.number().int().min(1).max(4),
+      max: z.number().int().min(1).max(30),
+    })
+    .strict(),
+  z.object({ kind: z.literal('check_bonus'), bonus: z.number().int().min(1).max(5) }).strict(),
+  z
+    .object({
+      kind: z.literal('weapon_bonus'),
+      weapons: z.array(z.string().min(1).max(40)).min(1).max(6),
+      damage: z.number().int().min(0).max(10),
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal('unarmored_base_ac'), base: z.number().int().min(10).max(25) })
+    .strict(),
+  z.object({ kind: z.literal('spell_dc_bonus'), bonus: z.number().int().min(1).max(5) }).strict(),
+  z.object({ kind: z.literal('poison_save_advantage') }).strict(),
+  z.object({ kind: z.literal('wound_closure') }).strict(),
+  z
+    .object({
+      kind: z.literal('regeneration'),
+      dice: DICE,
+      everyMinutes: z.number().int().min(1).max(1440),
+    })
+    .strict(),
+  z.object({ kind: z.literal('displacement') }).strict(),
+  z
+    .object({
       kind: z.literal('spell_attack_bonus'),
       bonus: z.number().int().min(1).max(5),
       ignoreHalfCover: z.boolean().optional(),
     })
     .strict(),
+]);
+
+const PotionEffectSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('condition'),
+      conditions: z.array(z.string().min(1).max(40)).min(1).max(4),
+      rounds: z.union([z.number().int().positive(), z.string().min(1).max(12)]),
+      tempHp: z.number().int().positive().max(100).optional(),
+    })
+    .strict(),
+  z.object({ kind: z.literal('resistance'), damageType: z.string().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal('giant_strength'), score: z.number().int().min(1).max(30) }).strict(),
+  z
+    .object({
+      kind: z.literal('cure'),
+      conditions: z.array(z.string().min(1).max(40)).max(8),
+      exhaustion: z.boolean().optional(),
+      vitality: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal('poison'), damage: DICE, dc: z.number().int().min(1).max(30) })
+    .strict(),
+  z.object({ kind: z.literal('sharpness') }).strict(),
+  z.object({ kind: z.literal('narrative'), text: z.string().min(1).max(500) }).strict(),
+  z.object({ kind: z.literal('heal'), dice: DICE }).strict(),
 ]);
 
 const LootItemSchema = z
@@ -799,35 +862,18 @@ const LootItemSchema = z
     deflect: z.boolean().optional(),
     mightOfGiants: z.array(z.string().min(1).max(60)).max(6).optional(),
     castWhileCarried: z.boolean().optional(),
-    potion: z
-      .discriminatedUnion('kind', [
-        z
-          .object({
-            kind: z.literal('condition'),
-            conditions: z.array(z.string().min(1).max(40)).min(1).max(4),
-            rounds: z.union([z.number().int().positive(), z.string().min(1).max(12)]),
-            tempHp: z.number().int().positive().max(100).optional(),
-          })
-          .strict(),
-        z.object({ kind: z.literal('resistance'), damageType: z.string().min(1).max(20) }).strict(),
-        z
-          .object({ kind: z.literal('giant_strength'), score: z.number().int().min(1).max(30) })
-          .strict(),
-        z
-          .object({
-            kind: z.literal('cure'),
-            conditions: z.array(z.string().min(1).max(40)).max(8),
-            exhaustion: z.boolean().optional(),
-            vitality: z.boolean().optional(),
-          })
-          .strict(),
-        z
-          .object({ kind: z.literal('poison'), damage: DICE, dc: z.number().int().min(1).max(30) })
-          .strict(),
-        z.object({ kind: z.literal('sharpness') }).strict(),
-        z.object({ kind: z.literal('narrative'), text: z.string().min(1).max(500) }).strict(),
-      ])
+    potion: PotionEffectSchema.optional(),
+    carried: z.boolean().optional(),
+    activate: z
+      .object({
+        label: z.string().min(1).max(60),
+        effect: PotionEffectSchema,
+        charges: z.number().int().min(1).max(20).optional(),
+        daily: z.boolean().optional(),
+      })
+      .strict()
       .optional(),
+    studyIncrease: SAVE_ABILITY.optional(),
     conjuresAmmo: z.boolean().optional(),
     charges: z
       .object({

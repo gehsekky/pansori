@@ -1,4 +1,4 @@
-import { abilityMod, d20TestPenalty, profBonus, rollDice, skillCheck } from '../rulesEngine.js';
+import { abilityMod, checkPenalty, profBonus, rollDice, skillCheck } from '../rulesEngine.js';
 import { activeGrid, pickHookText } from '../mapEngine.js';
 import { adjacentPositions, chebyshev } from '../gridEngine.js';
 import {
@@ -251,7 +251,7 @@ export const handleTalkResponse: ActionHandler<{
           char.species === 'halfling',
           hasReliableTalent(char),
           false,
-          d20TestPenalty(char)
+          checkPenalty(char)
         ),
         gDie,
         chk.dc
@@ -629,7 +629,7 @@ export const handleInfluence: ActionHandler<{
         char.species === 'halfling',
         hasReliableTalent(char),
         false,
-        d20TestPenalty(char)
+        checkPenalty(char)
       ),
       gDie,
       dc
@@ -757,7 +757,7 @@ export const handleStudy: ActionHandler<{
         char.species === 'halfling',
         hasReliableTalent(char),
         false,
-        d20TestPenalty(char)
+        checkPenalty(char)
       ),
       studyGuidance,
       dc - thaumaturgeBonus

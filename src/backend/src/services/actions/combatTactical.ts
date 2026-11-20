@@ -2,8 +2,8 @@ import type { ActionContext, ActionHandler } from './types.js';
 import type { CombatEntity, Enemy } from '../../types.js';
 import {
   abilityMod,
+  checkPenalty,
   d,
-  d20TestPenalty,
   profBonus,
   resolveEnemyAttack,
   skillCheck,
@@ -261,7 +261,7 @@ export const handleTryEscapeGrapple: ActionHandler<{ type: 'try_escape_grapple' 
         char.species === 'halfling',
         hasReliableTalent(char),
         false,
-        d20TestPenalty(char)
+        checkPenalty(char)
       ),
       gDie,
       grapplerRoll + 1

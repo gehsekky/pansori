@@ -1,15 +1,16 @@
-import { applyOilOfSharpness, resolvePotion } from '../potions.js';
-import { commitCharacter, getItemData } from '../gameEngine.js';
-import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
 import {
+  abilityMod,
   profBonus,
   resolveMysteryConsumable,
   resolveSaveWithAdvantage,
   rollDice,
 } from '../rulesEngine.js';
+import { applyOilOfSharpness, resolvePotion } from '../potions.js';
+import { attuneBlocker, chargesLeft, dailyUsed, markDaily, spendCharges } from '../chargedItems.js';
+import { commitCharacter, getItemData } from '../gameEngine.js';
+import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
-import { attuneBlocker } from '../chargedItems.js';
 import { characterAc } from '../armorClass.js';
 import { clearInstance } from '../equipment.js';
 import { fmt } from '../narrativeFmt.js';
@@ -158,7 +159,72 @@ export const handleUse: ActionHandler<{
   let nextSt = ctx.st;
   let narrative: string;
 
-  if (itemData.slot === 'weapon') {
+  if (itemData.activate) {
+    // SRD activated wondrous items — a Magic action while worn (and attuned),
+    // spending a charge or the once-per-dawn use.
+    const act = itemData.activate;
+    const inst = held.instance_id;
+    const worn = Object.values(nextChar.equipment ?? {}).includes(inst);
+    const attunedOk = !itemData.requiresAttunement || (nextChar.attuned_items ?? []).includes(inst);
+    if (!worn || !attunedOk) {
+      ctx.narrative = `You must be wearing${itemData.requiresAttunement ? ' and attuned to' : ''} the ${held.name} to use it.`;
+      return;
+    }
+    if (nextSt.combat_active && nextChar.turn_actions.action_used) {
+      ctx.narrative = 'You have already used your action this turn.';
+      return;
+    }
+    if (act.daily && dailyUsed(held, 'activate')) {
+      ctx.narrative = `The ${held.name} can't do that again until dawn.`;
+      return;
+    }
+    if (act.charges && chargesLeft(held, itemData) < act.charges) {
+      ctx.narrative = `The ${held.name} has no charges left.`;
+      return;
+    }
+    const res = resolvePotion(act.effect, nextChar, nextSt, ctx.context);
+    nextSt = res.st;
+    nextChar = { ...res.target };
+    if (act.daily) markDaily(nextChar, inst, 'activate');
+    const chargeNote = act.charges
+      ? spendCharges(nextChar, inst, act.charges, ctx.context.lootTable)
+      : '';
+    narrative = `${nextChar.name} uses the ${held.name} — ${act.label}: ${nextChar.name} ${res.note}.${chargeNote}`;
+  } else if (itemData.studyIncrease) {
+    // SRD Manuals and Tomes — 48 hours of study raise a score by 2 (max 30);
+    // the book then loses its magic. Simplification: done out of combat, no
+    // in-world time passes, and the spent book is removed.
+    if (nextSt.combat_active) {
+      ctx.narrative = `Studying the ${held.name} takes days — not mid-fight.`;
+      return;
+    }
+    const ab = itemData.studyIncrease;
+    const base = nextChar.ability_set_base?.[ab] ?? nextChar[ab];
+    if (base >= 30) {
+      ctx.narrative = `Your ${ab.toUpperCase()} can't rise any higher.`;
+      return;
+    }
+    const raised = Math.min(30, base + 2);
+    const modBefore = abilityMod(nextChar.con);
+    nextChar = {
+      ...nextChar,
+      inventory: nextChar.inventory.filter((_, i) => i !== firstIdx),
+      ...(nextChar.ability_set_base?.[ab] !== undefined
+        ? { ability_set_base: { ...nextChar.ability_set_base, [ab]: raised } }
+        : { [ab]: raised }),
+    };
+    // syncSetAbilities adjusts HP for a CON change from here; the direct bump
+    // above needs its share added by hand.
+    const modBumped = abilityMod(nextChar.con);
+    syncSetAbilities(nextChar, ctx.context.lootTable);
+    const extra = (modBumped - modBefore) * nextChar.level;
+    if (extra) {
+      nextChar.max_hp += extra;
+      nextChar.hp = Math.min(nextChar.max_hp, nextChar.hp + extra);
+    }
+    nextChar.ac = characterAc(nextChar, ctx.context.lootTable);
+    narrative = `${nextChar.name} spends long days with the ${held.name}. Their ${ab.toUpperCase()} rises to ${raised}, and the book's magic fades.`;
+  } else if (itemData.slot === 'weapon') {
     narrative = `The ${held.name} is ready. Use "attack" to strike, or "equip" to make it your active weapon.`;
   } else if (itemData.slot === 'armor') {
     narrative = `The ${held.name} offers protection. Use "equip" to don it for a +${itemData.ac_bonus || 0} AC bonus.`;

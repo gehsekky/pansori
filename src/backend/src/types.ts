@@ -648,6 +648,8 @@ export type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gar
 export type BrutalStrikeEffect = 'forceful' | 'hamstring' | 'staggering' | 'sundering';
 
 export interface TurnActions {
+  // SRD Cloak of Displacement — damaged since the start of this turn.
+  displacement_broken?: boolean;
   action_used: boolean;
   bonus_action_used: boolean;
   reaction_used: boolean;

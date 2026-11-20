@@ -163,6 +163,18 @@ export function d20TestPenalty(char: {
   return Math.max(0, char.revive_d20_penalty ?? 0) + 2 * Math.max(0, char.exhaustion_level ?? 0);
 }
 
+/**
+ * The penalty for an ability check: the D20 Test penalty, less any worn
+ * check bonus (SRD Stone of Good Luck's +1). May be negative (a net bonus).
+ */
+export function checkPenalty(char: {
+  revive_d20_penalty?: number;
+  exhaustion_level?: number;
+  worn_traits?: { checkBonus?: number };
+}): number {
+  return d20TestPenalty(char) - (char.worn_traits?.checkBonus ?? 0);
+}
+
 // SRD Slow — "It can't take reactions." Combine with the existing
 // reaction-slot exhaustion check to gate every reaction site
 // (Shield / Hellish Rebuke / Counterspell, OAs, Uncanny Dodge,
@@ -1157,9 +1169,12 @@ export function resolveSpellAttack(
 export function rollDeathSave(
   current: DeathSaves = { successes: 0, failures: 0 },
   advantage = false,
-  reviveD20Pen = 0
+  reviveD20Pen = 0,
+  // SRD Periapt of Wound Closure — a roll of 9 or lower becomes a 10.
+  floorTen = false
 ) {
-  const roll = advantage ? Math.max(d(20), d(20)) : d(20);
+  const rolled = advantage ? Math.max(d(20), d(20)) : d(20);
+  const roll = floorTen && rolled <= 9 ? 10 : rolled;
   if (roll === 20)
     return { roll, result: 'regain_hp' as const, saves: { successes: 0, failures: 0 } };
   if (roll === 1) {

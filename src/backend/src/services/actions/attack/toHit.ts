@@ -98,7 +98,14 @@ export function computeToHitContext(
     !!equippedArmorLootItem?.noArmorTrainingNeeded
   );
   // SRD Pact of the Blade — you have proficiency with your pact weapon.
+  // SRD Bracers of Archery — proficiency with the Longbow and Shortbow.
+  const wornProficient =
+    !!weaponItem &&
+    (pc.char.worn_traits?.weaponBonuses ?? []).some((b) =>
+      b.weapons.some((w) => weaponItem.id.includes(w))
+    );
   const weaponProficient =
+    wornProficient ||
     isPactWeapon(pc.char, weaponItem) ||
     hasWeaponProficiency(
       pc.char.weapon_proficiencies ?? [],

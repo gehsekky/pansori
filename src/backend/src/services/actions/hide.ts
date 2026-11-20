@@ -1,5 +1,5 @@
 import type { ActionContext, ActionHandler } from './types.js';
-import { abilityMod, d20TestPenalty, skillCheck } from '../rulesEngine.js';
+import { abilityMod, checkPenalty, skillCheck } from '../rulesEngine.js';
 import { applyGuidanceDie, applyTacticalMind, consumeGuidanceDie, updatePcActor } from './actor.js';
 import {
   canAttemptHide,
@@ -75,7 +75,7 @@ export function resolveHideAttempt(ctx: ActionContext): HideResult {
         pc.char.species === 'halfling',
         hasReliableTalent(pc.char),
         strokeOfLuckAvailable(pc.char),
-        d20TestPenalty(pc.char),
+        checkPenalty(pc.char),
         peerlessRoll
       ),
       gDie,

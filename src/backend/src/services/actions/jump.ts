@@ -10,8 +10,8 @@
 // (services/jump.ts) is modeled, not a grid action.
 
 import { SQUARE_SIZE, chebyshev, opportunityAttackTriggers, posEqual } from '../gridEngine.js';
+import { checkPenalty, resolveEnemyAttack, skillCheck } from '../rulesEngine.js';
 import { combatGridDims, effectiveSpeed, getEnemyById } from '../gameEngine.js';
-import { d20TestPenalty, resolveEnemyAttack, skillCheck } from '../rulesEngine.js';
 import { hasEscapeTheHorde, hasSecondStoryWork, hasSkillProficiency } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
@@ -120,7 +120,7 @@ export const handleJump: ActionHandler<{ type: 'jump'; to: { x: number; y: numbe
       false,
       false,
       false,
-      d20TestPenalty(nextChar)
+      checkPenalty(nextChar)
     );
     // SRD Fighter Tactical Mind — a Second Wind can rescue the failed landing.
     const tm = applyTacticalMindTo(nextChar, rawCheck, 10);

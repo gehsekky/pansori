@@ -1,6 +1,6 @@
 import {
   abilityMod,
-  d20TestPenalty,
+  checkPenalty,
   effectiveLightFor,
   passivePerceptionDcInLight,
   skillCheck,
@@ -104,7 +104,7 @@ export const handleSneak: ActionHandler<{ type: 'sneak' }> = (ctx) => {
       member.species === 'halfling',
       hasReliableTalent(member),
       isActive && strokeOfLuckAvailable(member),
-      d20TestPenalty(member),
+      checkPenalty(member),
       peerlessRollSneak
     );
     // Only the active PC auto-spends a once-per-rest resource (same policy as
