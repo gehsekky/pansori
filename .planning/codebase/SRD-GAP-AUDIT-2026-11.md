@@ -435,6 +435,31 @@ attacks don't crit). Deferred: Dancing Sword, Staff of the Python, and the
 cursed items (Berserker Axe, Demon Armor, Armor of Vulnerability, Shield of
 Missile Attraction).
 
+**Batch 6 done 2026-11-19 — cursed items.** New: `LootItem.curseEffects`
+(active while attuned, worn or not — Remove Curse's broken attunement is the
+only way out) and `curseLocksSlot`; a cursed item the bearer is attuned to
+can't be de-attuned or given away. Berserker Axe (battleaxe / greataxe /
+halberd): +1, +1 HP max per level while attuned (`item_hp_bonus`),
+Disadvantage with other weapons, and damage from another creature forces a DC
+15 Wisdom save or `berserk` (the menu offers only attacking the nearest enemy,
+moving and ending the turn; ends with no enemy within 60 ft or with the
+fight). Demon Armor (studded leather / chain mail / plate): +1 AC, clawed
+Unarmed Strikes (1d8 Slashing, +1), can't be removed, Disadvantage on attacks
+against Demons and on saves against their condition effects (the eight SRD
+demons now carry `creatureSubtype: 'demon'`). Armor of Vulnerability (3 bases
+× 3 types): Resistance while worn; the curse, revealed on attunement, gives
+Vulnerability to the other two physical types (applied after Resistance, in
+both PC damage paths). Shield of Missile Attraction: Resistance to ranged
+weapon attacks while held; the curse redirects an enemy's ranged weapon
+attack at anyone within 10 ft of the bearer to the bearer. Found on the way:
+Remove Curse looked for `cursed` on the inventory entry (it lives on the
+catalog item), so it never freed a real cursed item; it now also takes the
+freed item off and re-derives its effects. Simplifications: berserk never
+targets allies; self-inflicted damage can trigger it; the Demon Armor's
+save Disadvantage doesn't reach damage-only saves, and Abyssal isn't modeled;
+Missile Attraction only redirects enemy attacks. Still deferred: Dancing
+Sword, Staff of the Python.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

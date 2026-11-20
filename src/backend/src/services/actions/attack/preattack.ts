@@ -143,6 +143,11 @@ export function runPreattack(
   // is equipped (both hands free). (The Battleaxe now carries the RAW Topple
   // mastery; the old homebrew `flex` mastery — versatile die even with a shield
   // — has been retired.)
+  // SRD Demon Armor — its clawed gauntlets make Unarmed Strikes deal 1d8 Slashing.
+  const claws = pc.char.worn_traits?.clawedUnarmed;
+  if (!weaponItem && claws && !pc.char.conditions.includes('wild_shaped')) {
+    weaponDamage = claws.dice;
+  }
   const isVersatile = !!(weaponItem?.versatileDamage && !equippedShieldId(pc.char));
   if (isVersatile) {
     weaponDamage = weaponItem!.versatileDamage!;

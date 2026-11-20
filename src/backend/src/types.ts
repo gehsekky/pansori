@@ -327,6 +327,8 @@ export interface EnemyTemplate {
   // only Fiends/Undead; future Turn Undead, etc.). Omitted ⇒ unspecified.
   // Carried through place() + procgen onto the Enemy.
   creatureType?: CreatureType;
+  // SRD subtype in parentheses on the type line — 'demon' (Demon Armor's curse).
+  creatureSubtype?: string;
   str?: number;
   dex?: number;
   con?: number;
@@ -487,6 +489,8 @@ export interface Enemy {
   // SRD creature type (see EnemyTemplate.creatureType) — drives Fiend/Undead
   // interactions like Holy Water. Carried from the template via place()/procgen.
   creatureType?: CreatureType;
+  // SRD subtype in parentheses on the type line — 'demon' (Demon Armor's curse).
+  creatureSubtype?: string;
   hp: number;
   ac: number;
   damage: string;
@@ -1495,6 +1499,9 @@ export interface Character {
   // oath was fulfilled (a new one waits for dawn — the Long Rest).
   oath_sworn_id?: string;
   oath_fulfilled?: boolean;
+  // SRD Berserker Axe — the Hit Point maximum it currently adds (so equip /
+  // attune changes adjust max HP by the difference).
+  item_hp_bonus?: number;
   // SRD Hex (Warlock L1) — the id of the hexed enemy entity. Like Hunter's Mark:
   // the caster's hits vs this target deal +1d6 necrotic. Set on cast, cleared on
   // breakConcentration. (The curse-an-ability-for-disadvantage rider is narrative.)

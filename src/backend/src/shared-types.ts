@@ -1840,7 +1840,23 @@ export type WornEffect =
   // to spell attack rolls while held; `ignoreHalfCover` (War Mage) skips Half Cover.
   | { kind: 'spell_attack_bonus'; bonus: number; ignoreHalfCover?: boolean }
   // SRD Adamantine Armor — a Critical Hit against the wearer becomes a normal hit.
-  | { kind: 'no_crits' };
+  | { kind: 'no_crits' }
+  // ── Curse effects (`LootItem.curseEffects`, active while attuned) ──
+  // SRD Armor of Vulnerability — Vulnerability to a damage type.
+  | { kind: 'vulnerability'; damageType: string }
+  // SRD Shield of Missile Attraction — Resistance to ranged weapon attack damage
+  // (while held), and ranged weapon attacks at creatures within `radiusFt` of
+  // you target you instead (the curse).
+  | { kind: 'ranged_weapon_resistance' }
+  | { kind: 'missile_attraction'; radiusFt: number }
+  // SRD Berserker Axe — +1 Hit Point maximum per level while attuned; the curse:
+  // Disadvantage with other weapons, and going berserk when damaged.
+  | { kind: 'hp_per_level' }
+  | { kind: 'berserker' }
+  // SRD Demon Armor — Unarmed Strikes with its claws, and the curse's
+  // Disadvantage against Demons.
+  | { kind: 'clawed_unarmed'; dice: string; damageType: string; bonus: number }
+  | { kind: 'demon_bane' };
 
 /**
  * SRD Potions — what drinking (or applying) a potion does. Timed effects ride
@@ -1952,6 +1968,15 @@ export interface WornTraits {
   spellAttackBonus?: number;
   spellIgnoreHalfCover?: boolean;
   critImmune?: boolean;
+  vulnerabilities?: string[];
+  rangedWeaponResistance?: boolean;
+  missileAttractionFt?: number;
+  hpPerLevel?: boolean;
+  // SRD Berserker Axe — the cursed weapon's instance id (other weapons attack at
+  // Disadvantage; damage can send the bearer berserk).
+  berserkerWeapon?: string;
+  clawedUnarmed?: { dice: string; damageType: string; bonus: number };
+  demonBane?: boolean;
 }
 
 /**
@@ -2185,11 +2210,17 @@ export interface LootItem {
   // services/wornEffects.ts. Distinct from `effect` (the consumable-use string).
   wornEffects?: WornEffect[];
   /**
+   * SRD curse effects — apply while the bearer is attuned, worn or not
+   * ("removing the armor fails to end the curse"). Only Remove Curse, which
+   * breaks the attunement, ends them.
+   */
+  curseEffects?: WornEffect[];
+  // SRD Demon Armor — while attuned, it can't be taken off.
+  curseLocksSlot?: boolean;
+  /**
    * Cursed item flag (SRD). The curse reveals on attunement and
-   * voluntary de-attunement is blocked — only Remove Curse / Greater
-   * Restoration / equivalent magic can break the bond. Pansori doesn't
-   * yet implement those spells, so cursed items are effectively
-   * permanent for now; the flag is in place for when remove-curse lands.
+   * voluntary de-attunement is blocked, and the bearer won't give it
+   * away — only the Remove Curse spell breaks the bond.
    */
   cursed?: boolean;
   /**

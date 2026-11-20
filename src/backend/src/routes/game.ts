@@ -1027,6 +1027,23 @@ gameRouter.post('/session/:id/equip', async (req: Request, res: Response) => {
         .json({ error: 'This item requires attunement. Attune to it first (out of combat).' });
       return;
     }
+    // SRD Demon Armor's curse — once donned (and attuned), it can't be taken off
+    // or swapped out until Remove Curse breaks the bond.
+    const lockedArmor = (instanceId: string | null | undefined) => {
+      if (!instanceId || !(char.attuned_items ?? []).includes(instanceId)) return undefined;
+      const inv = char.inventory.find((i) => i.instance_id === instanceId);
+      const l = inv ? ctx.lootTable.find((x) => x.id === inv.id) : undefined;
+      return l?.curseLocksSlot ? l : undefined;
+    };
+    const locked =
+      lockedArmor(slotsForInstance(char.equipment, iid).length ? iid : undefined) ??
+      (loot.slot === 'armor' ? lockedArmor(equippedArmorId(char)) : undefined);
+    if (locked) {
+      res.status(409).json({
+        error: `The cursed ${locked.name} won't come off — only Remove Curse can free you.`,
+      });
+      return;
+    }
     if (loot.slot === 'shield') {
       const check = canDonShield(combatActive);
       if (!check.allowed) {
@@ -1142,6 +1159,16 @@ gameRouter.post('/session/:id/transfer', async (req: Request, res: Response) => 
     const item = fromChar.inventory.find((i) => i.instance_id === item_instance_id);
     if (!item) {
       res.status(400).json({ error: 'Item not found on source character' });
+      return;
+    }
+    // SRD cursed items — a bearer attuned to one won't part with it.
+    const itemLoot = (CONTEXTS[row.seed.context_id ?? ''] ?? defaultContext()).lootTable.find(
+      (l) => l.id === item.id
+    );
+    if (itemLoot?.cursed && (fromChar.attuned_items ?? []).includes(item_instance_id)) {
+      res.status(409).json({
+        error: `${fromChar.name} won't part with the cursed ${item.name} — only Remove Curse breaks its hold.`,
+      });
       return;
     }
     // Equipped items must be unequipped before transfer (5e: donning another

@@ -165,7 +165,16 @@ export function computeToHitContext(
   const oath = oathbowEdges(ctx, weaponItem, targetId);
   if (oath.ignoreCover && edges.coverAcBonus > 0) edges.coverAcBonus = 0;
 
+  // SRD Berserker Axe's curse — Disadvantage with any other weapon. SRD Demon
+  // Armor's curse — Disadvantage on attacks against Demons.
+  const worn = pc.char.worn_traits;
+  const berserkerDisadv =
+    !!worn?.berserkerWeapon && !!weaponItem && weaponItem.instance_id !== worn.berserkerWeapon;
+  const demonDisadv = !!worn?.demonBane && target.creatureSubtype === 'demon';
+
   const disadvantage =
+    berserkerDisadv ||
+    demonDisadv ||
     edges.disadvantage ||
     heavyWeaponSmallDisadv ||
     !armorProficient ||
@@ -191,6 +200,8 @@ export function computeToHitContext(
       .join(', '),
     edges.grappled ? 'grappled' : '',
     oath.disadvantage ? oath.note : '',
+    berserkerDisadv ? 'cursed — not your Berserker Axe' : '',
+    demonDisadv ? 'Demon Armor curse vs a demon' : '',
   ]
     .filter(Boolean)
     .join(', ');
@@ -230,8 +241,15 @@ export function computeToHitContext(
     ? (pc.char.weapon_enhancement ?? 0) + (weaponItem.magicBonus ?? 0)
     : 0;
   // SRD Barbarian Sundering Blow — +5 on this roll (consumed in computeAttackEdges).
+  // SRD Demon Armor — +1 to Unarmed Strikes with its claws.
+  const clawBonus = !weaponItem ? (worn?.clawedUnarmed?.bonus ?? 0) : 0;
   const totalAttackBonus =
-    sacredWeaponBonus - revivePenalty + archeryBonus + magicWeaponBonus + edges.sunderingBonus;
+    clawBonus +
+    sacredWeaponBonus -
+    revivePenalty +
+    archeryBonus +
+    magicWeaponBonus +
+    edges.sunderingBonus;
 
   return {
     weaponProficient,

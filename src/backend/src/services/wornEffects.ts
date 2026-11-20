@@ -24,6 +24,24 @@ export function activeWornEffects(char: Character, lootTable: LootItem[]): WornE
 }
 
 /**
+ * SRD curse effects of every cursed item the character is attuned to — worn
+ * or not ("removing the armor fails to end the curse"). Each comes with the
+ * cursed item's instance id.
+ */
+export function activeCurseEffects(
+  char: Character,
+  lootTable: LootItem[]
+): Array<{ effect: WornEffect; instanceId: string }> {
+  const out: Array<{ effect: WornEffect; instanceId: string }> = [];
+  for (const instanceId of char.attuned_items ?? []) {
+    const inv = char.inventory?.find((i) => i.instance_id === instanceId);
+    const loot = inv ? lootTable.find((l) => l.id === inv.id) : undefined;
+    for (const effect of loot?.curseEffects ?? []) out.push({ effect, instanceId });
+  }
+  return out;
+}
+
+/**
  * Total flat bonus to saving throws of `ability` from worn gear. Counts both
  * ability-specific bonuses (e.g. Moonstone Amulet +1 WIS) and all-saves bonuses
  * (`ability: 'all'` — Cloak / Ring of Protection's +1 to every save).
@@ -85,10 +103,24 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
     else if (e.kind === 'spell_save_advantage') t.spellSaveAdvantage = true;
     else if (e.kind === 'no_crits') t.critImmune = true;
-    else if (e.kind === 'spell_attack_bonus') {
+    else if (e.kind === 'ranged_weapon_resistance') t.rangedWeaponResistance = true;
+    else if (e.kind === 'clawed_unarmed') {
+      t.clawedUnarmed = { dice: e.dice, damageType: e.damageType, bonus: e.bonus };
+    } else if (e.kind === 'spell_attack_bonus') {
       t.spellAttackBonus = (t.spellAttackBonus ?? 0) + e.bonus;
       if (e.ignoreHalfCover) t.spellIgnoreHalfCover = true;
     }
+  }
+  // Curse effects ride on attunement, not the slot.
+  for (const { effect: e, instanceId } of activeCurseEffects(char, lootTable)) {
+    if (e.kind === 'vulnerability') {
+      const list = (t.vulnerabilities ??= []);
+      if (!list.includes(e.damageType)) list.push(e.damageType);
+    } else if (e.kind === 'missile_attraction') {
+      t.missileAttractionFt = Math.max(t.missileAttractionFt ?? 0, e.radiusFt);
+    } else if (e.kind === 'hp_per_level') t.hpPerLevel = true;
+    else if (e.kind === 'berserker') t.berserkerWeapon = instanceId;
+    else if (e.kind === 'demon_bane') t.demonBane = true;
   }
   return Object.keys(t).length > 0 ? t : undefined;
 }
@@ -186,8 +218,12 @@ export function syncSetAbilities(char: Character, lootTable: LootItem[]): void {
     char.darkvision_ft = char.darkvision_base;
     char.darkvision_base = undefined;
   }
-  // 4. A CON change ripples into max HP (Δmod × level), mirroring handleApplyAsi.
-  const conDelta = (abilityMod(char.con) - oldConMod) * char.level;
+  // 4. A CON change ripples into max HP (Δmod × level), mirroring handleApplyAsi;
+  //    so does SRD Berserker Axe's +1 per level (tracked in `item_hp_bonus`).
+  const itemHp = char.worn_traits?.hpPerLevel ? char.level : 0;
+  const conDelta =
+    (abilityMod(char.con) - oldConMod) * char.level + itemHp - (char.item_hp_bonus ?? 0);
+  char.item_hp_bonus = itemHp || undefined;
   if (conDelta !== 0) {
     char.max_hp = Math.max(1, char.max_hp + conDelta);
     char.hp = Math.max(0, Math.min(char.max_hp, char.hp + conDelta));

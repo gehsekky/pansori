@@ -17,7 +17,7 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (224 weapons + 121 armor + 546 gear)', () => {
+  it('has the expected catalog size (227 weapons + 134 armor + 546 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
     // plus consumable/misc gear, tools, foci, light sources, thrown splash
     // weapons, ammunition (arrows / bolts / bullets / needles), and magic items
@@ -29,15 +29,16 @@ describe('SRD_ITEMS catalog integrity', () => {
     // wondrous items / rings, 37 potions / oils, 11 wands, 8 staffs (they're
     // Quarterstaffs, so weapons), a Spell Scroll for each of the 340 spells, 35
     // activated weapons, 19 activated / special armors and 70 pieces of
-    // Ammunition of Slaying (14 creature types × 5 kinds).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(891);
+    // Ammunition of Slaying (14 creature types × 5 kinds), and 16 cursed items
+    // (3 Berserker Axes, 3 Demon Armors, 9 Armors of Vulnerability, 1 shield).
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(907);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
     const gear = Object.values(SRD_ITEMS).filter(
       (i) => i.type === 'misc' || i.type === 'consumable'
     );
-    expect(weapons).toHaveLength(224); // 38 base + 114 +N + 29 named + 8 staffs + 35 activated
-    expect(armor).toHaveLength(121); // 13 base + 39 +N + 50 named + 19 activated / special
+    expect(weapons).toHaveLength(227); // 38 base + 114 +N + 29 named + 8 staffs + 35 activated + 3 cursed
+    expect(armor).toHaveLength(134); // 13 base + 39 +N + 50 named + 19 activated / special + 13 cursed
     expect(gear).toHaveLength(546); // incl. 11 wands + 340 scrolls + 70 slaying ammo
   });
 

@@ -78,6 +78,7 @@ export function materializeEnemy(template: EnemyTemplate, id: string, hp: number
     // previously only carried by code campaigns' place() helper, so
     // wilderness encounters (and now DB room placements) lost it.
     creatureType: template.creatureType,
+    creatureSubtype: template.creatureSubtype,
     hp,
     maxHp: hp,
     ac: template.ac,

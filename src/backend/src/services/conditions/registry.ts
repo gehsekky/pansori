@@ -137,6 +137,10 @@ const defs: ConditionDef[] = [
   // SRD Sword of Wounding — can't regain Hit Points (blocks Regeneration);
   // repeats the CON save at the end of each of its turns.
   { id: 'festering_wound', duration: 600 },
+  // SRD Berserker Axe's curse — the bearer attacks the nearest creature each
+  // turn (choices restricted in generateChoices); ends when no foe is within
+  // 60 ft, or with the fight.
+  { id: 'berserk', duration: 'permanent' },
   // SRD Deafened — the creature can't hear and auto-fails any ability check that
   // requires hearing. No attack/save modifiers (deafened ≠ silenced; it doesn't
   // block Verbal spell components RAW, though pansori's precast currently gates

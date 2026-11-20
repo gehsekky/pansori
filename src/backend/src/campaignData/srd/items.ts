@@ -3436,6 +3436,95 @@ const SLAYING_AMMO: Array<[string, LootItem]> = [
   })
 );
 
+// ─── Cursed items (SRD 5.2.1) ────────────────────────────────────────────────
+// The curse reveals on attunement (`curseDesc`); attunement can't then be ended
+// by choice, and the bearer won't give the item away. `curseEffects` apply
+// while attuned, worn or not — only Remove Curse (which breaks the attunement)
+// ends them. "Any armor" items are generated on a few representative bases.
+const CURSED_ARMOR_BASES = ['studded_leather', 'chain_mail', 'plate_armor'];
+const PHYSICAL_TYPES = ['bludgeoning', 'piercing', 'slashing'];
+
+const CURSED_ITEMS: Array<[string, LootItem]> = [
+  // SRD Berserker Axe (Rare, attunement). Simplification: berserk, the bearer
+  // only attacks the nearest enemy (never an ally).
+  ...named(['battleaxe', 'greataxe', 'halberd'], (b) =>
+    namedMagic(
+      b.id,
+      `berserker_axe_${b.id}`,
+      `Berserker ${b.name}`,
+      RARITY_VALUE.Rare,
+      `${b.desc} A +1 magic weapon. While you are attuned to it, your Hit Point maximum rises by 1 per level. (Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 1,
+        cursed: true,
+        curseDesc:
+          "You won't part with the axe, and you have Disadvantage on attacks with any other weapon. When another creature damages you, make a DC 15 Wisdom save or go berserk — attacking the nearest foe each turn until none is within 60 feet.",
+        curseEffects: [{ kind: 'hp_per_level' }, { kind: 'berserker' }],
+      }
+    )
+  ),
+  // SRD Demon Armor (Very Rare, attunement). Simplification: knowing Abyssal
+  // isn't modeled; the save Disadvantage covers Demons' condition effects.
+  ...CURSED_ARMOR_BASES.map((id) =>
+    namedMagic(
+      id,
+      `demon_armor_${id}`,
+      `Demon ${BASE_ITEMS[id].name}`,
+      RARITY_VALUE['Very Rare'],
+      `${BASE_ITEMS[id].desc}. Fiendish armor: +1 AC, and its clawed gauntlets make your Unarmed Strikes deal 1d8 Slashing damage with +1 to attack and damage. (Very Rare; requires attunement.)`,
+      {
+        requiresAttunement: true,
+        magicBonus: 1,
+        cursed: true,
+        curseLocksSlot: true,
+        curseDesc:
+          "Once donned, the armor can't be taken off until Remove Curse frees you. You have Disadvantage on attacks against Demons and on saves against their spells and abilities.",
+        wornEffects: [{ kind: 'clawed_unarmed', dice: '1d8', damageType: 'slashing', bonus: 1 }],
+        curseEffects: [{ kind: 'demon_bane' }],
+      }
+    )
+  ),
+  // SRD Armor of Vulnerability (Rare, attunement) — one per resisted type.
+  ...CURSED_ARMOR_BASES.flatMap((id) =>
+    PHYSICAL_TYPES.map((t) =>
+      namedMagic(
+        id,
+        `${id}_of_vulnerability_${t}`,
+        `${BASE_ITEMS[id].name} of ${cap(t)} Resistance`,
+        RARITY_VALUE.Rare,
+        `${BASE_ITEMS[id].desc}. While you wear it, you have Resistance to ${cap(t)} damage. (Rare; requires attunement.)`,
+        {
+          requiresAttunement: true,
+          cursed: true,
+          curseDesc: `This is an Armor of Vulnerability. Until Remove Curse ends it — even with the armor off — you have Vulnerability to ${PHYSICAL_TYPES.filter((x) => x !== t).join(' and ')} damage.`,
+          wornEffects: [{ kind: 'resistance', damageType: t }],
+          curseEffects: PHYSICAL_TYPES.filter((x) => x !== t).map((x) => ({
+            kind: 'vulnerability' as const,
+            damageType: x,
+          })),
+        }
+      )
+    )
+  ),
+  // SRD Shield of Missile Attraction (Rare, attunement).
+  namedMagic(
+    'shield',
+    'shield_of_missile_attraction',
+    'Shield of Missile Attraction',
+    RARITY_VALUE.Rare,
+    'A magic shield: while you hold it, you have Resistance to damage from attacks made with ranged weapons. (Rare; requires attunement.)',
+    {
+      requiresAttunement: true,
+      cursed: true,
+      curseDesc:
+        'Until Remove Curse ends it — even with the shield set down — any ranged weapon attack aimed at a creature within 10 feet of you targets you instead.',
+      wornEffects: [{ kind: 'ranged_weapon_resistance' }],
+      curseEffects: [{ kind: 'missile_attraction', radiusFt: 10 }],
+    }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -3793,6 +3882,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...ACTIVATED_WEAPONS,
   ...ACTIVATED_ARMOR,
   ...SLAYING_AMMO,
+  ...CURSED_ITEMS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

@@ -398,6 +398,12 @@ export function resolveOneAttack(
     baseHit += weaponMagicBonus;
     magicWeaponNote = ` +${weaponMagicBonus} (magic)`;
   }
+  // SRD Demon Armor — +1 to the damage of a clawed Unarmed Strike.
+  const claws = !weaponItem ? pc.char.worn_traits?.clawedUnarmed : undefined;
+  if (atk.hit && claws?.bonus && weaponDamage) {
+    baseHit += claws.bonus;
+    magicWeaponNote += ` +${claws.bonus} (Demon Armor claws)`;
+  }
   const versatileNote = isVersatile ? ' (versatile)' : '';
   const coverNote = coverAcBonus > 0 ? ` +${coverAcBonus} cover` : '';
   const bonusNote = totalAttackBonus > 0 ? ` +${totalAttackBonus} bonus` : '';
@@ -721,7 +727,8 @@ export function resolveOneAttack(
   // (no weaponItem). Otherwise the weapon's own type stands.
   const empoweredStrikes = !weaponItem && getClassLevel(pc.char, 'monk') >= 6;
   const effectiveDamageType =
-    bestDamageType(weaponItem, target) ?? (empoweredStrikes ? 'force' : undefined);
+    bestDamageType(weaponItem, target) ??
+    (empoweredStrikes ? 'force' : claws && weaponDamage ? claws.damageType : undefined);
   // SRD Boon of Irresistible Offense — Overcome Defenses: B/P/S damage ignores
   // Resistance (Immunity / Vulnerability still apply).
   // SRD Vorpal Sword ignores Resistance to Slashing the same way.

@@ -80,9 +80,8 @@ export const handleAttune: ActionHandler<{ type: 'attune'; instanceId: string }>
  * `de_attune`: voluntarily end attunement with a magic item (SRD
  * — "If you cease attunement, you spend another short rest..."
  * — Pansori treats this as out-of-combat, no resource cost). Cursed
- * items resist voluntary de-attunement; a Remove Curse / Greater
- * Restoration would be required (not yet implemented as a spell —
- * cursed items currently can't be unbound until that lands).
+ * items resist voluntary de-attunement — only the Remove Curse spell
+ * breaks that bond (see castSpell/buff.ts).
  */
 export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: string }> = (
   ctx,
@@ -102,7 +101,7 @@ export const handleDeAttune: ActionHandler<{ type: 'de_attune'; instanceId: stri
   const invItem = char.inventory.find((i) => i.instance_id === action.instanceId);
   const lootItem = invItem ? ctx.context.lootTable.find((l) => l.id === invItem.id) : undefined;
   if (lootItem?.cursed) {
-    ctx.narrative = `The curse on the ${invItem?.name ?? 'item'} prevents voluntary de-attunement. You'll need Remove Curse magic to break this bond.`;
+    ctx.narrative = `The curse on the ${invItem?.name ?? 'item'} prevents voluntary de-attunement. Only the Remove Curse spell can break this bond.`;
     return;
   }
   // De-attuning a currently-equipped attunement-required item also

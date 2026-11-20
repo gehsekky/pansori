@@ -1,11 +1,12 @@
 import type { AbilityKey, Spell } from '../../../types.js';
 import { SHILLELAGH_WEAPON_IDS, spellSaveDC, upcastDamage } from '../../rulesEngine.js';
+import { clearInstance, equippedWeaponId } from '../../equipment.js';
 import { concentrationRoundsFor, pickCastPrefix } from './utils.js';
 import type { ActionContext } from '../types.js';
 import { characterAc } from '../../armorClass.js';
 import { composeNow } from '../../narrative/compose.js';
-import { equippedWeaponId } from '../../equipment.js';
 import { invocationDef } from '../../invocations.js';
+import { syncSetAbilities } from '../../wornEffects.js';
 
 /**
  * Self / ally / self_or_ally buff branch. Handles spells where the
@@ -605,20 +606,29 @@ export function runBuffSpell(
     const liftFrom = (c: typeof buffTarget): { next: typeof buffTarget; freed: string[] } => {
       const durs = { ...(c.condition_durations ?? {}) };
       delete durs.cursed;
+      // `cursed` lives on the catalog item (an inventory entry may copy it).
       const cursedAttuned = (c.inventory ?? []).filter(
-        (it) => it.cursed && (c.attuned_items ?? []).includes(it.instance_id ?? '')
+        (it) =>
+          (!!it.cursed || !!ctx.context.lootTable.find((l) => l.id === it.id)?.cursed) &&
+          (c.attuned_items ?? []).includes(it.instance_id ?? '')
       );
-      return {
-        next: {
-          ...c,
-          conditions: (c.conditions ?? []).filter((x) => x !== 'cursed'),
-          condition_durations: durs,
-          attuned_items: (c.attuned_items ?? []).filter(
-            (id) => !cursedAttuned.some((it) => it.instance_id === id)
-          ),
-        },
-        freed: cursedAttuned.map((it) => it.name),
+      const freedIds = new Set(cursedAttuned.map((it) => it.instance_id));
+      // Breaking the attunement ends the item's curse effects; an item that
+      // needs attunement can't stay equipped, so it comes off.
+      let equipment = c.equipment ?? {};
+      for (const id of freedIds) equipment = clearInstance(equipment, id);
+      const next = {
+        ...c,
+        conditions: (c.conditions ?? []).filter((x) => x !== 'cursed'),
+        condition_durations: durs,
+        attuned_items: (c.attuned_items ?? []).filter((id) => !freedIds.has(id)),
+        equipment,
       };
+      if (freedIds.size) {
+        syncSetAbilities(next, ctx.context.lootTable);
+        next.ac = characterAc(next, ctx.context.lootTable);
+      }
+      return { next, freed: cursedAttuned.map((it) => it.name) };
     };
     let freed: string[] = [];
     if (isCasterTarget) {

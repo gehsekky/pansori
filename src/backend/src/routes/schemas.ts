@@ -676,6 +676,22 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('darkvision'), feet: z.number().int().positive().max(300) }).strict(),
   z.object({ kind: z.literal('spell_save_advantage') }).strict(),
   z.object({ kind: z.literal('no_crits') }).strict(),
+  z.object({ kind: z.literal('vulnerability'), damageType: z.string().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal('ranged_weapon_resistance') }).strict(),
+  z
+    .object({ kind: z.literal('missile_attraction'), radiusFt: z.number().int().min(5).max(60) })
+    .strict(),
+  z.object({ kind: z.literal('hp_per_level') }).strict(),
+  z.object({ kind: z.literal('berserker') }).strict(),
+  z
+    .object({
+      kind: z.literal('clawed_unarmed'),
+      dice: DICE,
+      damageType: z.string().min(1).max(20),
+      bonus: z.number().int().min(0).max(5),
+    })
+    .strict(),
+  z.object({ kind: z.literal('demon_bane') }).strict(),
   z
     .object({
       kind: z.literal('spell_attack_bonus'),
@@ -730,6 +746,8 @@ const LootItemSchema = z
     light: z.boolean().optional(),
     requiresAttunement: z.boolean().optional(),
     wornEffects: z.array(WornEffectSchema).max(8).optional(),
+    curseEffects: z.array(WornEffectSchema).max(6).optional(),
+    curseLocksSlot: z.boolean().optional(),
     cursed: z.boolean().optional(),
     curseDesc: z.string().max(2000).optional(),
     armorAcBase: z.number().int().min(8).max(25).optional(),
@@ -1048,6 +1066,7 @@ const EnemyTemplateSchema = z
         'undead',
       ])
       .optional(),
+    creatureSubtype: z.string().min(1).max(30).optional(),
     str: AbilityScore.optional(),
     dex: AbilityScore.optional(),
     con: AbilityScore.optional(),

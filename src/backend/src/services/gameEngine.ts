@@ -1374,6 +1374,9 @@ function conditionSavingThrow(
     (!!(effect as { fromSpell?: boolean }).fromSpell && !!char.worn_traits?.spellSaveAdvantage);
   // SRD Barbarian Danger Sense (L2): Advantage on DEX saves.
   const dangerSenseAdv = effect.ability === 'dex' && hasDangerSense(char);
+  // SRD Demon Armor's curse — Disadvantage on saves against Demons' spells and abilities.
+  const demonCurseDisadv =
+    !!(effect as { fromDemon?: boolean }).fromDemon && !!char.worn_traits?.demonBane;
   let applied = rollConditionSave(
     effect.ability,
     char[effect.ability] ?? 10,
@@ -1383,7 +1386,7 @@ function conditionSavingThrow(
     0,
     char.conditions ?? [],
     inspirationActive || luckActive || speciesAdv || dangerSenseAdv,
-    enc,
+    enc || demonCurseDisadv,
     d20TestPenalty(char)
   );
   // SRD Fighter Indomitable — reroll the failed save with +Fighter level
@@ -1981,11 +1984,18 @@ function computeEnemyAttack(
       !!enemy.damageType && (char.worn_traits?.resistances ?? []).includes(enemy.damageType);
     const wornImmune =
       !!enemy.damageType && (char.worn_traits?.immunities ?? []).includes(enemy.damageType);
+    // SRD Shield of Missile Attraction — Resistance to ranged weapon attacks.
+    const rangedWeaponResist =
+      (enemy.attackReachFt ?? 5) >= 20 && !!char.worn_traits?.rangedWeaponResistance;
+    // SRD Armor of Vulnerability's curse — Vulnerability, applied after Resistance.
+    const wornVulnerable =
+      !!enemy.damageType && (char.worn_traits?.vulnerabilities ?? []).includes(enemy.damageType);
     const wornReduction = (char.worn_traits?.reductions ?? [])
       .filter((r) => r.damageType === enemy.damageType)
       .reduce((sum, r) => sum + rollDice(r.dice), 0);
     const anyResist =
       wornResist ||
+      rangedWeaponResist ||
       wardResist ||
       isRaging ||
       isPetrified ||
@@ -1997,7 +2007,11 @@ function computeEnemyAttack(
       spellResist;
     const postResistDmg = wornImmune
       ? 0
-      : Math.max(0, (anyResist ? Math.ceil(result.damage / 2) : result.damage) - wornReduction);
+      : Math.max(
+          0,
+          (anyResist ? Math.ceil(result.damage / 2) : result.damage) * (wornVulnerable ? 2 : 1) -
+            wornReduction
+        );
     const rageNote = isRaging ? ` (Rage resistance: ${result.damage}→${postResistDmg})` : '';
     const petrNote = isPetrified
       ? ` (Petrified resistance: ${result.damage}→${postResistDmg})`
@@ -2023,7 +2037,9 @@ function computeEnemyAttack(
       !superiorDefenseActive
         ? ` (Elemental Affinity ${enemy.damageType} resistance: ${result.damage}→${postResistDmg})`
         : '';
-    const wardNote = '';
+    const wardNote =
+      (rangedWeaponResist ? ' (Shield of Missile Attraction: ranged resistance)' : '') +
+      (wornVulnerable ? ` (cursed: vulnerable to ${enemy.damageType})` : '');
     const charAfterWard = char;
     const postWardDmg = postResistDmg;
     // SRD Monk Deflect Attacks (L3) is now an INTERACTIVE reaction window —
@@ -2244,7 +2260,10 @@ function computeEnemyAttack(
       }
     } else if (enemy.onHitEffect) {
       const csResult = conditionSavingThrow(
-        enemy.onHitEffect as OnHitEffect & { ability: AbilityKey; dc: number },
+        {
+          ...enemy.onHitEffect,
+          fromDemon: enemy.creatureSubtype === 'demon',
+        } as OnHitEffect & { ability: AbilityKey; dc: number },
         updatedChar,
         st,
         context,
@@ -2658,6 +2677,64 @@ export function breakCharmOnDamage(st: GameState, prevHp: Map<string, number>): 
     }
   }
   return next;
+}
+
+/**
+ * SRD Berserker Axe's curse — whenever another creature damages the bearer
+ * (in a fight), a DC 15 Wisdom save or it goes berserk. Same end-of-action HP
+ * snapshot as the charm break. Returns the state and a narration note.
+ * Simplification: self-inflicted damage can also trigger it.
+ */
+export function berserkOnDamage(
+  st: GameState,
+  prevHp: Map<string, number>,
+  context: Context
+): { st: GameState; note: string } {
+  if (!st.combat_active) return { st, note: '' };
+  const notes: string[] = [];
+  const characters = st.characters.map((c) => {
+    if (!c.worn_traits?.berserkerWeapon || c.dead || c.hp <= 0) return c;
+    if (c.conditions.includes('berserk') || c.hp >= (prevHp.get(c.id) ?? c.hp)) return c;
+    const failed = rollConditionSave(
+      'wis',
+      c.wis ?? 10,
+      15,
+      hasSaveProficiency(c, 'wis', context),
+      c.level,
+      0,
+      c.conditions ?? []
+    );
+    if (!failed) {
+      notes.push(`${c.name} masters the Berserker Axe's fury (WIS save vs DC 15)`);
+      return c;
+    }
+    notes.push(`${c.name} fails a DC 15 WIS save and goes berserk!`);
+    return { ...c, conditions: [...c.conditions, 'berserk'] };
+  });
+  if (!notes.length) return { st, note: '' };
+  return { st: { ...st, characters }, note: `\n\n${fmt.note(`[${notes.join(' ')}]`)}` };
+}
+
+/**
+ * While berserk the menu offers only attacking the nearest enemy, moving and
+ * ending the turn. It lapses once no enemy is within 60 ft. Simplification:
+ * allies are never the target.
+ */
+function berserkChoices(state: GameState, char: Character, choices: GameChoice[]): GameChoice[] {
+  if (!char.conditions.includes('berserk') || !state.combat_active) return choices;
+  const me = state.entities?.find((e) => e.id === char.id)?.pos;
+  if (!me) return choices;
+  const near = (state.entities ?? [])
+    .filter((e) => e.isEnemy && e.hp > 0)
+    .map((e) => ({ id: e.id, ft: distanceFeet(me, e.pos) }))
+    .sort((a, b) => a.ft - b.ft)[0];
+  if (!near || near.ft > 60) return choices;
+  const kept = choices.filter((c) => {
+    const a = c.action as { type: string; targetEnemyId?: string };
+    if (a.type === 'attack' || a.type === 'bonus_weapon_attack') return a.targetEnemyId === near.id;
+    return ['grid_move', 'end_turn', 'pass', 'resolve_reaction', 'death_save'].includes(a.type);
+  });
+  return kept.length ? kept : choices;
 }
 
 // SRD Paladin Abjure Foes — its Frightened ends early when the creature takes
@@ -3950,6 +4027,8 @@ export function endCombatState(st: GameState): GameState {
           cond === 'superior_defense' ||
           cond === 'innate_sorcery' ||
           cond === 'holy_nimbus' ||
+          // The Berserker Axe's fury ends with the fight.
+          cond === 'berserk' ||
           // Holy Aura's party ward (1 min ≈ encounter) doesn't carry over.
           cond === 'holy_warded'
         ) {
@@ -8226,7 +8305,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       }
     }
   }
-  const sliced = MAX_CHOICES ? choices.slice(0, MAX_CHOICES) : choices;
+  const restricted = berserkChoices(state, char, choices);
+  const sliced = MAX_CHOICES ? restricted.slice(0, MAX_CHOICES) : restricted;
   // Stamp seenKey on each choice (undefined for kinds not worth dimming).
   // Centralizing the stamp here means each emit site doesn't need to know
   // its own disambiguation rules.
@@ -9880,6 +9960,8 @@ export function pcDamageTaken(
   const response = pcDamageResponse(char, st, type, spellId);
   if (response === 'immune') return 0;
   let out = response === 'resist' ? Math.floor(dmg / 2) : dmg;
+  // SRD Vulnerability (Armor of Vulnerability's curse) — doubled after Resistance.
+  if (type && char.worn_traits?.vulnerabilities?.includes(type)) out *= 2;
   for (const r of char.worn_traits?.reductions ?? []) {
     if (r.damageType === type) out -= rollDice(r.dice);
   }
@@ -10086,7 +10168,13 @@ function resolveEnemyConditionCast(args: {
   let applied: boolean;
   if (ability && args.context) {
     const res = conditionSavingThrow(
-      { condition: cond, ability, dc, fromSpell: true } as OnHitEffect & {
+      {
+        condition: cond,
+        ability,
+        dc,
+        fromSpell: true,
+        fromDemon: enemy.creatureSubtype === 'demon',
+      } as OnHitEffect & {
         ability: AbilityKey;
         dc: number;
       },
@@ -10525,6 +10613,29 @@ export function hostileTargetSides(side: EntitySide): EntitySide[] {
  * `hostileTargetSides('enemy')` is `['pc']`, equivalent to the prior
  * `!isEnemy && !isCompanion` filter.
  */
+/**
+ * SRD Shield of Missile Attraction — when a ranged weapon attacker (reach 20+
+ * ft) targets a PC within a cursed bearer's radius, the bearer becomes the
+ * target. Returns the (possibly redirected) character index.
+ */
+export function missileAttractionTarget(
+  st: GameState,
+  attacker: Pick<Enemy, 'attackReachFt'>,
+  targetCharIdx: number
+): number {
+  if (targetCharIdx < 0 || (attacker.attackReachFt ?? 5) < 20) return targetCharIdx;
+  const target = st.characters[targetCharIdx];
+  const tPos = st.entities?.find((e) => e.id === target.id && !e.isEnemy)?.pos;
+  if (!tPos) return targetCharIdx;
+  const idx = st.characters.findIndex((c) => {
+    const ft = c.worn_traits?.missileAttractionFt;
+    if (!ft || c.id === target.id || c.dead || c.hp <= 0) return false;
+    const pos = st.entities?.find((e) => e.id === c.id && !e.isEnemy)?.pos;
+    return !!pos && distanceFeet(pos, tPos) <= ft;
+  });
+  return idx >= 0 ? idx : targetCharIdx;
+}
+
 export function selectTarget(
   actorId: string,
   st: GameState
@@ -11689,7 +11800,14 @@ export async function runEnemyTurns(args: {
           }
         }
       }
-      const { actorEnt: eEnt, targetCharIdx } = selectTarget(eEntry.id, st);
+      const picked = selectTarget(eEntry.id, st);
+      const eEnt = picked.actorEnt;
+      // SRD Shield of Missile Attraction's curse — a ranged weapon attack at a
+      // creature within range of the cursed bearer targets the bearer instead.
+      const targetCharIdx = missileAttractionTarget(st, rm, picked.targetCharIdx);
+      if (targetCharIdx !== picked.targetCharIdx) {
+        narrative += `\n\n${fmt.note(`[The cursed Shield of Missile Attraction draws the ${rm.name}'s attack toward ${st.characters[targetCharIdx].name}.]`)}`;
+      }
       if (targetCharIdx >= 0) {
         let target = st.characters[targetCharIdx];
         // SRD Hide DC tracking — delegated to `resolveEnemyHideCheck`.
@@ -12966,6 +13084,9 @@ export async function takeAction({
   // SRD — break Charm on any creature that took damage this action.
   st = breakCharmOnDamage(st, prevHpForCharm);
   st = breakAbjureOnDamage(st, prevHpForCharm);
+  // SRD Berserker Axe — damage can send its cursed bearer berserk.
+  const berserk = berserkOnDamage(st, prevHpForCharm, context);
+  st = berserk.st;
   // SRD Warding Bond — redirect a warded ally's damage to its warder.
   st = redirectWardingBondDamage(st, prevHpForCharm);
 
@@ -12974,7 +13095,7 @@ export async function takeAction({
   const allDead = st.characters.every((c) => c.dead);
 
   return {
-    narrative: narrativeOut,
+    narrative: narrativeOut + berserk.note,
     choices: st.last_choices,
     newState: st,
     // The seed is normally immutable, but a few actions mutate it in place
