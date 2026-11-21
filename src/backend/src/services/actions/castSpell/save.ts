@@ -264,6 +264,7 @@ export function runSaveSpell(
                     [condToApply]: {
                       ability: spell.savingThrow!,
                       dc,
+                      ...(spell.conditionFailInto ? { failInto: spell.conditionFailInto } : {}),
                       // Recurring save-ends damage (Phantasmal Killer / Force):
                       // the enemy turn loop deals this on each failed re-save.
                       ...(spell.recurringSaveDamage

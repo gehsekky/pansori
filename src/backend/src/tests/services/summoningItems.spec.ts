@@ -111,7 +111,11 @@ describe('calling a creature', () => {
     const r = await use(st, 'figurine_bronze_griffon');
     const allies = r.newState.summoned_allies ?? [];
     expect(allies).toHaveLength(1);
-    expect(allies[0]).toMatchObject({ name: 'Griffon', fromItem: 'i0', ownerId: 'pc-1' });
+    expect(allies[0]).toMatchObject({
+      name: 'Griffon',
+      fromItem: 'i0:figurine_bronze_griffon',
+      ownerId: 'pc-1',
+    });
     expect(r.narrative).toMatch(/Griffon stands ready/);
     // Combat start puts it on the grid.
     const fight = seedSummonedAllies({

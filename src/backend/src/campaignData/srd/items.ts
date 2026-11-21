@@ -5460,6 +5460,76 @@ const UNIQUE_ITEMS: Array<[string, LootItem]> = [
   ),
 ];
 
+// ─── Random-table items (SRD 5.2.1, batch 13) ────────────────────────────────
+// Items whose use is decided by a roll on their own table: the Wand of Wonder
+// (`itemEffect`), the Bags of Tricks (a summon's `randomForms`), the Bag of
+// Beans, and the Ivory Goats (three figurines, each with its own recharge).
+const BAGS_OF_TRICKS: Array<[string, string]> = [
+  ['gray', 'Weasel, Giant Rat, Badger, Boar, Panther, Giant Badger, Dire Wolf or Giant Elk'],
+  ['rust', 'Rat, Owl, Mastiff, Goat, Giant Goat, Giant Boar, Lion or Brown Bear'],
+  ['tan', 'Jackal, Ape, Baboon, Axe Beak, Black Bear, Giant Weasel, Giant Hyena or Tiger'],
+];
+const RANDOM_ITEMS: Array<[string, LootItem]> = [
+  wand(
+    'wand_of_wonder',
+    'Wand of Wonder',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn; spending the last one risks crumbling it to dust). Spend a charge to point it at a spot within 120 feet, then roll 1d100 to see what happens — a Fireball, Lightning Bolt, a cloud of butterflies, a stream of gems, or something stranger. Its spells have save DC 15.',
+    {
+      requiresAttunement: true,
+      charges: WAND_CHARGES,
+      itemSpellDc: 15,
+      itemSpells: [sp('wand_of_wonder', 1)],
+    }
+  ),
+  ...BAGS_OF_TRICKS.map(([color, table]) =>
+    wondrous(
+      `bag_of_tricks_${color}`,
+      `Bag of Tricks (${cap(color)})`,
+      'Uncommon',
+      `Out of combat, pull a fuzzy ball from the bag and toss it: it becomes a random creature (1d8: ${table}) that joins the party until the next Long Rest. Three balls per dawn.`,
+      null,
+      {
+        weight: 0.5,
+        castWhileCarried: true,
+        charges: { max: 3, regain: '3' },
+        itemSpells: [sp(`bag_of_tricks_${color}`, 1)],
+      }
+    )
+  ),
+  // Simplification: the bag holds a fixed 7 beans rather than 3d4.
+  wondrous(
+    'bag_of_beans',
+    'Bag of Beans',
+    'Rare',
+    'Holds 7 dry beans. Dump some out and they explode around you (DC 15 Dexterity save, 5d4 Force damage, half on a success; you are caught too). Or, out of combat, plant one and water it: a minute later something springs from the ground (roll 1d100).',
+    null,
+    {
+      weight: 0.5,
+      castWhileCarried: true,
+      charges: uses(7),
+      itemSpellDc: 15,
+      itemSpells: [sp('beans_dump', 1), sp('beans_plant', 1)],
+    }
+  ),
+  wondrous(
+    'figurine_of_wondrous_power_ivory_goats',
+    'Figurine of Wondrous Power (Ivory Goats)',
+    'Rare',
+    "Three goat statuettes. Out of combat, throw one to turn it into a goat that joins the party until the next Long Rest: the Goat of Travail becomes a Giant Goat that fights (then not again for 30 days), the Goat of Traveling a large goat you can ride (as often as you like), and the Goat of Terror a Giant Goat you can ride that doesn't attack (then not again for 15 days).",
+    null,
+    {
+      weight: 0,
+      castWhileCarried: true,
+      itemSpells: [
+        sp('goat_of_travail', 0, { rechargeDays: 30 }),
+        sp('goat_of_traveling', 0),
+        sp('goat_of_terror', 0, { rechargeDays: 15 }),
+      ],
+    }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -5824,6 +5894,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...SUMMONING_ITEMS,
   ...UTILITY_ITEMS,
   ...UNIQUE_ITEMS,
+  ...RANDOM_ITEMS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

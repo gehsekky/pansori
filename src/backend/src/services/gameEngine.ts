@@ -7937,8 +7937,11 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       if (spell.outOfCombatOnly && state.combat_active) continue;
       const econ = spell.castTime === 'bonus_action' ? 'bonus_action_used' : 'action_used';
       if (state.combat_active && char.turn_actions[econ]) continue;
-      const isOffensive = !!(spell.damage || spell.condition) || spell.id === 'true_strike';
-      if (isOffensive && !enemyAlive) continue;
+      const isOffensive =
+        !!(spell.damage || spell.condition) ||
+        spell.id === 'true_strike' ||
+        spell.itemEffect === 'wand_of_wonder';
+      if (isOffensive && !enemyAlive && spell.itemEffect !== 'beans_dump') continue;
       if (spell.heal && state.characters.every((c) => c.dead || c.hp >= c.max_hp)) continue;
       const how = loot.spellScroll
         ? `Read the ${loot.name}`
@@ -7953,7 +7956,9 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         itemInstanceId: inv.instance_id,
       };
       const perEnemy = isOffensive && !spell.blastRadius && livingEnemies.length >= 2;
-      const targets = perEnemy ? livingEnemies : [isOffensive ? livingEnemies[0] : undefined];
+      const targets = perEnemy
+        ? livingEnemies
+        : [isOffensive && enemyAlive ? livingEnemies[0] : undefined];
       for (const en of targets) {
         choices.push({
           label: `${how}${costNote}${perEnemy && en ? ` → ${en.name}` : ''}`,
@@ -11472,6 +11477,8 @@ export async function runEnemyTurns(args: {
         const acted = new Set(seEnt.save_ends_acted ?? []);
         const nextActed = new Set(acted);
         const cleared: string[] = [];
+        // Conditions a failed save hardens into another (Wand of Wonder).
+        const hardened: Array<[string, string]> = [];
         // SRD Phantasmal Killer / Force — a failed end-of-turn save takes the
         // illusion's psychic damage again. Accrued across save-ends conditions.
         let recurDamage = 0;
@@ -11503,6 +11510,8 @@ export async function runEnemyTurns(args: {
           const failed = legendary.failed;
           if (!failed) {
             cleared.push(cond);
+          } else if (info.failInto) {
+            hardened.push([cond, info.failInto]);
           } else if (info.recurDice) {
             recurDamage += applyDamageMultiplier(
               rollDice(info.recurDice),
@@ -11515,24 +11524,39 @@ export async function runEnemyTurns(args: {
           }
         }
         const recurNewHp = Math.max(0, seEnt.hp - recurDamage);
-        if (cleared.length > 0 || nextActed.size !== acted.size || recurDamage > 0) {
+        if (
+          cleared.length > 0 ||
+          hardened.length > 0 ||
+          nextActed.size !== acted.size ||
+          recurDamage > 0
+        ) {
+          const gone = [...cleared, ...hardened.map(([c]) => c)];
           st = {
             ...st,
             entities: (st.entities ?? []).map((e) => {
               if (e.id !== eEntry.id || !e.isEnemy) return e;
               const nextSaveEnds = { ...(e.save_ends ?? {}) };
-              for (const c of cleared) delete nextSaveEnds[c];
+              for (const c of gone) delete nextSaveEnds[c];
+              const nextDurations = { ...(e.condition_durations ?? {}) };
+              for (const c of gone) delete nextDurations[c];
               return {
                 ...e,
                 hp: recurDamage > 0 ? recurNewHp : e.hp,
-                conditions: e.conditions.filter((c) => !cleared.includes(c)),
+                conditions: [
+                  ...e.conditions.filter((c) => !gone.includes(c)),
+                  ...hardened.map(([, into]) => into).filter((c) => !e.conditions.includes(c)),
+                ],
+                condition_durations: nextDurations,
                 save_ends: nextSaveEnds,
-                save_ends_acted: [...nextActed].filter((c) => !cleared.includes(c)),
+                save_ends_acted: [...nextActed].filter((c) => !gone.includes(c)),
               };
             }),
           };
           if (cleared.length > 0) {
             narrative += `\n\n[${rm.name} shakes off ${cleared.join(', ')}.]`;
+          }
+          for (const [from, into] of hardened) {
+            narrative += `\n\n[${rm.name} fails to shake off ${from} — it is ${into}!]`;
           }
           if (recurDamage > 0) {
             narrative += `\n\n[${rm.name} takes ${recurDamage} ${recurType} from ${recurLabel}${recurNewHp <= 0 ? ' and succumbs' : ''}.]`;
@@ -13058,7 +13082,13 @@ export async function takeAction({
     const veiled = char.condition_sources?.invisible === NATURES_VEIL_SOURCE;
     // SRD Ring / Cloak of Invisibility — the item's Invisible survives attacking.
     const itemInvisible = char.conditions.includes('item_invisibility');
+    // Invisible only as of this very action (a Wand of Wonder's Invisibility):
+    // there was nothing for the action to reveal.
+    const newlyInvisible = !state.characters
+      .find((c) => c.id === char.id)
+      ?.conditions.includes('invisible');
     const keepsInvisible =
+      newlyInvisible ||
       veiled ||
       itemInvisible ||
       grantsInvisible ||

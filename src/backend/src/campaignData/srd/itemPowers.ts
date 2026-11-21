@@ -449,4 +449,153 @@ export const ITEM_POWERS: Record<string, Spell> = {
       }),
     ])
   ),
+  // ── Random-table items ────────────────────────────────────────────────────
+  // SRD Wand of Wonder — a d100 roll on its table decides what each charge does
+  // (`runItemEffect`); the table's own effects are the powers below it.
+  wand_of_wonder: power({
+    id: 'wand_of_wonder',
+    name: 'Wonder',
+    level: 1,
+    itemEffect: 'wand_of_wonder',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    targetType: 'enemy',
+    desc: 'Point the wand at a spot within 120 feet and see what happens — a roll on the Wand of Wonder table.',
+  }),
+  // Simplification: the flash catches enemies only, not the wielder's allies.
+  wonder_flash: power({
+    id: 'wonder_flash',
+    name: 'Shimmering Burst',
+    level: 1,
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'blinded',
+    conditionDuration: 10,
+    conditionSaveEnds: true,
+    aoeCondition: true,
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'Colorful light bursts 30 feet out from you: each creature makes a Constitution save or is Blinded for 1 minute (save again at the end of each turn).',
+  }),
+  // The damage is set per use (1d4 x 10 gems).
+  wonder_gems: power({
+    id: 'wonder_gems',
+    name: 'Stream of Gems',
+    level: 1,
+    damage: '10',
+    damageType: 'bludgeoning',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    targetType: 'enemy',
+    desc: 'A stream of tiny gems pelts a creature, 1 Bludgeoning damage per gem.',
+  }),
+  wonder_petrify: power({
+    id: 'wonder_petrify',
+    name: 'Creeping Stone',
+    level: 1,
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'restrained',
+    conditionSaveEnds: true,
+    conditionFailInto: 'petrified',
+    rangeKind: 'ranged',
+    rangeFt: 120,
+    targetType: 'enemy',
+    desc: 'A creature makes a Constitution save or is Restrained as it begins to turn to stone; if it fails again at the end of its next turn, it is Petrified.',
+  }),
+  // SRD Bag of Beans — dumped beans burst in a 10-foot Sphere around you (you
+  // make the save too); a planted bean grows into something off its table.
+  beans_dump: power({
+    id: 'beans_dump',
+    name: 'Dump the Beans',
+    level: 1,
+    itemEffect: 'beans_dump',
+    savingThrow: 'dex',
+    saveEffect: 'half',
+    damage: '5d4',
+    damageType: 'force',
+    blastRadius: 10,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'Tip beans out: they explode in a 10-foot Sphere around you. Everyone there, you included, makes a DC 15 Dexterity save, taking 5d4 Force damage (half on a success).',
+  }),
+  beans_plant: power({
+    id: 'beans_plant',
+    name: 'Plant a Bean',
+    level: 1,
+    itemEffect: 'beans_plant',
+    outOfCombatOnly: true,
+    targetType: 'self',
+    rangeKind: 'self',
+    desc: 'Plant and water a bean; a minute later something springs up from the ground.',
+  }),
+  // SRD Bag of Tricks — the fuzzy ball becomes a creature off the bag's d8
+  // table. Simplification: as with the other item creatures, it's pulled out
+  // between fights and joins the next one (it leaves at the next Long Rest).
+  ...Object.fromEntries(
+    (
+      [
+        [
+          'gray',
+          [
+            'weasel',
+            'giant_rat',
+            'badger',
+            'boar',
+            'panther',
+            'giant_badger',
+            'dire_wolf',
+            'giant_elk',
+          ],
+        ],
+        [
+          'rust',
+          ['rat', 'owl', 'mastiff', 'goat', 'giant_goat', 'giant_boar', 'lion', 'brown_bear'],
+        ],
+        [
+          'tan',
+          [
+            'jackal',
+            'ape',
+            'baboon',
+            'axe_beak',
+            'black_bear',
+            'giant_weasel',
+            'giant_hyena',
+            'tiger',
+          ],
+        ],
+      ] as const
+    ).map(([color, table]) => [
+      `bag_of_tricks_${color}`,
+      summonPower(
+        `bag_of_tricks_${color}`,
+        'Fuzzy Ball',
+        { ...creature(table[0]), randomForms: table.map((k) => creature(k)), stacks: true },
+        'Pull a fuzzy ball from the bag and toss it: it becomes a creature off the bag’s table (1d8).'
+      ),
+    ])
+  ),
+  // SRD Figurine of Wondrous Power (Ivory Goats). Simplification: each goat
+  // stays until the next Long Rest (not 3 hours / its charge-hours); the Goat
+  // of Terror's horn weapons and fear aura aren't modeled.
+  goat_of_travail: summonPower(
+    'goat_of_travail',
+    'Goat of Travail',
+    creature('giant_goat'),
+    'The statuette becomes a Giant Goat that fights beside you.'
+  ),
+  goat_of_traveling: summonPower(
+    'goat_of_traveling',
+    'Goat of Traveling',
+    { ...creature('riding_horse', { isMount: true, speed: 60 }), name: 'Traveling Goat' },
+    'The statuette becomes a large goat (a Riding Horse’s statistics) you can ride.'
+  ),
+  goat_of_terror: summonPower(
+    'goat_of_terror',
+    'Goat of Terror',
+    creature('giant_goat', { noAttack: true, isMount: true, speed: 40 }),
+    'The statuette becomes a Giant Goat you can ride; it doesn’t attack.'
+  ),
 };

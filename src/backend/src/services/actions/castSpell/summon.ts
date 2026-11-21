@@ -1,6 +1,6 @@
+import { abilityMod, d } from '../../rulesEngine.js';
 import type { ActionContext } from '../types.js';
 import type { Spell } from '../../../types.js';
-import { abilityMod } from '../../rulesEngine.js';
 import { pactChainForms } from '../../invocations.js';
 import { randomUUID } from 'crypto';
 
@@ -44,18 +44,24 @@ export function runSummonSpell(
       ? pactChainForms()
       : []),
   ];
-  const chosen = forms.find((o) => o.name === summonVariant) ?? base;
+  // SRD Bag of Tricks — the creature comes off the bag's d8 table.
+  const rolled = base.randomForms?.length
+    ? base.randomForms[d(base.randomForms.length) - 1]
+    : undefined;
+  const chosen = rolled ?? forms.find((o) => o.name === summonVariant) ?? base;
   // SRD Find Familiar — one familiar only: a recast gives the existing
   // familiar the new form (the old one is replaced).
   const isFamiliar = spell.id === 'find_familiar';
   // SRD Manual of Golems — the golem serves for good (no Long Rest reversion).
   const forGood = !!fromItem && !!base.permanent;
-  if (fromItem && !forGood) {
+  // Each of an item's powers keeps its own creature (the Ivory Goats are three
+  // figurines in one set); using that power again replaces it, unless the item
+  // makes several at once (Bag of Tricks).
+  const itemTag = fromItem ? `${fromItem.instanceId}:${spell.id}` : undefined;
+  if (itemTag && !forGood && !base.stacks) {
     ctx.st = {
       ...ctx.st,
-      summoned_allies: (ctx.st.summoned_allies ?? []).filter(
-        (a) => a.fromItem !== fromItem.instanceId
-      ),
+      summoned_allies: (ctx.st.summoned_allies ?? []).filter((a) => a.fromItem !== itemTag),
     };
   }
   if (isFamiliar) {
@@ -91,7 +97,7 @@ export function runSummonSpell(
     // flag + Speed so combat start auto-mounts the caster.
     isMount: base.isMount,
     speed: base.speed,
-    ...(fromItem && !forGood ? { fromItem: fromItem.instanceId } : {}),
+    ...(itemTag && !forGood ? { fromItem: itemTag } : {}),
   }));
   ctx.st = {
     ...ctx.st,
@@ -103,6 +109,12 @@ export function runSummonSpell(
     ctx.narrative =
       (ctx.narrative ?? '') +
       `${char.name} finishes the work${slotNote} — a ${chosen.name} stirs to life and obeys its maker's commands.`;
+    return true;
+  }
+  if (rolled) {
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      `${char.name} pulls a small fuzzy ball from the bag${slotNote} and tosses it — it lands as a ${chosen.name}, ready to fight at the party's side until the next Long Rest.`;
     return true;
   }
   if (fromItem) {

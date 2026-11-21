@@ -163,10 +163,14 @@ export function runAoeSpell(
   // above already returned if !ctx.enemy. TS can't narrow across the
   // long handler body, so we re-assert.
   const aoeAnchor = ctx.enemy?.id;
-  const epicenter =
-    ctx.st.entities.find((e) => e.id === aoeAnchor && e.isEnemy)?.pos ??
-    ctx.st.entities.find((e) => e.isEnemy)?.pos;
   const casterPos = ctx.st.entities.find((e) => e.id === char.id)?.pos;
+  // A self-centered Sphere is an Emanation from the caster (a Bag of Beans
+  // dumped at your feet); every other Sphere is centered on the target.
+  const emanation = spell.rangeKind === 'self' && aoeShape === 'sphere';
+  const epicenter = emanation
+    ? casterPos
+    : (ctx.st.entities.find((e) => e.id === aoeAnchor && e.isEnemy)?.pos ??
+      ctx.st.entities.find((e) => e.isEnemy)?.pos);
   if (!epicenter) return false;
 
   const blastTargets =

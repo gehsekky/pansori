@@ -29,6 +29,7 @@ import { runCombatStart } from '../attack/combatStart.js';
 import { runDivineWord } from './divineWord.js';
 import { runEnlargeReduce } from './enlargeReduce.js';
 import { runHealSpell } from './heal.js';
+import { runItemEffect } from './itemEffects.js';
 import { runMultiTargetSpell } from './multiTarget.js';
 import { runPrismaticSpray } from './prismaticSpray.js';
 import { runRecurringAttackSpell } from '../recurringSpellAttack.js';
@@ -118,9 +119,9 @@ export const handleCastSpell: ActionHandler<{
   const { spellId, slotLevel } = action;
   const fromItem = (action as { itemInstanceId?: string }).itemInstanceId;
   // An item power (not a spell) is only reachable through its item.
-  const baseSpell = fromItem
-    ? itemSpellFor(ctx.context.spellTable, spellId)
-    : ctx.context.spellTable?.[spellId];
+  const baseSpell =
+    ctx.tableCast?.spell ??
+    (fromItem ? itemSpellFor(ctx.context.spellTable, spellId) : ctx.context.spellTable?.[spellId]);
   if (!baseSpell) {
     ctx.narrative = `Unknown spell: ${spellId}.`;
     return;
@@ -181,6 +182,13 @@ export const handleCastSpell: ActionHandler<{
         : i
     );
     ctx.narrative = `${pc.char.name} casts ${spell.name}${slotNote} into the ${store.loot.name}, where it waits to be released (DC ${dc}).`;
+    return;
+  }
+
+  // ── Item tables (Wand of Wonder, Bag of Beans) ─────────────────────────
+  // The item's charge is spent; its own table decides what happens, which may
+  // be a spell cast through this same handler.
+  if (spell.itemEffect && runItemEffect(ctx, spell, action, slotNote, handleCastSpell)) {
     return;
   }
 
@@ -680,7 +688,8 @@ export const handleCastSpell: ActionHandler<{
     // defaults to Wolf). The form's HP becomes the polymorph Temp HP pool.
     const beastFormId = (action as { beastForm?: string }).beastForm;
     const form = beastFormId ? BEAST_FORMS[beastFormId] : undefined;
-    const polymorphForm = form ? { name: form.name, hp: form.hp ?? 11 } : undefined;
+    const polymorphForm =
+      ctx.tableCast?.form ?? (form ? { name: form.name, hp: form.hp ?? 11 } : undefined);
     const r = runSaveSpell(
       ctx,
       spellTarget,

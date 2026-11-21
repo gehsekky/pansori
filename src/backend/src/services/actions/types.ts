@@ -5,6 +5,7 @@ import type {
   GridPos,
   PlacedLoot,
   Seed,
+  Spell,
   StructuredAction,
 } from '../../types.js';
 import type { EnemySubAttackResult, PendingSaveRerollInfo } from '../gameEngine.js';
@@ -72,6 +73,13 @@ export interface ActionContext {
    * scroll when an out-of-range cast is refunded.
    */
   itemCast?: { attackBonus?: number; undo: () => void };
+  /**
+   * A spell an item's random table casts (Wand of Wonder): set by
+   * `runItemEffect` around a nested cast. The nested cast is free (no slot,
+   * prep or Material), uses `dc`, and resolves `spell` as given; `form` is a
+   * Polymorph form picked by the table.
+   */
+  tableCast?: { name: string; dc: number; spell: Spell; form?: { name: string; hp: number } };
   /**
    * Structured emission queue (see services/narrative/fragments.ts).
    * Migrated handlers push fragments here instead of doing

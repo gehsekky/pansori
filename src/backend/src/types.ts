@@ -1013,6 +1013,13 @@ export interface Spell {
   // An attack-roll power's condition the target escapes with a check at the end
   // of each of its turns (Iron Bands: DC 20 Strength) — run as a save-ends.
   conditionEscape?: { ability: AbilityKey; dc: number };
+  // A save-ends condition that becomes this one when the target fails its
+  // repeat save (Wand of Wonder's Restrained → Petrified).
+  conditionFailInto?: ConditionName;
+  // An item power resolved by its own table rather than the spell pipeline
+  // (Wand of Wonder's d100 effects, a Bag of Beans' dumped or planted beans) —
+  // dispatched by `runItemEffect` once the item's charge is spent.
+  itemEffect?: 'wand_of_wonder' | 'beans_dump' | 'beans_plant';
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.
@@ -1146,6 +1153,12 @@ export interface Spell {
     // caster; `speed` is the mount's Speed (ft).
     isMount?: boolean;
     speed?: number;
+    // The creature is rolled from this list (equal odds) instead of being the
+    // block above (Bag of Tricks: a d8 table per bag).
+    randomForms?: Array<{ name: string; ac: number; maxHp: number; toHit: number; damage: string }>;
+    // An item creature that doesn't replace the item's earlier ones (Bag of
+    // Tricks: up to three at once).
+    stacks?: boolean;
   };
   // SRD Dragon's Breath — a self/ally buff that grants the target a breath
   // weapon: until the spell ends (concentration) the target can take an action

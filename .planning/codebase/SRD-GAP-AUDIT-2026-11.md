@@ -634,6 +634,36 @@ Apparatus of the Crab (a vehicle); Dragon Orb (an Artifact); the random-table
 items (Mysterious Deck, Wand of Wonder, Hat of Many Spells, Bag of Beans, Deck
 of Illusions, Robe of Useful Items) alongside the batch 9–10 deferrals.
 
+**Batch 13 done 2026-11-20 — random-table items, part 1.** New machinery: an
+item power can be resolved by its own table (`Spell.itemEffect`, dispatched by
+`castSpell/itemEffects.ts` once the charge is spent), and a table result can
+cast a real spell through the same handler as a free cast with the item's DC
+(`ctx.tableCast`, server-side only); item summons can be rolled from a list
+(`summon.randomForms`) and can stack (`summon.stacks`), and each of an item's
+powers now keeps its own creature (`fromItem` is `instance:power`); a
+self-centered damage Sphere is an Emanation from the caster; a save-ends
+condition can harden into another on a failed repeat save
+(`conditionFailInto` → `save_ends.failInto`). Fixed along the way: Invisibility
+gained during an action (not just from an Invisibility-named cast) is no longer
+stripped by that same action. Items: Wand of Wonder (the full d100 table —
+Darkness / Faerie Fire / Fireball / Slow / Stinking Cloud, Gust of Wind,
+Lightning Bolt, Invisibility on yourself and Polymorph into a Black Bear,
+Giant Wasp or Frog at DC 15; self-Stun, 1d6 Psychic, Enlarge on the target,
+shrinking yourself, the blinding burst, the gem stream and the creeping
+petrification); the Gray, Rust and Tan Bags of Tricks; the Bag of Beans; and
+the Ivory Goats. Simplifications: the wand's rain, butterflies, grass, leaves
+and vanished object are scenery (no obscured areas on the grid); its hostile
+Rhinoceros / Elephant / Rat wanders off; the burst spares allies; the whole gem
+stream hits the target, and the gems are gathered as gold. Bag of Tricks
+creatures come out between fights like the other item creatures. The Bag of
+Beans holds a fixed 7 beans; a planted bean's creatures (Treant, Shriekers,
+Bulette, toads, the pyramid's Undead) and its toadstools and eggs are
+described rather than placed; the fruit tree's 1d8 potions go into the pack.
+The goats stay until the next Long Rest; the Goat of Traveling's charge-hours
+and the Goat of Terror's horn weapons and fear aura aren't modeled. Still
+deferred: Hat of Many Spells, Deck of Illusions, Robe of Useful Items, the
+Mysterious Deck, and the batch 9–12 deferrals.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

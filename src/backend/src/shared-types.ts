@@ -739,6 +739,9 @@ export interface CombatEntity {
       // Not a spell or magical effect (Alchemist's Fire), so Magic Resistance
       // gives no Advantage and Legendary Resistance isn't spent on it.
       mundane?: boolean;
+      // A failed repeat save turns the condition into this one for good (Wand
+      // of Wonder: Restrained, then Petrified).
+      failInto?: string;
     }
   >;
   // Conditions in `save_ends` for which this creature has completed ≥1 afflicted
