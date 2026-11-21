@@ -143,6 +143,16 @@ export function runPrecast(
       ctx.narrative = `The ${plan.loot.name} casts ${spell.name} on its wearer only.`;
       return { done: true };
     }
+    // SRD Dust of Dryness — only a creature made mostly of water is affected.
+    if (spell.onlyVs) {
+      const tgt = action.targetEnemyId
+        ? ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId)
+        : ctx.enemy;
+      if (!tgt || !spell.onlyVs.some((n) => tgt.name.includes(n))) {
+        ctx.narrative = `The ${plan.loot.name} works only on a ${spell.onlyVs.join(' or ')}.`;
+        return { done: true };
+      }
+    }
   }
   const noComponents = !!itemPlan && !itemPlan.scroll;
 

@@ -262,4 +262,129 @@ export const ITEM_POWERS: Record<string, Spell> = {
     rangeFt: 60,
     desc: 'Motes of light burst in a 15-foot cube: Dexterity save, 5d4 Radiant per mote (half on a success).',
   }),
+
+  // ── Utility and travel items ──────────────────────────────────────────────
+  // SRD Feather Token (Bird) — a Roc that can't attack, carrying the party.
+  feather_bird: summonPower(
+    'feather_bird',
+    'Feather Bird',
+    creature('roc', { noAttack: true, isMount: true }),
+    'The token becomes an enormous bird (a Roc that can’t attack) you can ride.'
+  ),
+  // SRD Rope of Entanglement — DC 15 Dexterity save or Restrained. Simplification:
+  // the target's escape check is its end-of-turn save, and the rope's own AC / HP
+  // aren't modeled.
+  entangle_rope: power({
+    id: 'entangle_rope',
+    name: 'Entangle',
+    level: 1,
+    savingThrow: 'dex',
+    saveEffect: 'negates',
+    condition: 'restrained',
+    conditionDuration: 10,
+    conditionSaveEnds: true,
+    rangeKind: 'ranged',
+    rangeFt: 20,
+    targetType: 'enemy',
+    desc: 'The rope darts out at a creature within 20 feet: Dexterity save or Restrained (it tries to break free at the end of each of its turns).',
+  }),
+  // SRD Dust of Dryness — a pinch on a creature made mostly of water: Con save,
+  // 10d6 Necrotic (half on a success).
+  dryness_dust: power({
+    id: 'dryness_dust',
+    name: 'Dust of Dryness',
+    level: 1,
+    damage: '10d6',
+    damageType: 'necrotic',
+    savingThrow: 'con',
+    saveEffect: 'half',
+    rangeKind: 'touch',
+    targetType: 'enemy',
+    onlyVs: ['Water Elemental'],
+    desc: 'A pinch on a creature made mostly of water within 5 feet: Constitution save, 10d6 Necrotic (half on a success).',
+  }),
+  // SRD Decanter of Endless Water (Geyser) — one creature in a 30-ft Line: Str
+  // save or 1d4 Bludgeoning and Prone. Simplification: aimed at one creature
+  // within 30 ft; the Splash and Fountain commands are table color.
+  geyser: power({
+    id: 'geyser',
+    name: 'Geyser',
+    level: 1,
+    damage: '1d4',
+    damageType: 'bludgeoning',
+    savingThrow: 'str',
+    saveEffect: 'negates',
+    condition: 'prone',
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    targetType: 'enemy',
+    desc: 'Thirty gallons of water gush out in a line: one creature makes a Strength save or takes 1d4 Bludgeoning and falls Prone.',
+  }),
+  // SRD Gem of Brightness — a beam (1 charge) or a 30-ft Cone flare (5 charges):
+  // Con save or Blinded for 1 minute, saving again at the end of each turn.
+  brightness_beam: power({
+    id: 'brightness_beam',
+    name: 'Brilliant Beam',
+    level: 1,
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'blinded',
+    conditionDuration: 10,
+    conditionSaveEnds: true,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    targetType: 'enemy',
+    desc: 'A beam of light at one creature within 60 feet: Constitution save or Blinded for 1 minute (save again at the end of each turn).',
+  }),
+  brightness_flare: power({
+    id: 'brightness_flare',
+    name: 'Blinding Flare',
+    level: 1,
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'blinded',
+    conditionDuration: 10,
+    conditionSaveEnds: true,
+    aoeCondition: true,
+    blastRadius: 30,
+    aoeShape: 'cone',
+    rangeKind: 'self',
+    desc: 'A flare of light in a 30-foot cone: each creature makes a Constitution save or is Blinded for 1 minute (save again at the end of each turn).',
+  }),
+  // SRD Iron Bands — a ranged attack (Dex + Proficiency Bonus): Restrained on a
+  // hit; a DC 20 Strength check breaks free. Simplification: the escape check is
+  // made at the end of each of the target's turns, and a success doesn't
+  // destroy the bands (a failure doesn't lock out retries for a day); the
+  // Huge-or-smaller limit isn't checked.
+  iron_bands: power({
+    id: 'iron_bands',
+    name: 'Iron Bands',
+    level: 1,
+    attackRoll: true,
+    condition: 'restrained',
+    conditionDuration: 10,
+    conditionEscape: { ability: 'str', dc: 20 },
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    targetType: 'enemy',
+    desc: 'Hurl the sphere at a creature within 60 feet (ranged attack, Dexterity + Proficiency Bonus): on a hit it is Restrained in iron bands (a DC 20 Strength check breaks free).',
+  }),
+  // SRD Feather Token (Whip) — a floating whip: a melee spell attack (+9) for 1d6
+  // + 5 Force, repeated as a Bonus Action for 1 hour. Simplification: the first
+  // strike comes with the throw, and it's treated as within reach of its target.
+  feather_whip: power({
+    id: 'feather_whip',
+    name: 'Floating Whip',
+    level: 1,
+    attackRoll: true,
+    damage: '1d6+5',
+    damageType: 'force',
+    recurringAttack: true,
+    recurringAttackCost: 'bonus_action',
+    durationRounds: 600,
+    rangeKind: 'ranged',
+    rangeFt: 30,
+    targetType: 'enemy',
+    desc: 'A floating whip lashes a creature (melee spell attack +9, 1d6 + 5 Force) and keeps striking as a Bonus Action for 1 hour.',
+  }),
 };

@@ -123,6 +123,15 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     } else if (e.kind === 'displacement') t.displacement = true;
     else if (e.kind === 'truesight') t.truesightFt = Math.max(t.truesightFt ?? 0, e.feet);
     else if (e.kind === 'missile_snaring') t.missileSnaring = true;
+    else if (e.kind === 'reveal_invisible') {
+      t.revealInvisibleFt = Math.max(t.revealInvisibleFt ?? 0, e.feet);
+    } else if (e.kind === 'dark_flight') t.darkFlightFt = Math.max(t.darkFlightFt ?? 0, e.feet);
+    else if (e.kind === 'free_action') t.freeAction = true;
+    else if (e.kind === 'feather_fall') t.featherFall = true;
+    // Two sets of horseshoes can't both fit one mount: the better one counts.
+    else if (e.kind === 'mount_speed') {
+      t.mountSpeedBonus = Math.max(t.mountSpeedBonus ?? 0, e.feet);
+    } else if (e.kind === 'mount_float') t.mountFloats = true;
     else if (e.kind === 'ranged_weapon_resistance') t.rangedWeaponResistance = true;
     else if (e.kind === 'clawed_unarmed') {
       t.clawedUnarmed = { dice: e.dice, damageType: e.damageType, bonus: e.bonus };

@@ -93,7 +93,11 @@ export const handleGridMove: ActionHandler<{
   // someone in the same square) and require the final cell to be
   // an empty space — flying doesn't let you land in a wall.
   // SRD Potion of Flying — a Fly Speed equal to Speed while it lasts.
-  const flySpeedFt = Math.max(char.fly_speed_ft ?? 0, potionFlyFt(char));
+  // SRD Cloak of the Bat — a Fly Speed while in Dim Light or Darkness.
+  const roomLight = currentRoomForMove?.lighting ?? 'bright';
+  const batFt =
+    roomLight === 'dim' || roomLight === 'dark' ? (char.worn_traits?.darkFlightFt ?? 0) : 0;
+  const flySpeedFt = Math.max(char.fly_speed_ft ?? 0, potionFlyFt(char), batFt);
   const isFlying = flySpeedFt > 0 && flySpeedFt >= walkSpeedFt;
   // Transient wall spells that block movement (Wall of Force) stop everyone,
   // including flyers — nothing physically passes through. Opaque-only walls
@@ -150,11 +154,17 @@ export const handleGridMove: ActionHandler<{
     acrobatic ||
     hasInvocation(char, 'gift_of_the_depths') ||
     !!char.worn_traits?.swimFt;
+  // SRD Ring of Free Action — Difficult Terrain costs no extra movement. SRD
+  // Horseshoes of a Zephyr — a floating mount ignores Difficult Terrain and
+  // crosses water.
+  const floatingMount = !!mountEnt && !!char.worn_traits?.mountFloats;
+  const ignoresDifficult = !!char.worn_traits?.freeAction || floatingMount;
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
-    const isDifficult = difficultTerrain.some((dt) => posEqual(dt, pos));
+    const isDifficult = !ignoresDifficult && difficultTerrain.some((dt) => posEqual(dt, pos));
     const needsClimb = climbTerrain.some((ct) => posEqual(ct, pos)) && !hasClimbSpeed;
-    const needsSwim = swimTerrain.some((sw) => posEqual(sw, pos)) && !hasSwimSpeed;
+    const needsSwim =
+      !floatingMount && swimTerrain.some((sw) => posEqual(sw, pos)) && !hasSwimSpeed;
     const slowed = isDifficult || needsClimb || needsSwim;
     return acc + (slowed ? SQUARE_SIZE * 2 : SQUARE_SIZE);
   }, 0);
@@ -165,8 +175,9 @@ export const handleGridMove: ActionHandler<{
   // While mounted, the mount's Speed is the movement budget (SRD: the mount
   // moves as you direct it). Falls back to the rider's own speed if the mount
   // carries none.
+  // SRD Horseshoes of Speed — +30 ft to the mount's Speed.
   const speedFt = mountEnt
-    ? (mountEnt.speed_ft ?? walkSpeedFt)
+    ? (mountEnt.speed_ft ?? walkSpeedFt) + (char.worn_traits?.mountSpeedBonus ?? 0)
     : isFlying
       ? Math.max(walkSpeedFt, flySpeedFt)
       : walkSpeedFt;

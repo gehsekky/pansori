@@ -1,6 +1,6 @@
 import type { Character, InventoryItem, ItemSpell, LootItem, Spell } from '../types.js';
+import { abilityMod, d, profBonus, rollDice } from './rulesEngine.js';
 import { classSpellListTag, getAllClasses } from './multiclass.js';
-import { d, rollDice } from './rulesEngine.js';
 import { ITEM_POWERS } from '../campaignData/srd/itemPowers.js';
 import { clearInstance } from './equipment.js';
 
@@ -186,7 +186,8 @@ export function planItemCast(
     scroll: false,
     cost,
     dc: is.dc ?? loot.itemSpellDc,
-    attackBonus: is.attack,
+    // SRD Iron Bands — Dexterity modifier + Proficiency Bonus.
+    attackBonus: is.attack === 'dex' ? abilityMod(char.dex) + profBonus(char.level) : is.attack,
   };
 }
 

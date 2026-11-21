@@ -3,11 +3,12 @@ import {
   profBonus,
   resolveMysteryConsumable,
   resolveSaveWithAdvantage,
+  rollConditionSave,
   rollDice,
 } from '../rulesEngine.js';
-import { applyOilOfSharpness, expendedSlotLevel, resolvePotion } from '../potions.js';
+import { applyOilOfSharpness, expendedSlotLevel, potionRounds, resolvePotion } from '../potions.js';
 import { attuneBlocker, chargesLeft, dailyUsed, markDaily, spendCharges } from '../chargedItems.js';
-import { commitCharacter, getItemData } from '../gameEngine.js';
+import { commitCharacter, getItemData, hasSaveProficiency } from '../gameEngine.js';
 import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
 import { applyDamage } from '../damage.js';
@@ -188,14 +189,64 @@ export const handleUse: ActionHandler<{
       ctx.narrative = `The ${held.name} has no charges left.`;
       return;
     }
-    const res = resolvePotion(act.effect, nextChar, nextSt, ctx.context);
+    // Roll a timed effect's duration once — every subject shares it.
+    const effect =
+      act.effect.kind === 'condition'
+        ? { ...act.effect, rounds: potionRounds(act.effect.rounds) }
+        : act.effect;
+    // SRD Ring of X-ray Vision — using it again before a Long Rest risks
+    // Exhaustion (a Constitution save).
+    let reuseNote = '';
+    if (act.reuseExhaustionDc && dailyUsed(held, 'activate')) {
+      const failed = rollConditionSave(
+        'con',
+        nextChar.con,
+        act.reuseExhaustionDc,
+        hasSaveProficiency(nextChar, 'con', ctx.context),
+        nextChar.level,
+        0,
+        nextChar.conditions
+      );
+      if (failed) {
+        const lvl = Math.min(6, (nextChar.exhaustion_level ?? 0) + 1);
+        nextChar = { ...nextChar, exhaustion_level: lvl };
+        reuseNote = ` The strain tells — ${nextChar.name} fails a DC ${act.reuseExhaustionDc} Constitution save and gains a level of Exhaustion (now ${lvl}).`;
+      } else {
+        reuseNote = ` ${nextChar.name} shrugs off the strain (DC ${act.reuseExhaustionDc} Constitution save).`;
+      }
+    }
+    const res = resolvePotion(effect, nextChar, nextSt, ctx.context);
     nextSt = res.st;
     nextChar = { ...res.target };
-    if (act.daily) markDaily(nextChar, inst, 'activate');
+    if (act.daily || act.reuseExhaustionDc) markDaily(nextChar, inst, 'activate');
+    // SRD Dust of Disappearance — party members within range share the effect.
+    let partyNote = '';
+    if (effect.kind === 'condition' && effect.party) {
+      const range = effect.party;
+      const me = nextSt.entities?.find((e) => e.id === nextChar.id);
+      const near = (id: string) => {
+        if (!nextSt.combat_active || !me) return true;
+        const e = nextSt.entities?.find((x) => x.id === id);
+        return (
+          !!e && Math.max(Math.abs(e.pos.x - me.pos.x), Math.abs(e.pos.y - me.pos.y)) * 5 <= range
+        );
+      };
+      const joined: string[] = [];
+      nextSt = {
+        ...nextSt,
+        characters: nextSt.characters.map((c) => {
+          if (c.id === nextChar.id || c.dead || c.hp <= 0 || !near(c.id)) return c;
+          joined.push(c.name);
+          return resolvePotion(effect, c, nextSt, ctx.context).target;
+        }),
+      };
+      if (joined.length)
+        partyNote = ` ${joined.join(', ')} ${joined.length > 1 ? 'share' : 'shares'} it.`;
+    }
     const chargeNote = act.charges
       ? spendCharges(nextChar, inst, act.charges, ctx.context.lootTable)
       : '';
-    narrative = `${nextChar.name} uses the ${held.name} — ${act.label}: ${nextChar.name} ${res.note}.${chargeNote}`;
+    narrative = `${nextChar.name} uses the ${held.name} — ${act.label}: ${nextChar.name} ${res.note}.${partyNote}${reuseNote}${chargeNote}`;
   } else if (itemData.studyIncrease) {
     // SRD Manuals and Tomes — 48 hours of study raise a score by 2 (max 30);
     // the book then loses its magic. Simplification: done out of combat, no

@@ -2964,7 +2964,10 @@ export function effectiveSpeed(char: Character, lootTable: LootItem[] = []): num
   // odd speeds (a rare 25 ft speed) don't fractional. If both hasted
   // and slowed are somehow stacked (RAW: cancel adv/disadv style), they
   // multiplicatively offset — pansori MVP applies both in sequence.
-  if (char.conditions?.includes('slowed')) base = Math.floor(base / 2);
+  // SRD Ring of Free Action — magic can't reduce the wearer's Speed.
+  if (char.conditions?.includes('slowed') && !char.worn_traits?.freeAction) {
+    base = Math.floor(base / 2);
+  }
   // SRD Exhaustion — Speed is reduced by 5 ft per Exhaustion level.
   base = Math.max(0, base - 5 * (char.exhaustion_level ?? 0));
   if (speedFloor > 0) return base;
@@ -3001,12 +3004,40 @@ function wearingHeavyArmor(char: Character, lootTable: LootItem[]): boolean {
   return lootTable.find((l) => l.id === armorId)?.armorCategory === 'heavy';
 }
 
+/**
+ * Carried weight. SRD Bag of Holding / Handy Haversack / Portable Hole /
+ * Efficient Quiver — what an extradimensional container holds doesn't weigh on
+ * its bearer (the container's own weight does). Items go in greedily: the
+ * Efficient Quiver takes ammunition and weapons first, then the general
+ * containers take the rest. Containers never hold each other (one inside
+ * another would tear open an Astral gate).
+ */
 function charCarriedWeight(char: Pick<Character, 'inventory'>): number {
-  return (char.inventory ?? []).reduce((sum, i) => {
-    const w = (i as { weight?: number }).weight ?? 0;
-    const count = (i as { count?: number }).count ?? 1;
-    return sum + w * count;
-  }, 0);
+  type Inv = {
+    weight?: number;
+    count?: number;
+    holds?: LootItem['holds'];
+    type?: string;
+    slot?: string;
+  };
+  const items = (char.inventory ?? []) as Inv[];
+  const weightOf = (i: Inv) => (i.weight ?? 0) * (i.count ?? 1);
+  const total = items.reduce((sum, i) => sum + weightOf(i), 0);
+  const containers = items.filter((i) => i.holds);
+  if (containers.length === 0) return total;
+  const contents = items.filter((i) => !i.holds);
+  const ammoOrWeapon = (i: Inv) => i.type === 'weapon' || i.slot === 'quiver';
+  const quiverLoad = contents.filter(ammoOrWeapon).reduce((s, i) => s + weightOf(i), 0);
+  const quiverRoom = containers
+    .filter((c) => c.holds!.ammoAndWeapons)
+    .reduce((s, c) => s + c.holds!.lb, 0);
+  const inQuivers = Math.min(quiverLoad, quiverRoom);
+  const bagRoom = containers
+    .filter((c) => !c.holds!.ammoAndWeapons)
+    .reduce((s, c) => s + c.holds!.lb, 0);
+  const contentsWeight = contents.reduce((s, i) => s + weightOf(i), 0);
+  const inBags = Math.min(contentsWeight - inQuivers, bagRoom);
+  return total - inQuivers - inBags;
 }
 
 // SRD Variant Encumbrance — Heavily Encumbered (>10×STR) gives

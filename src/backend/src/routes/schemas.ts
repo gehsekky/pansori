@@ -731,6 +731,14 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('truesight'), feet: z.number().int().min(5).max(300) }).strict(),
   z.object({ kind: z.literal('missile_snaring') }).strict(),
   z
+    .object({ kind: z.literal('reveal_invisible'), feet: z.number().int().min(5).max(300) })
+    .strict(),
+  z.object({ kind: z.literal('dark_flight'), feet: z.number().int().min(5).max(300) }).strict(),
+  z.object({ kind: z.literal('free_action') }).strict(),
+  z.object({ kind: z.literal('feather_fall') }).strict(),
+  z.object({ kind: z.literal('mount_speed'), feet: z.number().int().min(5).max(120) }).strict(),
+  z.object({ kind: z.literal('mount_float') }).strict(),
+  z
     .object({
       kind: z.literal('spell_attack_bonus'),
       bonus: z.number().int().min(1).max(5),
@@ -746,6 +754,7 @@ const PotionEffectSchema = z.discriminatedUnion('kind', [
       conditions: z.array(z.string().min(1).max(40)).min(1).max(4),
       rounds: z.union([z.number().int().positive(), z.string().min(1).max(12)]),
       tempHp: z.number().int().positive().max(100).optional(),
+      party: z.number().int().min(5).max(120).optional(),
     })
     .strict(),
   z.object({ kind: z.literal('resistance'), damageType: z.string().min(1).max(20) }).strict(),
@@ -874,10 +883,18 @@ const LootItemSchema = z
         charges: z.number().int().min(1).max(20).optional(),
         daily: z.boolean().optional(),
         bonusAction: z.boolean().optional(),
+        reuseExhaustionDc: z.number().int().min(1).max(30).optional(),
       })
       .strict()
       .optional(),
     evasionRing: z.boolean().optional(),
+    holds: z
+      .object({
+        lb: z.number().int().min(1).max(10000),
+        ammoAndWeapons: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     studyIncrease: SAVE_ABILITY.optional(),
     conjuresAmmo: z.boolean().optional(),
     charges: z
@@ -902,7 +919,7 @@ const LootItemSchema = z
             damage: DICE.optional(),
             noConcentration: z.boolean().optional(),
             daily: z.boolean().optional(),
-            attack: z.number().int().min(-5).max(20).optional(),
+            attack: z.union([z.number().int().min(-5).max(20), z.literal('dex')]).optional(),
             selfOnly: z.boolean().optional(),
             rechargeDays: z.number().int().min(1).max(30).optional(),
             backfire: z

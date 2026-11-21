@@ -163,6 +163,19 @@ export function runAttackRollSpell(
               ...e,
               conditions: [...e.conditions.filter((c) => c !== cond), cond],
               condition_durations: { ...e.condition_durations, [cond]: dur },
+              // SRD Iron Bands — the target tries to break free each turn.
+              ...(spell.conditionEscape
+                ? {
+                    save_ends: {
+                      ...e.save_ends,
+                      [cond]: {
+                        ability: spell.conditionEscape.ability,
+                        dc: spell.conditionEscape.dc,
+                      },
+                    },
+                    save_ends_acted: (e.save_ends_acted ?? []).filter((c) => c !== cond),
+                  }
+                : {}),
             }
           : e
       ),

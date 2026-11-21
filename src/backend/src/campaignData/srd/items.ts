@@ -2572,6 +2572,7 @@ const POTIONS: [string, LootItem][] = [
 // Rarities and Values set the prices; a Spell Scroll is worth twice its
 // scribing cost. Simplification: charges come back at the Long Rest ("dawn").
 const RARITY_VALUE = {
+  Common: 100,
   Uncommon: 400,
   Rare: 4000,
   'Very Rare': 40000,
@@ -4524,6 +4525,612 @@ const SUMMONING_ITEMS: Array<[string, LootItem]> = [
   ),
 ];
 
+// ─── Utility and travel items (SRD 5.2.1, batch 11) ──────────────────────────
+// Extradimensional containers (`holds`: their contents don't weigh on the
+// bearer), flight and mounts, senses, and the many items whose use is
+// described and adjudicated at the table (a `narrative` activation).
+const tell = (
+  label: string,
+  text: string,
+  more: Partial<NonNullable<LootItem['activate']>> = {}
+) => ({
+  label,
+  effect: { kind: 'narrative' as const, text },
+  ...more,
+});
+// One-use (or few-use) consumables: the charges are the item.
+const uses = (n: number): ItemCharges => ({ max: n, regain: '0', consumable: true });
+// SRD Carpet of Flying — four sizes, each with its own Fly Speed.
+const CARPETS: Array<[string, number, string]> = [
+  ['3x5', 80, '3 by 5 feet; carries 200 lb.'],
+  ['4x6', 60, '4 by 6 feet; carries 400 lb.'],
+  ['5x7', 40, '5 by 7 feet; carries 600 lb.'],
+  ['6x9', 30, '6 by 9 feet; carries 800 lb.'],
+];
+// SRD Feather Tokens whose single use is table color.
+const FEATHER_TOKENS: Array<[string, string, Rarity, string, string]> = [
+  [
+    'anchor',
+    'Anchor',
+    'Uncommon',
+    'Touch it to a boat or ship: for 24 hours the vessel can’t be moved by any means.',
+    'touches the token to the vessel — it holds fast, as if anchored to the world, for 24 hours',
+  ],
+  [
+    'fan',
+    'Fan',
+    'Uncommon',
+    'Toss it aboard a boat or ship: a giant fan fills the sails, adding 5 miles per hour for 8 hours.',
+    'tosses the token aloft — a giant flapping fan fills the sails for 8 hours',
+  ],
+  [
+    'swan_boat',
+    'Swan Boat',
+    'Rare',
+    'Touch it to a body of water: a 50-foot swan-shaped boat appears, moving at 6 miles per hour at your command for 24 hours.',
+    'touches the token to the water — a great swan-shaped boat rises from the waves, ready for 24 hours',
+  ],
+  [
+    'tree',
+    'Tree',
+    'Uncommon',
+    'Outdoors, touch it to the ground: a 60-foot oak springs up in its place.',
+    'touches the token to the ground — a 60-foot oak tree springs up',
+  ],
+];
+
+const UTILITY_ITEMS: Array<[string, LootItem]> = [
+  // ── Extradimensional containers ─────────────────────────────────────────
+  // Simplification: weight limits only (no volume), and nesting one container
+  // in another (an Astral gate) can't happen — containers don't hold each other.
+  wondrous(
+    'bag_of_holding',
+    'Bag of Holding',
+    'Uncommon',
+    'A bag far larger inside than out: it holds up to 500 pounds of your gear and always weighs 5 pounds.',
+    null,
+    { weight: 5, holds: { lb: 500 } }
+  ),
+  wondrous(
+    'handy_haversack',
+    'Handy Haversack',
+    'Rare',
+    'A backpack of three extradimensional pouches (two of 200 pounds, one of 500): its contents don’t weigh on you, it always weighs 5 pounds, and whatever you reach for is on top.',
+    null,
+    { weight: 5, holds: { lb: 900 } }
+  ),
+  // Simplification: treated as holding 5,000 pounds of gear while folded.
+  wondrous(
+    'portable_hole',
+    'Portable Hole',
+    'Rare',
+    'A black cloth that unfolds into a 10-foot-deep extradimensional hole. Folded up, it weighs next to nothing, whatever is inside.',
+    null,
+    {
+      weight: 0,
+      holds: { lb: 5000 },
+      carried: true,
+      activate: tell(
+        'Unfold the hole',
+        'spreads the cloth on the ground — a 10-foot-deep hole opens where it lies'
+      ),
+    }
+  ),
+  wondrous(
+    'efficient_quiver',
+    'Efficient Quiver',
+    'Uncommon',
+    'A quiver of three extradimensional compartments — up to 60 arrows or bolts, 18 javelins and 6 long objects such as bows or spears — that never weighs more than 2 pounds.',
+    null,
+    { weight: 2, holds: { lb: 60, ammoAndWeapons: true } }
+  ),
+
+  // ── Flight, travel and mounts ───────────────────────────────────────────
+  // Simplification: the rider flies (the carpet's other passengers aren't
+  // modeled), for an hour at a time; the carrying limits aren't checked.
+  ...CARPETS.map(([size, ft, note]) =>
+    wondrous(
+      `carpet_of_flying_${size}`,
+      `Carpet of Flying (${size.replace('x', ' × ')} ft)`,
+      'Very Rare',
+      `Speak its command word to make it hover and fly: you ride it with a Fly Speed of ${ft} feet. ${note}`,
+      null,
+      {
+        carried: true,
+        activate: {
+          label: 'Fly the carpet',
+          effect: { kind: 'condition', conditions: [`carpet_flying_${ft}`], rounds: HOUR },
+        },
+      }
+    )
+  ),
+  // Simplification: the 30-foot speed over 200 pounds and sending the broom off
+  // alone aren't modeled.
+  wondrous(
+    'broom_of_flying',
+    'Broom of Flying',
+    'Uncommon',
+    'Stand astride it and it hovers: you ride it through the air with a Fly Speed of 50 feet.',
+    null,
+    {
+      weight: 3,
+      requiresAttunement: true,
+      carried: true,
+      activate: {
+        label: 'Ride the broom',
+        effect: { kind: 'condition', conditions: ['broom_of_flying'], rounds: HOUR },
+      },
+    }
+  ),
+  // Simplification: the horseshoes are fitted to whichever mount their bearer rides.
+  wondrous(
+    'horseshoes_of_speed',
+    'Horseshoes of Speed',
+    'Rare',
+    'A set of four horseshoes: fitted to your mount, they increase its Speed by 30 feet.',
+    null,
+    { weight: 4, carried: true, wornEffects: [{ kind: 'mount_speed', feet: 30 }] }
+  ),
+  wondrous(
+    'horseshoes_of_a_zephyr',
+    'Horseshoes of a Zephyr',
+    'Very Rare',
+    'A set of four horseshoes: fitted to your mount, it floats just above the ground — ignoring Difficult Terrain, crossing water or lava, leaving no tracks, and traveling 12 hours a day without Exhaustion.',
+    null,
+    { weight: 4, carried: true, wornEffects: [{ kind: 'mount_float' }] }
+  ),
+  wondrous(
+    'folding_boat',
+    'Folding Boat',
+    'Rare',
+    'A small wooden box that unfolds into a Rowboat or a Keelboat at a command word, and folds back up when empty.',
+    null,
+    {
+      weight: 4,
+      carried: true,
+      activate: tell('Unfold the boat', 'speaks a command word — the box unfolds into a boat'),
+    }
+  ),
+  wondrous(
+    'rope_of_climbing',
+    'Rope of Climbing',
+    'Uncommon',
+    'A 60-foot rope that moves at your command: it slithers to a spot you choose, fastens or unfastens itself, and knots itself for an easier climb.',
+    null,
+    {
+      weight: 3,
+      carried: true,
+      activate: tell(
+        'Command the rope',
+        'commands the rope — it slithers toward its destination and fastens itself'
+      ),
+    }
+  ),
+  wondrous(
+    'rope_of_entanglement',
+    'Rope of Entanglement',
+    'Rare',
+    'Hold one end and command the other to entangle a creature within 20 feet: DC 15 Dexterity save or Restrained (DC 15 to break free). Hold it in your off hand.',
+    'off_hand',
+    { weight: 3, itemSpellDc: 15, itemSpells: [sp('entangle_rope', 0)] }
+  ),
+  wondrous(
+    'ring_of_feather_falling',
+    'Ring of Feather Falling',
+    'Rare',
+    'When you fall, you drift down 60 feet per round and take no falling damage.',
+    'ring',
+    { requiresAttunement: true, weight: 0, wornEffects: [{ kind: 'feather_fall' }] }
+  ),
+  // Simplification: the immunity covers every source, not just magic.
+  wondrous(
+    'ring_of_free_action',
+    'Ring of Free Action',
+    'Rare',
+    'Difficult Terrain costs you no extra movement, and magic can’t reduce your Speed or make you Paralyzed or Restrained.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      wornEffects: [
+        { kind: 'free_action' },
+        { kind: 'condition_immunity', condition: 'paralyzed' },
+        { kind: 'condition_immunity', condition: 'restrained' },
+      ],
+    }
+  ),
+  // Simplification: the Polymorph into a bat isn't modeled.
+  wondrous(
+    'cloak_of_the_bat',
+    'Cloak of the Bat',
+    'Rare',
+    'Advantage on Dexterity (Stealth) checks, and in Dim Light or Darkness you can grip its edges to fly (Fly Speed 40 feet).',
+    'cloak',
+    {
+      requiresAttunement: true,
+      wornEffects: [
+        { kind: 'skill_advantage', skill: 'stealth' },
+        { kind: 'dark_flight', feet: 40 },
+      ],
+    }
+  ),
+  wondrous(
+    'amulet_of_the_planes',
+    'Amulet of the Planes',
+    'Very Rare',
+    'Name a familiar place on another plane and cast Plane Shift to go there.',
+    'neck',
+    // Simplification: the DC 15 Arcana check (and its random destinations on a
+    // failure) isn't rolled.
+    { requiresAttunement: true, itemSpells: [sp('plane_shift', 0)] }
+  ),
+  wondrous(
+    'cubic_gate',
+    'Cubic Gate',
+    'Legendary',
+    '3 charges (regains 1d3 at dawn). Press a side to cast Gate, or press it twice to cast Plane Shift, to the plane keyed to that side.',
+    null,
+    {
+      castWhileCarried: true,
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('gate', 1), sp('plane_shift', 1)],
+    }
+  ),
+  // Simplification: once a day instead of after 1d8 hours.
+  wondrous(
+    'well_of_many_worlds',
+    'Well of Many Worlds',
+    'Legendary',
+    'A black cloth that unfolds into a two-way portal to another world or plane, open until someone folds it up.',
+    null,
+    {
+      weight: 0,
+      carried: true,
+      activate: tell(
+        'Open a portal',
+        'unfolds the cloth — a shimmering portal to another world opens',
+        { daily: true }
+      ),
+    }
+  ),
+  wondrous(
+    'instant_fortress',
+    'Instant Fortress',
+    'Rare',
+    'Set the statuette down and speak its command word: it grows into a 20-foot-square, 30-foot-high adamantine tower with arrow slits and a door that opens only for you.',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 0,
+      carried: true,
+      activate: tell(
+        'Raise the fortress',
+        'sets the statuette down — it grows into an adamantine tower'
+      ),
+    }
+  ),
+
+  // ── Senses and detection ────────────────────────────────────────────────
+  wondrous(
+    'gem_of_seeing',
+    'Gem of Seeing',
+    'Rare',
+    '3 charges (regains 1d3 at dawn). Spend 1 to peer through it: Truesight out to 120 feet for 10 minutes. Hold it in your off hand.',
+    'off_hand',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      charges: { max: 3, regain: '1d3' },
+      activate: {
+        label: 'Peer through the gem',
+        charges: 1,
+        effect: { kind: 'condition', conditions: ['gem_of_seeing'], rounds: 100 },
+      },
+    }
+  ),
+  // Simplification: it reveals Invisible creatures to its bearer's attacks (within
+  // 30 feet), not to everyone in its light.
+  wondrous(
+    'lantern_of_revealing',
+    'Lantern of Revealing',
+    'Uncommon',
+    'A hooded lantern: Bright Light in a 30-foot radius (Dim Light 30 feet beyond), and Invisible creatures in its Bright Light can be seen. Hold it in your off hand.',
+    'off_hand',
+    {
+      weight: 2,
+      wornEffects: [
+        { kind: 'light', radiusFt: 30 },
+        { kind: 'reveal_invisible', feet: 30 },
+      ],
+    }
+  ),
+  wondrous(
+    'eyes_of_minute_seeing',
+    'Eyes of Minute Seeing',
+    'Uncommon',
+    'Crystal lenses: Advantage on Intelligence (Investigation) checks to examine things up close.',
+    'head',
+    { weight: 0, wornEffects: [{ kind: 'skill_advantage', skill: 'investigation' }] }
+  ),
+  // No mechanical effect yet — the engine rolls no Sleight of Hand checks.
+  wondrous(
+    'gloves_of_thievery',
+    'Gloves of Thievery',
+    'Uncommon',
+    'Imperceptible while worn: +5 to Dexterity (Sleight of Hand) checks.',
+    'hands',
+    { weight: 0 }
+  ),
+  wondrous(
+    'ring_of_mind_shielding',
+    'Ring of Mind Shielding',
+    'Uncommon',
+    'Magic can’t read your thoughts, tell whether you lie, or learn your alignment or creature type, and others speak to you telepathically only if you allow it. If you die wearing it, your soul may dwell in the ring.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      activate: tell('Hide the ring', 'turns the ring imperceptible'),
+    }
+  ),
+  wondrous(
+    'ring_of_x_ray_vision',
+    'Ring of X-ray Vision',
+    'Rare',
+    'See through solid matter within 30 feet for 1 minute. Using it again before a Long Rest takes a DC 15 Constitution save or a level of Exhaustion.',
+    'ring',
+    {
+      requiresAttunement: true,
+      weight: 0,
+      activate: tell(
+        'X-ray vision',
+        'gazes through stone, metal and wood out to 30 feet for 1 minute',
+        { reuseExhaustionDc: 15 }
+      ),
+    }
+  ),
+  wondrous(
+    'sending_stones',
+    'Sending Stones',
+    'Uncommon',
+    'A matched pair: touching one, you cast Sending to the bearer of the other. Then neither works again until dawn.',
+    null,
+    { weight: 0, castWhileCarried: true, itemSpells: [sp('sending', 0, { daily: true })] }
+  ),
+  wand(
+    'wand_of_secrets',
+    'Wand of Secrets',
+    'Uncommon',
+    '3 charges (regains 1d3 at dawn). Spend 1: the wand points to the nearest secret door or trap within 60 feet.',
+    {
+      charges: { max: 3, regain: '1d3' },
+      activate: tell(
+        'Seek secrets',
+        'sweeps the wand around — it pulses toward the nearest secret door or trap within 60 feet, if there is one',
+        { charges: 1 }
+      ),
+    }
+  ),
+  wand(
+    'wand_of_enemy_detection',
+    'Wand of Enemy Detection',
+    'Rare',
+    '7 charges (regains 1d6+1 at dawn). Spend 1: for 1 minute you know the direction of the nearest hostile creature within 60 feet, even invisible or hidden.',
+    {
+      requiresAttunement: true,
+      charges: WAND_CHARGES,
+      activate: tell(
+        'Sense enemies',
+        'feels the wand tug toward the nearest hostile creature within 60 feet',
+        { charges: 1 }
+      ),
+    }
+  ),
+
+  // ── Dusts, smoke, water and light ───────────────────────────────────────
+  wondrous(
+    'dust_of_disappearance',
+    'Dust of Disappearance',
+    'Uncommon',
+    'Toss it into the air: you and everyone within 10 feet turn Invisible for 2d4 minutes (ending for a creature when it attacks, deals damage or casts a spell). One use.',
+    null,
+    {
+      weight: 0,
+      carried: true,
+      charges: uses(1),
+      activate: {
+        label: 'Throw the dust',
+        charges: 1,
+        effect: { kind: 'condition', conditions: ['invisible'], rounds: '2d4m', party: 10 },
+      },
+    }
+  ),
+  // Simplification: a fixed 7 pinches (1d6 + 4 found).
+  wondrous(
+    'dust_of_dryness',
+    'Dust of Dryness',
+    'Uncommon',
+    '7 pinches. A pinch turns a 15-foot cube of water into a pellet; sprinkled on a creature made mostly of water (a Water Elemental) within 5 feet, it makes a DC 13 Constitution save or takes 10d6 Necrotic (half on a success).',
+    null,
+    {
+      weight: 0,
+      castWhileCarried: true,
+      charges: uses(7),
+      itemSpellDc: 13,
+      itemSpells: [sp('dryness_dust', 1)],
+    }
+  ),
+  wondrous(
+    'decanter_of_endless_water',
+    'Decanter of Endless Water',
+    'Uncommon',
+    'Pours fresh or salt water on command — a splash, a fountain, or a geyser that knocks one creature in a 30-foot line Prone (DC 13 Strength save, 1d4 Bludgeoning). Hold it in your off hand.',
+    'off_hand',
+    { weight: 2, itemSpellDc: 13, itemSpells: [sp('geyser', 0)] }
+  ),
+  wondrous(
+    'eversmoking_bottle',
+    'Eversmoking Bottle',
+    'Uncommon',
+    'Unstopper it and thick smoke billows out, Heavily Obscuring a 60-foot Emanation that grows to 120 feet; closed again, the cloud lingers 10 minutes.',
+    null,
+    {
+      carried: true,
+      activate: tell(
+        'Open the bottle',
+        'unstoppers the bottle — thick smoke billows out and swallows the area from sight'
+      ),
+    }
+  ),
+  // Simplification: once spent, it keeps its name (a 50 GP jewel at the table).
+  wondrous(
+    'gem_of_brightness',
+    'Gem of Brightness',
+    'Uncommon',
+    '50 charges (no recharge). Shed light (no charge), fire a beam at one creature within 60 feet (1 charge), or flare in a 30-foot cone (5 charges): DC 15 Constitution save or Blinded for 1 minute. Hold it in your off hand.',
+    'off_hand',
+    {
+      weight: 0,
+      charges: { max: 50, regain: '0' },
+      itemSpellDc: 15,
+      itemSpells: [sp('light', 0), sp('brightness_beam', 1), sp('brightness_flare', 5)],
+    }
+  ),
+  wondrous(
+    'iron_bands',
+    'Iron Bands',
+    'Rare',
+    'Throw the sphere at a creature within 60 feet (ranged attack, Dexterity + Proficiency Bonus): on a hit it’s Restrained by iron bands until it breaks free (DC 20 Strength). Then not again until dawn.',
+    null,
+    {
+      weight: 1,
+      castWhileCarried: true,
+      itemSpells: [sp('iron_bands', 0, { daily: true, attack: 'dex' })],
+    }
+  ),
+  wondrous(
+    'dimensional_shackles',
+    'Dimensional Shackles',
+    'Rare',
+    'Shackles for an Incapacitated creature of Small to Large size: while bound, it can’t teleport or travel to another plane. It can try to break free (DC 30 Strength) once every 30 days.',
+    null,
+    {
+      carried: true,
+      activate: tell(
+        'Shackle a captive',
+        'clamps the shackles on an Incapacitated captive — it can no longer teleport or leave the plane'
+      ),
+    }
+  ),
+  wondrous(
+    'immovable_rod',
+    'Immovable Rod',
+    'Uncommon',
+    'Press its button and the rod is fixed in place, holding up to 8,000 pounds, until the button is pressed again.',
+    null,
+    {
+      weight: 2,
+      carried: true,
+      activate: tell('Press the button', 'presses the button — the rod locks fast in midair'),
+    }
+  ),
+  wondrous(
+    'bead_of_nourishment',
+    'Bead of Nourishment',
+    'Common',
+    'A flavorless bead that nourishes like a day of Rations. One use.',
+    null,
+    {
+      weight: 0,
+      carried: true,
+      charges: uses(1),
+      activate: tell('Eat the bead', 'swallows the bead — a full day of nourishment', {
+        charges: 1,
+      }),
+    }
+  ),
+  // Simplification: a fixed 4 ounces (1d6 + 1 found).
+  wondrous(
+    'sovereign_glue',
+    'Sovereign Glue',
+    'Legendary',
+    '4 ounces. An ounce bonds two objects (a 1-foot square) permanently once it sets — only Universal Solvent, Oil of Etherealness or Wish breaks the bond.',
+    null,
+    {
+      weight: 0,
+      carried: true,
+      charges: uses(4),
+      activate: tell(
+        'Apply an ounce',
+        'spreads an ounce of the glue — in a minute the bond is unbreakable',
+        {
+          charges: 1,
+        }
+      ),
+    }
+  ),
+  wondrous(
+    'universal_solvent',
+    'Universal Solvent',
+    'Legendary',
+    '4 ounces. Each ounce dissolves a square foot of adhesive, Sovereign Glue included.',
+    null,
+    {
+      weight: 0,
+      carried: true,
+      charges: uses(4),
+      activate: tell('Pour an ounce', 'pours out an ounce — the adhesive dissolves', {
+        charges: 1,
+      }),
+    }
+  ),
+  // Simplification: a fixed 2 pots (1d4 found).
+  wondrous(
+    'marvelous_pigments',
+    'Marvelous Pigments',
+    'Very Rare',
+    '2 pots of pigment. Ten minutes of painting with one pot makes real objects and terrain (doors, pits, trees) within a 20-foot cube, none worth more than 25 GP.',
+    null,
+    {
+      weight: 1,
+      carried: true,
+      charges: uses(2),
+      activate: tell('Paint', 'paints for ten minutes — the painted things become real', {
+        charges: 1,
+      }),
+    }
+  ),
+  ...FEATHER_TOKENS.map(([kind, name, rarity, desc, text]) =>
+    wondrous(`feather_token_${kind}`, `Feather Token (${name})`, rarity, `${desc} One use.`, null, {
+      weight: 0,
+      carried: true,
+      charges: uses(1),
+      activate: tell(`Use the ${name} token`, text, { charges: 1 }),
+    })
+  ),
+  wondrous(
+    'feather_token_bird',
+    'Feather Token (Bird)',
+    'Rare',
+    'Toss it into the air: it becomes an enormous bird (a Roc that can’t attack) that carries you. One use.',
+    null,
+    { weight: 0, castWhileCarried: true, charges: uses(1), itemSpells: [sp('feather_bird', 1)] }
+  ),
+  wondrous(
+    'feather_token_whip',
+    'Feather Token (Whip)',
+    'Rare',
+    'Throw it: a floating whip lashes a creature (+9 to hit, 1d6 + 5 Force) and keeps striking as a Bonus Action for 1 hour. One use.',
+    null,
+    {
+      weight: 0,
+      castWhileCarried: true,
+      charges: uses(1),
+      itemSpells: [sp('feather_whip', 1, { attack: 9 })],
+    }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -4886,6 +5493,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...WONDROUS_3,
   ...WONDROUS_4,
   ...SUMMONING_ITEMS,
+  ...UTILITY_ITEMS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

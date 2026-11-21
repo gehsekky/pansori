@@ -1007,6 +1007,12 @@ export interface Spell {
   // blast), resolved through the spell engine but not a spell: on no class
   // list, never learnable, cast only from its item (ITEM_POWERS).
   itemPower?: boolean;
+  // Works only on these creatures (Stat-block name substrings; Dust of Dryness:
+  // a creature made mostly of water). Any other target is refused before use.
+  onlyVs?: string[];
+  // An attack-roll power's condition the target escapes with a check at the end
+  // of each of its turns (Iron Bands: DC 20 Strength) — run as a save-ends.
+  conditionEscape?: { ability: AbilityKey; dc: number };
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.
@@ -1471,6 +1477,7 @@ export interface Character {
     healFraction?: number; // Vampiric Touch heals this fraction of damage dealt
     rounds_left: number; // duration; decremented on round wrap, cleared at 0
     concentration?: boolean; // cleared by breakConcentration when set
+    attackBonus?: number; // a magic item's fixed attack bonus (Feather Token whip: +9)
   } | null;
   // SRD petrification ladder (Cockatrice bite, Basilisk / Medusa / Gorgon gaze).
   // Set when a failed petrify save Restrains this PC; the re-save resolves at the

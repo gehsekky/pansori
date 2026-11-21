@@ -123,7 +123,8 @@ export function computeAttackEdges(
   const targetAdvConditions = tgtConds.filter(TARGET_ADV);
   // SRD Invisible — negated by See Invisibility (`sees_invisible`), or by
   // Truesight (Boon of Truesight / Witch Sight) within its range.
-  const tsFt = truesightFt(char);
+  // SRD Lantern of Revealing — Invisible creatures in its Bright Light are seen.
+  const tsFt = Math.max(truesightFt(char), char.worn_traits?.revealInvisibleFt ?? 0);
   const seesInvisible =
     !!char.sees_invisible ||
     (tsFt > 0 && !!pcEnt && !!tgtEnt && distanceFeet(pcEnt.pos, tgtEnt.pos) <= tsFt);

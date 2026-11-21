@@ -42,13 +42,25 @@ export function potionResists(
   return char.conditions.includes(POTION_CONDITIONS.resistance) && char.potion_resistance === type;
 }
 
+/**
+ * Item flight, timed like a potion: SRD Winged Boots (30 ft), Wings of Flying
+ * (60 ft), Broom of Flying (50 ft) and the four Carpets of Flying.
+ */
+export const ITEM_FLIGHT: Record<string, number> = {
+  winged_boots: 30,
+  wings_of_flying: 60,
+  broom_of_flying: 50,
+  carpet_flying_80: 80,
+  carpet_flying_60: 60,
+  carpet_flying_40: 40,
+  carpet_flying_30: 30,
+};
+
 /** SRD Potion of Flying — a Fly Speed equal to Speed (0 when not under it). */
 export function potionFlyFt(char: Pick<Character, 'conditions' | 'speed'>): number {
   return Math.max(
     char.conditions.includes(POTION_CONDITIONS.flying) ? (char.speed ?? 30) : 0,
-    // SRD Winged Boots (30 ft) / Wings of Flying (60 ft) — timed like a potion.
-    char.conditions.includes('winged_boots') ? 30 : 0,
-    char.conditions.includes('wings_of_flying') ? 60 : 0
+    ...char.conditions.map((c) => ITEM_FLIGHT[c] ?? 0)
   );
 }
 
@@ -87,9 +99,13 @@ export function endGiantStrength(char: Character): Character {
   };
 }
 
-/** Rounds a `condition` potion lasts: a number, or `'NdMh'` hours of dice. */
-function potionRounds(rounds: number | string): number {
+/**
+ * Rounds a `condition` potion lasts: a number, `'NdMh'` hours of dice, or
+ * `'NdMm'` minutes of dice (Dust of Disappearance: 2d4 minutes).
+ */
+export function potionRounds(rounds: number | string): number {
   if (typeof rounds === 'number') return rounds;
+  if (rounds.endsWith('m')) return rollDice(rounds.slice(0, -1)) * ROUNDS_PER_MINUTE;
   const hours = rounds.endsWith('h') ? rollDice(rounds.slice(0, -1)) : rollDice(rounds);
   return hours * ROUNDS_PER_HOUR;
 }
@@ -231,6 +247,14 @@ const CONDITION_NOTES: Record<string, string> = {
   // SRD Ring / Cloak of Invisibility — granted with `invisible`; attacking doesn't end it.
   item_invisibility: "turns Invisible (attacking doesn't end it)",
   boots_of_speed: 'doubles their Speed (Opportunity Attacks against them have Disadvantage)',
+  broom_of_flying: 'rides the broom through the air (Fly Speed 50 feet)',
+  ...Object.fromEntries(
+    [80, 60, 40, 30].map((ft) => [
+      `carpet_flying_${ft}`,
+      `rides the carpet through the air (Fly Speed ${ft} feet)`,
+    ])
+  ),
+  gem_of_seeing: 'peers through the gem (Truesight 120 feet)',
 };
 
 /**

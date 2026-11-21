@@ -19,6 +19,7 @@ import { pickHookText } from '../mapEngine.js';
 import { primalKnowledgeScore } from '../barbarianFeatures.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from './actor.js';
+import { wornSkillAdvantage } from '../wornEffects.js';
 
 /**
  * `interact_object`: search a room object (chest, body, altar, etc.).
@@ -111,7 +112,8 @@ export const handleInteractObject: ActionHandler<{
     lowLightDisadv,
     hasExpertise(nextChar, skillName),
     hasJackOfAllTrades(nextChar),
-    inspAdv || luckAdv,
+    // SRD Eyes of Minute Seeing / Eyes of the Eagle — worn skill Advantage.
+    inspAdv || luckAdv || wornSkillAdvantage(nextChar, skillName),
     nextChar.species === 'halfling',
     hasReliableTalent(nextChar),
     strokeOfLuckAvailable(nextChar),

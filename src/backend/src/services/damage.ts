@@ -276,6 +276,18 @@ export function applyFallingDamage(
   /** Combined narrative chunk including concentration note if any. */
   narrative: string;
 } {
+  // SRD Ring of Feather Falling — the wearer drifts down unharmed.
+  if (distanceFt >= 10 && char.worn_traits?.featherFall) {
+    return {
+      char,
+      st,
+      amountDealt: 0,
+      diceRolled: 0,
+      rolledDamage: 0,
+      landedProne: false,
+      narrative: `${char.name} drifts gently down ${distanceFt} ft and lands unharmed.`,
+    };
+  }
   if (distanceFt < 10) {
     return {
       char,

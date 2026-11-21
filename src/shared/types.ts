@@ -1876,6 +1876,19 @@ export type WornEffect =
   | { kind: 'truesight'; feet: number }
   // SRD Gloves of Missile Snaring — a Reaction cuts a ranged weapon hit by 1d10 + DEX.
   | { kind: 'missile_snaring' }
+  // SRD Lantern of Revealing — Invisible creatures within `feet` are seen.
+  | { kind: 'reveal_invisible'; feet: number }
+  // SRD Cloak of the Bat — a Fly Speed of `feet` in Dim Light or Darkness.
+  | { kind: 'dark_flight'; feet: number }
+  // SRD Ring of Free Action — Difficult Terrain costs no extra movement and
+  // magic can't reduce Speed (with Paralyzed / Restrained immunity alongside).
+  | { kind: 'free_action' }
+  // SRD Ring of Feather Falling — no damage from falling.
+  | { kind: 'feather_fall' }
+  // SRD Horseshoes of Speed / of a Zephyr — fitted to the bearer's mount: +`feet`
+  // Speed, or it floats (ignores Difficult Terrain and crosses water).
+  | { kind: 'mount_speed'; feet: number }
+  | { kind: 'mount_float' }
   // SRD Cloak of Displacement — attacks against you have Disadvantage until you
   // take damage (back at the start of your next turn); not while Speed is 0.
   | { kind: 'displacement' };
@@ -1897,7 +1910,16 @@ export type WornEffect =
  * - `narrative`: an effect described and adjudicated at the table.
  */
 export type PotionEffect =
-  | { kind: 'condition'; conditions: string[]; rounds: number | string; tempHp?: number }
+  // `rounds` dice: `'1d4h'` hours, `'2d4m'` minutes. `party`: every party
+  // member within that many feet gains it too, for the same time (Dust of
+  // Disappearance).
+  | {
+      kind: 'condition';
+      conditions: string[];
+      rounds: number | string;
+      tempHp?: number;
+      party?: number;
+    }
   | { kind: 'resistance'; damageType: string }
   | { kind: 'giant_strength'; score: number }
   | { kind: 'cure'; conditions: string[]; exhaustion?: boolean; vitality?: boolean }
@@ -2013,6 +2035,12 @@ export interface WornTraits {
   displacement?: boolean;
   truesightFt?: number;
   missileSnaring?: boolean;
+  revealInvisibleFt?: number;
+  darkFlightFt?: number;
+  freeAction?: boolean;
+  featherFall?: boolean;
+  mountSpeedBonus?: number;
+  mountFloats?: boolean;
 }
 
 /**
@@ -2037,8 +2065,9 @@ export interface ItemSpell {
   // Usable once, then not again until this many Long Rests (days) have passed
   // (Figurine of Wondrous Power: 5). Implies `daily`.
   rechargeDays?: number;
-  // Fixed spell attack bonus (Circlet of Blasting: +5), instead of the holder's.
-  attack?: number;
+  // Fixed spell attack bonus (Circlet of Blasting: +5), instead of the holder's;
+  // `'dex'` = the holder's Dexterity modifier + Proficiency Bonus (Iron Bands).
+  attack?: number | 'dex';
   // The item casts it on its wearer only (Ring of Jumping, Boots of Levitation).
   selfOnly?: boolean;
   // Each use risks the item blowing up in the user's hands (Horn of Blasting:
@@ -2278,7 +2307,14 @@ export interface LootItem {
     daily?: boolean;
     // A Bonus Action instead of a Magic action (Boots of Speed).
     bonusAction?: boolean;
+    // Each use after the first before a Long Rest needs a Constitution save
+    // against this DC or the user gains an Exhaustion level (Ring of X-ray Vision).
+    reuseExhaustionDc?: number;
   };
+  // SRD Bag of Holding / Handy Haversack / Portable Hole / Efficient Quiver —
+  // carried items up to `lb` pounds don't count toward the bearer's load (the
+  // container's own weight does). `ammoAndWeapons`: only ammunition and weapons.
+  holds?: { lb: number; ammoAndWeapons?: boolean };
   // SRD Ring of Evasion — a failed Dexterity save becomes a success for a
   // charge (and the wearer's Reaction).
   evasionRing?: boolean;

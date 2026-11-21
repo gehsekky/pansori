@@ -555,6 +555,48 @@ the Python staff shattering when the snake dies aren't modeled. Deferred:
 Ivory Goats, Bag of Tricks (random tables), Pipes of the Sewers (uncontrolled
 swarms), Efreeti Bottle.
 
+**Batch 11 done 2026-11-20 — utility and travel items.** New machinery:
+`LootItem.holds` (extradimensional containers: carried items up to a weight
+don't count toward the load — the Efficient Quiver only takes ammunition and
+weapons); item flight conditions (`ITEM_FLIGHT`, alongside Winged Boots and
+Wings of Flying); worn effects `reveal_invisible` (an Invisible target within
+range doesn't impose Disadvantage), `dark_flight` (a Fly Speed in Dim Light or
+Darkness), `free_action` (Difficult Terrain costs nothing extra, Slow doesn't
+halve Speed), `feather_fall` (no falling damage), `mount_speed` and
+`mount_float` (carried horseshoes boost the ridden mount, or let it float over
+Difficult Terrain and water); `activate.reuseExhaustionDc`; a party-wide
+timed activation (`PotionEffect.condition.party`) and minute dice (`'2d4m'`);
+`Spell.onlyVs` (a power that only works on named creatures) and
+`Spell.conditionEscape` (an attack power's condition escaped by a save-ends
+check); `ItemSpell.attack: 'dex'` (Dex + Proficiency Bonus); and a repeating
+item attacker keeps its fixed bonus (`recurring_attack.attackBonus`). Found on
+the way: worn skill Advantage (Eyes of the Eagle) now applies to searches.
+Items: Bag of Holding, Handy Haversack, Portable Hole, Efficient Quiver; the
+four Carpets of Flying, Broom of Flying, Horseshoes of Speed and of a Zephyr,
+Folding Boat, Ropes of Climbing and Entanglement; Rings of Feather Falling,
+Free Action, Mind Shielding and X-ray Vision; Cloak of the Bat; Amulet of the
+Planes, Cubic Gate, Well of Many Worlds, Instant Fortress; Gem of Seeing,
+Lantern of Revealing, Eyes of Minute Seeing, Gloves of Thievery, Sending
+Stones, Wands of Secrets and Enemy Detection; Dust of Disappearance, Dust of
+Dryness, Decanter of Endless Water, Eversmoking Bottle, Gem of Brightness,
+Iron Bands, Dimensional Shackles, Immovable Rod, Bead of Nourishment,
+Sovereign Glue, Universal Solvent, Marvelous Pigments; and the six Feather
+Tokens (the Bird calls a Roc mount that can't attack; the Whip strikes at +9
+and again as a Bonus Action). Table-color items (the boat, ropes of climbing,
+rod, bottle, fortress, shackles, glue, pigments, …) carry a narrative
+activation. Simplifications: containers track weight only (no volume, no
+nesting); the carpet carries only its rider, and neither it nor the broom
+checks weight; the horseshoes fit whichever mount the bearer rides; Free
+Action's immunities cover every source; Cloak of the Bat's Polymorph, the
+Amulet of the Planes' Arcana check, the X-ray range limits and the Lantern
+revealing Invisible creatures to anyone but its bearer aren't modeled; Gloves
+of Thievery have no effect yet (nothing rolls Sleight of Hand); escape checks
+(Rope of Entanglement, Iron Bands) run as end-of-turn saves, and Iron Bands
+aren't destroyed by a successful escape; dusts, glue, solvent and pigments
+come in fixed amounts; the Well of Many Worlds recharges at dawn. Known issue
+(not fixed): ammunition bundles weigh their per-bundle weight per piece, so
+20 Arrows count 20 pounds instead of 1.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

@@ -45,10 +45,16 @@ export function resolveRecurringAttack(
   // A melee spell attack made from beside the target (Spiritual Weapon and the
   // other summoned attackers strike from their own space — simplification: the
   // attack is treated as made from within 5 ft, with no Cover).
+  // A magic item's own attacker (Feather Token whip) keeps its fixed bonus.
+  const prevItemCast = ctx.itemCast;
+  if (recurring.attackBonus !== undefined) {
+    ctx.itemCast = { attackBonus: recurring.attackBonus, undo: prevItemCast?.undo ?? (() => {}) };
+  }
   const atk = rollSpellAttack(ctx, target, recurring.castingScore, {
     ranged: false,
     fromAdjacent: true,
   });
+  ctx.itemCast = prevItemCast;
   if (!atk.hit) {
     ctx.narrative += ` ${recurring.name} misses the ${target.name} (${atk.total} vs AC ${atk.ac})${atk.note}.`;
     return;
@@ -109,6 +115,7 @@ export function runRecurringAttackSpell(
     healFraction: spell.recurringHealFraction,
     rounds_left: spell.durationRounds ?? 10,
     concentration: spell.concentration,
+    ...(ctx.itemCast?.attackBonus !== undefined ? { attackBonus: ctx.itemCast.attackBonus } : {}),
   };
   updatePcActor(ctx, {
     recurring_attack: recurring,
