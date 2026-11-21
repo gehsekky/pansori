@@ -5660,6 +5660,20 @@ const RANDOM_ITEMS: Array<[string, LootItem]> = [
       itemSpells: [sp('hat_of_many_spells', 0)],
     }
   ),
+  ...([13, 22] as const).map((n) =>
+    wondrous(
+      `mysterious_deck_${n}`,
+      `Mysterious Deck (${n} Cards)`,
+      'Legendary',
+      `A deck of ${n} ivory cards. Out of combat, draw one and its magic takes hold at once — riches, a Wish, a loyal Knight, a lasting curse${n === 22 ? ', the loss of every magic item you carry, or imprisonment beyond the world' : ''}, and stranger fates. A drawn card returns to the deck (except the ${n === 22 ? 'Fool and ' : ''}Jester).`,
+      null,
+      {
+        weight: 0,
+        castWhileCarried: true,
+        itemSpells: [sp(`deck_draw_${n}`, 0)],
+      }
+    )
+  ),
 ];
 
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([

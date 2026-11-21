@@ -893,6 +893,8 @@ export type StructuredAction =
       // SRD Hat of Many Spells — the Wizard spell (not known) the wearer tries
       // to pull from the hat. Set by the hat's option picker.
       hatSpellId?: string;
+      // SRD Mysterious Deck's Moon — cast Wish with one of the card's 1d3 uses.
+      deckWish?: boolean;
       // Cleric L10 Divine Intervention — cast this Cleric spell (level ≤5,
       // non-Reaction) without a slot or Material components, 1/Long Rest.
       // Set by the Divine Intervention choice surface; precast validates

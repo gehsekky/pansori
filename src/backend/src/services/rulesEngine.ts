@@ -718,8 +718,11 @@ export function rollConditionSave(
   // SRD Holy Aura — a warded creature has Advantage on ALL saving throws
   // (literal check, like `hopeful` / `hasted` above).
   // SRD Candle of Invocation — Advantage on D20 Tests within its light.
+  // SRD Mysterious Deck's Jester — Advantage on D20 Tests for 72 hours.
   const holyAuraAdv =
-    targetConditions.includes('holy_warded') || targetConditions.includes('candle_of_invocation');
+    targetConditions.includes('holy_warded') ||
+    targetConditions.includes('candle_of_invocation') ||
+    targetConditions.includes('deck_jester');
   const advSource = advantage || hasteAdv || hopefulAdv || holyAuraAdv;
   const netAdv = advSource && !disadv;
   const netDisadv = disadv && !advSource;

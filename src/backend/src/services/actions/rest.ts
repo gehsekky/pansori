@@ -1,4 +1,11 @@
 import type { Character, Context } from '../../types.js';
+import {
+  POTION_SOURCE,
+  elapseCharPotionTime,
+  elapsePotionTime,
+  endGiantStrength,
+  hitDieHealing,
+} from '../potions.js';
 import { canRestInRoom, pick } from '../gameEngine.js';
 import {
   channelDivinityUsesMax,
@@ -7,12 +14,6 @@ import {
   hasClass,
   wildShapeUsesMax,
 } from '../multiclass.js';
-import {
-  elapseCharPotionTime,
-  elapsePotionTime,
-  endGiantStrength,
-  hitDieHealing,
-} from '../potions.js';
 import { rageUsesMax, spellSlotsForClassLevel } from '../rulesEngine.js';
 import type { ActionHandler } from './types.js';
 import { characterAc } from '../armorClass.js';
@@ -287,17 +288,26 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     // SRD Life Drain — a Long Rest removes any reduction to the Hit Point
     // maximum, restoring `max_hp` and bringing the character to that full value.
     const restoredMaxHp = c.max_hp + (c.life_drain_reduction ?? 0);
+    // SRD Mysterious Deck — the Fool's and Jester's 72 hours outlast a Long
+    // Rest (8 hours of it pass).
+    const REST_ROUNDS = 8 * 600;
+    const lasting = ['deck_fool', 'deck_jester'].filter(
+      (k) => c.conditions.includes(k) && (c.condition_durations?.[k] ?? 0) > REST_ROUNDS
+    );
     const refreshed = {
       // A Long Rest clears every condition — a Giant Strength potion included.
       ...endGiantStrength(c),
       max_hp: restoredMaxHp,
       life_drain_reduction: 0,
       hp: restoredMaxHp,
-      temp_hp: 0,
+      // SRD Mysterious Deck's Sun — 10 Temporary Hit Points at each dawn.
+      temp_hp: c.sun_card ? 10 : 0,
       hit_dice_remaining: newHd,
-      conditions: [],
-      condition_durations: {},
-      condition_sources: {},
+      conditions: lasting,
+      condition_durations: Object.fromEntries(
+        lasting.map((k) => [k, (c.condition_durations?.[k] ?? 0) - REST_ROUNDS])
+      ),
+      condition_sources: Object.fromEntries(lasting.map((k) => [k, POTION_SOURCE])),
       class_resource_uses: restoredUsesWithFeats,
       exhaustion_level: newExhaustion,
       spell_slots_used: {},

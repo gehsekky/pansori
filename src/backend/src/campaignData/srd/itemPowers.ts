@@ -649,4 +649,21 @@ export const ITEM_POWERS: Record<string, Spell> = {
     rangeKind: 'self',
     desc: 'Spend a spell slot and reach into the hat for a Wizard spell you don’t know: an Intelligence (Arcana) check against DC 10 + its level casts it; a failure brings something else out.',
   }),
+  // SRD Mysterious Deck — draw a card; its magic takes effect at once.
+  // Simplification: one declared draw per use, out of combat.
+  ...Object.fromEntries(
+    ([13, 22] as const).map((n) => [
+      `deck_draw_${n}`,
+      power({
+        id: `deck_draw_${n}`,
+        name: 'Draw a Card',
+        level: 1,
+        itemEffect: 'deck_draw',
+        outOfCombatOnly: true,
+        targetType: 'self',
+        rangeKind: 'self',
+        desc: 'Declare one draw and turn over a card from the deck — for good or ill, its magic takes hold at once.',
+      }),
+    ])
+  ),
 };

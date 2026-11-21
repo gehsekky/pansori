@@ -7926,6 +7926,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
+  // ── SRD Mysterious Deck's Moon — Wish without a slot, 1d3 times ───────────
+  if (
+    context.spellTable?.wish &&
+    (char.deck_wishes ?? 0) > 0 &&
+    !(state.combat_active && char.turn_actions.action_used)
+  ) {
+    choices.push({
+      label: `Moon card — cast Wish (${char.deck_wishes} left)`,
+      action: { type: 'cast_spell', spellId: 'wish', slotLevel: 9, deckWish: true },
+      pickOption: spellPickOption('wish', context),
+    });
+  }
+
   // ── SRD Spells Cast from Items — held wands / staffs, Spell Scrolls ───────
   // One choice per castable (item, spell, level); offensive single-target
   // spells get one choice per living enemy. Not tagged `kind: 'cast_spell'`

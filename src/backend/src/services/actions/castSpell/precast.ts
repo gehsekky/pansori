@@ -64,6 +64,7 @@ export function runPrecast(
     overchannel?: boolean;
     mysticArcanum?: boolean;
     wishDuplicate?: boolean;
+    deckWish?: boolean;
     invocation?: string;
     itemInstanceId?: string;
     targetCharId?: string;
@@ -79,8 +80,17 @@ export function runPrecast(
   // SRD Wish (basic use) — a duplicated spell "simply takes effect": no slot,
   // no prep, no material component, no level prerequisite. Treated like the
   // other slot-free casts (Divine Intervention etc.) in the gates below.
+  // SRD Mysterious Deck's Moon — the drawer can cast Wish 1d3 times (no slot).
+  let usedDeckWish = false;
+  if (action.deckWish) {
+    if (spell.id !== 'wish' || (pc.char.deck_wishes ?? 0) <= 0) {
+      ctx.narrative = 'You have no Wish from the Moon card left to cast.';
+      return { done: true };
+    }
+    usedDeckWish = true;
+  }
   // A spell cast by an item's random table (Wand of Wonder) is just as free.
-  const usedWish = action.wishDuplicate === true || !!ctx.tableCast;
+  const usedWish = action.wishDuplicate === true || !!ctx.tableCast || usedDeckWish;
 
   // Sorcerer Metamagic — capture the modifier set by the prior activation and
   // clear it from state so it applies to exactly this one cast. Done first so
@@ -534,6 +544,10 @@ export function runPrecast(
     };
   }
 
+  if (usedDeckWish) {
+    pc.char.deck_wishes = Math.max(0, (pc.char.deck_wishes ?? 0) - 1);
+  }
+
   // Deduct the material cost now that slot + affordability are both
   // confirmed. Material is consumed on a successful cast initiation
   // even if a downstream gate (e.g. Revivify's death-window check)
@@ -653,29 +667,31 @@ export function runPrecast(
   }
   // Slot-free casts must not claim a slot — a playtest log showed Magic
   // Initiate's freebie narrated as "(level-1 slot)".
-  const slotNote = ctx.tableCast
-    ? ` (from the ${ctx.tableCast.name})`
-    : itemPlan
-      ? ` (from the ${itemPlan.loot.name}${itemPlan.cost > 0 ? `, ${itemPlan.cost} charge${itemPlan.cost === 1 ? '' : 's'}` : ''})${itemNote}`
-      : usedDivineIntervention
-        ? ' (Divine Intervention)'
-        : usedMysticArcanum
-          ? ' (Mystic Arcanum)'
-          : usedSpellMastery
-            ? ' (Spell Mastery)'
-            : usedSignature
-              ? ' (Signature Spell)'
-              : usedMagicInitiateFree
-                ? ' (Magic Initiate — free cast)'
-                : usedInvocation
-                  ? ` (${invocationDef(action.invocation!)?.name} — no slot)`
-                  : usedWish
-                    ? ' (granted by Wish)'
-                    : isRitualCast
-                      ? ' (ritual)'
-                      : spell.level > 0
-                        ? ` (level-${slotLevel} slot)`
-                        : ' (cantrip)';
+  const slotNote = usedDeckWish
+    ? ' (the Moon card)'
+    : ctx.tableCast
+      ? ` (from the ${ctx.tableCast.name})`
+      : itemPlan
+        ? ` (from the ${itemPlan.loot.name}${itemPlan.cost > 0 ? `, ${itemPlan.cost} charge${itemPlan.cost === 1 ? '' : 's'}` : ''})${itemNote}`
+        : usedDivineIntervention
+          ? ' (Divine Intervention)'
+          : usedMysticArcanum
+            ? ' (Mystic Arcanum)'
+            : usedSpellMastery
+              ? ' (Spell Mastery)'
+              : usedSignature
+                ? ' (Signature Spell)'
+                : usedMagicInitiateFree
+                  ? ' (Magic Initiate — free cast)'
+                  : usedInvocation
+                    ? ` (${invocationDef(action.invocation!)?.name} — no slot)`
+                    : usedWish
+                      ? ' (granted by Wish)'
+                      : isRitualCast
+                        ? ' (ritual)'
+                        : spell.level > 0
+                          ? ` (level-${slotLevel} slot)`
+                          : ' (cantrip)';
   // SRD Sorcerer Innate Sorcery (L1): +1 spell save DC while active.
   const innateDcBonus = pc.char.conditions.includes('innate_sorcery') ? 1 : 0;
   // SRD Robe of the Archmagi — +2 to the wearer's own spell save DC.

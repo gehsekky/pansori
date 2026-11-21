@@ -1020,6 +1020,7 @@ export interface Spell {
   // (Wand of Wonder's d100 effects, a Bag of Beans' dumped or planted beans) —
   // dispatched by `runItemEffect` once the item's charge is spent.
   itemEffect?:
+    | 'deck_draw'
     | 'wand_of_wonder'
     | 'beans_dump'
     | 'beans_plant'
@@ -1363,6 +1364,12 @@ export interface Character {
   // checkConcentration, and the ad-hoc skill-check sites via the
   // `d20TestPenalty(char)` helper.
   revive_d20_penalty?: number;
+  // SRD Mysterious Deck — lasting card effects: Moon's Wishes left to cast,
+  // Euryale's curse (-2 to saving throws), and Sun's 10 Temporary Hit Points
+  // at each dawn (Long Rest).
+  deck_wishes?: number;
+  euryale_curse?: boolean;
+  sun_card?: boolean;
   turn_actions: TurnActions;
   initiative_roll: number | null;
   hit_die: number;

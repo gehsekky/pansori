@@ -1,15 +1,17 @@
-// SRD 5.2.1 random-table items (batch 13) — the Wand of Wonder's d100 table,
-// the Bags of Tricks, the Bag of Beans and the Ivory Goats.
+// SRD 5.2.1 random-table items (batches 13–15) — the Wand of Wonder's d100
+// table, the Bags of Tricks, the Bag of Beans, the Ivory Goats, the Robe of
+// Useful Items, the Deck of Illusions, the Hat of Many Spells and the
+// Mysterious Deck.
 
 import { CORRIDOR_ID, makeChar, makeState } from '../../test-fixtures.js';
 import type { Character, Enemy, GameState, Seed } from '../../types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateChoices, takeAction } from '../../services/gameEngine.js';
+import { syncSetAbilities, wornSaveBonus } from '../../services/wornEffects.js';
 import { ITEM_POWERS } from '../../campaignData/srd/itemPowers.js';
 import { SRD_ITEMS } from '../../campaignData/srd/items.js';
 import { SRD_SPELLS } from '../../campaignData/srd/spells.js';
 import { context as baseCtx } from '../fixtures/testContext.js';
-import { syncSetAbilities } from '../../services/wornEffects.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -432,5 +434,114 @@ describe('Hat of Many Spells', () => {
       expect(r.narrative).toContain(why);
       expect(pc(r.newState).turn_actions.action_used).toBeFalsy();
     }
+  });
+});
+
+describe('Mysterious Deck', () => {
+  const deckOf = (n: 13 | 22, more: string[] = [], over: Partial<Character> = {}) =>
+    calm(bearer([`mysterious_deck_${n}`, ...more], { str: 16, ...over }));
+  const draw = (st: GameState, n: 13 | 22) => cast(st, `deck_draw_${n}`);
+  /** Force the next d100 rolls (one per card drawn), then the lowest faces. */
+  const cards = (...rolls: number[]) => {
+    const spy = vi.spyOn(Math, 'random');
+    for (const r of rolls) spy.mockReturnValueOnce((r - 0.5) / 100);
+    spy.mockReturnValue(0);
+  };
+
+  it('comes as a 13-card and a 22-card deck, drawn out of combat only', () => {
+    expect(SRD_ITEMS.mysterious_deck_13.name).toBe('Mysterious Deck (13 Cards)');
+    expect(SRD_ITEMS.mysterious_deck_22.desc).toContain('Legendary');
+    const inFight = generateChoices(fight([bearer(['mysterious_deck_13'])]), seedWith(), ctx);
+    expect(inFight.some((c) => c.label.includes('Draw a Card'))).toBe(false);
+  });
+
+  it('Moon grants Wish 1d3 times, cast without a slot', async () => {
+    cards(45); // Moon; d3 = 1
+    const r = await draw(deckOf(13), 13);
+    expect(r.narrative).toContain('Moon');
+    expect(pc(r.newState).deck_wishes).toBe(1);
+    const offer = generateChoices(r.newState, seedWith(), ctx).find((c) =>
+      c.label.startsWith('Moon card — cast Wish')
+    );
+    expect(offer?.pickOption?.param).toBe('wishSpellId');
+    const wished = await run(r.newState, {
+      type: 'cast_spell',
+      spellId: 'wish',
+      slotLevel: 9,
+      deckWish: true,
+    });
+    expect(pc(wished.newState).deck_wishes).toBe(0);
+    const none = await run(wished.newState, {
+      type: 'cast_spell',
+      spellId: 'wish',
+      slotLevel: 9,
+      deckWish: true,
+    });
+    expect(none.narrative).toContain('no Wish from the Moon card');
+  });
+
+  it('Euryale curses saves by -2; the Fates lift it', async () => {
+    cards(16); // 15–18 in the 22-card deck
+    let st = (await draw(deckOf(22), 22)).newState;
+    expect(pc(st).euryale_curse).toBe(true);
+    expect(wornSaveBonus(pc(st), 'wis', lootTable)).toBe(-2);
+    cards(20);
+    st = (await draw(st, 22)).newState;
+    expect(pc(st).euryale_curse).toBe(false);
+  });
+
+  it('the Fool: Disadvantage for 72 hours, draw again, and it leaves the deck', async () => {
+    cards(30, 33); // Fool, then Gem
+    const r = await draw(deckOf(22), 22);
+    const me = pc(r.newState);
+    expect(me.conditions).toContain('deck_fool');
+    expect(me.condition_durations?.deck_fool).toBe(72 * 600);
+    expect(me.gold).toBe(50000);
+    expect(me.inventory[0].powers_used).toContain('deck:Fool');
+    // Drawing the Fool again rerolls.
+    cards(29, 33);
+    const again = await draw(r.newState, 22);
+    expect(again.narrative).not.toContain('Fool —');
+    expect(pc(again.newState).gold).toBe(100000);
+  });
+
+  it('Talons destroys every magic item carried, sparing mundane gear', async () => {
+    cards(90);
+    const r = await draw(deckOf(22, ['longsword_plus_1', 'dagger', 'potion_of_climbing']), 22);
+    const ids = pc(r.newState).inventory.map((i) => i.id);
+    expect(ids).toEqual(['dagger']);
+  });
+
+  it('Void takes the drawer out of the party', async () => {
+    cards(99);
+    const r = await draw(deckOf(13), 13);
+    expect(pc(r.newState).dead).toBe(true);
+    expect(r.narrative).toContain('draw no more cards');
+  });
+
+  it('Star raises the primary ability by 2; Knight joins; Ruin takes the gold', async () => {
+    cards(75);
+    let r = await draw(deckOf(13, [], { gold: 300 }), 13);
+    expect(pc(r.newState).str).toBe(18);
+    cards(35);
+    r = await draw(r.newState, 13);
+    expect(r.newState.summoned_allies?.[0].name).toBe('Knight');
+    cards(60);
+    r = await draw(r.newState, 13);
+    expect(pc(r.newState).gold).toBe(0);
+  });
+
+  it('Sun gives a magic item and dawn Temporary Hit Points', async () => {
+    cards(85);
+    const r = await draw(deckOf(13), 13);
+    expect(pc(r.newState).sun_card).toBe(true);
+    expect(pc(r.newState).inventory).toHaveLength(2);
+  });
+
+  it('Throne grants proficiency and Expertise in a social skill', async () => {
+    cards(92);
+    const r = await draw(deckOf(13, [], { skill_proficiencies: [] }), 13);
+    expect(pc(r.newState).skill_proficiencies).toContain('Persuasion');
+    expect(pc(r.newState).expertise_skills).toContain('persuasion');
   });
 });

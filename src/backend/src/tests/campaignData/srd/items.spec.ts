@@ -17,7 +17,7 @@ describe('SRD_ITEMS catalog integrity', () => {
     }
   });
 
-  it('has the expected catalog size (234 weapons + 134 armor + 720 gear)', () => {
+  it('has the expected catalog size (234 weapons + 134 armor + 722 gear)', () => {
     // Full SRD 5.2.1 weapon + armor tables (incl. firearms: Musket, Pistol),
     // plus consumable/misc gear, tools, foci, light sources, thrown splash
     // weapons, ammunition (arrows / bolts / bullets / needles), and magic items
@@ -34,7 +34,7 @@ describe('SRD_ITEMS catalog integrity', () => {
     // and 31 round-2 wondrous items (stones, books, flight, periapts, …), and
     // 48 utility and travel items (containers, carpets, dusts, tokens, …), and
     // 26 unique items (5 Dancing Swords and the Rod of Lordly Might are weapons).
-    expect(ALL_SRD_ITEM_IDS).toHaveLength(1088);
+    expect(ALL_SRD_ITEM_IDS).toHaveLength(1090);
     const weapons = Object.values(SRD_ITEMS).filter((i) => i.type === 'weapon');
     const armor = Object.values(SRD_ITEMS).filter((i) => i.type === 'armor');
     const gear = Object.values(SRD_ITEMS).filter(
@@ -42,7 +42,7 @@ describe('SRD_ITEMS catalog integrity', () => {
     );
     expect(weapons).toHaveLength(234); // 38 base + 114 +N + 29 named + 9 staffs + 35 activated + 3 cursed + 6 unique
     expect(armor).toHaveLength(134); // 13 base + 39 +N + 50 named + 19 activated / special + 13 cursed
-    expect(gear).toHaveLength(720); // incl. 13 wands + 340 scrolls + 70 slaying ammo + 31 + 28 + 10 + 21 + 48 + 20 + 8 wondrous + 6 more base gear
+    expect(gear).toHaveLength(722); // incl. 13 wands + 340 scrolls + 70 slaying ammo + 31 + 28 + 10 + 21 + 48 + 20 + 10 wondrous + 6 more base gear
   });
 
   it('covers the full SRD 5.2.1 weapon + armor tables', () => {

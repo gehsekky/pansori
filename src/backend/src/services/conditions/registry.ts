@@ -158,6 +158,16 @@ const defs: ConditionDef[] = [
   // caster's concentration drop), so 'permanent' keeps tickConditions from
   // auto-expiring it. (The fiend/undead-hit-blinds-attacker rider is deferred.)
   { id: 'holy_warded', duration: 'permanent', imposesDisadvantageOnAttackers: true },
+  // SRD Mysterious Deck — the Fool (Disadvantage on D20 Tests for 72 hours) and
+  // the Jester (Advantage on them). Simplification: attack rolls and saving
+  // throws only, not ability checks.
+  {
+    id: 'deck_fool',
+    duration: 'permanent',
+    imposesDisadvantageOnSelfAttacks: true,
+    disadvantageSaves: ['str', 'dex', 'con', 'int', 'wis', 'cha'],
+  },
+  { id: 'deck_jester', duration: 'permanent', grantsAdvantageOnSelfAttacks: true },
   // Unconscious + petrified: no auto-expire; cleared by death-save recovery
   // / Restoration. Saves auto-fail while present.
   // SRD Unconscious — attack rolls against you have Advantage (and a hit from

@@ -1,17 +1,26 @@
+import type { AbilityKey, Character, LootItem, Spell } from '../../../types.js';
 import type { ActionContext, ActionHandler } from '../types.js';
-import type { Character, LootItem, Spell } from '../../../types.js';
 import { classSpellListTag, hasExpertise, hasSkillProficiency } from '../../multiclass.js';
-import { d, rollConditionSave, rollDice, skillCheck } from '../../rulesEngine.js';
+import {
+  d,
+  hasWeaponProficiency,
+  rollConditionSave,
+  rollDice,
+  skillCheck,
+} from '../../rulesEngine.js';
 import { hasSaveProficiency, pcDamageTaken } from '../../gameEngine.js';
 import { maxCastableLevel, onSpellList } from '../../chargedItems.js';
+import { syncSetAbilities, wornSaveBonus } from '../../wornEffects.js';
 import { ITEM_POWERS } from '../../../campaignData/srd/itemPowers.js';
 import { SRD_ITEMS } from '../../../campaignData/srd/items.js';
 import { SRD_MONSTERS } from '../../../campaignData/srd/monsters.js';
 import { SRD_SPELLS } from '../../../campaignData/srd/spells.js';
 import { applyDamage } from '../../damage.js';
+import { characterAc } from '../../armorClass.js';
+import { clearInstance } from '../../equipment.js';
+import { grantTimed } from '../../potions.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from '../actor.js';
-import { wornSaveBonus } from '../../wornEffects.js';
 
 type CastAction = {
   type: 'cast_spell';
@@ -60,6 +69,9 @@ export function runItemEffect(
       return true;
     case 'hat_spell':
       runHat(ctx, action, cast);
+      return true;
+    case 'deck_draw':
+      drawFromDeck(ctx, spell, action);
       return true;
     default:
       return false;
@@ -685,4 +697,276 @@ function hatMishap(ctx: ActionContext, action: CastAction, cast: CastHandler, tr
   if (!pool.length) return say('an empty hatful of glitter.');
   const [got] = giveItems(ctx, [pool[d(pool.length) - 1].id]);
   return say(`${char.name} pulls out a ${got}!`);
+}
+
+// ─── SRD Mysterious Deck ─────────────────────────────────────────────────────
+
+// The deck tables: each card's top d100 roll, in order.
+const DECK_13: Array<[number, string]> = [
+  [8, 'Euryale'],
+  [16, 'Flames'],
+  [24, 'Jester'],
+  [32, 'Key'],
+  [40, 'Knight'],
+  [48, 'Moon'],
+  [56, 'Rogue'],
+  [64, 'Ruin'],
+  [72, 'Skull'],
+  [80, 'Star'],
+  [88, 'Sun'],
+  [96, 'Throne'],
+  [100, 'Void'],
+];
+const DECK_22: Array<[number, string]> = [
+  [5, 'Balance'],
+  [10, 'Comet'],
+  [14, 'Donjon'],
+  [18, 'Euryale'],
+  [23, 'Fates'],
+  [27, 'Flames'],
+  [31, 'Fool'],
+  [36, 'Gem'],
+  [41, 'Jester'],
+  [46, 'Key'],
+  [51, 'Knight'],
+  [56, 'Moon'],
+  [60, 'Puzzle'],
+  [64, 'Rogue'],
+  [68, 'Ruin'],
+  [73, 'Sage'],
+  [77, 'Skull'],
+  [82, 'Star'],
+  [87, 'Sun'],
+  [91, 'Talons'],
+  [96, 'Throne'],
+  [100, 'Void'],
+];
+// Cards that leave the deck once drawn (a re-draw is rerolled).
+const ONE_TIME_CARDS = ['Fool', 'Jester'];
+const ABILITIES: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+/** A magic item, by its catalog description's rarity tag (or a +N / scroll). */
+export function isMagicItem(l: LootItem | undefined): boolean {
+  if (!l) return false;
+  return (
+    !!l.magicBonus ||
+    !!l.spellScroll ||
+    /\((Common|Uncommon|Rare|Very Rare|Legendary|Artifact)[;.,)]/.test(l.desc ?? '')
+  );
+}
+
+/** The Mysterious Deck's draw: roll its table (rerolling a card that has left). */
+function drawFromDeck(ctx: ActionContext, spell: Spell, action: CastAction): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const table = spell.id === 'deck_draw_22' ? DECK_22 : DECK_13;
+  const instanceId = (action as { itemInstanceId?: string }).itemInstanceId;
+  const notes: string[] = [];
+  let draws = 1;
+  while (draws-- > 0 && !ctx.actor.char.dead) {
+    const inv = ctx.actor.char.inventory.find((i) => i.instance_id === instanceId);
+    const gone = (inv?.powers_used ?? []).filter((k) => k.startsWith('deck:'));
+    let card = '';
+    for (let tries = 0; tries < 50; tries++) {
+      const roll = d(100);
+      card = table.find(([top]) => roll <= top)![1];
+      if (!gone.includes(`deck:${card}`)) break;
+    }
+    if (ONE_TIME_CARDS.includes(card) && instanceId) {
+      updatePcActor(ctx, {
+        inventory: ctx.actor.char.inventory.map((i) =>
+          i.instance_id === instanceId
+            ? { ...i, powers_used: [...(i.powers_used ?? []), `deck:${card}`] }
+            : i
+        ),
+      });
+    }
+    const { text, extraDraw } = applyCard(ctx, card);
+    notes.push(`${card} — ${text}`);
+    // SRD Fool — draw another card (not one of your declared draws).
+    if (extraDraw) draws++;
+  }
+  ctx.narrative = `${ctx.actor.char.name} draws from the Mysterious Deck. ${notes.join(' Then: ')}`;
+}
+
+/** Raise (or lower) one ability score, within [floor, cap]. Returns the change. */
+function shiftAbility(ctx: ActionContext, ab: AbilityKey, by: number, cap: number): number {
+  if (ctx.actor.kind !== 'pc') return 0;
+  const cur = ctx.actor.char[ab] as number;
+  const next = Math.max(1, by > 0 ? Math.min(cap, cur + by) : cur + by);
+  updatePcActor(ctx, { [ab]: next } as Partial<Character>);
+  return next - cur;
+}
+
+/** The card's effect on the drawer. `extraDraw`: draw one more card. */
+function applyCard(ctx: ActionContext, card: string): { text: string; extraDraw?: boolean } {
+  if (ctx.actor.kind !== 'pc') return { text: '' };
+  const char = ctx.actor.char;
+  const primary = (ctx.context.classPrimaryStats?.[char.character_class] ?? 'str') as AbilityKey;
+  const casting = ctx.context.spellcastingAbility?.[char.character_class];
+  const named = (ab: AbilityKey) => ab.toUpperCase();
+  switch (card) {
+    case 'Balance': {
+      // Simplification: the trade is made for you — +2 to the class's primary
+      // ability, -2 to the lowest other score above 5.
+      const lower = ABILITIES.filter((a) => a !== primary && (char[a] as number) > 5).sort(
+        (a, b) => (char[a] as number) - (char[b] as number)
+      )[0];
+      if (!lower || (char[primary] as number) >= 22)
+        return { text: 'the scales hold still; nothing changes.' };
+      shiftAbility(ctx, primary, 2, 22);
+      shiftAbility(ctx, lower, -2, 30);
+      return { text: `the scales tip: ${named(primary)} +2, ${named(lower)} -2.` };
+    }
+    case 'Comet':
+      // Simplification: the chosen foe and the year of Advantage on Death
+      // Saving Throws aren't tracked.
+      return {
+        text: 'a streak of fire across the card — glory awaits whoever fells the next great foe alone.',
+      };
+    case 'Donjon':
+    case 'Void': {
+      // Simplification: the drawer is lost to the party as if dead; the rescue
+      // (or the search for the trapped soul) is left to the table.
+      updatePcActor(ctx, { hp: 0, dead: true });
+      return {
+        text:
+          card === 'Donjon'
+            ? `${char.name} vanishes, entombed in a sphere beyond the world. They draw no more cards.`
+            : `${char.name}'s soul is torn away and locked in a far-off prison; their body falls still. They draw no more cards.`,
+      };
+    }
+    case 'Euryale':
+      updatePcActor(ctx, { euryale_curse: true });
+      return {
+        text: `a medusa's gaze curses ${char.name}: -2 to saving throws until the curse is lifted.`,
+      };
+    case 'Fates':
+      if (char.euryale_curse) {
+        updatePcActor(ctx, { euryale_curse: false });
+        return { text: "reality unspools and respins — Euryale's curse never happened." };
+      }
+      // Simplification: erasing an event is left to the table.
+      return {
+        text: 'reality unspools around one moment of your choosing — an event the GM will let you undo.',
+      };
+    case 'Flames':
+      return {
+        text: 'a powerful devil turns its hateful gaze on you, and will hunt you until one of you dies.',
+      };
+    case 'Fool': {
+      const conds = grantTimed(char, ['deck_fool'], 72 * 600);
+      updatePcActor(ctx, conds);
+      return {
+        text: 'Disadvantage on attack rolls and saving throws for 72 hours — and draw again.',
+        extraDraw: true,
+      };
+    }
+    case 'Gem':
+      updatePcActor(ctx, { gold: (char.gold ?? 0) + 50000 });
+      return { text: 'fifty gems worth 1,000 GP each spill at your feet (50,000 GP).' };
+    case 'Jester': {
+      updatePcActor(ctx, grantTimed(char, ['deck_jester'], 72 * 600));
+      return { text: 'Advantage on attack rolls and saving throws for 72 hours.' };
+    }
+    case 'Key': {
+      const pool = Object.values(SRD_ITEMS).filter(
+        (l) =>
+          l.type === 'weapon' &&
+          (l.value ?? 0) >= 4000 &&
+          !l.cursed &&
+          isMagicItem(l) &&
+          hasWeaponProficiency(char.weapon_proficiencies ?? [], l.weaponType, l)
+      );
+      if (!pool.length) return { text: 'a key turns in the air, but finds no lock.' };
+      const [got] = giveItems(ctx, [pool[d(pool.length) - 1].id]);
+      return { text: `a ${got} appears in your hands.` };
+    }
+    case 'Knight':
+      joinParty(ctx, 'knight', 1);
+      return { text: 'a Knight steps out of the light, sworn to serve you until death.' };
+    case 'Moon': {
+      const n = d(3);
+      updatePcActor(ctx, { deck_wishes: (char.deck_wishes ?? 0) + n });
+      return { text: `you may cast Wish ${n === 1 ? 'once' : `${n} times`}.` };
+    }
+    case 'Puzzle': {
+      // Simplification: the score lost is Intelligence unless that's your main or
+      // spellcasting ability (then Wisdom); no extra card is drawn.
+      const ab: AbilityKey = primary === 'int' || casting === 'int' ? 'wis' : 'int';
+      const lost = -shiftAbility(ctx, ab, -(d(4) + 1), 30);
+      return { text: `your mind knots: ${named(ab)} -${lost}, for good.` };
+    }
+    case 'Rogue':
+      return {
+        text: 'somewhere, someone you know has turned against you — and you don’t know who.',
+      };
+    case 'Ruin':
+      updatePcActor(ctx, { gold: 0 });
+      return { text: 'every coin and scrap of wealth you own is gone.' };
+    case 'Sage':
+      return {
+        text: 'once within the year, you may ask a question in meditation and receive a true answer.',
+      };
+    case 'Skull':
+      // Simplification: the Avatar of Death isn't placed on the board (it joins
+      // the uncontrolled-creatures deferral).
+      return { text: 'a ghostly reaper in a tattered robe appears, hunting you alone.' };
+    case 'Star': {
+      const gained = shiftAbility(ctx, primary, 2, 24);
+      return {
+        text: gained
+          ? `${named(primary)} +${gained}.`
+          : `your ${named(primary)} is already as high as it can go.`,
+      };
+    }
+    case 'Sun': {
+      const pool = Object.values(SRD_ITEMS).filter(
+        (l) =>
+          l.type === 'misc' && (l.value === 400 || l.value === 4000) && !l.cursed && isMagicItem(l)
+      );
+      const [got] = pool.length ? giveItems(ctx, [pool[d(pool.length) - 1].id]) : [];
+      updatePcActor(ctx, { sun_card: true });
+      return {
+        text: `${got ? `a ${got} appears on your person, and ` : ''}you'll gain 10 Temporary Hit Points every dawn for the rest of your life.`,
+      };
+    }
+    case 'Talons': {
+      const doomed = new Set(
+        char.inventory.filter((i) => isMagicItem(itemById(ctx, i.id))).map((i) => i.instance_id)
+      );
+      let equipment = char.equipment ?? {};
+      for (const id of doomed) equipment = clearInstance(equipment, id);
+      const next = {
+        ...char,
+        inventory: char.inventory.filter((i) => !doomed.has(i.instance_id)),
+        equipment,
+        attuned_items: (char.attuned_items ?? []).filter((id) => !doomed.has(id)),
+      };
+      syncSetAbilities(next, ctx.context.lootTable);
+      next.ac = characterAc(next, ctx.context.lootTable);
+      updatePcActor(ctx, next);
+      return {
+        text: `every magic item ${char.name} carries crumbles to dust (${doomed.size} lost).`,
+      };
+    }
+    case 'Throne': {
+      // Simplification: the skill is the first of Persuasion, Intimidation,
+      // Insight and History you lack Expertise in.
+      const skill =
+        ['Persuasion', 'Intimidation', 'Insight', 'History'].find(
+          (sk) => !hasExpertise(char, sk)
+        ) ?? 'Persuasion';
+      updatePcActor(ctx, {
+        skill_proficiencies: hasSkillProficiency(char, skill)
+          ? char.skill_proficiencies
+          : [...char.skill_proficiencies, skill],
+        expertise_skills: [...new Set([...(char.expertise_skills ?? []), skill.toLowerCase()])],
+      });
+      return {
+        text: `proficiency and Expertise in ${skill}, and the deed to a small keep — once you clear out the monsters living there.`,
+      };
+    }
+    default:
+      return { text: 'the card is blank.' };
+  }
 }

@@ -170,6 +170,7 @@ export const handleCastSpell: ActionHandler<{
       overchannel?: boolean;
       mysticArcanum?: boolean;
       wishDuplicate?: boolean;
+      deckWish?: boolean;
     },
     spell
   );

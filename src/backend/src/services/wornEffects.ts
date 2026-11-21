@@ -54,12 +54,18 @@ export function activeCurseEffects(
  * (`ability: 'all'` — Cloak / Ring of Protection's +1 to every save).
  */
 export function wornSaveBonus(char: Character, ability: AbilityKey, lootTable: LootItem[]): number {
-  return activeWornEffects(char, lootTable).reduce(
-    (sum, e) =>
-      e.kind === 'save_bonus' && (e.ability === ability || e.ability === 'all')
-        ? sum + e.bonus
-        : sum,
-    0
+  // SRD Mysterious Deck's Euryale — a -2 curse on saving throws, folded in here
+  // with the worn bonuses (every PC save site reads this).
+  const curse = char.euryale_curse ? -2 : 0;
+  return (
+    curse +
+    activeWornEffects(char, lootTable).reduce(
+      (sum, e) =>
+        e.kind === 'save_bonus' && (e.ability === ability || e.ability === 'all')
+          ? sum + e.bonus
+          : sum,
+      0
+    )
   );
 }
 

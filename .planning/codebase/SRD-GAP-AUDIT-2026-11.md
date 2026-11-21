@@ -679,8 +679,33 @@ and Mastiffs join the party for good. The deck holds 24 cards and each draw
 rolls on the table; the illusions are described rather than placed. The hat's
 Wizard list is the arcane list (as for spellbooks), its Spellcasting Focus use
 isn't modeled, its creatures wander off, the bats make one attack and scatter,
-and the magic item is a consumable that doesn't vanish after an hour. Still
-deferred: the Mysterious Deck and the batch 9–12 deferrals.
+and the magic item is a consumable that doesn't vanish after an hour.
+
+**Batch 15 done 2026-11-20 — Mysterious Deck.** The 13-card and 22-card decks
+(`deck_draw_13` / `deck_draw_22`): each draw rolls its column of the table; the
+Fool and Jester leave the deck once drawn (a repeat is rerolled), and the Fool
+draws another card. Card effects: Balance (+2 / -2), Donjon and Void (the
+drawer is lost — marked dead), Euryale (-2 to saving throws, folded into
+`wornSaveBonus`; `Character.euryale_curse`), Fates (lifts Euryale's curse),
+Fool / Jester (Disadvantage / Advantage on attack rolls and saves for 72 hours
+— registry conditions `deck_fool` / `deck_jester`, timed on the in-world
+clock and kept through Long Rests), Gem (50,000 GP), Key (a Rare+ magic weapon
+you're proficient with), Knight (joins for good), Moon (1d3 Wishes cast
+without a slot — `Character.deck_wishes`, the `deckWish` cast), Puzzle (-1d4+1
+INT or WIS), Ruin (all gold), Star (+2, max 24), Sun (a magic item and 10
+Temporary Hit Points at each Long Rest — `Character.sun_card`), Talons (every
+magic item carried is destroyed), Throne (proficiency and Expertise in a
+social skill). Simplifications: one declared draw per use and out of combat
+only; Balance, Puzzle and Throne choose for you (primary ability up, the
+lowest other score down; INT lost unless it's your main or casting ability;
+the first of Persuasion / Intimidation / Insight / History you lack Expertise
+in); the Jester always gives Advantage (never the extra draws) and Puzzle's
+extra draw isn't taken; the Fool and Jester skip ability checks; Comet's foe,
+Flames' devil, Rogue's traitor, Sage's question and the Fates' undoing are
+described; the Skull's Avatar of Death isn't placed (it joins the
+uncontrolled-creatures deferral); Donjon and Void don't block revival magic.
+"Magic item" (Talons, Key, Sun) is read from the catalog description's rarity
+tag. Still deferred: the batch 9–12 deferrals.
 
 ## 7. Core rules not found
 

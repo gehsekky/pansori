@@ -110,8 +110,11 @@ export function potionRounds(rounds: number | string): number {
   return hours * ROUNDS_PER_HOUR;
 }
 
-/** Add `conds` to the character for `rounds`, sourced to the potion. */
-function grantTimed(char: Character, conds: string[], rounds: number): Character {
+/**
+ * Add `conds` to the character for `rounds`, sourced to the potion so they run
+ * down with the in-world clock (also used by the Mysterious Deck's Fool / Jester).
+ */
+export function grantTimed(char: Character, conds: string[], rounds: number): Character {
   const durations = { ...(char.condition_durations ?? {}) };
   const sources = { ...(char.condition_sources ?? {}) };
   for (const c of conds) {

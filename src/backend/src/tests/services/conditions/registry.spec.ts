@@ -131,11 +131,12 @@ describe('condition registry — derived Sets (compat shim)', () => {
     );
   });
 
-  it('DISADV_CONDITIONS — self-attack-disadvantage conditions (+ cursed / heat_seared / enfeebled)', () => {
+  it('DISADV_CONDITIONS — self-attack-disadvantage conditions (+ cursed / heat_seared / enfeebled / deck_fool)', () => {
     expect([...DISADV_CONDITIONS].sort()).toEqual(
       [
         'blinded',
         'cursed',
+        'deck_fool',
         'enfeebled',
         'frightened',
         'heat_seared',
@@ -146,10 +147,11 @@ describe('condition registry — derived Sets (compat shim)', () => {
     );
   });
 
-  it('PLAYER_ADV_CONDITIONS = {invisible}; ENEMY_DISADV_CONDITIONS = {invisible, blurred, holy_warded}', () => {
+  it('PLAYER_ADV_CONDITIONS = {invisible, deck_jester}; ENEMY_DISADV_CONDITIONS = {invisible, blurred, holy_warded}', () => {
     // Blur added `blurred` and Holy Aura added `holy_warded` (attackers have
-    // Disadvantage) alongside Invisible.
-    expect([...PLAYER_ADV_CONDITIONS]).toEqual(['invisible']);
+    // Disadvantage) alongside Invisible. The Mysterious Deck's Jester grants
+    // Advantage on the bearer's own attacks.
+    expect([...PLAYER_ADV_CONDITIONS].sort()).toEqual(['deck_jester', 'invisible']);
     expect([...ENEMY_DISADV_CONDITIONS].sort()).toEqual(
       ['blurred', 'holy_warded', 'invisible'].sort()
     );
