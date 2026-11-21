@@ -717,7 +717,9 @@ export function rollConditionSave(
   const hopefulAdv = ability === 'wis' && targetConditions.includes('hopeful');
   // SRD Holy Aura — a warded creature has Advantage on ALL saving throws
   // (literal check, like `hopeful` / `hasted` above).
-  const holyAuraAdv = targetConditions.includes('holy_warded');
+  // SRD Candle of Invocation — Advantage on D20 Tests within its light.
+  const holyAuraAdv =
+    targetConditions.includes('holy_warded') || targetConditions.includes('candle_of_invocation');
   const advSource = advantage || hasteAdv || hopefulAdv || holyAuraAdv;
   const netAdv = advSource && !disadv;
   const netDisadv = disadv && !advSource;

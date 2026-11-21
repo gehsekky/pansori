@@ -127,6 +127,24 @@ export interface ItemCastPlan {
   cost: number;
   dc?: number;
   attackBonus?: number;
+  // SRD Ring of Spell Storing / Ioun Stone of Reserve — the held spell cast.
+  stored?: NonNullable<InventoryItem['stored_spells']>[number];
+}
+
+/** Slot levels the instance's stored spells take up. */
+export function storedLevels(inv: InventoryItem): number {
+  return (inv.stored_spells ?? []).reduce((n, s) => n + s.level, 0);
+}
+
+/** Why the character can't use an `ItemSpell.requires` item, or null. */
+function requiresBlocker(char: Character, is: ItemSpell, loot: LootItem): string | null {
+  const r = is.requires;
+  if (!r) return null;
+  if ((char.spell_slots_max?.[r.slotLevel] ?? 0) < r.slots) {
+    return `Only a spellcaster with ${r.slots} level ${r.slotLevel} spell slots can use the ${loot.name}.`;
+  }
+  if ((char.gold ?? 0) < r.gold) return `The ${loot.name}'s work needs ${r.gold} GP of supplies.`;
+  return null;
 }
 
 /**
@@ -157,8 +175,27 @@ export function planItemCast(
     const s = SCROLL_STATS[spell.level] ?? SCROLL_STATS[9];
     return { inv, loot, scroll: true, cost: 0, dc: s.dc, attackBonus: s.attack };
   }
+  if (loot.spellStore) {
+    if (!canUseItem(char, inv, loot)) return { error: `You must be wearing the ${loot.name}.` };
+    const held = (inv.stored_spells ?? []).find((x) => x.spellId === spell.id && x.level === level);
+    if (!held) return { error: `The ${loot.name} holds no level ${level} ${spell.name}.` };
+    return {
+      inv,
+      loot,
+      scroll: false,
+      cost: 0,
+      dc: held.dc,
+      attackBonus: held.attack,
+      stored: held,
+    };
+  }
   const is = loot.itemSpells?.find((x) => x.spellId === spell.id);
   if (!is) return { error: `The ${loot.name} can't cast ${spell.name}.` };
+  const blocked = requiresBlocker(char, is, loot);
+  if (blocked) return { error: blocked };
+  if (is.uses && (inv.spell_uses?.[is.spellId] ?? 0) >= is.uses) {
+    return { error: `The ${loot.name} has nothing left to cast ${spell.name} with.` };
+  }
   if (!canUseItem(char, inv, loot)) {
     const how = loot.slot === 'weapon' || loot.slot === 'off_hand' ? 'holding' : 'wearing';
     return { error: `You must be ${how} the ${loot.name}.` };
@@ -206,10 +243,36 @@ export function spendItemCast(char: Character, plan: ItemCastPlan, lootTable: Lo
     drop();
     return ' The scroll crumbles to dust.';
   }
+  if (plan.stored) {
+    const gone = plan.stored;
+    char.inventory = char.inventory.map((i) => {
+      if (i.instance_id !== plan.inv.instance_id) return i;
+      const left = [...(i.stored_spells ?? [])];
+      const k = left.findIndex((x) => x.spellId === gone.spellId && x.level === gone.level);
+      if (k >= 0) left.splice(k, 1);
+      return { ...i, stored_spells: left.length ? left : undefined };
+    });
+    return ` The spell leaves the ${plan.loot.name}.`;
+  }
   if (plan.is?.daily || plan.is?.rechargeDays) {
     markDaily(char, plan.inv.instance_id, dailyKey(plan.is.spellId), plan.is.rechargeDays);
   }
-  return spendCharges(char, plan.inv.instance_id, plan.cost, lootTable);
+  let note = '';
+  if (plan.is?.uses) {
+    const id = plan.is.spellId;
+    char.inventory = char.inventory.map((i) =>
+      i.instance_id === plan.inv.instance_id
+        ? { ...i, spell_uses: { ...(i.spell_uses ?? {}), [id]: (i.spell_uses?.[id] ?? 0) + 1 } }
+        : i
+    );
+    const left = plan.is.uses - ((plan.inv.spell_uses?.[id] ?? 0) + 1);
+    note = ` (${left} left for it)`;
+  }
+  if (plan.is?.requires) {
+    char.gold = (char.gold ?? 0) - plan.is.requires.gold;
+    note += ` ${plan.is.requires.gold} GP of supplies are spent.`;
+  }
+  return note + spendCharges(char, plan.inv.instance_id, plan.cost, lootTable);
 }
 
 /** Mark the instance's once-per-dawn property `key` as spent. Mutates `char`. */
@@ -353,12 +416,21 @@ export function itemCastOptions(
       out.push({ inv, loot, spell, level: spell.level, cost: 0 });
       continue;
     }
+    if (loot.spellStore && canUseItem(char, inv, loot)) {
+      for (const held of inv.stored_spells ?? []) {
+        const spell = spellTable[held.spellId];
+        if (spell) out.push({ inv, loot, spell, level: held.level, cost: 0 });
+      }
+      continue;
+    }
     if (!loot.itemSpells?.length || !canUseItem(char, inv, loot)) continue;
     const left = chargesLeft(inv, loot);
     for (const is of loot.itemSpells) {
       const spell = itemSpellFor(spellTable, is.spellId);
       if (!spell || ((is.daily || is.rechargeDays) && dailyUsed(inv, dailyKey(is.spellId))))
         continue;
+      if (requiresBlocker(char, is, loot)) continue;
+      if (is.uses && (inv.spell_uses?.[is.spellId] ?? 0) >= is.uses) continue;
       const base = is.level ?? spell.level;
       for (let lvl = base; lvl <= (is.maxLevel ?? base); lvl++) {
         const cost = itemSpellCost(is, spell, lvl)!;
@@ -419,4 +491,101 @@ export function useEvasionRing(
     return { char: next, note: `${loot.name} turns the failure into a success${left}` };
   }
   return null;
+}
+
+/**
+ * SRD Rod of Absorption / Ioun Stones of Absorption and Greater Absorption — a
+ * Reaction cancels an enemy's spell. The rod (held and attuned) only takes a
+ * spell aimed at its bearer alone (no area) and stores its levels as energy;
+ * a stone (carried and attuned) cancels any spell its bearer can see, up to its
+ * level cap, and burns out after canceling 20 levels. Auto-resolved for the
+ * party (player-favorable): the target's own items first, then anyone's stone.
+ * Returns the updated party and a note, or null when nothing cancels it.
+ */
+export function absorbEnemySpell(
+  characters: Character[],
+  targetId: string,
+  spell: Spell,
+  lootTable: LootItem[]
+): { characters: Character[]; note: string } | null {
+  const order = [
+    ...characters.filter((c) => c.id === targetId),
+    ...characters.filter((c) => c.id !== targetId),
+  ];
+  for (const c of order) {
+    if (c.dead || c.hp <= 0 || c.turn_actions?.reaction_used) continue;
+    for (const inv of c.inventory ?? []) {
+      const loot = lootTable.find((l) => l.id === inv.id);
+      const ab = loot?.absorbSpells;
+      if (!loot || !ab || !(c.attuned_items ?? []).includes(inv.instance_id)) continue;
+      if (spell.level > ab.maxLevel) continue;
+      const used = inv.absorbed_levels ?? 0;
+      if (ab.targetedOnly) {
+        // The rod: held, aimed at its bearer alone, and room left to store it.
+        if (c.id !== targetId || spell.blastRadius || !isHeld(c, inv.instance_id)) continue;
+        if (used + spell.level > ab.lifetime) continue;
+      } else if (used >= ab.lifetime) continue;
+      const total = used + spell.level;
+      const burnsOut = !ab.targetedOnly && total >= ab.lifetime;
+      const next: Character = {
+        ...c,
+        turn_actions: { ...c.turn_actions, reaction_used: true },
+        inventory: burnsOut
+          ? c.inventory.filter((i) => i.instance_id !== inv.instance_id)
+          : c.inventory.map((i) =>
+              i.instance_id === inv.instance_id
+                ? {
+                    ...i,
+                    absorbed_levels: total,
+                    ...(ab.targetedOnly
+                      ? { energy: (i.energy ?? ab.startEnergy ?? 0) + spell.level }
+                      : {}),
+                  }
+                : i
+            ),
+        attuned_items: burnsOut
+          ? (c.attuned_items ?? []).filter((id) => id !== inv.instance_id)
+          : c.attuned_items,
+      };
+      const what = ab.targetedOnly
+        ? `drinks it in (${spell.level} level${spell.level === 1 ? '' : 's'} of energy stored)`
+        : burnsOut
+          ? 'cancels it — then burns out, dull and gray'
+          : 'cancels it';
+      return {
+        characters: characters.map((x) => (x.id === c.id ? next : x)),
+        note: ` ✦ ${c.name}'s ${loot.name} ${what} — ${spell.name} has no effect.`,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * SRD Ring of Spell Storing / Ioun Stone of Reserve — whether `spell` cast at
+ * `level` can be stored in the instance: a level 1..`maxLevel` spell with room
+ * left. (Any creature may cast into it; the bearer's own casting is what
+ * pansori offers.)
+ */
+export function storeTarget(
+  char: Character,
+  instanceId: string,
+  spell: Spell,
+  level: number,
+  lootTable: LootItem[]
+): { inv: InventoryItem; loot: LootItem } | { error: string } {
+  const inv = char.inventory?.find((i) => i.instance_id === instanceId);
+  const loot = inv ? lootTable.find((l) => l.id === inv.id) : undefined;
+  const cap = loot?.spellStore;
+  if (!inv || !loot || !cap) return { error: 'That item can’t hold a spell.' };
+  if (spell.level < 1 || level > cap.maxLevel) {
+    return { error: `The ${loot.name} holds spells of level 1 to ${cap.maxLevel} only.` };
+  }
+  const free = cap.levels - storedLevels(inv);
+  if (level > free) {
+    return {
+      error: `The ${loot.name} has room for only ${free} more level${free === 1 ? '' : 's'} of spells.`,
+    };
+  }
+  return { inv, loot };
 }

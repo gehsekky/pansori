@@ -7,7 +7,15 @@ import {
   rollDice,
 } from '../rulesEngine.js';
 import { applyOilOfSharpness, expendedSlotLevel, potionRounds, resolvePotion } from '../potions.js';
-import { attuneBlocker, chargesLeft, dailyUsed, markDaily, spendCharges } from '../chargedItems.js';
+import {
+  attuneBlocker,
+  chargesLeft,
+  dailyUsed,
+  markDaily,
+  maxCastableLevel,
+  restsLeft,
+  spendCharges,
+} from '../chargedItems.js';
 import { commitCharacter, getItemData, hasSaveProficiency } from '../gameEngine.js';
 import { hasSkillProficiency, maxAttunement } from '../multiclass.js';
 import type { ActionHandler } from './types.js';
@@ -181,8 +189,34 @@ export const handleUse: ActionHandler<{
       ctx.narrative = `You have already used your ${act.bonusAction ? 'Bonus Action' : 'action'} this turn.`;
       return;
     }
-    if (act.daily && dailyUsed(held, 'activate')) {
-      ctx.narrative = `The ${held.name} can't do that again until dawn.`;
+    if ((act.daily || act.rechargeDays) && dailyUsed(held, 'activate')) {
+      const n = restsLeft(held, 'activate');
+      ctx.narrative = act.rechargeDays
+        ? `The ${held.name} is still recovering — ${n} more Long Rest${n === 1 ? '' : 's'}.`
+        : `The ${held.name} can't do that again until dawn.`;
+      return;
+    }
+    // SRD Rod of Absorption — stored energy becomes an expended spell slot.
+    if (act.effect.kind === 'energy_slot') {
+      const energy = held.energy ?? itemData.absorbSpells?.startEnergy ?? 0;
+      const cap = Math.min(act.effect.maxLevel, energy, maxCastableLevel(nextChar));
+      const lvl = cap > 0 ? expendedSlotLevel(nextChar, cap) : 0;
+      if (!lvl) {
+        ctx.narrative = `The ${held.name} holds ${energy} level${energy === 1 ? '' : 's'} of spell energy — there's no expended slot it can refill.`;
+        return;
+      }
+      const usedSlots = nextChar.spell_slots_used ?? {};
+      nextChar = {
+        ...nextChar,
+        spell_slots_used: { ...usedSlots, [lvl]: Math.max(0, (usedSlots[lvl] ?? 0) - 1) },
+        inventory: nextChar.inventory.map((i) =>
+          i.instance_id === inst ? { ...i, energy: energy - lvl } : i
+        ),
+      };
+      narrative = `${nextChar.name} draws ${lvl} level${lvl === 1 ? '' : 's'} of stored energy from the ${held.name} — a level ${lvl} spell slot is restored (${energy - lvl} left).`;
+      updatePcActor(ctx, nextChar);
+      ctx.st = nextSt;
+      ctx.narrative = narrative;
       return;
     }
     if (act.charges && chargesLeft(held, itemData) < act.charges) {
@@ -218,7 +252,9 @@ export const handleUse: ActionHandler<{
     const res = resolvePotion(effect, nextChar, nextSt, ctx.context);
     nextSt = res.st;
     nextChar = { ...res.target };
-    if (act.daily || act.reuseExhaustionDc) markDaily(nextChar, inst, 'activate');
+    if (act.daily || act.reuseExhaustionDc || act.rechargeDays) {
+      markDaily(nextChar, inst, 'activate', act.rechargeDays);
+    }
     // SRD Dust of Disappearance — party members within range share the effect.
     let partyNote = '';
     if (effect.kind === 'condition' && effect.party) {

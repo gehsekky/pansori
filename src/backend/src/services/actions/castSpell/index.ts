@@ -5,12 +5,13 @@ import {
   resolvePlayerAttack,
   rollCritical,
   rollDice,
+  spellAttackBonus,
   transmutedDamageType,
 } from '../../rulesEngine.js';
 import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
-import { itemSpellFor, itemSpellVersion } from '../../chargedItems.js';
+import { itemSpellFor, itemSpellVersion, storeTarget } from '../../chargedItems.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
 import { applySingleTargetDamage } from './applyDamage.js';
@@ -133,6 +134,21 @@ export const handleCastSpell: ActionHandler<{
     ctx.context.lootTable
   );
 
+  // SRD Ring of Spell Storing / Ioun Stone of Reserve — a spell cast INTO the
+  // item has no effect but to be held there. Checked before the slot is spent.
+  const storeIn = (action as { storeInItem?: string }).storeInItem;
+  const store = storeIn
+    ? storeTarget(pc.char, storeIn, spell, slotLevel, ctx.context.lootTable)
+    : undefined;
+  if (store && 'error' in store) {
+    ctx.narrative = store.error;
+    return;
+  }
+  if (store && fromItem) {
+    ctx.narrative = 'A spell cast from an item can’t be stored in another.';
+    return;
+  }
+
   const precast = runPrecast(
     ctx,
     action as {
@@ -149,6 +165,24 @@ export const handleCastSpell: ActionHandler<{
   );
   if (precast.done) return;
   const { castingScore, slotNote, dc, isRitualCast, freeCast } = precast;
+
+  if (store) {
+    const held = {
+      spellId: spell.id,
+      level: slotLevel,
+      dc,
+      attack:
+        spellAttackBonus(pc.char.level, castingScore) +
+        (pc.char.worn_traits?.spellAttackBonus ?? 0),
+    };
+    pc.char.inventory = pc.char.inventory.map((i) =>
+      i.instance_id === store.inv.instance_id
+        ? { ...i, stored_spells: [...(i.stored_spells ?? []), held] }
+        : i
+    );
+    ctx.narrative = `${pc.char.name} casts ${spell.name}${slotNote} into the ${store.loot.name}, where it waits to be released (DC ${dc}).`;
+    return;
+  }
 
   // ── SRD Wish (basic use) ────────────────────────────────────────────────
   // Wish's own 9th-level slot was just spent in precast. If the caster chose a

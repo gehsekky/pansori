@@ -877,6 +877,17 @@ export function resolveOneAttack(
   // Sword of Life Stealing's Temporary Hit Points.
   if (itemHit.after.length) ctx.narrative += ` ${fmt.note(`[${itemHit.after.join('; ')}]`)}`;
   if (hammerThrow.thrown) ctx.narrative += thunderclap(ctx, weaponItem, targetId);
+  if (itemHit.heal > 0) {
+    const hp = Math.min(pc.char.max_hp, pc.char.hp + itemHit.heal);
+    updatePcActor(ctx, { hp });
+    ctx.st = {
+      ...ctx.st,
+      entities: (ctx.st.entities ?? []).map((e) =>
+        e.id === pc.char.id && !e.isEnemy ? { ...e, hp } : e
+      ),
+    };
+    ctx.narrative += ` ${fmt.note(`[${pc.char.name} drains ${itemHit.heal} Hit Points (now ${hp}/${pc.char.max_hp})]`)}`;
+  }
   if (itemHit.tempHp > (pc.char.temp_hp ?? 0)) {
     updatePcActor(ctx, { temp_hp: itemHit.tempHp });
     ctx.narrative += ` ${fmt.note(`[${pc.char.name} gains ${itemHit.tempHp} Temporary Hit Points]`)}`;

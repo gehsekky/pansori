@@ -387,4 +387,66 @@ export const ITEM_POWERS: Record<string, Spell> = {
     targetType: 'enemy',
     desc: 'A floating whip lashes a creature (melee spell attack +9, 1d6 + 5 Force) and keeps striking as a Bonus Action for 1 hour.',
   }),
+
+  // ── Unique items ──────────────────────────────────────────────────────────
+  // SRD Rod of Lordly Might's Terrify — each creature within 30 ft: DC 17 Wis
+  // save or Frightened for 1 minute (save again each turn).
+  lordly_terrify: power({
+    id: 'lordly_terrify',
+    name: 'Terrify',
+    level: 3,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'frightened',
+    conditionDuration: 10,
+    conditionSaveEnds: true,
+    aoeCondition: true,
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'Each enemy within 30 feet makes a Wisdom save or is Frightened for 1 minute (save again at the end of each turn).',
+  }),
+  // SRD Ring of Elemental Command's Elemental Compulsion — an Elemental within 60
+  // ft: DC 18 Wis save or Charmed until the start of your next turn.
+  // Simplification: you don't steer its move and action; it just won't fight.
+  elemental_compulsion: power({
+    id: 'elemental_compulsion',
+    name: 'Elemental Compulsion',
+    level: 1,
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'charmed',
+    conditionDuration: 1,
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    targetType: 'enemy',
+    onlyVs: ['elemental'],
+    desc: 'Compel an Elemental within 60 feet: Wisdom save or Charmed by you until the start of your next turn.',
+  }),
+  // SRD Helm of Brilliance's fire opal flames — the held weapon burns: +1d6 Fire
+  // on a hit until extinguished. Simplification: until the end of the fight.
+  helm_flames: power({
+    id: 'helm_flames',
+    name: 'Blazing Weapon',
+    level: 1,
+    targetType: 'self',
+    rangeKind: 'self',
+    weaponRider: { dice: '1d6', damageType: 'fire', persistent: true },
+    desc: 'The weapon you hold bursts into harmless flame: +1d6 Fire damage on each hit.',
+  }),
+  // SRD Manual of Golems — the golem it teaches you to build, which serves for
+  // good. Simplification: the work's days pass at once (out of combat).
+  ...Object.fromEntries(
+    (['clay', 'flesh', 'iron', 'stone'] as const).map((kind) => [
+      `build_${kind}_golem`,
+      power({
+        id: `build_${kind}_golem`,
+        name: `Build a ${kind.charAt(0).toUpperCase()}${kind.slice(1)} Golem`,
+        level: 5,
+        outOfCombatOnly: true,
+        summon: creature(`${kind}_golem`, { permanent: true }),
+        desc: `Build a ${kind} golem from the manual; it obeys you and serves for good.`,
+      }),
+    ])
+  ),
 };

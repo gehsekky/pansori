@@ -597,6 +597,43 @@ come in fixed amounts; the Well of Many Worlds recharges at dawn. Known issue
 (not fixed): ammunition bundles weigh their per-bundle weight per piece, so
 20 Arrows count 20 pounds instead of 1.
 
+**Batch 12 done 2026-11-20 — unique items.** New machinery: enemy spells can
+be canceled before they resolve (`LootItem.absorbSpells`, auto-resolved with
+a Reaction — the Rod of Absorption takes a spell aimed at its bearer alone and
+stores its levels as energy that refills expended slots up to level 5; Ioun
+Stones of Absorption cancel spells up to level 4 / 8 cast at anyone in the
+party, burning out after 20 levels); spell storing (`LootItem.spellStore`,
+`cast_spell` with `storeInItem` — the spell is held with its slot level, save
+DC and attack bonus, and cast back out from the item); worn effects
+`spell_turning`, `creature_bane`, `ignore_difficult_terrain` and a worn Fly
+Speed (`speed_mode` 'fly'); `ItemSpell.uses` (a per-spell supply, the Helm of
+Brilliance's gems) and `ItemSpell.requires` (slots + gold, the Manuals of
+Golems); `activate.rechargeDays`; a Drain Life rider (`healHalf`); permanent
+item summons (`summon.permanent`); and Candle of Invocation Advantage on
+attack rolls and saves. Items: Ring of Three Wishes; Cube of Force; Ring of
+Spell Turning; Rod of Absorption; Ioun Stones of Absorption, Greater
+Absorption and Reserve; Ring of Spell Storing; the five Dancing Swords; Helm
+of Brilliance; Rod of Lordly Might; Rod of Security; the four Rings of
+Elemental Command; Candle of Invocation; the four Manuals of Golems; Bag of
+Devouring. Simplifications: absorption and turning resolve automatically;
+Spell Turning doesn't deflect a spell back; the stores start empty and only
+their bearer casts into them; drawing on the rod's energy takes no action;
+the Dancing Sword's strike is a Bonus Action attack with it in hand; the
+Helm's gem counts are fixed (5 / 10 / 15 / 20), its flames last the fight,
+and its Diamond Light, losing Fire Resistance with the last ruby and bursting
+on a failed save against fire aren't modeled; the Rod of Lordly Might's
+on-hit powers are armed beforehand and its six button forms aren't modeled;
+Elemental Compulsion charms rather than letting you steer the Elemental; the
+Cube's Shield (a Reaction) isn't offered; the Candle burns all 4 hours at
+once and doesn't cover ability checks or the free level 1 spells; golems take
+no in-world time to build; the Bag of Devouring devours nothing yet. Still
+deferred: Ioun Stone of Mastery (Proficiency Bonus is derived from level at
+~40 sites); Iron Flask (capturing and releasing a creature); Mirror of Life
+Trapping, Sphere of Annihilation and Talisman of the Sphere (world objects);
+Apparatus of the Crab (a vehicle); Dragon Orb (an Artifact); the random-table
+items (Mysterious Deck, Wand of Wonder, Hat of Many Spells, Bag of Beans, Deck
+of Illusions, Robe of Useful Items) alongside the batch 9–10 deferrals.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

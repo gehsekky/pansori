@@ -48,7 +48,9 @@ export function runSummonSpell(
   // SRD Find Familiar — one familiar only: a recast gives the existing
   // familiar the new form (the old one is replaced).
   const isFamiliar = spell.id === 'find_familiar';
-  if (fromItem) {
+  // SRD Manual of Golems — the golem serves for good (no Long Rest reversion).
+  const forGood = !!fromItem && !!base.permanent;
+  if (fromItem && !forGood) {
     ctx.st = {
       ...ctx.st,
       summoned_allies: (ctx.st.summoned_allies ?? []).filter(
@@ -89,7 +91,7 @@ export function runSummonSpell(
     // flag + Speed so combat start auto-mounts the caster.
     isMount: base.isMount,
     speed: base.speed,
-    ...(fromItem ? { fromItem: fromItem.instanceId } : {}),
+    ...(fromItem && !forGood ? { fromItem: fromItem.instanceId } : {}),
   }));
   ctx.st = {
     ...ctx.st,
@@ -97,6 +99,12 @@ export function runSummonSpell(
   };
   // Mounts read differently from a war-band of summons: you conjure one steed
   // and ride it into the next fight.
+  if (forGood) {
+    ctx.narrative =
+      (ctx.narrative ?? '') +
+      `${char.name} finishes the work${slotNote} — a ${chosen.name} stirs to life and obeys its maker's commands.`;
+    return true;
+  }
   if (fromItem) {
     const who = count === 1 ? `a ${chosen.name}` : `${count} ${chosen.name}s`;
     ctx.narrative =

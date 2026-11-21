@@ -131,6 +131,12 @@ import {
   expendedSlotLevel,
   potionResists,
 } from './potions.js';
+import {
+  absorbEnemySpell,
+  attuneBlocker,
+  itemCastOptions,
+  useEvasionRing,
+} from './chargedItems.js';
 import { applyExpiryHooks, getConditionDuration } from './conditions/registry.js';
 import {
   applyMulticlassProfGrants,
@@ -171,7 +177,6 @@ import {
   spellSlotsForChar,
   wildShapeUsesMax,
 } from './multiclass.js';
-import { attuneBlocker, itemCastOptions, useEvasionRing } from './chargedItems.js';
 import {
   availableRecoveries,
   enumerateRecoveryPlans,
@@ -1857,7 +1862,11 @@ function computeEnemyAttack(
     !char.conditions.some((c) =>
       ['grappled', 'restrained', 'paralyzed', 'stunned', 'unconscious', 'petrified'].includes(c)
     );
+  // SRD Ring of Elemental Command — Elementals have Disadvantage against the wearer.
+  const baneDisadv =
+    !!enemy.creatureType && !!char.worn_traits?.creatureBane?.includes(enemy.creatureType);
   const hasDisadvantage =
+    baneDisadv ||
     displacementDisadv ||
     baseDisadvantage ||
     forceDisadvantage ||
@@ -10203,7 +10212,11 @@ function resolveEnemyAoeSpell(args: {
     const saveProf =
       args.context && hasSaveProficiency(c, save, args.context) ? profBonus(c.level) : 0;
     // Danger Sense (DEX) / Mantle of Spell Resistance — Advantage on the save.
-    const saveAdv = (save === 'dex' && hasDangerSense(c)) || !!c.worn_traits?.spellSaveAdvantage;
+    // Candle of Invocation — Advantage on D20 Tests in its light.
+    const saveAdv =
+      (save === 'dex' && hasDangerSense(c)) ||
+      !!c.worn_traits?.spellSaveAdvantage ||
+      c.conditions.includes('candle_of_invocation');
     const d20 = saveAdv ? Math.max(rollDice('1d20'), rollDice('1d20')) : rollDice('1d20');
     const wornBonus = args.context ? wornSaveBonus(c, save, args.context.lootTable) : 0;
     const total = d20 + abilityMod(saveScore) + saveProf + auraOfProtectionBonus(c, st) + wornBonus;
@@ -10220,7 +10233,10 @@ function resolveEnemyAoeSpell(args: {
       }
     }
     const evasion = save === 'dex' && spell.saveEffect === 'half' && hasEvasion(c);
+    // SRD Ring of Spell Turning — a saved spell of level 7 or lower does nothing.
+    const turned = saved && !!c.worn_traits?.spellTurning && spell.level <= 7;
     const effOf = (rolled: number): number => {
+      if (turned) return 0;
       if (evasion) return saved ? 0 : half(rolled);
       if (saved) return spell.saveEffect === 'half' ? half(rolled) : 0;
       return rolled;
@@ -10229,7 +10245,8 @@ function resolveEnemyAoeSpell(args: {
     const dmg =
       pcDamageTaken(c, st, effOf(dmgRoll), spell.damageType, spell.id) +
       pcDamageTaken(c, st, effOf(dmgRoll2), spell.damageType2 ?? spell.damageType, spell.id);
-    const evasionNote = (evasion ? ' ✦ Evasion' : '') + ringNote;
+    const evasionNote =
+      (evasion ? ' ✦ Evasion' : '') + ringNote + (turned ? ' ✦ Ring of Spell Turning' : '');
     const newHp = Math.max(0, c.hp - dmg);
     st = commitCharacter(st, { ...saver, hp: newHp });
     narrative += dealsDamage
@@ -10382,6 +10399,19 @@ export function resolveEnemySpell(args: {
 } {
   const { enemy, spell, target } = args;
   let narrative = args.narrative;
+  // SRD Rod of Absorption / Ioun Stones of Absorption — a Reaction cancels it.
+  if (args.context) {
+    const absorbed = absorbEnemySpell(args.st.characters, target.id, spell, args.context.lootTable);
+    if (absorbed) {
+      const st = { ...args.st, characters: absorbed.characters };
+      const tgt = absorbed.characters.find((c) => c.id === target.id) ?? target;
+      return {
+        st,
+        target: tgt,
+        narrative: `${narrative} ${enemy.name} casts ${spell.name}!${absorbed.note}`,
+      };
+    }
+  }
   // Pure single-target condition spell (Hold Person, Cause Fear): no damage, not
   // an area — resolve the save + apply the condition (with the PC's rerolls).
   if (spell.condition && !spell.damage && !spell.blastRadius) {
@@ -10438,7 +10468,8 @@ export function resolveEnemySpell(args: {
     // Mantle of Spell Resistance — Advantage on saves against spells.
     const dangerSenseAdv =
       (spell.savingThrow === 'dex' && hasDangerSense(target)) ||
-      !!target.worn_traits?.spellSaveAdvantage;
+      !!target.worn_traits?.spellSaveAdvantage ||
+      target.conditions.includes('candle_of_invocation');
     const saveD20 = dangerSenseAdv
       ? Math.max(rollDice('1d20'), rollDice('1d20'))
       : rollDice('1d20');
@@ -10461,7 +10492,10 @@ export function resolveEnemySpell(args: {
       spell.savingThrow === 'dex' && spell.saveEffect === 'half' && hasEvasion(target);
     // Damage for a given save outcome (used both for the committed damage and
     // the interactive Indomitable refund = failed-minus-saved).
+    // SRD Ring of Spell Turning — a saved spell of level 7 or lower does nothing.
+    const turns = !!target.worn_traits?.spellTurning && spell.level <= 7;
     const dmgFor = (didSave: boolean): number => {
+      if (didSave && turns) return 0;
       if (evasion) return didSave ? 0 : Math.floor(dmgRoll / 2);
       if (didSave && spell.saveEffect === 'half') return Math.floor(dmgRoll / 2);
       if (didSave && spell.saveEffect === 'negates') return 0;
@@ -10509,7 +10543,8 @@ export function resolveEnemySpell(args: {
         pendingSaveReroll = undefined;
       }
     }
-    const evasionNote = evasion ? ' ✦ Evasion' : '';
+    const evasionNote =
+      (evasion ? ' ✦ Evasion' : '') + (saved && turns ? ' ✦ Ring of Spell Turning' : '');
     const dmg = pcDamageTaken(target, args.st, dmgFor(saved), spell.damageType, spell.id);
     newTarget = { ...workingTarget, hp: Math.max(0, workingTarget.hp - dmg) };
     riderOnFailedSave = !saved && !!spell.condition;

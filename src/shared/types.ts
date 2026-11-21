@@ -1827,7 +1827,7 @@ export type WornEffect =
   | { kind: 'initiative_advantage'; party?: boolean }
   | { kind: 'ranged_ac_bonus'; bonus: number }
   | { kind: 'spell_attack_disadvantage' }
-  | { kind: 'speed_mode'; mode: 'swim' | 'climb'; feet: number | 'walk' }
+  | { kind: 'speed_mode'; mode: 'swim' | 'climb' | 'fly'; feet: number | 'walk' }
   | { kind: 'speed_floor'; feet: number }
   // `atLeast` (Belt of Dwarvenkind): Darkvision of at least `feet`, not added on top.
   | { kind: 'darkvision'; feet: number; atLeast?: boolean }
@@ -1889,6 +1889,14 @@ export type WornEffect =
   // Speed, or it floats (ignores Difficult Terrain and crosses water).
   | { kind: 'mount_speed'; feet: number }
   | { kind: 'mount_float' }
+  // SRD Ring of Elemental Command (earth) — Difficult Terrain costs no extra movement.
+  | { kind: 'ignore_difficult_terrain' }
+  // SRD Ring of Spell Turning — a successful save against a spell of level 7 or
+  // lower means it has no effect on you (no half damage).
+  | { kind: 'spell_turning' }
+  // SRD Ring of Elemental Command — Advantage on attack rolls against creatures
+  // of this type, and they have Disadvantage on attack rolls against you.
+  | { kind: 'creature_bane'; creatureType: string }
   // SRD Cloak of Displacement — attacks against you have Disadvantage until you
   // take damage (back at the start of your next turn); not while Speed is 0.
   | { kind: 'displacement' };
@@ -1929,7 +1937,10 @@ export type PotionEffect =
   // SRD Periapt of Health — regain Hit Points.
   | { kind: 'heal'; dice: string }
   // SRD Pearl of Power — regain one expended spell slot of `maxLevel` or lower.
-  | { kind: 'regain_slot'; maxLevel: number };
+  | { kind: 'regain_slot'; maxLevel: number }
+  // SRD Rod of Absorption — turn stored spell energy into an expended slot of
+  // level `maxLevel` or lower (one stored level per slot level).
+  | { kind: 'energy_slot'; maxLevel: number };
 
 export interface MagicRider {
   label: string;
@@ -1947,6 +1958,8 @@ export interface MagicRider {
   tempHpFromDamage?: boolean;
   // A save the target makes (Dagger of Venom, Sword of Wounding, Ammunition of Slaying).
   save?: RiderSave;
+  // SRD Rod of Lordly Might's Drain Life — the wielder regains half the damage.
+  healHalf?: boolean;
 }
 
 /**
@@ -2041,6 +2054,10 @@ export interface WornTraits {
   featherFall?: boolean;
   mountSpeedBonus?: number;
   mountFloats?: boolean;
+  flyFt?: number | 'walk';
+  ignoresDifficultTerrain?: boolean;
+  spellTurning?: boolean;
+  creatureBane?: string[];
 }
 
 /**
@@ -2073,6 +2090,12 @@ export interface ItemSpell {
   // Each use risks the item blowing up in the user's hands (Horn of Blasting:
   // 20 percent, 10d6 Force) — it's then destroyed.
   backfire?: { chancePct: number; damage: string; damageType: string };
+  // A limited supply of its own, never regained (Helm of Brilliance: one gem of
+  // the spell's type is used up per cast — 15 fire opals for Fireball).
+  uses?: number;
+  // Only a spellcaster with this many spell slots of `slotLevel` can use it, at
+  // this cost in gold (Manual of Golems: two level 5 slots).
+  requires?: { slotLevel: number; slots: number; gold: number };
 }
 
 /** SRD item charges — `regain` is the dice regained at dawn (on a Long Rest). */
@@ -2310,6 +2333,22 @@ export interface LootItem {
     // Each use after the first before a Long Rest needs a Constitution save
     // against this DC or the user gains an Exhaustion level (Ring of X-ray Vision).
     reuseExhaustionDc?: number;
+    // Once used, back after this many Long Rests (Rod of Security: 10 days).
+    rechargeDays?: number;
+  };
+  // SRD Ring of Spell Storing / Ioun Stone of Reserve — spells cast into it are
+  // held (up to `levels` slot levels in all, each of level 1..`maxLevel`) until
+  // the bearer casts them, with the original caster's DC and attack bonus.
+  spellStore?: { levels: number; maxLevel: number };
+  // SRD Rod of Absorption / Ioun Stones of Absorption — a Reaction cancels an
+  // enemy's spell of level `maxLevel` or lower; `lifetime` levels in all, then
+  // it's spent. `targetedOnly`: only a spell aimed at the bearer alone (no area).
+  // `startEnergy`: the rod's stored levels, which become spell slots.
+  absorbSpells?: {
+    maxLevel: number;
+    lifetime: number;
+    targetedOnly?: boolean;
+    startEnergy?: number;
   };
   // SRD Bag of Holding / Handy Haversack / Portable Hole / Efficient Quiver —
   // carried items up to `lb` pounds don't count toward the bearer's load (the

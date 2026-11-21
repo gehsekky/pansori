@@ -97,7 +97,10 @@ export const handleGridMove: ActionHandler<{
   const roomLight = currentRoomForMove?.lighting ?? 'bright';
   const batFt =
     roomLight === 'dim' || roomLight === 'dark' ? (char.worn_traits?.darkFlightFt ?? 0) : 0;
-  const flySpeedFt = Math.max(char.fly_speed_ft ?? 0, potionFlyFt(char), batFt);
+  // SRD Ring of Elemental Command (air) — a Fly Speed equal to Speed.
+  const wornFly = char.worn_traits?.flyFt;
+  const ringFt = wornFly === 'walk' ? walkSpeedFt : (wornFly ?? 0);
+  const flySpeedFt = Math.max(char.fly_speed_ft ?? 0, potionFlyFt(char), batFt, ringFt);
   const isFlying = flySpeedFt > 0 && flySpeedFt >= walkSpeedFt;
   // Transient wall spells that block movement (Wall of Force) stop everyone,
   // including flyers — nothing physically passes through. Opaque-only walls
@@ -158,7 +161,8 @@ export const handleGridMove: ActionHandler<{
   // Horseshoes of a Zephyr — a floating mount ignores Difficult Terrain and
   // crosses water.
   const floatingMount = !!mountEnt && !!char.worn_traits?.mountFloats;
-  const ignoresDifficult = !!char.worn_traits?.freeAction || floatingMount;
+  const ignoresDifficult =
+    !!char.worn_traits?.freeAction || !!char.worn_traits?.ignoresDifficultTerrain || floatingMount;
   const costFeet = path.reduce((acc, pos) => {
     if (isFlying) return acc + SQUARE_SIZE;
     const isDifficult = !ignoresDifficult && difficultTerrain.some((dt) => posEqual(dt, pos));

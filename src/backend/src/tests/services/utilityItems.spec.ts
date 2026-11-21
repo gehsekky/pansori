@@ -313,7 +313,7 @@ describe('dusts, water, light and bands', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const c = bearer({ dust_of_dryness: null });
     const no = await cast(fight([c], 3), 'dryness_dust');
-    expect(no.narrative).toMatch(/works only on a Water Elemental/);
+    expect(no.narrative).toMatch(/no power over the Ogre/);
     expect(no.newState.characters[0].inventory[0].charges_used).toBeUndefined();
     const water = seedWith(foe({ name: 'Water Elemental' }));
     const r = await cast(fight([c], 3), 'dryness_dust', 1, water);

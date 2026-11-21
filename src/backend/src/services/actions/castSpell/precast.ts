@@ -143,13 +143,15 @@ export function runPrecast(
       ctx.narrative = `The ${plan.loot.name} casts ${spell.name} on its wearer only.`;
       return { done: true };
     }
-    // SRD Dust of Dryness — only a creature made mostly of water is affected.
+    // SRD Dust of Dryness (a creature made of water) / Ring of Elemental Command
+    // (Elementals) — only the named creatures or creature types are affected.
     if (spell.onlyVs) {
       const tgt = action.targetEnemyId
         ? ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId)
         : ctx.enemy;
-      if (!tgt || !spell.onlyVs.some((n) => tgt.name.includes(n))) {
-        ctx.narrative = `The ${plan.loot.name} works only on a ${spell.onlyVs.join(' or ')}.`;
+      const fits = (n: string) => !!tgt && (tgt.name.includes(n) || tgt.creatureType === n);
+      if (!tgt || !spell.onlyVs.some(fits)) {
+        ctx.narrative = `The ${plan.loot.name} has no power over ${tgt ? `the ${tgt.name}` : 'that'}.`;
         return { done: true };
       }
     }

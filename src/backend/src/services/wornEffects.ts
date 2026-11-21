@@ -107,7 +107,15 @@ export function deriveWornTraits(char: Character, lootTable: LootItem[]): WornTr
     else if (e.kind === 'spell_attack_disadvantage') t.spellAttackDisadvantage = true;
     else if (e.kind === 'speed_mode' && e.mode === 'swim') t.swimFt = better(t.swimFt, e.feet);
     else if (e.kind === 'speed_mode' && e.mode === 'climb') t.climbFt = better(t.climbFt, e.feet);
-    else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
+    else if (e.kind === 'speed_mode' && e.mode === 'fly') t.flyFt = better(t.flyFt, e.feet);
+    else if (e.kind === 'ignore_difficult_terrain') t.ignoresDifficultTerrain = true;
+    else if (e.kind === 'spell_turning') {
+      t.spellTurning = true;
+      t.spellSaveAdvantage = true;
+    } else if (e.kind === 'creature_bane') {
+      const list = (t.creatureBane ??= []);
+      if (!list.includes(e.creatureType)) list.push(e.creatureType);
+    } else if (e.kind === 'speed_floor') t.speedFloor = Math.max(t.speedFloor ?? 0, e.feet);
     else if (e.kind === 'spell_save_advantage') t.spellSaveAdvantage = true;
     else if (e.kind === 'no_crits') t.critImmune = true;
     else if (e.kind === 'check_bonus') t.checkBonus = (t.checkBonus ?? 0) + e.bonus;

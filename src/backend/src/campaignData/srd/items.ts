@@ -5131,6 +5131,335 @@ const UTILITY_ITEMS: Array<[string, LootItem]> = [
   ),
 ];
 
+// ─── Unique items (SRD 5.2.1, batch 12) ──────────────────────────────────────
+// Spell-canceling and spell-storing items, the Dancing Sword, the Helm of
+// Brilliance, the Rods of Lordly Might and Security, the Rings of Three
+// Wishes, Spell Turning and Elemental Command, the Candle of Invocation and
+// the Manuals of Golems.
+const ELEMENTAL_RINGS: Array<[string, string, WornEffect[], ItemSpell[], string]> = [
+  [
+    'air',
+    'Air',
+    [
+      { kind: 'resistance', damageType: 'lightning' },
+      { kind: 'speed_mode', mode: 'fly', feet: 'walk' },
+    ],
+    [sp('chain_lightning', 3), sp('feather_fall', 0), sp('gust_of_wind', 2), sp('wind_wall', 1)],
+    'Resistance to Lightning damage and a Fly Speed equal to your Speed. Spells: Chain Lightning (3), Feather Fall (0), Gust of Wind (2), Wind Wall (1).',
+  ],
+  [
+    'earth',
+    'Earth',
+    [{ kind: 'resistance', damageType: 'acid' }, { kind: 'ignore_difficult_terrain' }],
+    [sp('earthquake', 5), sp('stone_shape', 2), sp('stoneskin', 3), sp('wall_of_stone', 3)],
+    'Resistance to Acid damage, and rubble, rock and dirt aren’t Difficult Terrain for you. Spells: Earthquake (5), Stone Shape (2), Stoneskin (3), Wall of Stone (3).',
+  ],
+  [
+    'fire',
+    'Fire',
+    [{ kind: 'damage_immunity', damageType: 'fire' }],
+    [sp('burning_hands', 1), sp('fireball', 2), sp('fire_storm', 4), sp('wall_of_fire', 3)],
+    'Immunity to Fire damage. Spells: Burning Hands (1), Fireball (2), Fire Storm (4), Wall of Fire (3).',
+  ],
+  [
+    'water',
+    'Water',
+    [{ kind: 'speed_mode', mode: 'swim', feet: 60 }],
+    [
+      sp('create_or_destroy_water', 1),
+      sp('ice_storm', 2),
+      sp('tsunami', 5),
+      sp('wall_of_ice', 3),
+      sp('water_walk', 2),
+    ],
+    'A Swim Speed of 60 feet and you can breathe underwater. Spells: Create or Destroy Water (1), Ice Storm (2), Tsunami (5), Wall of Ice (3), Water Walk (2).',
+  ],
+];
+const GOLEMS: Array<[string, string, number]> = [
+  ['clay', 'Clay', 65000],
+  ['flesh', 'Flesh', 50000],
+  ['iron', 'Iron', 100000],
+  ['stone', 'Stone', 80000],
+];
+
+const UNIQUE_ITEMS: Array<[string, LootItem]> = [
+  wondrous(
+    'ring_of_three_wishes',
+    'Ring of Three Wishes',
+    'Legendary',
+    '3 charges. Spend 1 to cast Wish; the ring loses its magic with the last.',
+    'ring',
+    { weight: 0, charges: uses(3), itemSpells: [sp('wish', 1)] }
+  ),
+  // Simplification: Shield (a Reaction) isn't offered from the cube.
+  wondrous(
+    'cube_of_force',
+    'Cube of Force',
+    'Rare',
+    '10 charges (regains 1d6 at dawn). Press a face to cast its spell (save DC 17): Mage Armor (1), Shield (1), Tiny Hut (3), Private Sanctum (4), Resilient Sphere (4), Wall of Force (5).',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 0,
+      castWhileCarried: true,
+      charges: { max: 10, regain: '1d6' },
+      itemSpellDc: 17,
+      itemSpells: [
+        sp('mage_armor', 1),
+        sp('shield', 1),
+        sp('tiny_hut', 3),
+        sp('private_sanctum', 4),
+        sp('resilient_sphere', 4),
+        sp('wall_of_force', 5),
+      ],
+    }
+  ),
+  // Simplification: deflecting a spell back at its caster isn't modeled.
+  wondrous(
+    'ring_of_spell_turning',
+    'Ring of Spell Turning',
+    'Legendary',
+    'Advantage on saving throws against spells, and a spell of level 7 or lower that you save against has no effect on you.',
+    'ring',
+    { requiresAttunement: true, weight: 0, wornEffects: [{ kind: 'spell_turning' }] }
+  ),
+  // Simplification: found with 5 levels stored (1d10); converting energy to a
+  // slot restores an expended slot at no action cost.
+  wondrous(
+    'rod_of_absorption',
+    'Rod of Absorption',
+    'Very Rare',
+    'While you hold it, your Reaction absorbs a spell aimed at you alone (no area): it has no effect and its levels are stored (50 in the rod’s lifetime). A spellcaster can turn stored levels into spell slots of up to level 5. Hold it in your off hand.',
+    'off_hand',
+    {
+      requiresAttunement: true,
+      weight: 2,
+      absorbSpells: { maxLevel: 9, lifetime: 50, targetedOnly: true, startEnergy: 5 },
+      activate: {
+        label: 'Draw stored energy',
+        effect: { kind: 'energy_slot', maxLevel: 5 },
+      },
+    }
+  ),
+  wondrous(
+    'ioun_stone_of_absorption',
+    'Ioun Stone of Absorption',
+    'Very Rare',
+    'While it orbits your head, your Reaction cancels a spell of level 4 or lower cast by a creature you can see. It burns out after canceling 20 levels of spells.',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 0,
+      carried: true,
+      absorbSpells: { maxLevel: 4, lifetime: 20 },
+    }
+  ),
+  wondrous(
+    'ioun_stone_of_greater_absorption',
+    'Ioun Stone of Greater Absorption',
+    'Legendary',
+    'While it orbits your head, your Reaction cancels a spell of level 8 or lower cast by a creature you can see. It burns out after canceling 20 levels of spells.',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 0,
+      carried: true,
+      absorbSpells: { maxLevel: 8, lifetime: 20 },
+    }
+  ),
+  // Simplification: found empty (no 1d6 − 1 levels chosen by the GM), and only
+  // the bearer casts spells into it.
+  wondrous(
+    'ring_of_spell_storing',
+    'Ring of Spell Storing',
+    'Rare',
+    'Holds up to 5 levels of spells (each of level 1 to 5) cast into it. While wearing it, you cast a stored spell with its original slot level, save DC and attack bonus.',
+    'ring',
+    { requiresAttunement: true, weight: 0, spellStore: { levels: 5, maxLevel: 5 } }
+  ),
+  wondrous(
+    'ioun_stone_of_reserve',
+    'Ioun Stone of Reserve',
+    'Rare',
+    'While it orbits your head it holds up to 4 levels of spells (each of level 1 to 4) cast into it, and you can cast them with their original slot level, save DC and attack bonus.',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 0,
+      carried: true,
+      castWhileCarried: true,
+      spellStore: { levels: 4, maxLevel: 4 },
+    }
+  ),
+  // SRD Dancing Sword (Very Rare, attunement). Simplification: the hovering
+  // blade's strike is a Bonus Action attack with the sword in hand, made each
+  // turn (it returns after four, ready to be tossed again).
+  ...named(['greatsword', 'longsword', 'rapier', 'scimitar', 'shortsword'], (b) =>
+    namedMagic(
+      b.id,
+      `dancing_sword_${b.id}`,
+      `Dancing ${b.name}`,
+      RARITY_VALUE['Very Rare'],
+      `${b.desc} A magic weapon you can toss into the air as a Bonus Action: it flies to a creature and attacks it with your attack roll and ability modifier. (Very Rare; requires attunement.)`,
+      { requiresAttunement: true, bonusAttack: true }
+    )
+  ),
+  // Simplification: a fixed 5 diamonds, 10 rubies, 15 fire opals and 20 opals;
+  // the Diamond Light against Undead, losing the Fire Resistance with the last
+  // ruby, and the helm bursting when it fails a save against fire aren't
+  // modeled. The blazing weapon lasts the fight.
+  wondrous(
+    'helm_of_brilliance',
+    'Helm of Brilliance',
+    'Very Rare',
+    'Set with gems: Resistance to Fire damage; a Magic action sets your weapon ablaze (+1d6 Fire on a hit); and each gem can be spent to cast a spell (save DC 18) — Daylight (20 opals), Fireball (15 fire opals), Prismatic Spray (5 diamonds) or Wall of Fire (10 rubies).',
+    'head',
+    {
+      requiresAttunement: true,
+      wornEffects: [{ kind: 'resistance', damageType: 'fire' }],
+      itemSpellDc: 18,
+      itemSpells: [
+        sp('helm_flames', 0),
+        sp('daylight', 0, { uses: 20 }),
+        sp('fireball', 0, { uses: 15 }),
+        sp('prismatic_spray', 0, { uses: 5 }),
+        sp('wall_of_fire', 0, { uses: 10 }),
+      ],
+    }
+  ),
+  // SRD Rod of Lordly Might (Legendary, attunement) — a +3 Mace. Simplification:
+  // Drain Life and Paralyze are armed before the attack (a free choice), and
+  // the six buttons' other forms (flame blade, axe, spear, pole, ram, compass)
+  // aren't modeled.
+  namedMagic(
+    'mace',
+    'rod_of_lordly_might',
+    'Rod of Lordly Might',
+    RARITY_VALUE.Legendary,
+    'A +3 mace with six buttons that change its form. Once per dawn each: Drain Life (a hit forces a DC 17 Constitution save or 4d6 extra Necrotic, and you regain half), Paralyze (a hit forces a DC 17 Constitution save or Paralyzed for 1 minute), and Terrify (each creature within 30 feet makes a DC 17 Wisdom save or is Frightened for 1 minute). (Legendary; requires attunement.)',
+    {
+      requiresAttunement: true,
+      magicBonus: 3,
+      itemSpellDc: 17,
+      itemSpells: [sp('lordly_terrify', 0, { daily: true })],
+      weaponPowers: [
+        {
+          id: 'drain_life',
+          label: 'Drain Life',
+          cost: 'free',
+          daily: true,
+          rider: {
+            label: 'Drain Life',
+            dice: '4d6',
+            damageType: 'necrotic',
+            healHalf: true,
+            save: { ability: 'con', dc: 17, onSave: 'none' },
+          },
+        },
+        {
+          id: 'paralyze',
+          label: 'Paralyze',
+          cost: 'free',
+          daily: true,
+          rider: {
+            label: 'Paralyze',
+            dice: '0',
+            save: { ability: 'con', dc: 17, condition: 'paralyzed', rounds: 10, saveEnds: true },
+          },
+        },
+      ],
+    }
+  ),
+  wand(
+    'rod_of_security',
+    'Rod of Security',
+    'Very Rare',
+    'Take yourself and up to 199 willing creatures to a demiplane of your design, with food and water, where each hour heals like a spent Hit Point Die. Then not again for 10 days.',
+    {
+      weight: 2,
+      activate: {
+        label: 'Open the demiplane',
+        effect: {
+          kind: 'narrative',
+          text: 'raises the rod — the party steps into a safe demiplane of their choosing',
+        },
+        rechargeDays: 10,
+      },
+    }
+  ),
+  ...ELEMENTAL_RINGS.map(([plane, name, focus, spells, desc]) =>
+    wondrous(
+      `ring_of_elemental_command_${plane}`,
+      `Ring of Elemental Command (${name})`,
+      'Legendary',
+      `Advantage on attack rolls against Elementals and they have Disadvantage against you; a Magic action compels an Elemental within 60 feet (DC 18 Wisdom save or Charmed until your next turn). ${desc} 5 charges (regains 1d4 + 1 at dawn); spells have save DC 18.`,
+      'ring',
+      {
+        requiresAttunement: true,
+        weight: 0,
+        wornEffects: [{ kind: 'creature_bane', creatureType: 'elemental' }, ...focus],
+        charges: { max: 5, regain: '1d4+1' },
+        itemSpellDc: 18,
+        itemSpells: [sp('elemental_compulsion', 0), ...spells],
+      }
+    )
+  ),
+  // Simplification: the candle burns all 4 hours at once (no snuffing it out),
+  // its Advantage covers attack rolls and saving throws (not ability checks),
+  // and a Cleric's or Druid's free level 1 spells aren't modeled.
+  wondrous(
+    'candle_of_invocation',
+    'Candle of Invocation',
+    'Very Rare',
+    'Light it: for 4 hours you and those within 30 feet have Advantage on D20 Tests. Or, the first time it’s lit, cast Gate with it (which destroys the candle).',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 0,
+      carried: true,
+      castWhileCarried: true,
+      charges: uses(1),
+      activate: {
+        label: 'Light the candle',
+        charges: 1,
+        effect: {
+          kind: 'condition',
+          conditions: ['candle_of_invocation'],
+          rounds: 4 * HOUR,
+          party: 30,
+        },
+      },
+      itemSpells: [sp('gate', 1)],
+    }
+  ),
+  // Simplification: building takes no in-world time, and a creature that can't
+  // use the manual is simply refused (no Psychic damage).
+  ...GOLEMS.map(([kind, name, gold]) =>
+    wondrous(
+      `manual_of_golems_${kind}`,
+      `Manual of Golems (${name})`,
+      'Very Rare',
+      `A spellcaster with two level 5 spell slots can build a ${name} Golem with it (${gold.toLocaleString('en-US')} GP of supplies); the book burns, and the golem obeys you.`,
+      null,
+      {
+        weight: 5,
+        castWhileCarried: true,
+        charges: uses(1),
+        itemSpells: [sp(`build_${kind}_golem`, 1, { requires: { slotLevel: 5, slots: 2, gold } })],
+      }
+    )
+  ),
+  // Simplification: a trap item with no mechanics yet — nothing is devoured.
+  wondrous(
+    'bag_of_devouring',
+    'Bag of Devouring',
+    'Very Rare',
+    'It looks like a Bag of Holding, but it is the mouth of a vast extradimensional creature: it devours animal or vegetable matter put in it and may drag in a creature that reaches inside.',
+    null,
+    { weight: 5 }
+  ),
+];
+
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...BASE_WEAPON_IDS.flatMap((b) =>
     WEAPON_RARITY.map(([n, v, r]) => magicVariant(b, n, v, r, 'weapon'))
@@ -5494,6 +5823,7 @@ const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([
   ...WONDROUS_4,
   ...SUMMONING_ITEMS,
   ...UTILITY_ITEMS,
+  ...UNIQUE_ITEMS,
 ]);
 
 export const SRD_ITEMS: Record<string, LootItem> = { ...BASE_ITEMS, ...MAGIC_ITEMS };

@@ -104,6 +104,8 @@ export interface ItemHitOutcome {
   // Narration appended after the hit line (saves, slays, conditions).
   after: string[];
   tempHp: number;
+  // SRD Rod of Lordly Might's Drain Life — Hit Points the wielder regains.
+  heal: number;
 }
 
 /**
@@ -123,7 +125,7 @@ export function rollItemHit(
     curHp: number;
   }
 ): ItemHitOutcome {
-  const out: ItemHitOutcome = { dmg: 0, labels: [], after: [], tempHp: 0 };
+  const out: ItemHitOutcome = { dmg: 0, labels: [], after: [], tempHp: 0, heal: 0 };
   const { weaponItem, target, targetId, isCrit } = args;
   if (ctx.actor.kind !== 'pc' || !weaponItem) return out;
   const pc = ctx.actor;
@@ -155,6 +157,7 @@ export function rollItemHit(
       out.dmg += dmg;
       out.labels.push(`${r.label} ${dice}: +${dmg} ${dType}`);
       if (r.tempHpFromDamage) out.tempHp = Math.max(out.tempHp, dmg);
+      if (r.healHalf) out.heal += Math.floor(dmg / 2);
     }
   };
 

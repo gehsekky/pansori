@@ -255,6 +255,7 @@ const CONDITION_NOTES: Record<string, string> = {
     ])
   ),
   gem_of_seeing: 'peers through the gem (Truesight 120 feet)',
+  candle_of_invocation: "basks in the candle's light (Advantage on attack rolls and saving throws)",
 };
 
 /**
@@ -372,6 +373,11 @@ export function resolvePotion(
       return { target, st, note: '', used: false };
     case 'narrative':
       note = potion.text;
+      break;
+    // SRD Rod of Absorption — resolved by the item activation, which owns the
+    // rod's stored energy (see inventory.ts).
+    case 'energy_slot':
+      note = 'draws on stored spell energy';
       break;
     case 'regain_slot': {
       const lvl = expendedSlotLevel(t, potion.maxLevel);

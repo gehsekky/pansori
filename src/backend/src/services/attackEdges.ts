@@ -113,6 +113,8 @@ export function computeAttackEdges(
     (c) => DISADV_CONDITIONS.has(c) && !(c === 'blinded' && ignoreBlinded)
   );
   const selfAdv = char.conditions.some((c) => PLAYER_ADV_CONDITIONS.has(c));
+  // SRD Candle of Invocation — Advantage on D20 Tests within its light.
+  const candleAdv = char.conditions.includes('candle_of_invocation');
   const heavilyEncumbered = isHeavilyEncumbered(char);
   const grappled = grappledAttackDisadvantage(char.conditions, pcEnt?.grappled_by, targetId);
 
@@ -245,7 +247,12 @@ export function computeAttackEdges(
   }
 
   const advantage =
-    selfAdv || proneAdv || targetAdvConditions.length > 0 || darknessAdv || grantedAdv.length > 0;
+    selfAdv ||
+    candleAdv ||
+    proneAdv ||
+    targetAdvConditions.length > 0 ||
+    darknessAdv ||
+    grantedAdv.length > 0;
   const disadvantage =
     rangedInMelee ||
     selfDisadvConditions.length > 0 ||

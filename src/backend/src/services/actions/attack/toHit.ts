@@ -188,8 +188,10 @@ export function computeToHitContext(
     thrownLongRangeDisadv ||
     oath.disadvantage;
 
+  // SRD Ring of Elemental Command — Advantage on attacks against Elementals.
+  const baneAdv = !!target.creatureType && !!worn?.creatureBane?.includes(target.creatureType);
   const advantage =
-    edges.advantage || flankingAdv || recklessAdv || packTacticsAdv || oath.advantage;
+    edges.advantage || flankingAdv || recklessAdv || packTacticsAdv || oath.advantage || baneAdv;
 
   const disadvReasons = [
     edges.rangedInMelee ? 'ranged in melee' : '',

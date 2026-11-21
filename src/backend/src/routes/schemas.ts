@@ -611,6 +611,7 @@ const MagicRiderSchema = z
     vsSwornEnemy: z.boolean().optional(),
     tempHpFromDamage: z.boolean().optional(),
     save: RiderSaveSchema.optional(),
+    healHalf: z.boolean().optional(),
   })
   .strict();
 
@@ -668,7 +669,7 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('speed_mode'),
-      mode: z.enum(['swim', 'climb']),
+      mode: z.enum(['swim', 'climb', 'fly']),
       feet: z.union([z.number().int().positive().max(120), z.literal('walk')]),
     })
     .strict(),
@@ -738,6 +739,9 @@ const WornEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('feather_fall') }).strict(),
   z.object({ kind: z.literal('mount_speed'), feet: z.number().int().min(5).max(120) }).strict(),
   z.object({ kind: z.literal('mount_float') }).strict(),
+  z.object({ kind: z.literal('ignore_difficult_terrain') }).strict(),
+  z.object({ kind: z.literal('spell_turning') }).strict(),
+  z.object({ kind: z.literal('creature_bane'), creatureType: z.string().min(1).max(30) }).strict(),
   z
     .object({
       kind: z.literal('spell_attack_bonus'),
@@ -774,6 +778,7 @@ const PotionEffectSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('narrative'), text: z.string().min(1).max(500) }).strict(),
   z.object({ kind: z.literal('heal'), dice: DICE }).strict(),
   z.object({ kind: z.literal('regain_slot'), maxLevel: z.number().int().min(1).max(9) }).strict(),
+  z.object({ kind: z.literal('energy_slot'), maxLevel: z.number().int().min(1).max(9) }).strict(),
 ]);
 
 const LootItemSchema = z
@@ -884,10 +889,27 @@ const LootItemSchema = z
         daily: z.boolean().optional(),
         bonusAction: z.boolean().optional(),
         reuseExhaustionDc: z.number().int().min(1).max(30).optional(),
+        rechargeDays: z.number().int().min(1).max(30).optional(),
       })
       .strict()
       .optional(),
     evasionRing: z.boolean().optional(),
+    spellStore: z
+      .object({
+        levels: z.number().int().min(1).max(20),
+        maxLevel: z.number().int().min(1).max(9),
+      })
+      .strict()
+      .optional(),
+    absorbSpells: z
+      .object({
+        maxLevel: z.number().int().min(1).max(9),
+        lifetime: z.number().int().min(1).max(100),
+        targetedOnly: z.boolean().optional(),
+        startEnergy: z.number().int().min(0).max(50).optional(),
+      })
+      .strict()
+      .optional(),
     holds: z
       .object({
         lb: z.number().int().min(1).max(10000),
@@ -922,6 +944,15 @@ const LootItemSchema = z
             attack: z.union([z.number().int().min(-5).max(20), z.literal('dex')]).optional(),
             selfOnly: z.boolean().optional(),
             rechargeDays: z.number().int().min(1).max(30).optional(),
+            uses: z.number().int().min(1).max(50).optional(),
+            requires: z
+              .object({
+                slotLevel: z.number().int().min(1).max(9),
+                slots: z.number().int().min(1).max(4),
+                gold: z.number().int().min(0).max(1000000),
+              })
+              .strict()
+              .optional(),
             backfire: z
               .object({
                 chancePct: z.number().int().min(1).max(100),
