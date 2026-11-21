@@ -10,6 +10,7 @@ import {
 } from '../../rulesEngine.js';
 import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
+import { hatBlocker, runItemEffect } from './itemEffects.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
 import { itemSpellFor, itemSpellVersion, storeTarget } from '../../chargedItems.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
@@ -29,7 +30,6 @@ import { runCombatStart } from '../attack/combatStart.js';
 import { runDivineWord } from './divineWord.js';
 import { runEnlargeReduce } from './enlargeReduce.js';
 import { runHealSpell } from './heal.js';
-import { runItemEffect } from './itemEffects.js';
 import { runMultiTargetSpell } from './multiTarget.js';
 import { runPrismaticSpray } from './prismaticSpray.js';
 import { runRecurringAttackSpell } from '../recurringSpellAttack.js';
@@ -148,6 +148,15 @@ export const handleCastSpell: ActionHandler<{
   if (store && fromItem) {
     ctx.narrative = 'A spell cast from an item can’t be stored in another.';
     return;
+  }
+
+  // SRD Hat of Many Spells — the chosen spell is checked before the action is spent.
+  if (spell.itemEffect === 'hat_spell') {
+    const why = hatBlocker(ctx, action);
+    if (why) {
+      ctx.narrative = why;
+      return;
+    }
   }
 
   const precast = runPrecast(

@@ -598,4 +598,55 @@ export const ITEM_POWERS: Record<string, Spell> = {
     creature('giant_goat', { noAttack: true, isMount: true, speed: 40 }),
     'The statuette becomes a Giant Goat you can ride; it doesn’t attack.'
   ),
+  // SRD Robe of Useful Items — detach a patch and it becomes what it shows. Two
+  // each of six fixed patches, plus random ones rolled when torn off.
+  ...Object.fromEntries(
+    (
+      [
+        ['lantern', 'Bullseye Lantern'],
+        ['dagger', 'Dagger'],
+        ['mirror', 'Mirror'],
+        ['pole', 'Pole'],
+        ['rope', 'Rope'],
+        ['sack', 'Sack'],
+        ['mystery', 'Mystery Patch'],
+      ] as const
+    ).map(([key, label]) => [
+      `robe_patch_${key}`,
+      power({
+        id: `robe_patch_${key}`,
+        name: `Detach a Patch (${label})`,
+        level: 1,
+        itemEffect: 'robe_patch',
+        targetType: 'self',
+        rangeKind: 'self',
+        desc:
+          key === 'mystery'
+            ? 'Tear off one of the odd patches and see what it becomes (1d100).'
+            : `Tear off a patch and it becomes a real ${label.toLowerCase()}.`,
+      }),
+    ])
+  ),
+  // SRD Deck of Illusions — a card thrown down becomes a harmless illusion of a
+  // creature off its table.
+  illusion_card: power({
+    id: 'illusion_card',
+    name: 'Draw an Illusion',
+    level: 1,
+    itemEffect: 'illusion_card',
+    targetType: 'self',
+    rangeKind: 'self',
+    desc: 'Draw a card at random and throw it down: an illusion of a creature (1d100) forms over it.',
+  }),
+  // SRD Hat of Many Spells — try to cast a Wizard spell you don't know, with a
+  // slot of its level and an Intelligence (Arcana) check; a failure rolls on
+  // the hat's table instead.
+  hat_of_many_spells: power({
+    id: 'hat_of_many_spells',
+    name: 'Pull an Unknown Spell',
+    level: 1,
+    itemEffect: 'hat_spell',
+    rangeKind: 'self',
+    desc: 'Spend a spell slot and reach into the hat for a Wizard spell you don’t know: an Intelligence (Arcana) check against DC 10 + its level casts it; a failure brings something else out.',
+  }),
 };

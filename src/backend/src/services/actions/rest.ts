@@ -151,6 +151,7 @@ export const handleShortRest: ActionHandler<{ type: 'short_rest' }> = (ctx) => {
   // long rest. Keys are `signature_used_<spellId>`.
   for (const k of Object.keys(srUses)) if (k.startsWith('signature_used_')) delete srUses[k];
   if (hasClass(next, 'rogue')) delete srUses.stroke_of_luck; // Stroke of Luck — short OR long rest
+  delete srUses.hat_of_many_spells_used; // SRD Hat of Many Spells — a Short or Long Rest
   delete srUses.improve_fate_used; // SRD Boon of Fate — Improve Fate recharges on a short OR long rest
   delete srUses.acrobat_deflect_used; // SRD Quarterstaff of the Acrobat — Attack Deflection, short OR long rest
   if (hasClass(next, 'barbarian')) delete srUses.relentless_rage_used; // Relentless Rage DC resets to 10
@@ -239,6 +240,7 @@ export const handleLongRest: ActionHandler<{ type: 'long_rest' }> = (ctx) => {
     delete restoredUses.sacred_weapon_active;
     delete restoredUses.lay_on_hands; // Paladin pool replenishes on a long rest
     delete restoredUses.indomitable; // Fighter Indomitable rerolls reset on a long rest
+    delete restoredUses.hat_of_many_spells_used; // SRD Hat of Many Spells
     delete restoredUses.improve_fate_used; // SRD Boon of Fate — Improve Fate resets on a long rest too
     delete restoredUses.acrobat_deflect_used; // SRD Quarterstaff of the Acrobat — Attack Deflection
     delete restoredUses.stroke_of_luck; // Rogue Stroke of Luck resets on a long rest too

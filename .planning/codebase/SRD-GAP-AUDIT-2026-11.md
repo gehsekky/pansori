@@ -660,9 +660,27 @@ Beans holds a fixed 7 beans; a planted bean's creatures (Treant, Shriekers,
 Bulette, toads, the pyramid's Undead) and its toadstools and eggs are
 described rather than placed; the fruit tree's 1d8 potions go into the pack.
 The goats stay until the next Long Rest; the Goat of Traveling's charge-hours
-and the Goat of Terror's horn weapons and fear aura aren't modeled. Still
-deferred: Hat of Many Spells, Deck of Illusions, Robe of Useful Items, the
-Mysterious Deck, and the batch 9–12 deferrals.
+and the Goat of Terror's horn weapons and fear aura aren't modeled.
+
+**Batch 14 done 2026-11-20 — random-table items, part 2.** Items: Robe of
+Useful Items (two each of six fixed patches, each a per-patch `uses` supply,
+plus odd patches rolled on its d100 table), Deck of Illusions, and Hat of Many
+Spells (an option picker of unknown Wizard spells — `hatSpellId` — checked
+before the action is spent; a spell slot of the spell's level and an
+Intelligence (Arcana) check against DC 10 + its level; a success casts it at
+the caster's DC through the table-cast path and the hat rests until a Short or
+Long Rest; a failure rolls the hat's d100 table — its ten random spells,
+self-Stun, self-Petrify, Poisoned, the pulled-out objects, the Swarm of Bats
+and a magic item). New SRD gear: Caltrops, Ladder, Mirror, Pole, Portable Ram,
+Sack. Simplifications: the robe has a fixed 10 odd patches (4d4); its coffer
+and gems come as gold, its door, pit, rowboat and window are described, its
+Spell Scroll is a random level 1–3 scroll from your class lists, and its horse
+and Mastiffs join the party for good. The deck holds 24 cards and each draw
+rolls on the table; the illusions are described rather than placed. The hat's
+Wizard list is the arcane list (as for spellbooks), its Spellcasting Focus use
+isn't modeled, its creatures wander off, the bats make one attack and scatter,
+and the magic item is a consumable that doesn't vanish after an hour. Still
+deferred: the Mysterious Deck and the batch 9–12 deferrals.
 
 ## 7. Core rules not found
 

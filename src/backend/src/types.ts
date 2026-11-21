@@ -1019,7 +1019,13 @@ export interface Spell {
   // An item power resolved by its own table rather than the spell pipeline
   // (Wand of Wonder's d100 effects, a Bag of Beans' dumped or planted beans) —
   // dispatched by `runItemEffect` once the item's charge is spent.
-  itemEffect?: 'wand_of_wonder' | 'beans_dump' | 'beans_plant';
+  itemEffect?:
+    | 'wand_of_wonder'
+    | 'beans_dump'
+    | 'beans_plant'
+    | 'robe_patch'
+    | 'illusion_card'
+    | 'hat_spell';
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.
@@ -1875,8 +1881,8 @@ export interface SummonedAlly {
   isMount?: boolean;
   speed?: number;
   // A creature from a magic item (Figurine of Wondrous Power, Horn of
-  // Valhalla): the item's instance id. Using the item again replaces it, and
-  // it reverts (leaves) at the next Long Rest.
+  // Valhalla): `<instance id>:<power id>`. Using that power again replaces
+  // it, and it reverts (leaves) at the next Long Rest.
   fromItem?: string;
 }
 

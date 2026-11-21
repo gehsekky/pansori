@@ -311,3 +311,126 @@ describe('Figurine of Wondrous Power (Ivory Goats)', () => {
     expect(st.summoned_allies).toHaveLength(1);
   });
 });
+
+describe('Robe of Useful Items', () => {
+  const robe = () => calm(bearer(['robe_of_useful_items'], { equipment: { cloak: 'i0' } }));
+  const count = (st: GameState, id: string) => pc(st).inventory.filter((i) => i.id === id).length;
+
+  it('a fixed patch becomes its object — two of each', async () => {
+    let st = robe();
+    st = (await cast(st, 'robe_patch_dagger')).newState;
+    st = (await cast(st, 'robe_patch_dagger')).newState;
+    expect(count(st, 'dagger')).toBe(2);
+    const third = await cast(st, 'robe_patch_dagger');
+    expect(third.narrative).toContain('nothing left');
+    expect(count(third.newState, 'dagger')).toBe(2);
+  });
+
+  it('only works while worn', async () => {
+    const r = await cast(
+      calm(bearer(['robe_of_useful_items'], { equipment: {} })),
+      'robe_patch_pole'
+    );
+    expect(count(r.newState, 'pole')).toBe(0);
+  });
+
+  it('a mystery patch rolls its table — gold, a horse, potions, mastiffs, a scroll', async () => {
+    d100(5);
+    let r = await cast(robe(), 'robe_patch_mystery');
+    expect(pc(r.newState).gold).toBe(100);
+    d100(48);
+    r = await cast(robe(), 'robe_patch_mystery');
+    expect(r.newState.summoned_allies?.[0]).toMatchObject({ name: 'Riding Horse', isMount: true });
+    expect(r.newState.summoned_allies?.[0].fromItem).toBeUndefined();
+    d100(65);
+    r = await cast(robe(), 'robe_patch_mystery');
+    expect(count(r.newState, 'healing_potion')).toBe(4);
+    d100(87);
+    r = await cast(robe(), 'robe_patch_mystery');
+    expect(r.newState.summoned_allies?.map((a) => a.name)).toEqual(['Mastiff', 'Mastiff']);
+    d100(80);
+    r = await cast(robe(), 'robe_patch_mystery');
+    const scroll = pc(r.newState).inventory.find((i) => i.id.startsWith('spell_scroll'));
+    expect(scroll).toBeDefined();
+    expect(SRD_SPELLS[SRD_ITEMS[scroll!.id].spellScroll!].level).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('Deck of Illusions', () => {
+  const deck = () => calm(bearer(['deck_of_illusions']));
+
+  it('a drawn card shows an illusion off the table, and the card is used up', async () => {
+    d100(68);
+    const r = await cast(deck(), 'illusion_card');
+    expect(r.narrative).toContain('illusion of a Lich');
+    expect(r.narrative).toContain('can do no harm');
+    expect(pc(r.newState).inventory[0].charges_used).toBe(1);
+  });
+
+  it('97–00 shows the card drawer', async () => {
+    d100(99);
+    const r = await cast(deck(), 'illusion_card');
+    expect(r.narrative).toContain('Bram — a perfect double');
+  });
+});
+
+describe('Hat of Many Spells', () => {
+  const wizard = (over: Partial<Character> = {}) =>
+    bearer(['hat_of_many_spells'], {
+      character_class: 'Wizard',
+      int: 18,
+      skill_proficiencies: ['Arcana'],
+      spell_slots_max: { 1: 4, 2: 3, 3: 2 },
+      spell_slots_used: {},
+      spells_known: ['magic_missile'],
+      prepared_spells: ['magic_missile'],
+      ...over,
+    });
+  const hat = (st: GameState, hatSpellId: string) => cast(st, 'hat_of_many_spells', { hatSpellId });
+
+  it('needs attunement by a Wizard and offers only unknown Wizard spells', () => {
+    expect(SRD_ITEMS.hat_of_many_spells.attuneBy).toEqual(['wizard']);
+    const choice = generateChoices(calm(wizard()), seedWith(), ctx).find((c) =>
+      c.label.includes('Hat of Many Spells')
+    );
+    const ids = choice?.pickOption?.options.map((o) => o.id) ?? [];
+    expect(choice?.pickOption?.param).toBe('hatSpellId');
+    expect(ids).toContain('fly');
+    expect(ids).not.toContain('magic_missile');
+    expect(ids).not.toContain('bless');
+    expect(ids.every((id) => SRD_SPELLS[id].level <= 3)).toBe(true);
+  });
+
+  it('a passed Arcana check casts the spell with a slot; then the hat rests', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const r = await hat(calm(wizard()), 'fly');
+    expect(r.narrative).toContain('pulls it out');
+    expect(pc(r.newState).spell_slots_used?.[3]).toBe(1);
+    expect(pc(r.newState).concentrating_on?.spellId).toBe('fly');
+    const again = await hat(r.newState, 'haste');
+    expect(again.narrative).toContain('Short or Long Rest');
+    expect(pc(again.newState).spell_slots_used?.[3]).toBe(1);
+  });
+
+  it('a failed check spends the slot and rolls the hat’s table', async () => {
+    // Arcana d20 = 1 (fails DC 13), then d100 = 68: magic sickness.
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.675).mockReturnValue(0);
+    const r = await hat(calm(wizard()), 'fly');
+    expect(r.narrative).toContain('something else comes out');
+    expect(pc(r.newState).conditions).toContain('poisoned');
+    expect(pc(r.newState).spell_slots_used?.[3]).toBe(1);
+  });
+
+  it('refuses a known spell, a non-Wizard spell, or one with no slot — without spending the action', async () => {
+    const st = fight([wizard()]);
+    for (const [id, why] of [
+      ['magic_missile', 'already know'],
+      ['bless', "isn't a Wizard spell"],
+      ['cone_of_cold', "can't cast a level 5"],
+    ]) {
+      const r = await hat(st, id);
+      expect(r.narrative).toContain(why);
+      expect(pc(r.newState).turn_actions.action_used).toBeFalsy();
+    }
+  });
+});

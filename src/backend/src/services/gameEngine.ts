@@ -234,6 +234,7 @@ import { availableLootIn } from './placedLoot.js';
 import { canTakeFeat } from './feats.js';
 import { characterAc } from './armorClass.js';
 import { factionShopPrice } from './campaignEngine.js';
+import { hatSpellOptions } from './actions/castSpell/itemEffects.js';
 import { llmProvider } from './llmProvider.js';
 import { pendingBonusSkills } from './bonusSkills.js';
 import { pendingFeatSpellPicks } from './actions/lessons.js';
@@ -7935,6 +7936,12 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const { spell, inv, loot, level, cost } = opt;
       if (spell.castTime === 'reaction' || spell.revive) continue;
       if (spell.outOfCombatOnly && state.combat_active) continue;
+      if (
+        spell.itemEffect === 'hat_spell' &&
+        ((char.class_resource_uses?.hat_of_many_spells_used ?? 0) > 0 ||
+          hatSpellOptions(char, context.spellTable).length === 0)
+      )
+        continue;
       const econ = spell.castTime === 'bonus_action' ? 'bonus_action_used' : 'action_used';
       if (state.combat_active && char.turn_actions[econ]) continue;
       const isOffensive =
@@ -7964,7 +7971,19 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
           label: `${how}${costNote}${perEnemy && en ? ` → ${en.name}` : ''}`,
           action: { ...base, targetEnemyId: en?.id },
           requiresBonusAction: spell.castTime === 'bonus_action' || undefined,
-          pickOption: spellPickOption(spell.id, context),
+          pickOption:
+            spell.itemEffect === 'hat_spell'
+              ? {
+                  // SRD Hat of Many Spells — a Wizard spell the wearer doesn't know.
+                  param: 'hatSpellId',
+                  title: 'Hat of Many Spells — reach in for a Wizard spell',
+                  options: hatSpellOptions(char, context.spellTable).map((s) => ({
+                    id: s.id,
+                    label: s.name,
+                    sub: `Lvl ${s.level} · Arcana DC ${10 + s.level}`,
+                  })),
+                }
+              : spellPickOption(spell.id, context),
         });
       }
     }

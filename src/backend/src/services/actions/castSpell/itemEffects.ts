@@ -1,9 +1,13 @@
 import type { ActionContext, ActionHandler } from '../types.js';
-import { d, rollConditionSave, rollDice } from '../../rulesEngine.js';
+import type { Character, LootItem, Spell } from '../../../types.js';
+import { classSpellListTag, hasExpertise, hasSkillProficiency } from '../../multiclass.js';
+import { d, rollConditionSave, rollDice, skillCheck } from '../../rulesEngine.js';
 import { hasSaveProficiency, pcDamageTaken } from '../../gameEngine.js';
+import { maxCastableLevel, onSpellList } from '../../chargedItems.js';
 import { ITEM_POWERS } from '../../../campaignData/srd/itemPowers.js';
+import { SRD_ITEMS } from '../../../campaignData/srd/items.js';
 import { SRD_MONSTERS } from '../../../campaignData/srd/monsters.js';
-import type { Spell } from '../../../types.js';
+import { SRD_SPELLS } from '../../../campaignData/srd/spells.js';
 import { applyDamage } from '../../damage.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from '../actor.js';
@@ -15,6 +19,7 @@ type CastAction = {
   slotLevel: number;
   targetEnemyId?: string;
   targetCharId?: string;
+  hatSpellId?: string;
 };
 type CastHandler = ActionHandler<{ type: 'cast_spell'; spellId: string; slotLevel: number }>;
 
@@ -47,6 +52,15 @@ export function runItemEffect(
     case 'beans_plant':
       plantBean(ctx, slotNote);
       return true;
+    case 'robe_patch':
+      robePatch(ctx, spell);
+      return true;
+    case 'illusion_card':
+      drawIllusion(ctx, slotNote);
+      return true;
+    case 'hat_spell':
+      runHat(ctx, action, cast);
+      return true;
     default:
       return false;
   }
@@ -76,20 +90,37 @@ function selfCondition(ctx: ActionContext, cond: string, rounds: number): void {
   });
 }
 
-/** Run `spell` through the cast handler as a free cast from the item's table. */
+type TableExtra = {
+  targetCharId?: string;
+  form?: { name: string; hp: number };
+  // The item casting it; defaults to the Wand of Wonder (DC 15, 120-foot reach).
+  item?: string;
+};
+
+/**
+ * Run `spell` through the cast handler as a free cast from an item's table.
+ * The Wand of Wonder's spells use DC 15 and reach 120 feet; any other item's
+ * (Hat of Many Spells) use the caster's own DC and range.
+ */
 function tableCast(
   ctx: ActionContext,
   cast: CastHandler,
   spell: Spell,
   lead: string,
   action: CastAction,
-  extra: { targetCharId?: string; form?: { name: string; hp: number } } = {}
+  extra: TableExtra = {}
 ): void {
+  const wand = !extra.item;
   const reach =
-    !spell.itemPower && spell.rangeKind === 'ranged' && (spell.rangeFt ?? 0) < WAND_RANGE
+    wand && !spell.itemPower && spell.rangeKind === 'ranged' && (spell.rangeFt ?? 0) < WAND_RANGE
       ? { ...spell, rangeFt: WAND_RANGE }
       : spell;
-  ctx.tableCast = { name: 'Wand of Wonder', dc: WAND_DC, spell: reach, form: extra.form };
+  ctx.tableCast = {
+    name: extra.item ?? 'Wand of Wonder',
+    ...(wand ? { dc: WAND_DC } : {}),
+    spell: reach,
+    form: extra.form,
+  };
   ctx.narrative = '';
   try {
     cast(ctx, {
@@ -123,7 +154,7 @@ function runWandOfWonder(
   const say = (text: string) => {
     ctx.narrative = `${lead} ${text}`;
   };
-  const castSpell = (id: string, extra: Parameters<typeof tableCast>[5] = {}) => {
+  const castSpell = (id: string, extra: TableExtra = {}) => {
     const s = spellTable[id] ?? ITEM_POWERS[id];
     if (!s) return say('the magic sputters out.');
     tableCast(ctx, cast, s, `${lead} it casts ${s.name}!`, action, extra);
@@ -303,4 +334,355 @@ function plantBean(ctx: ActionContext, slotNote: string): void {
     text = 'a stone pyramid bursts from the earth, its sealed tomb waiting below.';
   else text = 'a giant beanstalk erupts upward, climbing out of sight into the clouds.';
   ctx.narrative = `${lead} ${text}`;
+}
+
+/** A catalog item by id — the campaign's loot table first, else the SRD's. */
+function itemById(ctx: ActionContext, id: string): LootItem | undefined {
+  return ctx.context.lootTable.find((l) => l.id === id) ?? SRD_ITEMS[id];
+}
+
+/** Put `ids` (catalog item ids) into the acting PC's pack. Returns their names. */
+function giveItems(ctx: ActionContext, ids: string[]): string[] {
+  if (ctx.actor.kind !== 'pc') return [];
+  const items = ids.map((id) => itemById(ctx, id)).filter((l): l is LootItem => !!l);
+  updatePcActor(ctx, {
+    inventory: [
+      ...(ctx.actor.char.inventory ?? []),
+      ...items.map((l) => ({ ...l, instance_id: randomUUID() })),
+    ],
+  });
+  return items.map((l) => l.name);
+}
+
+/** Add creatures from the bestiary to the party for good (not item-bound). */
+function joinParty(ctx: ActionContext, key: string, count: number, mount?: number): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const m = SRD_MONSTERS[key];
+  if (!m) return;
+  const raised = Array.from({ length: count }, () => ({
+    id: `summon-${randomUUID()}`,
+    ownerId: ctx.actor.kind === 'pc' ? ctx.actor.char.id : '',
+    name: m.name,
+    ac: m.ac,
+    maxHp: m.hp,
+    toHit: m.toHit,
+    damage: m.damage,
+    ...(mount ? { isMount: true, speed: mount } : {}),
+  }));
+  ctx.st = { ...ctx.st, summoned_allies: [...(ctx.st.summoned_allies ?? []), ...raised] };
+}
+
+const ROBE_PATCHES: Record<string, string> = {
+  lantern: 'bullseye_lantern',
+  dagger: 'dagger',
+  mirror: 'mirror',
+  pole: 'pole',
+  rope: 'rope_hempen',
+  sack: 'sack',
+};
+
+/**
+ * SRD Robe of Useful Items — the torn-off patch becomes its object. A mystery
+ * patch rolls 1d100. Simplification: the coffer and gems come as their value
+ * in gold; the door, pit, rowboat and window are described rather than placed;
+ * the Spell Scroll (level 1–3) is picked at random from your class lists.
+ */
+function robePatch(ctx: ActionContext, spell: Spell): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const key = spell.id.replace('robe_patch_', '');
+  const lead = `${char.name} tears a patch from the Robe of Useful Items —`;
+  ctx.usedInitiative = ctx.st.combat_active ?? false;
+  if (ROBE_PATCHES[key]) {
+    const [name] = giveItems(ctx, [ROBE_PATCHES[key]]);
+    ctx.narrative = `${lead} it becomes a ${name}${key === 'lantern' ? ', filled and lit' : ''}.`;
+    return;
+  }
+  const roll = d(100);
+  const say = (text: string) => {
+    ctx.narrative = `${lead} (d100: ${roll}) ${text}`;
+  };
+  const addGold = (gp: number) => updatePcActor(ctx, { gold: (char.gold ?? 0) + gp });
+  if (roll <= 8) {
+    addGold(100);
+    return say('it becomes a bag of 100 GP.');
+  }
+  if (roll <= 15) {
+    addGold(500);
+    return say('it becomes a silver coffer worth 500 GP.');
+  }
+  if (roll <= 22) return say('it becomes an iron door that fits itself to an opening nearby.');
+  if (roll <= 30) {
+    addGold(1000);
+    return say('it becomes ten gems worth 100 GP each (1,000 GP).');
+  }
+  if (roll <= 44) {
+    giveItems(ctx, ['ladder']);
+    return say('it becomes a 24-foot wooden ladder.');
+  }
+  if (roll <= 51) {
+    joinParty(ctx, 'riding_horse', 1, 60);
+    return say('it becomes a saddled Riding Horse, ready to ride.');
+  }
+  if (roll <= 59) return say('it becomes a 10-foot-deep pit in the ground nearby.');
+  if (roll <= 68) {
+    giveItems(ctx, ['healing_potion', 'healing_potion', 'healing_potion', 'healing_potion']);
+    return say('it becomes four Potions of Healing.');
+  }
+  if (roll <= 75) return say('it becomes a 12-foot rowboat.');
+  if (roll <= 83) {
+    const scrolls = [...ctx.context.lootTable, ...Object.values(SRD_ITEMS)].filter((l) => {
+      const s = l.spellScroll ? (ctx.context.spellTable ?? SRD_SPELLS)[l.spellScroll] : undefined;
+      return !!s && s.level >= 1 && s.level <= 3 && onSpellList(char, s);
+    });
+    const pool = scrolls.length
+      ? scrolls
+      : Object.values(SRD_ITEMS).filter((l) => {
+          const s = l.spellScroll ? SRD_SPELLS[l.spellScroll] : undefined;
+          return !!s && s.level >= 1 && s.level <= 3;
+        });
+    const scroll = pool[d(pool.length) - 1];
+    giveItems(ctx, [scroll.id]);
+    return say(`it becomes a ${scroll.name}.`);
+  }
+  if (roll <= 90) {
+    joinParty(ctx, 'mastiff', 2);
+    return say('it becomes two Mastiffs, who fall in beside the party.');
+  }
+  if (roll <= 96) return say('it becomes a window that sets itself into a nearby wall.');
+  giveItems(ctx, ['portable_ram']);
+  return say('it becomes a Portable Ram.');
+}
+
+// SRD Deck of Illusions table — 32 creatures, three numbers each, then the
+// card drawer (97–00).
+const ILLUSIONS = [
+  'Adult Red Dragon',
+  'Archmage',
+  'Assassin',
+  'Bandit Captain',
+  'Basilisk',
+  'Berserker',
+  'Bugbear Warrior',
+  'Cloud Giant',
+  'Druid',
+  'Erinyes',
+  'Ettin',
+  'Fire Giant',
+  'Frost Giant',
+  'Gnoll Warrior',
+  'Goblin Warrior',
+  'Guardian Naga',
+  'Hill Giant',
+  'Hobgoblin Warrior',
+  'Incubus',
+  'Iron Golem',
+  'Knight',
+  'Kobold Warrior',
+  'Lich',
+  'Medusa',
+  'Night Hag',
+  'Ogre',
+  'Oni',
+  'Priest',
+  'Succubus',
+  'Troll',
+  'Veteran Warrior',
+  'Wyvern',
+];
+
+/** SRD Deck of Illusions — the thrown card shows a harmless illusory creature. */
+function drawIllusion(ctx: ActionContext, slotNote: string): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const roll = d(100);
+  const who =
+    roll >= 97 ? `${char.name} — a perfect double` : `a ${ILLUSIONS[Math.floor((roll - 1) / 3)]}`;
+  ctx.usedInitiative = ctx.st.combat_active ?? false;
+  ctx.narrative = `${char.name} draws a card from the Deck of Illusions${slotNote} and flicks it to the ground (d100: ${roll}) — an illusion of ${who} rises over it. It looks real, but it can do no harm, and anything that touches it passes right through.`;
+}
+
+const HAT_USED = 'hat_of_many_spells_used';
+
+/**
+ * SRD Hat of Many Spells — why the wearer can't try `action.hatSpellId` right
+ * now, or null. Checked before the cast spends the action.
+ */
+export function hatBlocker(ctx: ActionContext, action: CastAction): string | null {
+  if (ctx.actor.kind !== 'pc') return 'Only a character can use the hat.';
+  const { char } = ctx.actor;
+  if ((char.class_resource_uses?.[HAT_USED] ?? 0) > 0) {
+    return 'The hat has given all it will for now — it works again after a Short or Long Rest.';
+  }
+  const s = action.hatSpellId ? ctx.context.spellTable?.[action.hatSpellId] : undefined;
+  if (!s) return 'Choose a Wizard spell to pull from the hat.';
+  if (!(s.spellList ?? []).includes(classSpellListTag('wizard')!)) {
+    return `${s.name} isn't a Wizard spell.`;
+  }
+  if (s.level < 1 || s.level > maxCastableLevel(char)) {
+    return `You can't cast a level ${s.level} spell.`;
+  }
+  if ((char.spells_known ?? []).includes(s.id) || (char.prepared_spells ?? []).includes(s.id)) {
+    return `You already know ${s.name}.`;
+  }
+  if ((s.materialCost ?? 0) > 1000) return `${s.name}'s Material component costs too much.`;
+  const left = (char.spell_slots_max?.[s.level] ?? 0) - (char.spell_slots_used?.[s.level] ?? 0);
+  if (left <= 0) return `You have no level ${s.level} spell slot left.`;
+  return null;
+}
+
+/** The Wizard spells the hat could give `char` now (for its option picker). */
+export function hatSpellOptions(char: Character, spellTable: Record<string, Spell>): Spell[] {
+  const tag = classSpellListTag('wizard');
+  const top = maxCastableLevel(char);
+  return Object.values(spellTable)
+    .filter(
+      (s) =>
+        !s.itemPower &&
+        (s.spellList ?? []).includes(tag!) &&
+        s.level >= 1 &&
+        s.level <= top &&
+        (s.materialCost ?? 0) <= 1000 &&
+        !(char.spells_known ?? []).includes(s.id) &&
+        !(char.prepared_spells ?? []).includes(s.id)
+    )
+    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+}
+
+/** SRD Hat of Many Spells — spend the slot, make the Arcana check, see what comes out. */
+function runHat(ctx: ActionContext, action: CastAction, cast: CastHandler): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const s = ctx.context.spellTable![action.hatSpellId!];
+  updatePcActor(ctx, {
+    spell_slots_used: {
+      ...(char.spell_slots_used ?? {}),
+      [s.level]: (char.spell_slots_used?.[s.level] ?? 0) + 1,
+    },
+  });
+  const dc = 10 + s.level;
+  const check = skillCheck(
+    ctx.actor.char.int,
+    dc,
+    hasSkillProficiency(char, 'Arcana'),
+    char.level,
+    false,
+    hasExpertise(char, 'Arcana')
+  );
+  const tried = `${char.name} reaches into the Hat of Many Spells for ${s.name} (level ${s.level} slot; Arcana ${check.total} vs DC ${dc})`;
+  ctx.usedInitiative = true;
+  if (check.success) {
+    updatePcActor(ctx, {
+      class_resource_uses: { ...(ctx.actor.char.class_resource_uses ?? {}), [HAT_USED]: 1 },
+    });
+    tableCast(ctx, cast, s, `${tried} — and pulls it out!`, action, {
+      item: 'Hat of Many Spells',
+      ...(s.targetType === 'self' ? { targetCharId: char.id } : {}),
+    });
+    return;
+  }
+  hatMishap(ctx, action, cast, `${tried} — but something else comes out`);
+}
+
+/** SRD Hat of Many Spells — the table rolled when the Arcana check fails. */
+function hatMishap(ctx: ActionContext, action: CastAction, cast: CastHandler, tried: string): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const roll = d(100);
+  const lead = `${tried} (d100: ${roll}):`;
+  const say = (text: string) => {
+    ctx.narrative = `${lead} ${text}`;
+  };
+  const spellTable = ctx.context.spellTable ?? {};
+  const hatCast = (id: string, extra: TableExtra = {}) => {
+    const sp = spellTable[id];
+    if (!sp) return say('a puff of smoke.');
+    tableCast(ctx, cast, sp, `${lead} ${sp.name}!`, action, {
+      item: 'Hat of Many Spells',
+      ...extra,
+    });
+  };
+  if (roll <= 50) {
+    switch (d(10)) {
+      case 1:
+        return hatCast('enlarge_reduce', { targetCharId: char.id });
+      case 2:
+        return hatCast('enlarge_reduce');
+      case 3:
+        return hatCast('faerie_fire');
+      case 4:
+        return hatCast('fireball');
+      case 5:
+        return hatCast('gust_of_wind');
+      case 6:
+        return hatCast('invisibility', { targetCharId: char.id });
+      case 7:
+        return hatCast('lightning_bolt');
+      case 8:
+        return hatCast('phantasmal_force');
+      case 9:
+        return hatCast('polymorph');
+      default:
+        return hatCast('stinking_cloud');
+    }
+  }
+  if (roll <= 55) {
+    // Until the end of their next turn.
+    selfCondition(ctx, 'stunned', 2);
+    return say(
+      `${char.name} is Stunned until the end of their next turn, sure something awesome just happened.`
+    );
+  }
+  if (roll <= 60) return say('a harmless swarm of butterflies bursts out and flutters about.');
+  if (roll <= 65) {
+    const [got] = giveItems(ctx, [['acid', 'alchemists_fire', 'crowbar', 'torch'][d(4) - 1]]);
+    return say(`${char.name} pulls out ${got}.`);
+  }
+  if (roll <= 70) {
+    selfCondition(ctx, 'poisoned', 600);
+    return say(`a bout of magic sickness — ${char.name} is Poisoned for 1 hour.`);
+  }
+  if (roll <= 75) {
+    selfCondition(ctx, 'petrified', 2);
+    return say(`${char.name} turns to stone (Petrified) until the end of their next turn.`);
+  }
+  if (roll <= 80) {
+    const pick = d(4);
+    if (pick === 4) {
+      updatePcActor(ctx, { gold: (char.gold ?? 0) + 50 });
+      return say(`${char.name} pulls out a gem worth 50 GP.`);
+    }
+    const got = giveItems(
+      ctx,
+      [['dagger'], ['rope_hempen', 'grappling_hook'], ['caltrops']][pick - 1]
+    );
+    return say(`${char.name} pulls out ${got.join(' tied to a ')}.`);
+  }
+  if (roll <= 85) {
+    // Simplification: the creature isn't anyone's to command; it wanders off.
+    const beast = ['Camel', 'Constrictor Snake', 'Elephant', 'Mule'][d(4) - 1];
+    return say(`a ${beast} tumbles out of the hat, looks around, and wanders off.`);
+  }
+  if (roll <= 90) {
+    // Simplification: the hostile Swarm of Bats makes one attack and scatters.
+    const bats = SRD_MONSTERS.swarm_of_bats;
+    const atk = d(20) + bats.toHit;
+    if (atk >= (char.ac ?? 10)) {
+      const lost = hurtSelf(ctx, rollDice(bats.damage), 'piercing');
+      return say(
+        `a Swarm of Bats boils out and bites ${char.name} for ${lost} Piercing damage before scattering.`
+      );
+    }
+    return say(`a Swarm of Bats boils out and swirls around ${char.name}, then scatters.`);
+  }
+  if (roll <= 95) return say('a shimmering portal to another plane opens nearby, then closes.');
+  // A magic item: 1–3 Common, 4–5 Uncommon, 6 Rare.
+  const r = d(6);
+  const value = r <= 3 ? 100 : r <= 5 ? 400 : 4000;
+  const pool = Object.values(SRD_ITEMS).filter(
+    (l) => l.value === value && l.type === 'consumable' && !l.cursed
+  );
+  if (!pool.length) return say('an empty hatful of glitter.');
+  const [got] = giveItems(ctx, [pool[d(pool.length) - 1].id]);
+  return say(`${char.name} pulls out a ${got}!`);
 }

@@ -1363,6 +1363,90 @@ export const BASE_ITEMS: Record<string, LootItem> = {
     effect: null,
     aliases: ['bedroll', 'sleeping roll'],
   },
+  caltrops: {
+    id: 'caltrops',
+    value: 1,
+    name: 'Caltrops',
+    desc: 'A bag of spiked iron caltrops to scatter across a 5-foot square.',
+    weight: 2,
+    type: 'misc',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['caltrops', 'bag of caltrops'],
+  },
+  ladder: {
+    id: 'ladder',
+    value: 1,
+    name: 'Ladder',
+    desc: 'A 10-foot wooden ladder.',
+    weight: 25,
+    type: 'misc',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['ladder'],
+  },
+  mirror: {
+    id: 'mirror',
+    value: 5,
+    name: 'Mirror',
+    desc: 'A small handheld steel mirror.',
+    weight: 0.5,
+    type: 'misc',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['mirror', 'steel mirror'],
+  },
+  pole: {
+    id: 'pole',
+    value: 1,
+    name: 'Pole',
+    desc: 'A 10-foot wooden pole.',
+    weight: 7,
+    type: 'misc',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['pole', '10-foot pole'],
+  },
+  portable_ram: {
+    id: 'portable_ram',
+    value: 4,
+    name: 'Portable Ram',
+    desc: 'A heavy iron-capped ram for battering down doors.',
+    weight: 35,
+    type: 'misc',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['portable ram', 'ram'],
+  },
+  sack: {
+    id: 'sack',
+    value: 1,
+    name: 'Sack',
+    desc: 'A cloth sack that holds about a cubic foot.',
+    weight: 0.5,
+    type: 'misc',
+    slot: null,
+    damage: null,
+    ac_bonus: null,
+    heal: null,
+    effect: null,
+    aliases: ['sack'],
+  },
   rope_hempen: {
     id: 'rope_hempen',
     value: 1,
@@ -5526,6 +5610,54 @@ const RANDOM_ITEMS: Array<[string, LootItem]> = [
         sp('goat_of_traveling', 0),
         sp('goat_of_terror', 0, { rechargeDays: 15 }),
       ],
+    }
+  ),
+  // Simplification: the robe has a fixed 10 random patches (4d4), each rolled
+  // on its table as it's torn off.
+  wondrous(
+    'robe_of_useful_items',
+    'Robe of Useful Items',
+    'Uncommon',
+    'While you wear it, tear off a patch and it becomes the thing it shows: two each of a Bullseye Lantern, Dagger, Mirror, Pole, Rope and Sack, plus 10 odd patches (1d100: a bag of gold, gems, a ladder, a Riding Horse, Potions of Healing, a Spell Scroll, two Mastiffs, a door, a pit...).',
+    'cloak',
+    {
+      itemSpells: [
+        ...['lantern', 'dagger', 'mirror', 'pole', 'rope', 'sack'].map((k) =>
+          sp(`robe_patch_${k}`, 0, { uses: 2 })
+        ),
+        sp('robe_patch_mystery', 0, { uses: 10 }),
+      ],
+    }
+  ),
+  // Simplification: the deck holds 24 cards (a found deck is short 1d20 - 1 of
+  // its 34); each draw rolls on the table, and the illusion is described rather
+  // than placed (it can do no harm).
+  wondrous(
+    'deck_of_illusions',
+    'Deck of Illusions',
+    'Uncommon',
+    "24 cards. Draw one at random and throw it down: an illusion of a creature (1d100 — a dragon, a giant, a lich, an ogre, or even you) forms over it. It looks and moves like the real thing but can do no harm; touching it shows it's false.",
+    null,
+    {
+      weight: 0.5,
+      castWhileCarried: true,
+      charges: uses(24),
+      itemSpells: [sp('illusion_card', 1)],
+    }
+  ),
+  // Simplification: its use as a Spellcasting Focus isn't modeled; the Wizard
+  // list is the arcane spell list (as for spellbooks); the magic item from a
+  // 96–00 failure is a consumable and doesn't vanish after an hour.
+  wondrous(
+    'hat_of_many_spells',
+    'Hat of Many Spells',
+    'Very Rare',
+    "Holding it, spend a spell slot to try a Wizard spell you don't know (of a level you can cast, Material cost up to 1,000 GP): an Intelligence (Arcana) check against DC 10 + the spell's level casts it, and the hat then rests until you finish a Short or Long Rest. On a failure the slot is spent and something else comes out of the hat (1d100).",
+    'off_hand',
+    {
+      requiresAttunement: true,
+      attuneBy: ['wizard'],
+      itemSpells: [sp('hat_of_many_spells', 0)],
     }
   ),
 ];
