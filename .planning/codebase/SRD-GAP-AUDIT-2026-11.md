@@ -702,10 +702,51 @@ the first of Persuasion / Intimidation / Insight / History you lack Expertise
 in); the Jester always gives Advantage (never the extra draws) and Puzzle's
 extra draw isn't taken; the Fool and Jester skip ability checks; Comet's foe,
 Flames' devil, Rogue's traitor, Sage's question and the Fates' undoing are
-described; the Skull's Avatar of Death isn't placed (it joins the
-uncontrolled-creatures deferral); Donjon and Void don't block revival magic.
+described; Donjon and Void don't block revival magic.
 "Magic item" (Talons, Key, Sun) is read from the catalog description's rarity
 tag. Still deferred: the batch 9–12 deferrals.
+
+**Batch 16 done 2026-11-22 — uncontrolled creatures.** New machinery in
+`services/creatureSpawn.ts`: `spawnHostile` adds a creature to the room's
+enemies on the run seed; in a fight it takes the initiative slot right after
+the acting PC on a free square beside them, and out of combat it starts a fight
+(on the map, as a wilderness encounter). Its `hunts` option sets the entity's
+`commanded_target_id`, which `selectTarget` already honors. `joinAlly` adds a
+summon that joins a fight in progress (`seedSummonedAllies` mid-combat).
+`SummonedAlly.untilCombatEnds` allies leave in `endCombatState`.
+`selectTarget` takes an ignore list. `itemEffectBlocker` and
+`itemEffectHidden` gather item-power preconditions: a refused use costs neither
+the action nor a charge, and the choice is hidden. Items:
+- **Efreeti Bottle.** The first opening rolls 1d10: on a 1 the Efreeti hunts
+  its releaser and the bottle is spent; on a 10 it grants one Wish, which shares
+  the Moon card's `deck_wishes` count (the choice now reads "Granted Wish"); on
+  2–9 it serves, and serves on the next two openings, then escapes on the
+  fourth.
+- **Iron Flask.** It traps a Celestial, Elemental, Fey or Fiend on a failed
+  DC 17 Wisdom save, with Advantage if that kind has been trapped before and
+  with Magic and Legendary Resistance applied. The captured creature leaves the
+  fight as defeated, its XP shared. Releasing it adds it as an ally.
+- **Pipes of the Sewers.** It has 3 charges and regains 1d3. Each use calls
+  one Swarm of Rats, which serves for that fight on a failed DC 15 Wisdom save
+  and turns hostile on a success. Rats and Giant Rats ignore the attuned bearer
+  until hurt.
+- **Mysterious Deck's Skull.** It now places the Avatar of Death: HP half the
+  drawer's maximum, AC 20, Scythe attacks equal to half the drawer's PB rounded
+  up, hunting only the drawer.
+
+Simplifications:
+- **Durations.** The servant Efreeti and a released captive stay until the
+  next Long Rest, not 1 hour, and a hostile Efreeti fights until beaten, not 5
+  rounds.
+- **"Trapped before".** The Iron Flask tracks this by creature name.
+- **Pipes of the Sewers.** One swarm per use, only in a fight, and a swayed
+  swarm needn't be kept playing to.
+- **Avatar of Death.** Its "automatic hit" is +30 to hit, so a natural 1
+  misses. Allies who hurt it don't call avatars of their own, it doesn't vanish
+  when the drawer dies, and its victims can be revived.
+- **Hostile creatures from the Wand of Wonder, Hat and Bag of Beans tables.**
+  They are still described rather than placed; their table text has them wander
+  off.
 
 ## 7. Core rules not found
 

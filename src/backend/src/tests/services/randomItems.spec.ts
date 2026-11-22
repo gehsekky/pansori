@@ -461,7 +461,7 @@ describe('Mysterious Deck', () => {
     expect(r.narrative).toContain('Moon');
     expect(pc(r.newState).deck_wishes).toBe(1);
     const offer = generateChoices(r.newState, seedWith(), ctx).find((c) =>
-      c.label.startsWith('Moon card — cast Wish')
+      c.label.startsWith('Granted Wish — cast Wish')
     );
     expect(offer?.pickOption?.param).toBe('wishSpellId');
     const wished = await run(r.newState, {
@@ -477,7 +477,7 @@ describe('Mysterious Deck', () => {
       slotLevel: 9,
       deckWish: true,
     });
-    expect(none.narrative).toContain('no Wish from the Moon card');
+    expect(none.narrative).toContain('no granted Wish');
   });
 
   it('Euryale curses saves by -2; the Fates lift it', async () => {

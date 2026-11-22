@@ -10,8 +10,8 @@ import {
 } from '../../rulesEngine.js';
 import { equippedShieldId, equippedWeaponId } from '../../equipment.js';
 import { getItemData, pick } from '../../gameEngine.js';
-import { hatBlocker, runItemEffect } from './itemEffects.js';
 import { isSpellOutOfRange, runPrecast } from './precast.js';
+import { itemEffectBlocker, runItemEffect } from './itemEffects.js';
 import { itemSpellFor, itemSpellVersion, storeTarget } from '../../chargedItems.js';
 import { runPowerWordKill, runPowerWordStun } from './powerWords.js';
 import { BEAST_FORMS } from '../../../campaignData/srd/index.js';
@@ -150,9 +150,10 @@ export const handleCastSpell: ActionHandler<{
     return;
   }
 
-  // SRD Hat of Many Spells — the chosen spell is checked before the action is spent.
-  if (spell.itemEffect === 'hat_spell') {
-    const why = hatBlocker(ctx, action);
+  // Item powers with preconditions (the Hat of Many Spells' chosen spell, an
+  // Iron Flask's target) are checked before the action or a charge is spent.
+  if (spell.itemEffect && !ctx.tableCast) {
+    const why = itemEffectBlocker(ctx, spell, action);
     if (why) {
       ctx.narrative = why;
       return;

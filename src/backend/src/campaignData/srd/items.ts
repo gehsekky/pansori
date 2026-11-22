@@ -5674,6 +5674,47 @@ const RANDOM_ITEMS: Array<[string, LootItem]> = [
       }
     )
   ),
+  // Simplification: the servant Efreeti stays until the next Long Rest (not 1
+  // hour), and a hostile one fights until it's beaten rather than for 5 rounds.
+  wondrous(
+    'efreeti_bottle',
+    'Efreeti Bottle',
+    'Very Rare',
+    'A painted brass bottle. Pull the stopper and an Efreeti appears. The first time, roll 1d10: on a 1 it attacks you and the bottle loses its magic; on a 10 it grants you one Wish and is gone; otherwise it serves you, returning to the bottle at the next Long Rest (the stopper then stays shut until the next one) — three times, after which it escapes for good.',
+    null,
+    { weight: 1, castWhileCarried: true, itemSpells: [sp('efreeti_bottle', 0, { daily: true })] }
+  ),
+  // Simplification: the freed creature serves until the next Long Rest (not 1
+  // hour), then leaves; a captured creature counts as defeated.
+  wondrous(
+    'iron_flask',
+    'Iron Flask',
+    'Legendary',
+    'An iron flask with a brass stopper. Aim it at a Celestial, Elemental, Fey or Fiend you can see within 60 feet: unless it makes a DC 17 Wisdom saving throw (with Advantage if it has been trapped before), it is drawn inside. The flask holds one creature; pull the stopper to release it, and it obeys you until the next Long Rest.',
+    null,
+    {
+      weight: 1,
+      castWhileCarried: true,
+      itemSpells: [sp('iron_flask_trap', 0), sp('iron_flask_release', 0)],
+    }
+  ),
+  // Simplification: one swarm per Magic action (not 1–3 at once), only in a
+  // fight; a swayed swarm stays loyal until the battle ends (you needn't keep
+  // playing), and rats ignore you until they're hurt.
+  wondrous(
+    'pipes_of_the_sewers',
+    'Pipes of the Sewers',
+    'Uncommon',
+    'Ordinary rats and Giant Rats leave you be unless you harm them. In a fight, play the pipes and spend a charge (3; regains 1d3 at dawn) to call a Swarm of Rats: on a failed DC 15 Wisdom saving throw it obeys you until the battle ends; on a success it attacks the party.',
+    null,
+    {
+      requiresAttunement: true,
+      weight: 2,
+      castWhileCarried: true,
+      charges: { max: 3, regain: '1d3' },
+      itemSpells: [sp('pipes_of_the_sewers', 1)],
+    }
+  ),
 ];
 
 const MAGIC_ITEMS: Record<string, LootItem> = Object.fromEntries([

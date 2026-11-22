@@ -1,14 +1,33 @@
-import type { AbilityKey, Character, LootItem, Spell } from '../../../types.js';
+import type {
+  AbilityKey,
+  Character,
+  Enemy,
+  EnemyTemplate,
+  GameState,
+  InventoryItem,
+  LootItem,
+  Spell,
+} from '../../../types.js';
 import type { ActionContext, ActionHandler } from '../types.js';
+import { allyFrom, joinAlly, spawnHostile } from '../../creatureSpawn.js';
 import { classSpellListTag, hasExpertise, hasSkillProficiency } from '../../multiclass.js';
 import {
   d,
   hasWeaponProficiency,
+  profBonus,
   rollConditionSave,
   rollDice,
   skillCheck,
 } from '../../rulesEngine.js';
-import { hasSaveProficiency, pcDamageTaken } from '../../gameEngine.js';
+import {
+  endCombatState,
+  hasSaveProficiency,
+  isRoomCleared,
+  pcDamageTaken,
+  removeCombatant,
+  splitEncounterXp,
+} from '../../gameEngine.js';
+import { legendaryResistInto, magicResistanceAdvantage } from '../../monsterSaves.js';
 import { maxCastableLevel, onSpellList } from '../../chargedItems.js';
 import { syncSetAbilities, wornSaveBonus } from '../../wornEffects.js';
 import { ITEM_POWERS } from '../../../campaignData/srd/itemPowers.js';
@@ -29,6 +48,7 @@ type CastAction = {
   targetEnemyId?: string;
   targetCharId?: string;
   hatSpellId?: string;
+  itemInstanceId?: string;
 };
 type CastHandler = ActionHandler<{ type: 'cast_spell'; spellId: string; slotLevel: number }>;
 
@@ -72,6 +92,18 @@ export function runItemEffect(
       return true;
     case 'deck_draw':
       drawFromDeck(ctx, spell, action);
+      return true;
+    case 'efreeti_bottle':
+      openEfreetiBottle(ctx, action);
+      return true;
+    case 'iron_flask_trap':
+      trapInFlask(ctx, action);
+      return true;
+    case 'iron_flask_release':
+      releaseFromFlask(ctx, action);
+      return true;
+    case 'pipes_of_the_sewers':
+      playPipes(ctx);
       return true;
     default:
       return false;
@@ -520,7 +552,66 @@ const HAT_USED = 'hat_of_many_spells_used';
  * SRD Hat of Many Spells — why the wearer can't try `action.hatSpellId` right
  * now, or null. Checked before the cast spends the action.
  */
-export function hatBlocker(ctx: ActionContext, action: CastAction): string | null {
+/**
+ * Why an item power can't be used right now (checked before the action or a
+ * charge is spent), or null. Covers the Hat of Many Spells' chosen spell and the
+ * uncontrolled-creature items' preconditions.
+ */
+export function itemEffectBlocker(
+  ctx: ActionContext,
+  spell: Spell,
+  action: CastAction
+): string | null {
+  if (ctx.actor.kind !== 'pc') return 'Only a character can use that.';
+  switch (spell.itemEffect) {
+    case 'hat_spell':
+      return hatBlocker(ctx, action);
+    case 'pipes_of_the_sewers':
+      return ctx.st.combat_active
+        ? null
+        : 'The rats only answer the pipes in the thick of a fight.';
+    case 'iron_flask_trap': {
+      const held = flaskContents(usedItem(ctx, action));
+      if (held) return `The flask already holds a ${held.name}.`;
+      const target = ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId);
+      if (!target) return 'Choose a creature to trap.';
+      if (!flaskCanTrap(target))
+        return `The ${target.name} belongs to this plane — the flask can't hold it.`;
+      return null;
+    }
+    case 'iron_flask_release':
+      return flaskContents(usedItem(ctx, action)) ? null : 'The flask is empty.';
+    default:
+      return null;
+  }
+}
+
+/** Whether to leave an item power out of the choices (it would be refused). */
+export function itemEffectHidden(
+  char: Character,
+  inv: InventoryItem,
+  spell: Spell,
+  combat: boolean,
+  spellTable: Record<string, Spell>
+): boolean {
+  switch (spell.itemEffect) {
+    case 'hat_spell':
+      return (
+        (char.class_resource_uses?.[HAT_USED] ?? 0) > 0 ||
+        hatSpellOptions(char, spellTable).length === 0
+      );
+    case 'pipes_of_the_sewers':
+      return !combat;
+    case 'iron_flask_trap':
+      return !!flaskContents(inv);
+    case 'iron_flask_release':
+      return !flaskContents(inv);
+    default:
+      return false;
+  }
+}
+
+function hatBlocker(ctx: ActionContext, action: CastAction): string | null {
   if (ctx.actor.kind !== 'pc') return 'Only a character can use the hat.';
   const { char } = ctx.actor;
   if ((char.class_resource_uses?.[HAT_USED] ?? 0) > 0) {
@@ -761,6 +852,7 @@ function drawFromDeck(ctx: ActionContext, spell: Spell, action: CastAction): voi
   const table = spell.id === 'deck_draw_22' ? DECK_22 : DECK_13;
   const instanceId = (action as { itemInstanceId?: string }).itemInstanceId;
   const notes: string[] = [];
+  let avatar = false;
   let draws = 1;
   while (draws-- > 0 && !ctx.actor.char.dead) {
     const inv = ctx.actor.char.inventory.find((i) => i.instance_id === instanceId);
@@ -782,10 +874,20 @@ function drawFromDeck(ctx: ActionContext, spell: Spell, action: CastAction): voi
     }
     const { text, extraDraw } = applyCard(ctx, card);
     notes.push(`${card} — ${text}`);
+    if (card === 'Skull') avatar = true;
     // SRD Fool — draw another card (not one of your declared draws).
     if (extraDraw) draws++;
   }
   ctx.narrative = `${ctx.actor.char.name} draws from the Mysterious Deck. ${notes.join(' Then: ')}`;
+  // SRD Skull — the Avatar of Death appears beside the drawer and attacks only
+  // them. Simplification: allies who hurt it don't call avatars of their own,
+  // it doesn't vanish if the drawer dies, and its victims can still be revived.
+  if (avatar && !ctx.actor.char.dead) {
+    spawnHostile(ctx, avatarOfDeath(ctx.actor.char), {
+      tag: 'avatar',
+      hunts: ctx.actor.char.id,
+    });
+  }
 }
 
 /** Raise (or lower) one ability score, within [floor, cap]. Returns the change. */
@@ -908,8 +1010,6 @@ function applyCard(ctx: ActionContext, card: string): { text: string; extraDraw?
         text: 'once within the year, you may ask a question in meditation and receive a true answer.',
       };
     case 'Skull':
-      // Simplification: the Avatar of Death isn't placed on the board (it joins
-      // the uncontrolled-creatures deferral).
       return { text: 'a ghostly reaper in a tattered robe appears, hunting you alone.' };
     case 'Star': {
       const gained = shiftAbility(ctx, primary, 2, 24);
@@ -969,4 +1069,232 @@ function applyCard(ctx: ActionContext, card: string): { text: string; extraDraw?
     default:
       return { text: 'the card is blank.' };
   }
+}
+
+// ── Uncontrolled creatures ──────────────────────────────────────────────────
+
+/** The acting PC's copy of the item being used. */
+function usedItem(ctx: ActionContext, action: CastAction): InventoryItem | undefined {
+  if (ctx.actor.kind !== 'pc' || !action.itemInstanceId) return undefined;
+  return ctx.actor.char.inventory.find((i) => i.instance_id === action.itemInstanceId);
+}
+
+/** Merge `patch` into one of the acting PC's items. */
+function patchItem(ctx: ActionContext, instanceId: string, patch: Partial<InventoryItem>): void {
+  if (ctx.actor.kind !== 'pc') return;
+  updatePcActor(ctx, {
+    inventory: ctx.actor.char.inventory.map((i) =>
+      i.instance_id === instanceId ? { ...i, ...patch } : i
+    ),
+  });
+}
+
+/** The item is spent: it leaves the pack (and any slot or attunement). */
+function loseItem(ctx: ActionContext, instanceId: string): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  updatePcActor(ctx, {
+    inventory: char.inventory.filter((i) => i.instance_id !== instanceId),
+    equipment: clearInstance(char.equipment ?? {}, instanceId),
+    attuned_items: (char.attuned_items ?? []).filter((id) => id !== instanceId),
+  });
+}
+
+/**
+ * SRD Efreeti Bottle — the first opening rolls 1d10: 1, the Efreeti attacks its
+ * releaser and the bottle loses its magic; 10, it grants one Wish and the bottle
+ * is spent; 2–9, it serves, and does again the next two openings — the fourth
+ * time it escapes for good.
+ */
+function openEfreetiBottle(ctx: ActionContext, action: CastAction): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const inv = usedItem(ctx, action);
+  if (!inv) return;
+  const efreeti = SRD_MONSTERS.efreeti;
+  const opens = typeof inv.bottle_opens === 'number' ? inv.bottle_opens : 0;
+  const lead = `${char.name} pulls the stopper from the Efreeti Bottle. Smoke billows out and burns away in a flash of fire, leaving an Efreeti`;
+  const tag = `${inv.instance_id}:efreeti_bottle`;
+  if (opens >= 3) {
+    loseItem(ctx, inv.instance_id);
+    ctx.narrative = `${lead} — which laughs, bursts free of its service, and is gone. The bottle is only brass now.`;
+    return;
+  }
+  const roll = opens === 0 ? d(10) : undefined;
+  const rolled = roll !== undefined ? ` (d10: ${roll})` : '';
+  if (roll === 1) {
+    loseItem(ctx, inv.instance_id);
+    ctx.narrative = `${lead}${rolled} — enraged at its long imprisonment, it turns on ${char.name}! The bottle's magic is spent.`;
+    spawnHostile(ctx, efreeti, { tag: 'efreeti', hunts: char.id });
+    return;
+  }
+  if (roll === 10) {
+    loseItem(ctx, inv.instance_id);
+    updatePcActor(ctx, { deck_wishes: (ctx.actor.char.deck_wishes ?? 0) + 1 });
+    ctx.narrative = `${lead}${rolled} — grateful for its freedom, it offers ${char.name} a single Wish, then waits to grant it. The bottle's magic is spent.`;
+    return;
+  }
+  patchItem(ctx, inv.instance_id, { bottle_opens: opens + 1 });
+  ctx.st = {
+    ...ctx.st,
+    summoned_allies: (ctx.st.summoned_allies ?? []).filter((a) => a.fromItem !== tag),
+  };
+  joinAlly(ctx, { ...allyFrom(efreeti), fromItem: tag });
+  const left = 2 - opens;
+  ctx.narrative = `${lead}${rolled} — it bows, bound to obey ${char.name} until the next Long Rest, when it returns to the bottle.${left > 0 ? '' : ' It warns that it will not answer the stopper again.'}`;
+}
+
+/** SRD Iron Flask — creatures native to another plane. */
+const OUTSIDER_TYPES = new Set(['celestial', 'elemental', 'fey', 'fiend']);
+
+export function flaskCanTrap(enemy: Enemy | undefined): boolean {
+  return !!enemy && OUTSIDER_TYPES.has(enemy.creatureType ?? '');
+}
+
+/** What an Iron Flask holds (absent ⇒ empty). */
+export type FlaskCreature = {
+  name: string;
+  ac: number;
+  maxHp: number;
+  toHit: number;
+  damage: string;
+};
+
+export function flaskContents(inv: InventoryItem | undefined): FlaskCreature | undefined {
+  return (inv?.flask_creature as FlaskCreature | undefined) ?? undefined;
+}
+
+/**
+ * SRD Iron Flask — the target makes a DC 17 Wisdom saving throw (Advantage if
+ * the flask has held its kind before) or is trapped inside. Simplification: a
+ * trapped creature counts as defeated (its XP is shared as for a kill).
+ */
+function trapInFlask(ctx: ActionContext, action: CastAction): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const inv = usedItem(ctx, action);
+  const target = ctx.livingEnemiesInRoom.find((e) => e.id === action.targetEnemyId);
+  if (!inv || !target) return;
+  const ent = ctx.st.entities?.find((e) => e.id === target.id && e.isEnemy);
+  const before = Array.isArray(inv.flask_trapped) ? (inv.flask_trapped as string[]) : [];
+  const failedRoll = rollConditionSave(
+    'wis',
+    target.wis ?? 10,
+    17,
+    false,
+    char.level,
+    0,
+    ent?.conditions ?? [],
+    before.includes(target.name) || magicResistanceAdvantage(target)
+  );
+  const failed = legendaryResistInto(ctx, target, failedRoll);
+  const lead = `${char.name} unstoppers the Iron Flask and levels it at the ${target.name}`;
+  if (!failed) {
+    ctx.narrative = `${lead}. It resists the pull (DC 17 Wisdom save succeeded).${ctx.narrative ?? ''}`;
+    return;
+  }
+  patchItem(ctx, inv.instance_id, {
+    flask_creature: {
+      name: target.name,
+      ac: target.ac,
+      maxHp: target.maxHp ?? target.hp,
+      toHit: target.toHit,
+      damage: target.damage,
+    } satisfies FlaskCreature,
+    flask_trapped: [...new Set([...before, target.name])],
+  });
+  const split = splitEncounterXp(ctx.st, char.id, target.xp ?? 0);
+  ctx.st = removeCombatant(split.st, target.id);
+  ctx.st.enemies_killed = [...ctx.st.enemies_killed, target.id];
+  updatePcActor(ctx, { xp: (ctx.actor.char.xp ?? 0) + split.share });
+  ctx.narrative = `${lead} — it fails its DC 17 Wisdom save and is dragged, howling, into the flask (+${split.share} XP).`;
+  if (ctx.st.combat_active && isRoomCleared(ctx.st, ctx.seed, ctx.st.current_room)) {
+    ctx.st = endCombatState(ctx.st);
+  }
+}
+
+/** SRD Iron Flask — the creature inside comes out and obeys its releaser. */
+function releaseFromFlask(ctx: ActionContext, action: CastAction): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const inv = usedItem(ctx, action);
+  const held = flaskContents(inv);
+  if (!inv || !held) return;
+  patchItem(ctx, inv.instance_id, { flask_creature: undefined });
+  joinAlly(ctx, { ...held, fromItem: `${inv.instance_id}:iron_flask_release` });
+  ctx.narrative = `${char.name} pulls the Iron Flask's stopper. The ${held.name} pours out and bends to ${char.name}'s commands — until the next Long Rest, when it goes its own way.`;
+}
+
+/**
+ * SRD Pipes of the Sewers — the called Swarm of Rats makes a DC 15 Wisdom save:
+ * on a failure it's swayed and fights for the piper until the battle ends; on a
+ * success it behaves as rats do and attacks the party.
+ */
+function playPipes(ctx: ActionContext): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const swarm = SRD_MONSTERS.swarm_of_rats;
+  const swayed = rollConditionSave('wis', swarm.wis ?? 10, 15);
+  const lead = `${char.name} plays a shrill tune on the Pipes of the Sewers, and a Swarm of Rats pours out of the cracks`;
+  if (swayed) {
+    joinAlly(ctx, { ...allyFrom(swarm), untilCombatEnds: true });
+    ctx.narrative = `${lead} — swayed by the music (DC 15 Wisdom save failed), it swarms to ${char.name}'s side for the rest of the fight.`;
+    return;
+  }
+  ctx.narrative = `${lead} — but it shrugs off the music (DC 15 Wisdom save succeeded) and attacks the party!`;
+  spawnHostile(ctx, swarm, { tag: 'rats' });
+}
+
+/**
+ * SRD Pipes of the Sewers — rats and Giant Rats leave the bearer of attuned
+ * pipes alone. Simplification: a rat that has been hurt no longer does.
+ */
+export function ratsIgnore(st: GameState, enemy: Enemy, enemyId: string): string[] {
+  if (enemy.name !== 'Rat' && enemy.name !== 'Giant Rat') return [];
+  const ent = st.entities?.find((e) => e.id === enemyId);
+  if (ent && ent.hp < ent.maxHp) return [];
+  return st.characters
+    .filter((c) =>
+      c.inventory.some(
+        (i) => i.id === 'pipes_of_the_sewers' && (c.attuned_items ?? []).includes(i.instance_id)
+      )
+    )
+    .map((c) => c.id);
+}
+
+/** SRD Mysterious Deck's Skull — the Avatar of Death that hunts the drawer. */
+export function avatarOfDeath(char: Character): EnemyTemplate {
+  return {
+    name: 'Avatar of Death',
+    creatureType: 'undead',
+    cr: 0,
+    xp: 0,
+    hp: Math.max(1, Math.floor(char.max_hp / 2)),
+    ac: 20,
+    // Simplification: its Reaping Scythe "automatically hits"; it's given a
+    // to-hit high enough that only a natural 1 misses.
+    toHit: 30,
+    damage: '1d8+3',
+    damageType: 'slashing',
+    bonusDamage: '1d8',
+    bonusDamageType: 'necrotic',
+    multiattack: Math.ceil(profBonus(char.level) / 2),
+    str: 16,
+    dex: 16,
+    con: 16,
+    int: 16,
+    wis: 16,
+    cha: 16,
+    speedFt: 60,
+    immunities: ['necrotic', 'poison'],
+    condition_immunities: [
+      'charmed',
+      'exhaustion',
+      'frightened',
+      'paralyzed',
+      'petrified',
+      'poisoned',
+      'unconscious',
+    ],
+  };
 }

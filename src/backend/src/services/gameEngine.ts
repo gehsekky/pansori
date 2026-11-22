@@ -219,6 +219,12 @@ import { enemyRef, fillEnemyTokens } from './narrative/enemyName.js';
 import { enemySaveD20, legendaryResist, magicResistanceAdvantage } from './monsterSaves.js';
 import { equipmentFromLegacy, equippedArmorId, equippedWeaponId } from './equipment.js';
 import { evalCondition, visibleResponses } from './dialogueGating.js';
+import {
+  flaskCanTrap,
+  hatSpellOptions,
+  itemEffectHidden,
+  ratsIgnore,
+} from './actions/castSpell/itemEffects.js';
 import { fmt, pronounsForGender, stripForLlm } from './narrativeFmt.js';
 import {
   grappledAttackDisadvantage,
@@ -234,7 +240,6 @@ import { availableLootIn } from './placedLoot.js';
 import { canTakeFeat } from './feats.js';
 import { characterAc } from './armorClass.js';
 import { factionShopPrice } from './campaignEngine.js';
-import { hatSpellOptions } from './actions/castSpell/itemEffects.js';
 import { llmProvider } from './llmProvider.js';
 import { pendingBonusSkills } from './bonusSkills.js';
 import { pendingFeatSpellPicks } from './actions/lessons.js';
@@ -4079,6 +4084,10 @@ export function endCombatState(st: GameState): GameState {
         : st.entities
       : undefined,
     movement_used: undefined,
+    // Allies that serve for one fight only (Pipes of the Sewers' swarms) leave.
+    ...(collapsed.summoned_allies
+      ? { summoned_allies: collapsed.summoned_allies.filter((a) => !a.untilCombatEnds) }
+      : {}),
     // Persistent damage zones are combat constructs; clear any that outlived the
     // fight so a non-concentration zone (Guardian of Faith) can't leak into the
     // next encounter. Concentration zones are already dropped by breakConcentration.
@@ -7926,14 +7935,14 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
     }
   }
 
-  // ── SRD Mysterious Deck's Moon — Wish without a slot, 1d3 times ───────────
+  // ── Granted Wishes (Mysterious Deck's Moon, Efreeti Bottle) — no slot ───────
   if (
     context.spellTable?.wish &&
     (char.deck_wishes ?? 0) > 0 &&
     !(state.combat_active && char.turn_actions.action_used)
   ) {
     choices.push({
-      label: `Moon card — cast Wish (${char.deck_wishes} left)`,
+      label: `Granted Wish — cast Wish (${char.deck_wishes} left)`,
       action: { type: 'cast_spell', spellId: 'wish', slotLevel: 9, deckWish: true },
       pickOption: spellPickOption('wish', context),
     });
@@ -7949,19 +7958,18 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
       const { spell, inv, loot, level, cost } = opt;
       if (spell.castTime === 'reaction' || spell.revive) continue;
       if (spell.outOfCombatOnly && state.combat_active) continue;
-      if (
-        spell.itemEffect === 'hat_spell' &&
-        ((char.class_resource_uses?.hat_of_many_spells_used ?? 0) > 0 ||
-          hatSpellOptions(char, context.spellTable).length === 0)
-      )
-        continue;
+      if (itemEffectHidden(char, inv, spell, !!state.combat_active, context.spellTable)) continue;
       const econ = spell.castTime === 'bonus_action' ? 'bonus_action_used' : 'action_used';
       if (state.combat_active && char.turn_actions[econ]) continue;
       const isOffensive =
         !!(spell.damage || spell.condition) ||
         spell.id === 'true_strike' ||
-        spell.itemEffect === 'wand_of_wonder';
-      if (isOffensive && !enemyAlive && spell.itemEffect !== 'beans_dump') continue;
+        spell.itemEffect === 'wand_of_wonder' ||
+        spell.itemEffect === 'iron_flask_trap';
+      // SRD Iron Flask — only a creature from another plane can be trapped.
+      const foes =
+        spell.itemEffect === 'iron_flask_trap' ? livingEnemies.filter(flaskCanTrap) : livingEnemies;
+      if (isOffensive && foes.length === 0 && spell.itemEffect !== 'beans_dump') continue;
       if (spell.heal && state.characters.every((c) => c.dead || c.hp >= c.max_hp)) continue;
       const how = loot.spellScroll
         ? `Read the ${loot.name}`
@@ -7975,10 +7983,8 @@ export function generateChoices(state: GameState, seed: Seed, context: Context):
         slotLevel: level,
         itemInstanceId: inv.instance_id,
       };
-      const perEnemy = isOffensive && !spell.blastRadius && livingEnemies.length >= 2;
-      const targets = perEnemy
-        ? livingEnemies
-        : [isOffensive && enemyAlive ? livingEnemies[0] : undefined];
+      const perEnemy = isOffensive && !spell.blastRadius && foes.length >= 2;
+      const targets = perEnemy ? foes : [isOffensive && foes.length ? foes[0] : undefined];
       for (const en of targets) {
         choices.push({
           label: `${how}${costNote}${perEnemy && en ? ` → ${en.name}` : ''}`,
@@ -10840,7 +10846,9 @@ export function missileAttractionTarget(
 
 export function selectTarget(
   actorId: string,
-  st: GameState
+  st: GameState,
+  // Creatures this actor won't attack (rats leave the Pipes of the Sewers' bearer be).
+  ignore: string[] = []
 ): {
   actorEnt: CombatEntity | undefined;
   targetEnt: CombatEntity | undefined;
@@ -10853,7 +10861,11 @@ export function selectTarget(
   // (the caller's `targetCharIdx < 0` gate ends its turn).
   const charmerId = actorEnt?.conditions?.includes('charmed') ? actorEnt.charmer_id : undefined;
   const candidates = (st.entities ?? []).filter(
-    (e) => targetSides.includes(entitySide(e)) && e.hp > 0 && e.id !== charmerId
+    (e) =>
+      targetSides.includes(entitySide(e)) &&
+      e.hp > 0 &&
+      e.id !== charmerId &&
+      !ignore.includes(e.id)
   );
   // RAW player-command (summons): honor an explicit commanded target while
   // it's alive and still a valid hostile; otherwise fall back to the
@@ -12021,7 +12033,7 @@ export async function runEnemyTurns(args: {
           }
         }
       }
-      const picked = selectTarget(eEntry.id, st);
+      const picked = selectTarget(eEntry.id, st, ratsIgnore(st, rm, eEntry.id));
       const eEnt = picked.actorEnt;
       // SRD Shield of Missile Attraction's curse — a ranged weapon attack at a
       // creature within range of the cursed bearer targets the bearer instead.

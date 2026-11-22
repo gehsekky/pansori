@@ -666,4 +666,48 @@ export const ITEM_POWERS: Record<string, Spell> = {
       }),
     ])
   ),
+  // ── Uncontrolled creatures ────────────────────────────────────────────────
+  // SRD Efreeti Bottle — unstopper it and an Efreeti appears; the first opening
+  // rolls 1d10 for whether it attacks, serves, or grants a Wish.
+  efreeti_bottle: power({
+    id: 'efreeti_bottle',
+    name: 'Unstopper the Bottle',
+    level: 1,
+    itemEffect: 'efreeti_bottle',
+    targetType: 'self',
+    rangeKind: 'self',
+    desc: 'Pull the stopper: smoke pours out and an Efreeti appears. It may attack you, serve you, or grant a Wish.',
+  }),
+  // SRD Iron Flask — trap a creature from another plane (DC 17 Wisdom save), or
+  // release the one inside to obey you.
+  iron_flask_trap: power({
+    id: 'iron_flask_trap',
+    name: 'Trap a Creature',
+    level: 1,
+    itemEffect: 'iron_flask_trap',
+    targetType: 'enemy',
+    rangeKind: 'ranged',
+    rangeFt: 60,
+    desc: 'Aim the empty flask at a Celestial, Elemental, Fey or Fiend within 60 feet: it makes a DC 17 Wisdom saving throw or is drawn inside.',
+  }),
+  iron_flask_release: power({
+    id: 'iron_flask_release',
+    name: 'Release the Creature',
+    level: 1,
+    itemEffect: 'iron_flask_release',
+    targetType: 'self',
+    rangeKind: 'self',
+    desc: 'Pull the stopper and let the trapped creature out. It obeys you for a while, then goes its own way.',
+  }),
+  // SRD Pipes of the Sewers — play them and spend a charge to call a Swarm of
+  // Rats; it must resist the music (DC 15 Wisdom) or obey you.
+  pipes_of_the_sewers: power({
+    id: 'pipes_of_the_sewers',
+    name: 'Call a Swarm of Rats',
+    level: 1,
+    itemEffect: 'pipes_of_the_sewers',
+    targetType: 'self',
+    rangeKind: 'self',
+    desc: 'Play the pipes and a Swarm of Rats answers. It makes a DC 15 Wisdom saving throw: on a failure it fights for you until the battle ends; on a success it turns on the party.',
+  }),
 };

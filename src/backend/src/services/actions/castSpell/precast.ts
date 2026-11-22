@@ -84,7 +84,7 @@ export function runPrecast(
   let usedDeckWish = false;
   if (action.deckWish) {
     if (spell.id !== 'wish' || (pc.char.deck_wishes ?? 0) <= 0) {
-      ctx.narrative = 'You have no Wish from the Moon card left to cast.';
+      ctx.narrative = 'You have no granted Wish left to cast.';
       return { done: true };
     }
     usedDeckWish = true;
@@ -668,7 +668,7 @@ export function runPrecast(
   // Slot-free casts must not claim a slot — a playtest log showed Magic
   // Initiate's freebie narrated as "(level-1 slot)".
   const slotNote = usedDeckWish
-    ? ' (the Moon card)'
+    ? ' (a granted Wish)'
     : ctx.tableCast
       ? ` (from the ${ctx.tableCast.name})`
       : itemPlan

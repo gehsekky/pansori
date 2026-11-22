@@ -1026,7 +1026,11 @@ export interface Spell {
     | 'beans_plant'
     | 'robe_patch'
     | 'illusion_card'
-    | 'hat_spell';
+    | 'hat_spell'
+    | 'efreeti_bottle'
+    | 'iron_flask_trap'
+    | 'iron_flask_release'
+    | 'pipes_of_the_sewers';
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.
@@ -1364,7 +1368,8 @@ export interface Character {
   // checkConcentration, and the ad-hoc skill-check sites via the
   // `d20TestPenalty(char)` helper.
   revive_d20_penalty?: number;
-  // SRD Mysterious Deck — lasting card effects: Moon's Wishes left to cast,
+  // SRD Mysterious Deck — lasting card effects: Moon's Wishes left to cast (the
+  // Efreeti Bottle's granted Wish uses the same count),
   // Euryale's curse (-2 to saving throws), and Sun's 10 Temporary Hit Points
   // at each dawn (Long Rest).
   deck_wishes?: number;
@@ -1891,6 +1896,9 @@ export interface SummonedAlly {
   // Valhalla): `<instance id>:<power id>`. Using that power again replaces
   // it, and it reverts (leaves) at the next Long Rest.
   fromItem?: string;
+  // Only serves for the current fight (a Swarm of Rats swayed by the Pipes of
+  // the Sewers): `endCombatState` drops it when the battle ends.
+  untilCombatEnds?: boolean;
 }
 
 // SRD wall/terrain spells (Wall of Fire, Wall of Force) — a transient set of
