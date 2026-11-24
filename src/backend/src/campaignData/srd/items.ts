@@ -4026,14 +4026,14 @@ const WONDROUS_3: Array<[string, LootItem]> = [
       itemSpells: [sp('animal_friendship', 1), sp('fear', 1), sp('speak_with_animals', 1)],
     }
   ),
-  // SRD Ring of Shooting Stars. Simplification: the Lightning Spheres aren't
-  // modeled, every Shooting Stars mote lands on one point, and the ring works
-  // in any light.
+  // SRD Ring of Shooting Stars. Simplification: every Shooting Stars mote lands
+  // on one point, and the ring works in any light. Lightning Spheres are made in
+  // a fight and sent one per Bonus Action (not moved 30 feet at a time).
   wondrous(
     'ring_of_shooting_stars',
     'Ring of Shooting Stars',
     'Very Rare',
-    '6 charges (regains 1d6 at dawn). While wearing it, cast Dancing Lights or Light at will, spend 1 charge to cast Faerie Fire, or 1 to 3 charges for Shooting Stars: a 15-foot cube within 60 feet, DC 15 Dexterity save, 5d4 Radiant per charge (half on a success).',
+    '6 charges (regains 1d6 at dawn). While wearing it, cast Dancing Lights or Light at will, spend 1 charge to cast Faerie Fire, 1 to 3 charges for Shooting Stars (a 15-foot cube within 60 feet, DC 15 Dexterity save, 5d4 Radiant per charge, half on a success), or 2 charges for Lightning Spheres: 1–4 spheres you hold with Concentration and send at foes within 120 feet as a Bonus Action (DC 15 Dexterity save; 4d12, 5d4, 2d6 or 2d4 Lightning each for 1, 2, 3 or 4 spheres).',
     'ring',
     {
       requiresAttunement: true,
@@ -4044,6 +4044,10 @@ const WONDROUS_3: Array<[string, LootItem]> = [
         sp('light', 0),
         sp('faerie_fire', 1),
         sp('shooting_stars', 1, { maxLevel: 3, dc: 15 }),
+        ...[1, 2, 3, 4].flatMap((n) => [
+          sp(`lightning_spheres_${n}`, 2),
+          sp(`lightning_sphere_${n}`, 0, { dc: 15 }),
+        ]),
       ],
     }
   ),
@@ -5027,6 +5031,39 @@ const UTILITY_ITEMS: Array<[string, LootItem]> = [
         charges: 1,
         effect: { kind: 'condition', conditions: ['invisible'], rounds: '2d4m', party: 10 },
       },
+    }
+  ),
+  // Simplification: out of combat the sneezing passes harmlessly; a PC's repeat
+  // saves are rolled at once to set how long it lasts; the suffocation and
+  // Lesser Restoration's cure aren't modeled; it doesn't pass for Dust of
+  // Disappearance.
+  wondrous(
+    'dust_of_sneezing_and_choking',
+    'Dust of Sneezing and Choking',
+    'Uncommon',
+    'Throw it into the air: you and every creature within 30 feet make a DC 15 Constitution save or start sneezing uncontrollably — Incapacitated and choking, saving again at the end of each turn. Constructs, Elementals, Oozes, Plants and Undead are unaffected. One use.',
+    null,
+    {
+      weight: 0,
+      castWhileCarried: true,
+      charges: uses(1),
+      itemSpellDc: 15,
+      itemSpells: [sp('sneezing_dust', 1)],
+    }
+  ),
+  // Simplification: allies aren't dazzled, and the Stunned condition lasts until
+  // the end of the round rather than the end of your next turn.
+  wondrous(
+    'robe_of_scintillating_colors',
+    'Robe of Scintillating Colors',
+    'Very Rare',
+    '3 charges (regains 1d3 at dawn). While wearing it, spend a charge as a Magic action: until the end of your next turn the robe blazes with shifting colors, attacks against you have Disadvantage, and each creature within 30 feet that can see you makes a DC 15 Wisdom save or is Stunned while it lasts.',
+    'cloak',
+    {
+      requiresAttunement: true,
+      charges: { max: 3, regain: '1d3' },
+      itemSpellDc: 15,
+      itemSpells: [sp('scintillating_colors', 1)],
     }
   ),
   // Simplification: a fixed 7 pinches (1d6 + 4 found).

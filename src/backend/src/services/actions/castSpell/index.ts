@@ -398,15 +398,19 @@ export const handleCastSpell: ActionHandler<{
   //   3. combatStart resets `turn_actions` to FRESH_TURN, undoing the
   //      `action_used` (or `bonus_action_used`) precast just set. Save
   //      the precast turn_actions and restore after the call.
-  const precastNarrative = ctx.narrative;
-  const precastTurnActions = pc.char.turn_actions;
-  ctx.commitChar();
-  runCombatStart(ctx, spellTarget);
-  if (precastNarrative) {
-    ctx.narrative = precastNarrative + ctx.narrative;
+  //   4. Mid-fight it's a no-op that leaves `ctx.narrative` alone, so the
+  //      save + prepend is skipped (it would print the prelude twice).
+  if (!ctx.st.combat_active) {
+    const precastNarrative = ctx.narrative;
+    const precastTurnActions = pc.char.turn_actions;
+    ctx.commitChar();
+    runCombatStart(ctx, spellTarget);
+    if (precastNarrative) {
+      ctx.narrative = precastNarrative + ctx.narrative;
+    }
+    updatePcActor(ctx, { turn_actions: precastTurnActions });
+    ctx.commitChar();
   }
-  updatePcActor(ctx, { turn_actions: precastTurnActions });
-  ctx.commitChar();
 
   // ── SRD 5.2.1 True Strike (cantrip) ──────────────────────────────────────
   // Make a weapon attack with the casting weapon, but use the spellcasting

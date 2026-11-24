@@ -8,7 +8,9 @@ import type { Spell } from '../../types.js';
 // class list and lives outside the spell table: it can only be used through
 // its item (`ItemSpell.spellId`). Descriptions are our own words.
 
-const power = (p: Omit<Spell, 'castTime' | 'itemPower'>): Spell => ({
+const power = (
+  p: Omit<Spell, 'castTime' | 'itemPower'> & Partial<Pick<Spell, 'castTime'>>
+): Spell => ({
   castTime: 'action',
   itemPower: true,
   ...p,
@@ -664,6 +666,89 @@ export const ITEM_POWERS: Record<string, Spell> = {
         rangeKind: 'self',
         desc: 'Declare one draw and turn over a card from the deck — for good or ill, its magic takes hold at once.',
       }),
+    ])
+  ),
+  // SRD Dust of Sneezing and Choking — everyone within 30 feet, its thrower
+  // included, makes a DC 15 Constitution save or sneezes helplessly
+  // (Incapacitated; save again at the end of each turn).
+  sneezing_dust: power({
+    id: 'sneezing_dust',
+    name: 'Throw the Dust',
+    level: 1,
+    itemEffect: 'sneezing_dust',
+    savingThrow: 'con',
+    saveEffect: 'negates',
+    condition: 'incapacitated',
+    conditionSaveEnds: true,
+    aoeCondition: true,
+    unaffectedTypes: ['construct', 'elemental', 'ooze', 'plant', 'undead'],
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'A choking cloud: you and every creature within 30 feet make a Constitution save or sneeze helplessly (Incapacitated; save again each turn). Constructs, Elementals, Oozes, Plants and Undead are unaffected.',
+  }),
+  // SRD Robe of Scintillating Colors — dazzling hues until the end of your next
+  // turn: attackers have Disadvantage, and onlookers within 30 feet make a
+  // DC 15 Wisdom save or are Stunned while it lasts.
+  scintillating_colors: power({
+    id: 'scintillating_colors',
+    name: 'Dazzling Hues',
+    level: 1,
+    itemEffect: 'scintillating_colors',
+    savingThrow: 'wis',
+    saveEffect: 'negates',
+    condition: 'stunned',
+    conditionDuration: 1,
+    aoeCondition: true,
+    blastRadius: 30,
+    aoeShape: 'sphere',
+    rangeKind: 'self',
+    desc: 'The robe blazes with shifting colors until the end of your next turn: attacks against you have Disadvantage, and each enemy within 30 feet makes a Wisdom save or is Stunned.',
+  }),
+  // SRD Ring of Shooting Stars — Lightning Spheres: make 1–4 spheres
+  // (Concentration, 1 minute), then send them at foes as a Bonus Action. Fewer
+  // spheres hit harder. One power per count, so each throw carries its damage.
+  ...Object.fromEntries(
+    (
+      [
+        [1, '4d12'],
+        [2, '5d4'],
+        [3, '2d6'],
+        [4, '2d4'],
+      ] as const
+    ).flatMap(([n, dmg]) => [
+      [
+        `lightning_spheres_${n}`,
+        power({
+          id: `lightning_spheres_${n}`,
+          name: `Lightning Spheres (${n})`,
+          level: 1,
+          itemEffect: 'lightning_spheres',
+          concentration: true,
+          durationRounds: 10,
+          targetType: 'self',
+          rangeKind: 'self',
+          desc: `Conjure ${n} crackling sphere${n === 1 ? '' : 's'} of lightning (Concentration, up to 1 minute). As a Bonus Action, send one at a creature within 120 feet: DC 15 Dexterity save, ${dmg} Lightning damage (half on a success).`,
+        }),
+      ],
+      [
+        `lightning_sphere_${n}`,
+        power({
+          id: `lightning_sphere_${n}`,
+          name: 'Lightning Sphere',
+          level: 1,
+          castTime: 'bonus_action',
+          itemEffect: 'lightning_sphere',
+          damage: dmg,
+          damageType: 'lightning',
+          savingThrow: 'dex',
+          saveEffect: 'half',
+          targetType: 'enemy',
+          rangeKind: 'ranged',
+          rangeFt: 120,
+          desc: `A hovering sphere discharges into a creature: DC 15 Dexterity save, ${dmg} Lightning damage (half on a success).`,
+        }),
+      ],
     ])
   ),
   // ── Uncontrolled creatures ────────────────────────────────────────────────

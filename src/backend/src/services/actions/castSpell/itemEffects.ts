@@ -37,6 +37,7 @@ import { SRD_SPELLS } from '../../../campaignData/srd/spells.js';
 import { applyDamage } from '../../damage.js';
 import { characterAc } from '../../armorClass.js';
 import { clearInstance } from '../../equipment.js';
+import { distanceFeet } from '../../gridEngine.js';
 import { grantTimed } from '../../potions.js';
 import { randomUUID } from 'crypto';
 import { updatePcActor } from '../actor.js';
@@ -105,6 +106,16 @@ export function runItemEffect(
     case 'pipes_of_the_sewers':
       playPipes(ctx);
       return true;
+    case 'sneezing_dust':
+      return throwSneezingDust(ctx);
+    case 'scintillating_colors':
+      return dazzle(ctx);
+    case 'lightning_spheres':
+      makeSpheres(ctx, spell);
+      return true;
+    case 'lightning_sphere':
+      sendSphere(ctx, spell);
+      return false;
     default:
       return false;
   }
@@ -581,6 +592,12 @@ export function itemEffectBlocker(
     }
     case 'iron_flask_release':
       return flaskContents(usedItem(ctx, action)) ? null : 'The flask is empty.';
+    case 'lightning_spheres':
+      return ctx.st.combat_active ? null : 'Lightning Spheres are only worth making in a fight.';
+    case 'lightning_sphere':
+      return spheresLeft(ctx.actor.char, spell) > 0
+        ? null
+        : 'You have no Lightning Spheres of that kind.';
     default:
       return null;
   }
@@ -606,6 +623,10 @@ export function itemEffectHidden(
       return !!flaskContents(inv);
     case 'iron_flask_release':
       return !flaskContents(inv);
+    case 'lightning_spheres':
+      return !combat;
+    case 'lightning_sphere':
+      return spheresLeft(char, spell) === 0;
     default:
       return false;
   }
@@ -1297,4 +1318,137 @@ export function avatarOfDeath(char: Character): EnemyTemplate {
       'unconscious',
     ],
   };
+}
+
+// ── Dusts, robes and rings ──────────────────────────────────────────────────
+
+/** Whether a fight is on with an enemy standing (the area save then runs). */
+function foesStanding(ctx: ActionContext): boolean {
+  return (
+    !!ctx.st.combat_active &&
+    ctx.enemyAlive &&
+    (ctx.st.entities ?? []).some((e) => e.isEnemy && e.hp > 0)
+  );
+}
+
+/**
+ * SRD Dust of Sneezing and Choking — the thrower and the party members within
+ * 30 feet save first; the enemies' saves follow through the area-condition
+ * pipeline (returns false to run it). A PC's repeat saves are rolled at once:
+ * Incapacitated lasts until the turn after its first success.
+ */
+function throwSneezingDust(ctx: ActionContext): boolean {
+  if (ctx.actor.kind !== 'pc') return true;
+  const user = ctx.actor.char;
+  const lead = `${user.name} flings the dust into the air — a peppery cloud billows 30 feet around them.`;
+  if (!ctx.st.combat_active) {
+    ctx.narrative = `${lead} Everyone nearby sneezes helplessly for a minute, then it passes.`;
+    return true;
+  }
+  const userPos = ctx.st.entities?.find((e) => e.id === user.id)?.pos;
+  const notes: string[] = [];
+  for (const c of ctx.st.characters) {
+    if (c.dead || c.hp <= 0) continue;
+    const pos = ctx.st.entities?.find((e) => e.id === c.id)?.pos;
+    if (c.id !== user.id && (!userPos || !pos || distanceFeet(userPos, pos) > 30)) continue;
+    const pcNow = c.id === user.id ? ctx.actor.char : c;
+    const dc = 15 - wornSaveBonus(pcNow, 'con', ctx.context.lootTable);
+    const save = () =>
+      !rollConditionSave(
+        'con',
+        pcNow.con,
+        dc,
+        hasSaveProficiency(pcNow, 'con', ctx.context),
+        pcNow.level,
+        0,
+        pcNow.conditions
+      );
+    if (save()) {
+      notes.push(`${c.name} holds their breath (saves)`);
+      continue;
+    }
+    let turns = 1;
+    while (turns < 10 && !save()) turns++;
+    const patch = {
+      conditions: [...new Set([...pcNow.conditions, 'incapacitated'])],
+      condition_durations: {
+        ...(pcNow.condition_durations ?? {}),
+        incapacitated: Math.max(pcNow.condition_durations?.incapacitated ?? 0, turns + 1),
+      },
+    };
+    if (c.id === user.id) {
+      updatePcActor(ctx, patch);
+    } else {
+      ctx.st = {
+        ...ctx.st,
+        characters: ctx.st.characters.map((x) => (x.id === c.id ? { ...x, ...patch } : x)),
+        entities: (ctx.st.entities ?? []).map((e) =>
+          e.id === c.id ? { ...e, conditions: patch.conditions } : e
+        ),
+      };
+    }
+    notes.push(
+      `${c.name} is caught, sneezing helplessly (Incapacitated for ${turns} turn${turns === 1 ? '' : 's'})`
+    );
+  }
+  ctx.narrative = `${lead} ${notes.join('; ')}.`;
+  if (!foesStanding(ctx)) {
+    ctx.usedInitiative = true;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * SRD Robe of Scintillating Colors — attackers have Disadvantage against the
+ * wearer until their next turn; enemies within 30 feet then save against the
+ * Stunned condition through the area-condition pipeline.
+ */
+function dazzle(ctx: ActionContext): boolean {
+  if (ctx.actor.kind !== 'pc') return true;
+  const { char } = ctx.actor;
+  if (!char.conditions.includes('blurred')) selfCondition(ctx, 'blurred', 1);
+  ctx.narrative = `${char.name}'s robe erupts in a shifting storm of dazzling colors — attacks against them have Disadvantage until their next turn.`;
+  if (!foesStanding(ctx)) {
+    ctx.usedInitiative = !!ctx.st.combat_active;
+    return true;
+  }
+  return false;
+}
+
+/** Lightning Spheres the wearer still holds for this throw power (0 if none). */
+function spheresLeft(char: Character, spell: Spell): number {
+  const made = Number(spell.id.slice(spell.id.lastIndexOf('_') + 1));
+  const held = char.lightning_spheres;
+  if (!held || held.made !== made) return 0;
+  return char.concentrating_on?.spellId === `lightning_spheres_${made}` ? held.left : 0;
+}
+
+/** SRD Ring of Shooting Stars — conjure the spheres and concentrate on them. */
+function makeSpheres(ctx: ActionContext, spell: Spell): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const { char } = ctx.actor;
+  const made = Number(spell.id.slice(spell.id.lastIndexOf('_') + 1));
+  updatePcActor(ctx, {
+    concentrating_on: { spellId: spell.id, rounds_left: spell.durationRounds ?? 10 },
+    lightning_spheres: { made, left: made },
+  });
+  ctx.narrative = `${char.name} raises the Ring of Shooting Stars and ${made === 1 ? 'a crackling sphere' : `${made} crackling spheres`} of lightning flicker${made === 1 ? 's' : ''} into being, shedding a dim glow (Concentration; send them as a Bonus Action).`;
+  ctx.usedInitiative = true;
+}
+
+/**
+ * SRD Ring of Shooting Stars — one sphere discharges into the target (its save
+ * and damage run through the spell pipeline). The last one ends Concentration.
+ */
+function sendSphere(ctx: ActionContext, spell: Spell): void {
+  if (ctx.actor.kind !== 'pc') return;
+  const left = spheresLeft(ctx.actor.char, spell) - 1;
+  const made = ctx.actor.char.lightning_spheres?.made ?? 0;
+  updatePcActor(
+    ctx,
+    left > 0
+      ? { lightning_spheres: { made, left } }
+      : { lightning_spheres: undefined, concentrating_on: null }
+  );
 }

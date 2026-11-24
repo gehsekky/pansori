@@ -66,6 +66,10 @@ export function runAoeConditionSpell(ctx: ActionContext, spell: Spell, dc: numbe
     if (!target.isEnemy) continue; // pansori MVP conditions only enemies
     const foe = getEnemyById(ctx.seed, target.id);
     const name = foe?.name ?? target.id;
+    if (foe?.creatureType && spell.unaffectedTypes?.includes(foe.creatureType)) {
+      ctx.narrative += ` ${name}: unaffected.`;
+      continue;
+    }
     if (foe?.condition_immunities?.includes(cond)) {
       ctx.narrative += ` ${name}: immune.`;
       continue;

@@ -748,6 +748,37 @@ Simplifications:
   They are still described rather than placed; their table text has them wander
   off.
 
+**Batch 17 done 2026-11-24 — batch 9 leftovers.**
+- **Dust of Sneezing and Choking.** Enemies within 30 feet make a DC 15
+  Constitution save through the `aoeCondition` pipeline (Incapacitated, save
+  ends). The new `Spell.unaffectedTypes` passes over Constructs, Elementals,
+  Oozes, Plants and Undead. The thrower and party members within 30 feet save
+  too. A PC's repeat saves are rolled at once (up to 10) to set how long the
+  Incapacitated condition lasts.
+- **Robe of Scintillating Colors.** It has 3 charges and regains 1d3. A charge
+  gives the wearer `blurred` (attackers have Disadvantage) until their next
+  turn, and each enemy within 30 feet makes a DC 15 Wisdom save or is Stunned.
+- **Ring of Shooting Stars' Lightning Spheres.** For 2 charges,
+  `lightning_spheres_<n>` makes 1–4 spheres under Concentration
+  (`Character.lightning_spheres`). Each Bonus Action, `lightning_sphere_<n>`
+  sends one sphere at a foe within 120 feet: a DC 15 Dexterity save for 4d12,
+  5d4, 2d6 or 2d4 Lightning damage, half on a success. Sending the last sphere
+  ends Concentration.
+- **Item power cast times.** `power()` item powers can now set their own cast
+  time.
+- **Fix.** A spell cast mid-fight printed text written before the
+  combat-start step twice; the cast handler now skips that save-and-prepend
+  step when combat is already on.
+
+Simplifications:
+- **Dust out of combat.** The sneezing passes with no effect.
+- **Dust's other effects.** Suffocation and Lesser Restoration's cure aren't
+  modeled, and the dust doesn't pass for Dust of Disappearance.
+- **Robe.** It doesn't dazzle allies, and Stunned ends when the round ends
+  rather than at the end of the wearer's next turn.
+- **Lightning Spheres.** They're made only in a fight, and each is sent
+  straight at its target instead of moving 30 feet per Bonus Action.
+
 ## 7. Core rules not found
 
 **Grapple / Shove — done 2026-11-12** (`services/unarmedStrike.ts`). Now the

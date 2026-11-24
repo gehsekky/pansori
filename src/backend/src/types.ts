@@ -975,6 +975,10 @@ export interface Spell {
   // migrated. Confusion uses this for its 10-ft `confused` sphere; the
   // enemy turn loop then runs Confusion's 1d10 behavior table per creature.
   aoeCondition?: boolean;
+  // Creature types the `aoeCondition` effect passes over (Dust of Sneezing and
+  // Choking: Constructs, Elementals, Oozes, Plants and Undead succeed
+  // automatically).
+  unaffectedTypes?: CreatureType[];
   // RE-4 — the target rolls its save with Advantage (Dominate Beast/Person/
   // Monster: "Advantage on the save if you or your allies are fighting it" —
   // true in combat, where pansori spells are cast). Threaded into the
@@ -1030,7 +1034,11 @@ export interface Spell {
     | 'efreeti_bottle'
     | 'iron_flask_trap'
     | 'iron_flask_release'
-    | 'pipes_of_the_sewers';
+    | 'pipes_of_the_sewers'
+    | 'sneezing_dust'
+    | 'scintillating_colors'
+    | 'lightning_spheres'
+    | 'lightning_sphere';
   // SRD 5.2.1: spell range. 'self' = no external target; 'touch' = adjacent
   // only (≤ 5 ft / 1 grid square); 'ranged' uses rangeFt for the max distance.
   // When unspecified, the engine treats the spell as untargeted/utility.
@@ -1373,6 +1381,10 @@ export interface Character {
   // Euryale's curse (-2 to saving throws), and Sun's 10 Temporary Hit Points
   // at each dawn (Long Rest).
   deck_wishes?: number;
+  // SRD Ring of Shooting Stars — Lightning Spheres still hovering: how many were
+  // made (it sets each one's damage) and how many are left. Live only while the
+  // wearer concentrates on `lightning_spheres_<made>`.
+  lightning_spheres?: { made: number; left: number };
   euryale_curse?: boolean;
   sun_card?: boolean;
   turn_actions: TurnActions;
